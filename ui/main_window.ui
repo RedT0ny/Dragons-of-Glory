@@ -31,8 +31,8 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1487</width>
-       <height>747</height>
+       <width>1489</width>
+       <height>749</height>
       </rect>
      </property>
      <widget class="QGraphicsView" name="graphicsView">
@@ -43,6 +43,19 @@
         <width>1491</width>
         <height>751</height>
        </rect>
+      </property>
+     </widget>
+     <widget class="QScrollBar" name="verticalScrollBar">
+      <property name="geometry">
+       <rect>
+        <x>1470</x>
+        <y>-1</y>
+        <width>20</width>
+        <height>751</height>
+       </rect>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
       </property>
      </widget>
     </widget>
@@ -64,10 +77,23 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>167</width>
-       <height>747</height>
+       <width>169</width>
+       <height>749</height>
       </rect>
      </property>
+     <widget class="QScrollBar" name="verticalScrollBar_2">
+      <property name="geometry">
+       <rect>
+        <x>150</x>
+        <y>-1</y>
+        <width>20</width>
+        <height>751</height>
+       </rect>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
+      </property>
+     </widget>
     </widget>
    </widget>
    <widget class="QScrollArea" name="scrollArea_3">
@@ -75,7 +101,7 @@
      <rect>
       <x>0</x>
       <y>760</y>
-      <width>1671</width>
+      <width>1491</width>
       <height>131</height>
      </rect>
     </property>
@@ -87,11 +113,24 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1667</width>
-       <height>127</height>
+       <width>1489</width>
+       <height>129</height>
       </rect>
      </property>
     </widget>
+   </widget>
+   <widget class="QScrollBar" name="horizontalScrollBar">
+    <property name="geometry">
+     <rect>
+      <x>-10</x>
+      <y>740</y>
+      <width>1501</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Orientation::Horizontal</enum>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
