@@ -31,10 +31,20 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1489</width>
-       <height>749</height>
+       <width>1487</width>
+       <height>747</height>
       </rect>
      </property>
+     <widget class="QGraphicsView" name="graphicsView">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>1491</width>
+        <height>751</height>
+       </rect>
+      </property>
+     </widget>
     </widget>
    </widget>
    <widget class="QScrollArea" name="scrollArea_2">
@@ -54,8 +64,8 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>169</width>
-       <height>749</height>
+       <width>167</width>
+       <height>747</height>
       </rect>
      </property>
     </widget>
@@ -77,8 +87,8 @@
       <rect>
        <x>0</x>
        <y>0</y>
-       <width>1669</width>
-       <height>129</height>
+       <width>1667</width>
+       <height>127</height>
       </rect>
      </property>
     </widget>
@@ -97,15 +107,43 @@
     <property name="title">
      <string>FIle</string>
     </property>
+    <widget class="QMenu" name="menuNew_Game">
+     <property name="title">
+      <string>New Game</string>
+     </property>
+     <widget class="QMenu" name="menuScenario">
+      <property name="title">
+       <string>Scenario</string>
+      </property>
+      <addaction name="actionSilvanesti"/>
+      <addaction name="actionAbanasinia"/>
+      <addaction name="actionNeraka"/>
+     </widget>
+     <addaction name="actionCampaign"/>
+     <addaction name="menuScenario"/>
+    </widget>
+    <addaction name="menuNew_Game"/>
+    <addaction name="actionSave_Game"/>
+    <addaction name="actionLoad_Game"/>
+    <addaction name="actionQuit"/>
    </widget>
    <widget class="QMenu" name="menuOptions">
     <property name="title">
-     <string>Options</string>
+     <string>Settings</string>
     </property>
+    <widget class="QMenu" name="menuChoose_side">
+     <property name="title">
+      <string>Choose side</string>
+     </property>
+     <addaction name="actionHighlord"/>
+     <addaction name="actionWhitestone"/>
+    </widget>
+    <addaction name="actionSettings"/>
+    <addaction name="menuChoose_side"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
-     <string>Edit</string>
+     <string>View</string>
     </property>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -114,8 +152,8 @@
     </property>
    </widget>
    <addaction name="menuFIle"/>
-   <addaction name="menuOptions"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuOptions"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -130,6 +168,56 @@
     <bool>false</bool>
    </attribute>
   </widget>
+  <action name="actionCampaign">
+   <property name="text">
+    <string>Campaign</string>
+   </property>
+  </action>
+  <action name="actionSilvanesti">
+   <property name="text">
+    <string>Silvanesti</string>
+   </property>
+  </action>
+  <action name="actionAbanasinia">
+   <property name="text">
+    <string>Abanasinia</string>
+   </property>
+  </action>
+  <action name="actionNeraka">
+   <property name="text">
+    <string>Neraka</string>
+   </property>
+  </action>
+  <action name="actionSave_Game">
+   <property name="text">
+    <string>Save Game</string>
+   </property>
+  </action>
+  <action name="actionLoad_Game">
+   <property name="text">
+    <string>Load Game</string>
+   </property>
+  </action>
+  <action name="actionQuit">
+   <property name="text">
+    <string>Quit</string>
+   </property>
+  </action>
+  <action name="actionSettings">
+   <property name="text">
+    <string>Difficulty</string>
+   </property>
+  </action>
+  <action name="actionWhitestone">
+   <property name="text">
+    <string>Whitestone</string>
+   </property>
+  </action>
+  <action name="actionHighlord">
+   <property name="text">
+    <string>Highlord</string>
+   </property>
+  </action>
  </widget>
  <resources/>
  <connections/>
