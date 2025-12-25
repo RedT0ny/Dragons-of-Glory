@@ -1,5 +1,5 @@
 units:
-  log_format_generic: "{ordinal} {type} {race} de {land}"
+  log_format_generic: "{ordinal} {land} {race} {type}"
   log_format_named: "{ordinal} {name}"
   counter_format_generic: "{ordinal} {land}"
   counter_format_named: "{ordinal} {name}"

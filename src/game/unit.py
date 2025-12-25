@@ -10,7 +10,7 @@ class Unit:
     :type race: str
     :ivar allegiance: The allegiance of the unit (e.g., 'Highlord', 'Neutral', 'Whitesone').
     :type allegiance: str
-    :ivar land: The country the unit belongs to.
+    :ivar land: The country or faction the unit belongs to.
     :type land: str
     :ivar color: The color representation for the unit.
     :type color: str
@@ -27,17 +27,17 @@ class Unit:
     :ivar text_style: The visual style or theme for the unit.
     :type text_style: str
     """
-    def __init__(self, name, unit_type, combat_rating, race='human', allegiance='neutral', land=None, color, movement, position,
-                 terrain_affinity=None, equipment, status='inactive', text_style='default'):
+    def __init__(self, name, type, rating, movement, race='human', land=None,
+                 terrain_affinity=None, status='inactive', text_style='default'):
         self.name = name
-        self.unit_type = unit_type
+        self.unit_type = type
         self.race = race
-        self.allegiance = allegiance  # Whitesone, Highlord, neutral
+        self.allegiance = 'neutral'  # Whitesone, Highlord, neutral
         self.land = land
-        self.color = color  # Color for the unit, e.g., 'red', 'blue'
-        self.combat_rating = combat_rating # Combat rating for the unit
+        self.color = None  # Color for the unit, e.g., 'red', 'blue'. Defined by land.
+        self.combat_rating = rating # Combat rating for the unit
         self.movement = movement  # Movement points for the unit
-        self.position = position
+        self.position = (None,None) # Current position on the map (hex coordinates)
         self.terrain_affinity = terrain_affinity  # Terrain affinity for the unit
         self.equipment = equipment
         self.status = status
@@ -66,24 +66,26 @@ class Unit:
     :type flying_type: str
 """
 class Leader(Unit):
-    def __init__(self, name, allegiance, color, movement_points, tactical_rating):
-        super().__init__(name, allegiance, color, movement_points)
-        self.tactical_rating = tactical_rating
+    def __init__(self, name, rating, allegiance, color, movement):
+        super().__init__(name, rating, allegiance, color, movement)
+        self.combat_rating = 0
+        self.tactical_rating = rating
 
 class Hero(Unit):
-    def __init__(self, name, allegiance, color, movement_points, combat_rating, tactical_rating=0):
-        super().__init__(name, allegiance, color, movement_points)
+    def __init__(self, name, allegiance, color, movement, combat_rating, tactical_rating=0):
+        super().__init__(name, allegiance, color, movement)
+        self.combat_rating = combat_rating
         self.tactical_rating = tactical_rating
 
 class Army(Unit):
-    def __init__(self, name, allegiance, color, movement_points, combat_rating, army_type):
-        super().__init__(name, allegiance, color, movement_points)
+    def __init__(self, name, allegiance, color, movement, combat_rating, army_type):
+        super().__init__(name, allegiance, color, movement)
         self.combat_rating = combat_rating
         self.army_type = army_type  # Infantry, cavalry, minotaur, hobgoblin, thanoi
 
 class Fleet(Unit):
-    def __init__(self, name, allegiance, color, movement_points, combat_rating,):
-        super().__init__(name, allegiance, color, movement_points, combat_rating)
+    def __init__(self, name, allegiance, color, movement, combat_rating,):
+        super().__init__(name, allegiance, color, movement, combat_rating)
         self.combat_rating = combat_rating
         self.carrying_army = None  # Can carry one army
 
@@ -91,8 +93,8 @@ class Fleet(Unit):
         self.carrying_army = army
 
 class Flight(Unit):
-    def __init__(self, name, allegiance, color, movement_points, combat_rating):
-        super().__init__(name, allegiance, color, movement_points, combat_rating)
+    def __init__(self, name, allegiance, color, movement, combat_rating):
+        super().__init__(name, allegiance, color, movement, combat_rating)
         self.carrying_army = None
 
     def carry_army(self, army):
