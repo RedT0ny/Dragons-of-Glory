@@ -22,7 +22,7 @@ class Unit:
     :type position: duple(int, int)
     :ivar terrain_affinity: The terrain affinity of the unit.
     :type terrain_affinity: str
-    :ivar status: The current status of the unit (e.g., 'inactive', 'active', 'depleted', 'reserve').
+    :ivar status: The current status of the unit (e.g., 'inactive', 'active', 'depleted', 'reserve', 'destroyed').
     :type status: str
     :ivar text_style: The visual style or theme for the unit.
     :type text_style: str

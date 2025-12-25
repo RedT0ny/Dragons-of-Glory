@@ -1,3 +1,5 @@
+from src.game.combat import CombatResolver
+
 class GameState:
     """
     Represents the state of the game.
@@ -54,3 +56,18 @@ class GameState:
 
     def get_map(self):
         return self.map
+
+    def resolve_combat(self, attackers, hex_position):
+        """
+        Initiates combat resolution for a specific hex.
+        """
+        defenders = self.get_units_at(hex_position)
+        terrain = self.map.get_terrain(hex_position)
+        
+        resolver = CombatResolver(attackers, defenders, terrain)
+        result = resolver.resolve()
+        
+        self.apply_combat_result(result)
+
+    def get_units_at(self, position):
+        return [u for u in self.units if u.position == position]

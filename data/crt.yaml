@@ -1,0 +1,1583 @@
+table_name: Combat Results Table
+notes: Results to the left of the slash apply to the attacker; results to the right
+  apply to the defender.
+columns:
+- 1:3
+- 1:2
+- 2:3
+- 1:1
+- 3:2
+- 2:1
+- 3:1
+- 4:1
+- 5:1
+- 6:1
+rows:
+  '-5':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    3:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    4:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    5:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+  '-4':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '1'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '1'
+        retreat: false
+    5:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '2'
+        retreat: false
+  '-3':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '2'
+        retreat: false
+    4:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    5:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+  '-2':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '1'
+        retreat: false
+    3:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    5:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    6:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+  '-1':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '2'
+        retreat: false
+    2:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    5:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+  '0':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: ''
+        retreat: false
+    3:2:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    5:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+  '1':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:1:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    5:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    6:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+  '2':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:2:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    4:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    5:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    6:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+  '3':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:2:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: D
+        retreat: true
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    3:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    4:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    5:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    6:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+  '4':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:2:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: D1
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    2:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    3:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    4:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: true
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+  '5':
+    1:3:
+      attacker:
+        result: E
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    2:3:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    3:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    2:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    3:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    4:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+  '6':
+    1:3:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:2:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:3:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    3:2:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    2:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    3:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: true
+    4:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: true
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+  '7':
+    1:3:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:1:
+      attacker:
+        result: D
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    3:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: true
+    2:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: false
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+  '8':
+    1:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: ''
+        retreat: false
+    1:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    3:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    6:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '9':
+    1:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '1'
+        retreat: true
+    3:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    5:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '10':
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '1'
+        retreat: false
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    2:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    3:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    4:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '11':
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: false
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    3:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    2:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '12':
+    1:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:3:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    2:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '13':
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    3:2:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    2:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '14':
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:2:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    2:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  '15':
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: '2'
+        retreat: true
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:1:
+      attacker:
+        result: '2'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    2:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+  16+:
+    1:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:2:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    2:3:
+      attacker:
+        result: ''
+        retreat: false
+      defender:
+        result: D
+        retreat: true
+    1:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:2:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    2:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    3:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    4:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    5:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+    6:1:
+      attacker:
+        result: '1'
+        retreat: false
+      defender:
+        result: E
+        retreat: false
+legend:
+  '1': The force suffers one depletion
+  '2': The force suffers two depletions
+  D: Every unit in the force suffers one depletion
+  R: All units must retreat one hex
+  E: All units are eliminated
