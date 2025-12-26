@@ -6,13 +6,14 @@ class Hex:
     def __init__(self, q, r):
         self.q = q
         self.r = r
+        self.attacked_this_turn = False
 
     @property
     def s(self):
         """Implicit cube coordinate: q + r + s = 0"""
         return -self.q - self.r
 
-    def to_offset(self):
+    def axial_to_offset(self):
         """Converts axial (q, r) to offset (col, row) for the rectangular map."""
         # Asumiendo 'pointy top' y 'odd-r' (común en mapas rectangulares)
         col = self.q + (self.r - (self.r & 1)) // 2
@@ -20,7 +21,7 @@ class Hex:
         return col, row
 
     @staticmethod
-    def from_offset(col, row):
+    def offset_to_axial(col, row):
         """Converts offset (col, row) to axial (q, r)."""
         q = col - (row - (row & 1)) // 2
         r = row
@@ -44,7 +45,7 @@ class Hex:
                 abs(self.r - other.r)) // 2
 
     def __repr__(self):
-        col, row = self.to_offset()
+        col, row = self.axial_to_offset()
         return f"Hex(Axial:{self.q},{self.r} | Offset:{col:02d}{row:02d})"
 
     def __eq__(self, other):
@@ -63,6 +64,7 @@ class HexGrid:
         self.tiles = {}  # {(q, r): HexTile}
         self.unit_map = {}  # {(q, r): [Unit, ...]}
 
+    # Should this be here or under Hex() class?
     def get_units_in_hex(self, q, r):
         """Returns the list of units at a specific coordinate."""
         return self.unit_map.get((q, r), [])
@@ -70,7 +72,7 @@ class HexGrid:
     def get_nearby_units(self, hex_center, radius=1):
         """
         Searches for units in neighboring hexagons.
-        Useful for intercepts and control zones.
+        Useful for intercepting and control zones.
         """
         nearby = []
         # Para radio 1, solo vecinos directos
@@ -86,13 +88,20 @@ class HexGrid:
         return nearby
 
     def move_unit(self, unit, target_hex):
-        """Updates the unit's position in the map and the unit list."""
-        old_pos = unit.position # We assume that unit.position is a Hex object or (q,r)
-        if old_pos in self.unit_map:
-            self.unit_map[old_pos].remove(unit)
+        """Updates the unit's position in the map and the unit's internal state."""
+        # Remove from old spatial position
+        if unit.position:
+            # unit.position is likely a tuple (q, r)
+            if unit.position in self.unit_map:
+                if unit in self.unit_map[unit.position]:
+                    self.unit_map[unit.position].remove(unit)
         
+        # Add to new spatial position
         new_pos = (target_hex.q, target_hex.r)
         if new_pos not in self.unit_map:
             self.unit_map[new_pos] = []
+        
         self.unit_map[new_pos].append(unit)
-        unit.position = new_pos
+        
+        # Update unit's internal reference
+        unit.move(new_pos)

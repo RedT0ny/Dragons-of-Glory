@@ -5,7 +5,7 @@ class CombatResolver:
     """
     Handles resolution of Land and Air combat according to Rule 7 (DL_11).
     """
-    def __init__(self, attackers, defenders, terrain_type, is_air_combat=False):
+    def __init__(self, attackers, defenders, terrain_type):
         self.attackers = attackers
         self.defenders = defenders
         self.terrain_type = terrain_type
@@ -20,20 +20,21 @@ class CombatResolver:
     """
     def calculate_odds(self, attacker_cs, defender_cs):
 
-        # Rule 7.2: Minimum 1/4 odds, Maximum 7/1 odds logic
+        # Rule 7.2: Minimum 1/3 odds, Maximum 6/1 odds logic
         if defender_cs <= 0: return "6:1"
         ratio = attacker_cs / defender_cs
         # ... logic to map ratio to CRT columns ...
         if ratio >= 6: return "6:1"
         if ratio >= 5: return "5:1"
         if ratio >= 4: return "4:1"
+        if ratio >= 3.33: return "3:2"
         if ratio >= 3: return "3:1"
         if ratio >= 2: return "2:1"
+        if ratio >= 1.5: return "2:3"
         if ratio >= 1: return "1:1"
         if ratio >= 0.5: return "1:2"
-        if ratio >= 0.33: return "1:3"
 
-        return "1:4"
+        return "1:3"
 
     def resolve(self):
         # 1. Calculate Odds
@@ -52,9 +53,28 @@ class CombatResolver:
         # 4. Look up result from YAML data
         # Note: YAML keys might be ints or strings depending on formatting; 
         # ensure consistency.
-        result_code = self.crt_data[final_roll][odds_str]
-        
-        return result_code
+        result = self.crt_data[final_roll][odds_str]
+
+        self.apply_results(result)
+        return result
+
+    def apply_results(self, result_code):
+        """
+        Interprets: { a_res: "E", a_ret: bool, d_res: 1, d_ret: bool }
+        """
+        # Handle Attacker
+        if result['a_res'] == "E":
+            for u in self.attackers: u.status = "depleted"
+        elif isinstance(result['a_res'], int):
+            # Logic to eliminate X number of units...
+            pass
+
+        if result['a_ret']:
+            # Trigger retreat logic for attackers
+            pass
+
+        # Handle Defender
+        # ... similar logic for d_res and d_ret ...
 
     def calculate_total_drm(self):
         # TODO: Implement Rule 7.4 (Leaders and Terrain)

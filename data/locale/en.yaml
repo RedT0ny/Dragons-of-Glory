@@ -1,3 +1,176 @@
+countries:
+  abanasinia:
+    name: "Abanasinia"
+    adjective: "Abanasinian"
+  balifor:
+    name: "Balifor"
+    adjective: "Balifor"
+  blode:
+    name: "Blode"
+    adjective: "Blode"
+  blodehelm:
+    name: "Blodehelm"
+    adjective: "Blodehelm"
+  caergoth:
+    name: "Caergoth"
+    adjective: "Caergothian"
+  daltigoth:
+    name: "Daltigoth"
+    adjective: "Daltigothian"
+  dargaard:
+    name: "Dargaard"
+    adjective: "Dargaard"
+  goodlund:
+    name: "Goodlund"
+    adjective: "Goodlund"
+  gunthar:
+    name: "Gunthar"
+    adjective: "Gunthar"
+  haltigoth:
+    name: "Haltigoth"
+    adjective: "Haltigothian"
+  hargoth:
+    name: "Hargoth"
+    adjective: "Hargothian"
+  hylo:
+    name: "Hylo"
+    adjective: "Hylo"
+  icereach:
+    name: "Icereach"
+    adjective: "Icereach"
+  kalaman:
+    name: "Kalaman"
+    adjective: "Kalaman"
+  kaolyn:
+    name: "Kaolyn"
+    adjective: "Kaolyn"
+  kern:
+    name: "Kern"
+    adjective: "Kern"
+  kharolis:
+    name: "Kharolis"
+    adjective: "Kharolis"
+  khur:
+    name: "Khur"
+    adjective: "Khur"
+  kothas:
+    name: "Kothas"
+    adjective: "Kothas"
+  lemish:
+    name: "Lemish"
+    adjective: "Lemish"
+  maelgoth:
+    name: "Maelgoth"
+    adjective: "Maelgothian"
+  maelstrom:
+    name: "Maelstrom"
+    adjective: "Maelstrom"
+  mithas:
+    name: "Mithas"
+    adjective: "Mithas"
+  nergoth:
+    name: "N. Ergoth"
+    adjective: "N. Ergothian"
+  nordmaar:
+    name: "Nordmaar"
+    adjective: "Nordmaar"
+  palanthas:
+    name: "Palanthas"
+    adjective: "Palanthas"
+  qualinesti:
+    name: "Qualinesti"
+    adjective: "Qualinesti"
+  sanction:
+    name: "Sanction"
+    adjective: "Sanction"
+  sikket:
+    name: "Sikk'et Hul"
+    adjective: "Sikk'et Hul"
+  silvanesti:
+    name: "Silvanesti"
+    adjective: "Silvanesti"
+  solanthus:
+    name: "Solanthus"
+    adjective: "Solanthus"
+  tarsis:
+    name: "Tarsis"
+    adjective: "Tarsis"
+  thorbardin:
+    name: "Thorbardin"
+    adjective: "Thorbardin"
+  tower:
+    name: "High Clerist Tower"
+    adjective: "High Clerist Tower"
+  throt:
+    name: "Throt"
+    adjective: "Throt"
+  vingaard:
+    name: "Vingaard"
+    adjective: "Vingaard"
+  Zhakar:
+    name: "Zhakar"
+    adjective: "Zhakar"
+races:
+  draconian:
+    name: "Draconian"
+    plural: "Draconians"
+    adjective: "Draconian"
+  dragon:
+    name: "Dragon"
+    plural: "Dragons"
+    adjective: "Dragon"
+  dwarf:
+    name: "Dwarf"
+    plural: "Dwarves"
+    adjective: "Dwarven"
+  elf:
+    name: "Elf"
+    plural: "Elves"
+    adjective: "Elven"
+  goblin:
+    name: "Goblin"
+    plural: "Goblins"
+    adjective: "Goblin"
+  griffon:
+    name: "Griffon"
+    plural: "Griffons"
+    adjective: "Griffon"
+  human:
+    name: "Human"
+    plural: "Humans"
+    adjective: "Human"
+  kender:
+    name: "Kender"
+    plural: "Kenders"
+    adjective: "Kender"
+  minotaur:
+    name: "Minotaur"
+    plural: "Minotaurs"
+    adjective: "Minotaur"
+  ogre:
+    name: "Ogre"
+    plural: "Ogres"
+    adjective: "Ogre"
+  pegasus:
+    name: "Pegasus"
+    plural: "Pegasi"
+    adjective: "Pegasus"
+  pirate:
+    name: "Pirate"
+    plural: "Pirates"
+    adjective: "Pirate"
+  solamnic:
+    name: "Solamnic"
+    plural: "Knights"
+    adjective: "Solamnic"
+  thanoi:
+    name: "Thanoi"
+    plural: "Thanois"
+    adjective: "Thanoi"
+  undead:
+    name: "Undead"
+    plural: "Undead"
+    adjective: "Undead"
 units:
   log_format_generic: "{ordinal} {land} {race} {type}"
   log_format_named: "{ordinal} {name}"

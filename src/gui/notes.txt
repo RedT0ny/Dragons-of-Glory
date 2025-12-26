@@ -1,0 +1,4 @@
+Each unit will have:
+* Base/primary color - Fixed per country (identity)
+* Secondary/accent color - Dynamic based on allegiance (game state)
+

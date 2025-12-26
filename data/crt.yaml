@@ -1294,21 +1294,21 @@ rows:
   '13':
     1:3:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: '2'
         retreat: true
     1:2:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: '2'
         retreat: true
     2:3:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: D
@@ -1365,21 +1365,21 @@ rows:
   '14':
     1:3:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: '2'
         retreat: true
     1:2:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: '2'
         retreat: true
     2:3:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: D
@@ -1436,21 +1436,21 @@ rows:
   '15':
     1:3:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: '2'
         retreat: true
     1:2:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: '2'
         retreat: true
     2:3:
       attacker:
-        result: ''
+        result: '1'
         retreat: false
       defender:
         result: D
@@ -1507,21 +1507,21 @@ rows:
   16+:
     1:3:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: D
         retreat: true
     1:2:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: D
         retreat: true
     2:3:
       attacker:
-        result: ''
+        result: '2'
         retreat: false
       defender:
         result: D

@@ -1,0 +1,16 @@
+notes: List of countries
+countries:
+  abanasinia:
+    name: 'abanasinia'
+    capital: 'haven'
+    alignment: (5,-1)
+    territories: []
+    locations: []
+    strength: '12'
+  blode:
+    name: 'blode'
+    capital: 'bloten'
+    alignment: (-2,7)
+    territories: []
+    locations: []
+    strength: '48'

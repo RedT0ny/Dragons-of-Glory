@@ -1,4 +1,6 @@
 from src.game.combat import CombatResolver
+from src.game.map import HexGrid
+
 
 class GameState:
     """
@@ -20,9 +22,9 @@ class GameState:
     :ivar events: A list of events that occur during the game.
     :type events: list
     """
-    def __init__(self):
+    def __init__(self, map_width=100, map_height=80):
         self.units = []
-        self.map = None
+        self.map = HexGrid(map_width, map_height) # The grid handles the tiles and geometry
         self.turn = 0
         self.countries = []
         self.events = []
@@ -45,13 +47,24 @@ class GameState:
     def add_unit(self, unit):
         pass
 
-    def move_unit(self, unit, destination):
+    def get_units_by_country(self, country):
         pass
+
+    def get_units_at(self, hex_coord):
+        """
+        GameState asks the map's unit_map for the units at this coordinate.
+        """
+        return self.map.get_units_in_hex(hex_coord.q, hex_coord.r)
+
+    def move_unit(self, unit, target_hex):
+        """
+        Centralizes the move: updates unit.position AND the spatial map.
+        """
+        self.map.remove_unit_from_spatial_map(unit)
+        unit.position = (target_hex.q, target_hex.r)
+        self.map.add_unit_to_spatial_map(unit)
 
     def resolve_event(self, event):
-        pass
-
-    def get_units_by_country(self, country):
         pass
 
     def get_map(self):
