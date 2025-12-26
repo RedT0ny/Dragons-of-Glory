@@ -1,3 +1,5 @@
+import heapq
+
 class Hex:
     """
     Represents a hexagon using axial coordinates (q, r).
@@ -54,54 +56,170 @@ class Hex:
     def __hash__(self):
         return hash((self.q, self.r))
 
+
 class HexGrid:
     """
     Manage the collection of hexagons and the relationship with the units.
     """
-    def __init__(self, width, height):
+    def __init__(self, width, height, offset_q=0, offset_r=0):
         self.width = width
         self.height = height
-        self.tiles = {}  # {(q, r): HexTile}
-        self.unit_map = {}  # {(q, r): [Unit, ...]}
+        # offset_q and offset_r represent the 'origin' of this scenario 
+        # on the master Ansalon map.
+        self.offset_q = offset_q
+        self.offset_r = offset_r
+        
+        self.grid = {} # Shared master terrain data
+        self.hexside_data = {} # Shared master hexside data
+        self.unit_map = {} 
 
-    # Should this be here or under Hex() class?
+    def to_master_coords(self, q, r):
+        """Converts local scenario coordinates to master map coordinates."""
+        return q + self.offset_q, r + self.offset_r
+
+    def get_terrain(self, hex_coord):
+        master_q, master_r = self.to_master_coords(hex_coord.q, hex_coord.r)
+        return self.grid.get((master_q, master_r), "plain")
+
+    def get_hexside(self, from_hex, to_hex):
+        m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
+        m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
+        key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
+        return self.hexside_data.get(key)
+
     def get_units_in_hex(self, q, r):
-        """Returns the list of units at a specific coordinate."""
         return self.unit_map.get((q, r), [])
 
-    def get_nearby_units(self, hex_center, radius=1):
-        """
-        Searches for units in neighboring hexagons.
-        Useful for intercepting and control zones.
-        """
-        nearby = []
-        # Para radio 1, solo vecinos directos
-        target_hexes = [hex_center]
-        if radius >= 1:
-            target_hexes.extend(hex_center.neighbors())
-        
-        # Expand to larger radii if necessary (dragon fire, etc)
-        # ... ring_logic ...
+    def has_enemy_army(self, hex_coord, alliance):
+        """Rule 5: Check if hex contains any army from a different alliance."""
+        units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
+        for u in units:
+            if u.allegiance != alliance and u.allegiance != 'neutral':
+                return True
+        return False
 
-        for h in target_hexes:
-            nearby.extend(self.get_units_in_hex(h.q, h.r))
-        return nearby
+    def is_adjacent_to_enemy(self, hex_coord, unit):
+        """Rule 5: Check ZOC proximity, respecting terrain barriers."""
+        for neighbor in hex_coord.neighbors():
+            if self.has_enemy_army(neighbor, unit.allegiance):
+                hexside = self.get_hexside(hex_coord, neighbor)
+                # "Armies are never considered adjacent if separated by mountain or deep river"
+                if hexside not in ["mountain", "deep_river"]:
+                    return True
+        return False
 
-    def move_unit(self, unit, target_hex):
-        """Updates the unit's position in the map and the unit's internal state."""
-        # Remove from old spatial position
-        if unit.position:
-            # unit.position is likely a tuple (q, r)
-            if unit.position in self.unit_map:
-                if unit in self.unit_map[unit.position]:
-                    self.unit_map[unit.position].remove(unit)
+    def get_movement_cost(self, unit, from_hex, to_hex):
+        """
+        Rule 5 & 6: Data-driven movement costs using terrain_affinity.
+        """
+        # Rule 5: Wizards and Leaders move anywhere (cost 0 for pathfinding)
+        if unit.is_leader() or unit.unit_type in ["wizard", "general", "highlord"]:
+            return 0
+
+        terrain = self.get_terrain(to_hex)
+        hexside_type = self.get_hexside(from_hex, to_hex)
         
-        # Add to new spatial position
-        new_pos = (target_hex.q, target_hex.r)
-        if new_pos not in self.unit_map:
-            self.unit_map[new_pos] = []
+        # Rule 6: Flying Creatures (Wing)
+        if unit.unit_type == "wing":
+            if terrain == "desert": return float('inf')
+            cost = 1
+            if hexside_type == "mountain": cost += 1
+            return cost
+
+        # Rule 5: Ground Army Restrictions
+        if terrain in ["sea", "desert", "marsh"]:
+            return float('inf')
+
+        # Rule 5: Hexside Barriers
+        if hexside_type in ["mountain", "deep_river"]:
+            # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
+            if hexside_type == "mountain" and unit.terrain_affinity == "mountain":
+                pass 
+            else:
+                return float('inf')
+
+        # Calculate Costs
+        cost = 1
         
-        self.unit_map[new_pos].append(unit)
-        
-        # Update unit's internal reference
-        unit.move(new_pos)
+        # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
+        if terrain == "forest":
+            cost = 1 if unit.terrain_affinity == "forest" else 2
+
+        # Hexside Penalties
+        if hexside_type == "river":
+            cost += 2
+        elif hexside_type == "mountain":
+            cost += 1 # Affinity users pay 1 extra to cross the barrier
+
+        return cost
+
+    def get_neighbors(self, hex_coord, unit):
+        """
+        Returns accessible neighbors considering Rule 5 Zone of Control.
+        """
+        neighbors = []
+            
+            # Rule 5: If ground army starts adjacent to enemy, can only move if 
+            # first move puts it in a hex NOT adjacent to an enemy. (Cavalry/Flyers exempt)
+        currently_in_zoc = self.is_adjacent_to_enemy(hex_coord, unit)
+        # Cavalry and Leaders are exempt from ZOC-to-ZOC restrictions
+        is_exempt = unit.unit_type == 'cavalry' or unit.is_leader() or unit.unit_type == 'wing'
+
+        for neighbor in hex_coord.neighbors():
+            # Basic Bounds
+            col, row = neighbor.axial_to_offset()
+            if not (0 <= col < self.width and 0 <= row < self.height):
+                continue
+
+            # Rule 5: Cannot occupy enemy hex
+            if self.has_enemy_army(neighbor, unit.allegiance):
+                continue
+
+            # Rule 5: Movement must stop if moving from ZOC to another ZOC hex
+            if currently_in_zoc and not is_exempt:
+                if self.is_adjacent_to_enemy(neighbor, unit):
+                    continue
+
+            neighbors.append(neighbor)
+        return neighbors
+
+    def find_shortest_path(self, unit, start_hex, target_hex):
+        """
+        Calculates the shortest path using A* algorithm.
+        Returns a list of hex coordinates.
+        """
+        frontier = []
+        heapq.heappush(frontier, (0, start_hex))
+        came_from = {start_hex: None}
+        cost_so_far = {start_hex: 0}
+
+        while frontier:
+            current = heapq.heappop(frontier)[1]
+            if current == target_hex: break
+
+            for neighbor in self.get_neighbors(current, unit):
+                cost = self.get_movement_cost(unit, current, neighbor)
+                new_cost = cost_so_far[current] + cost
+                
+                if new_cost <= unit.movement:
+                    if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
+                        cost_so_far[neighbor] = new_cost
+                        priority = new_cost + self.heuristic(target_hex, neighbor)
+                        heapq.heappush(frontier, (priority, neighbor))
+                        came_from[neighbor] = current
+
+        return self.reconstruct_path(came_from, start_hex, target_hex)
+
+    def heuristic(self, a, b):
+        """Hexagonal distance heuristic for A*."""
+        return (abs(a.q - b.q) + abs(a.q + a.r - b.q - b.r) + abs(a.r - b.r)) / 2
+
+    def reconstruct_path(self, came_from, start, goal):
+        current = goal
+        path = []
+        while current != start:
+            if current not in came_from: return [] # No path found
+            path.append(current)
+            current = came_from[current]
+        path.reverse()
+        return path

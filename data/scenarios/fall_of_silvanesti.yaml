@@ -1,0 +1,7 @@
+scenario:
+  name: "Fall of Silvanesti"
+  map_settings:
+    width: 20
+    height: 25
+    offset_col: 60  # Starting column on the master map
+    offset_row: 45  # Starting row on the master map

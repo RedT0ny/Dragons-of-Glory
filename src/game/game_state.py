@@ -1,5 +1,5 @@
 from src.game.combat import CombatResolver
-from src.game.map import HexGrid
+from src.game.map import Hex, HexGrid
 
 
 class GameState:
@@ -22,9 +22,9 @@ class GameState:
     :ivar events: A list of events that occur during the game.
     :type events: list
     """
-    def __init__(self, map_width=100, map_height=80):
+    def __init__(self):
         self.units = []
-        self.map = HexGrid(map_width, map_height) # The grid handles the tiles and geometry
+        self.map = None  # Will be initialized by load_scenario
         self.turn = 0
         self.countries = []
         self.events = []
@@ -41,8 +41,57 @@ class GameState:
     def load_state(self, filename):
         pass
 
-    def next_turn(self):
+    def load_scenario(self, scenario_data, master_map_data):
+        """
+        Initializes the game state from scenario data.
+        """
+        map_conf = scenario_data['scenario']['map_settings']
+
+        # 1. Initialize HexGrid with offsets
+        # Convert offset_col/row to axial q/r if necessary
+        start_hex = Hex.offset_to_axial(map_conf['offset_col'], map_conf['offset_row'])
+
+        self.map = HexGrid(
+            width=map_conf['width'],
+            height=map_conf['height'],
+            offset_q=start_hex.q,
+            offset_r=start_hex.r
+        )
+
+        # 2. Populate Map Data
+        self.map.grid = master_map_data['terrain_map']
+        self.map.hexside_data = master_map_data['hexside_map']
+
+        # 3. Setup Countries and Units
+        # (This is where you'd loop through scenario_data['setup'] to
+        # create countries and place units on the map)
         pass
+
+    def next_turn(self):
+        """
+        Advances the game to the next turn.
+        Resets unit capacities and increments turn counter.
+        """
+        self.turn += 1
+
+        for unit in self.units:
+            # Rule 5: Reset MP to the base allowance defined in units.csv
+            unit.movement_points = unit.movement
+
+            # Reset combat and movement flags
+            unit.attacked_this_turn = False
+
+            # If you implement Rules for 'exhaustion' or 'depletion',
+            # this is where you handle recovery.
+
+        # Optional: Trigger scenario events for the new turn
+        self.check_events()
+
+    def check_events(self):
+        """Iterates through active events to see if turn-based triggers fire."""
+        for event in self.events:
+            if event.check_trigger(self):
+                event.activate(self)
 
     def add_unit(self, unit):
         pass

@@ -21,3 +21,12 @@ def load_data(path: str | Path) -> Dict[str, Any]:
             return json.load(f)
     else:
         raise ValueError(f"Unsupported data format: {path.suffix}")
+
+# Logic to be added to your loader/game_state initialization:
+def load_map_features(hex_grid, data):
+    for hex_coord, terrain in data['terrain'].items():
+        hex_grid.grid[hex_coord] = terrain
+        
+    for hexside, side_type in data['hexsides'].items():
+        # hexside would be a tuple of two adjacent hex coordinates
+        hex_grid.hexside_data[hexside] = side_type
