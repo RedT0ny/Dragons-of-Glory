@@ -113,7 +113,7 @@ class HexGrid:
         Rule 5 & 6: Data-driven movement costs using terrain_affinity.
         """
         # Rule 5: Wizards and Leaders move anywhere (cost 0 for pathfinding)
-        if unit.is_leader() or unit.unit_type in ["wizard", "general", "highlord"]:
+        if unit.is_leader():
             return 0
 
         terrain = self.get_terrain(to_hex)

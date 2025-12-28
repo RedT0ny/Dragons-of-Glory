@@ -29,18 +29,18 @@ countries:
   haltigoth:
     name: "Haltigoth"
     adjective: "Haltigothian"
-  hargoth:
-    name: "Hargoth"
-    adjective: "Hargothian"
+  coastlund:
+    name: "Coastlund"
+    adjective: "Coastlund"
   hylo:
     name: "Hylo"
     adjective: "Hylo"
   icereach:
     name: "Icereach"
     adjective: "Icereach"
-  kalaman:
-    name: "Kalaman"
-    adjective: "Kalaman"
+  nightlund:
+    name: "Nightlund"
+    adjective: "Nightlund"
   kaolyn:
     name: "Kaolyn"
     adjective: "Kaolyn"
@@ -59,9 +59,9 @@ countries:
   lemish:
     name: "Lemish"
     adjective: "Lemish"
-  maelgoth:
-    name: "Maelgoth"
-    adjective: "Maelgothian"
+  hinterlund:
+    name: "Hinterlund"
+    adjective: "Hinterlund"
   maelstrom:
     name: "Maelstrom"
     adjective: "Maelstrom"
@@ -176,3 +176,26 @@ units:
   log_format_named: "{ordinal} {name}"
   counter_format_generic: "{ordinal} {land}"
   counter_format_named: "{ordinal} {name}"
+unit_types:
+  admiral:
+    name: "Admiral"
+  cav:
+    name: "Cavalry"
+  emperor:
+    name: "Emperor"
+  highlord:
+    name: "Highlord"
+  hero:
+    name: "Hero"
+  inf:
+    name: "Infantry"
+  wiz:
+    name: "Wizard"
+  wing:
+    name: "Wing"
+  fleet:
+    name: "Fleet"
+  general:
+    name: "General"
+  leader:
+    name: "Leader"

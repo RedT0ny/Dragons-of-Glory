@@ -37,8 +37,8 @@
 3;;inf;human;kharolis;neutral;;khaki;4;4;2;
 1;;cav;human;kharolis;neutral;;khaki;4;8;2;
 1;;fleet;human;kharolis;neutral;;khaki;4;40;3;
-4;;inf;human;kalaman;neutral;;powderblue;4;4;2;
-2;;fleet;human;kalaman;neutral;;powderblue;4;40;3;
+4;;inf;human;nightlund;neutral;;powderblue;4;4;2;
+2;;fleet;human;nightlund;neutral;;powderblue;4;40;3;
 2;;inf;goblin;icereach;neutral;plain;;4;4;2;
 2;;inf;thanoi;icereach;neutral;ice;;6;5;3;
 20;draconian;inf;draconian;;highlord;;;6;6;3;
@@ -57,10 +57,10 @@
 5;;inf;human;palanthas;neutral;;olivedrab;4;4;2;
 4;;fleet;human;palanthas;neutral;;olivedrab;5;40;4;
 3;;inf;human;tower;neutral;;;4;5;2;
-3;;inf;human;hargoth;neutral;;;4;5;2;
-1;;cav;solamnic;hargoth;neutral;;;6;8;3;
-3;;inf;human;maelgoth;neutral;;;4;5;2;
-1;;cav;solamnic;maelgoth;neutral;;;6;8;3;
+3;;inf;human;coastlund;neutral;;;4;5;2;
+1;;cav;solamnic;coastlund;neutral;;;6;8;3;
+3;;inf;human;hinterlund;neutral;;;4;5;2;
+1;;cav;solamnic;hinterlund;neutral;;;6;8;3;
 4;;inf;human;blodehelm;neutral;;dimgrey;4;4;2;
 2;;cav;human;blodehelm;neutral;;dimgrey;4;8;2;
 4;;inf;ogre;daltigoth;neutral;mountain;darkmagenta;6;4;3;

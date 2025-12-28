@@ -29,18 +29,18 @@ countries:
   haltigoth:
     name: "Haltigoth"
     adjective: "Haltigothiano"
-  hargoth:
-    name: "Hargoth"
-    adjective: "Hargothiano"
+  coastlund:
+    name: "Coastlund"
+    adjective: "Coastlund"
   hylo:
     name: "Hylo"
     adjective: "Hylo"
   icereach:
     name: "Icereach"
     adjective: "Icereach"
-  kalaman:
-    name: "Kalaman"
-    adjective: "Kalaman"
+  nightlund:
+    name: "Nightlund"
+    adjective: "Nightlund"
   kaolyn:
     name: "Kaolyn"
     adjective: "Kaolyn"
@@ -59,9 +59,9 @@ countries:
   lemish:
     name: "Lemish"
     adjective: "Lemish"
-  maelgoth:
-    name: "Maelgoth"
-    adjective: "Maelgothiano"
+  hinterlund:
+    name: "Hinterlund"
+    adjective: "Hinterlund"
   maelstrom:
     name: "Maelstrom"
     adjective: "Maelstrom"

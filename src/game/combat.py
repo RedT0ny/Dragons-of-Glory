@@ -10,8 +10,7 @@ class CombatResolver:
         self.defenders = defenders
         self.terrain_type = terrain_type
         # Use the centralized loader
-        self.crt_data = load_data("data/crt.yaml")
-
+        self.crt_data = load_data("data/crt.csv") # csv or yaml?
     """
     Calculates the odds of a combat based on the attacker's combat rating and the defender's combat rating.
     
@@ -48,33 +47,53 @@ class CombatResolver:
 
         # 3. Roll 1d10
         roll = random.randint(1, 10)
-        final_roll = max(1, min(10, roll + drm))
+
+        final_roll = max(-5, min(16, roll + drm))
         
         # 4. Look up result from YAML data
         # Note: YAML keys might be ints or strings depending on formatting; 
         # ensure consistency.
         result = self.crt_data[final_roll][odds_str]
 
-        self.apply_results(result)
+        self.apply_results(result, self.attackers, True)
+        self.apply_results(result, self.defenders, False)
+
         return result
 
-    def apply_results(self, result_code):
+    def apply_results(self, result_code, units, is_attacker):
         """
-        Interprets: { a_res: "E", a_ret: bool, d_res: 1, d_ret: bool }
+        Apply combat results to the given units.
+
+        units: list of Unit objects in the hex
+        combat_result: string like "DR", "2/E", "E/1", etc.
+        is_attacker: True if applying to attacker's units
         """
-        # Handle Attacker
-        if result['a_res'] == "E":
-            for u in self.attackers: u.status = "depleted"
-        elif isinstance(result['a_res'], int):
-            # Logic to eliminate X number of units...
-            pass
+        must_retreat = False
 
-        if result['a_ret']:
-            # Trigger retreat logic for attackers
-            pass
+        # Parse combat result (e.g., "D1" or "2/E")
+        if is_attacker:
+            result = result_code.split('/')[0]
+        else:
+            result = result_code.split('/')[1]
 
-        # Handle Defender
-        # ... similar logic for d_res and d_ret ...
+        # Handle cumulative results like "DR"
+        if len(result) > 1:
+            # First apply the letter result, then the number
+            result = result[0]
+            must_retreat = True
+
+        # If result is "D" or "E", apply to all units
+        if result in ['D', 'E']:
+            for unit in units:
+                unit.apply_combat_loss(result, must_retreat)
+
+        elif result in ['1', '2']:
+            #TODO: Let the player choose which units take damage and retreat
+            return NotImplementedError
+
+        else:  # Error
+            error_msg = f"Invalid combat result: {result_code}"
+            raise ValueError(error_msg)
 
     def calculate_total_drm(self):
         # TODO: Implement Rule 7.4 (Leaders and Terrain)
