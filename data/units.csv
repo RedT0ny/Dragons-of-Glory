@@ -1,126 +1,126 @@
-﻿quantity;name;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
-5;ordinal+land+race+type;inf;ogre;kern;neutral;mountain;6;0;4
-4;;inf;kender;goodlund;neutral;forest;4;0;3
-6;;inf;kender;hylo;neutral;forest;4;0;3
-5;;inf;dwarf;kaolyn;neutral;;5;0;3
-5;;inf;human;khur;neutral;;4;0;4
-1;;cav;human;khur;neutral;;4;0;8
-4;;inf;minotaur;kothas;neutral;;8;0;5
-4;;fleet;minotaur;kothas;neutral;;5;0;35
-4;;inf;human;lemish;neutral;;4;0;4
-2;;cav;human;lemish;neutral;;4;0;8
-8;;inf;ogre;blode;neutral;mountain;6;0;4
-4;;inf;elf;qualinesti;neutral;forest;5;0;5
-4;;wing;griffon;qualinesti;neutral;;2;0;18
-4;;inf;elf;silvanesti;neutral;forest;6;0;5
-4;;wing;pegasus;silvanesti;neutral;;2;0;18
-4;;fleet;elf;silvanesti;neutral;;3;0;50
-3;;inf;human;sanction;neutral;;4;0;4
-4;;fleet;human;sanction;neutral;;4;0;40
-3;;inf;solamnic;solanthus;neutral;;6;0;5
-2;;cav;solamnic;solanthus;neutral;;6;0;8
-3;;inf;human;tarsis;neutral;;4;0;4
-3;;cav;human;tarsis;neutral;;4;0;8
-4;;inf;dwarf;thorbardin;neutral;mountain;5;0;3
-8;;inf;goblin;throt;neutral;;4;0;3
-3;;inf;human;vingaard;neutral;;4;0;4
-1;;cav;human;vingaard;neutral;;4;0;8
-5;;inf;dwarf;zhakar;neutral;mountain;5;0;3
-4;;wing;griffon;zhakar;neutral;;2;0;18
-4;;inf;goblin;sikket;neutral;;4;0;3
-1;;fleet;goblin;sikket;neutral;;4;0;35
-4;;inf;goblin;thank;neutral;;4;0;3
-4;;inf;human;balifor;neutral;;4;0;4
-2;;fleet;human;balifor;neutral;;4;0;40
-3;;inf;human;abanasinia;neutral;;4;0;4
-3;;inf;human;haltigoth;neutral;;4;0;4
-3;;inf;human;kharolis;neutral;;4;0;4
-1;;cav;human;kharolis;neutral;;4;0;8
-1;;fleet;human;kharolis;neutral;;4;0;40
-4;;inf;human;nightlund;neutral;;4;0;4
-2;;fleet;human;nightlund;neutral;;4;0;40
-2;;inf;human;icereach;neutral;;4;0;4
-2;;inf;thanoi;icereach;neutral;ice;6;0;5
-20;draconian;inf;draconian;;highlord;;6;0;6
-4;;inf;human;nordmaar;neutral;;4;0;4
-2;;cav;human;nordmaar;neutral;;4;0;8
-4;;inf;minotaur;mithas;neutral;;8;0;5
-4;;fleet;minotaur;mithas;neutral;;5;0;35
-2;;inf;solamnic;nergoth;neutral;;6;0;5
-2;;cav;solamnic;nergoth;neutral;;6;0;8
-2;;inf;solamnic;gunthar;neutral;;8;0;5
-3;;inf;human;gunthar;neutral;;4;0;5
-2;;cav;solamnic;gunthar;neutral;;8;0;8
-1;;fleet;human;gunthar;neutral;;4;0;40
-3;;inf;solamnic;caergoth;neutral;;6;0;5
-2;;cav;solamnic;caergoth;neutral;;6;0;8
-5;;inf;human;palanthas;neutral;;4;0;4
-4;;fleet;human;palanthas;neutral;;5;0;40
-3;;inf;human;tower;neutral;;4;0;5
-3;;inf;human;coastlund;neutral;;4;0;5
-1;;cav;solamnic;coastlund;neutral;;6;0;8
-3;;inf;human;hinterlund;neutral;;4;0;5
-1;;cav;solamnic;hinterlund;neutral;;6;0;8
-4;;inf;human;blodehelm;neutral;;4;0;4
-2;;cav;human;blodehelm;neutral;;4;0;8
-4;;inf;ogre;daltigoth;neutral;mountain;6;0;4
-1;;fleet;human;daltigoth;neutral;;4;0;40
-2;;inf;pirate;maelstrom;neutral;;8;0;0
-6;;fleet;pirate;maelstrom;neutral;;4;0;45
-2;;inf;undead;dargaard;neutral;;10;0;8
-1;;wing;dragon;black;highlord;;2;0;16
-1;;wing;dragon;white;highlord;;2;0;16
-2;;wing;dragon;green;highlord;;2;0;16
-2;;wing;dragon;red;highlord;;2;0;16
-2;;wing;dragon;blue;highlord;;2;0;16
-1;Orin Woodwind;general;human;abanasinia;neutral;;0;2;10
-1;Orwell Harwich;general;human;balifor;neutral;;0;1;10
-1;King Vogor Stoneshaker;general;ogre;blode;neutral;;0;2;10
-1;King Wilhelm;general;human;blodehelm;neutral;;0;2;10
-1;Lord Eleszar;general;solamnic;caergoth;neutral;;0;2;10
-1;Stormogre;general;ogre;daltigoth;neutral;;0;2;10
-1;Lord Soth;general;undead;dargaard;neutral;;0;3;10
-1;Kronin Thistleknot;general;kender;goodlund;neutral;;0;1;8
-1;Gunthar Uth Winstan;general;solamnic;gunthar;neutral;;0;4;10
-1;Regent Kurrin;general;human;haltigoth;neutral;;0;2;10
-1;Lord Hargoth;general;solamnic;coastlund;neutral;;0;2;10
-1;Loraliee Spellslinger;general;kender;hylo;neutral;;0;2;8
-1;Harald Haakan;general;human;icereach;neutral;;0;2;10
-1;Calof Miat;general;human;nightlund;neutral;;0;1;10
-1;Erran Flowstone;general;dwarf;kaolyn;neutral;;0;2;8
-1;Khan Guugar;general;ogre;kern;neutral;;0;2;10
-1;Duke Berlan Drafford;general;human;kharolis;neutral;;0;1;10
-1;Khan Sharuk;general;human;khur;neutral;;0;1;10
-1;Garik Es-Karos;admiral;minotaur;kothas;neutral;;0;3;10
-1;Lord Tyrian;general;human;lemish;neutral;;0;2;10
-1;Lord Heltann;general;solamnic;hinterlund;neutral;;0;1;10
-1;Grand Mariner Felura Kar-Erian;admiral;pirate;maelstrom;neutral;;0;2;10
-1;Chot Es-Kalin;admiral;minotaur;mithas;neutral;;0;3;10
-1;Emperor Mercadior Redic V;general;solamnic;nergoth;neutral;;0;3;10
-1;King Huemac Kerian;general;human;nordmaar;neutral;;0;2;10
-1;Lord Amothus;general;human;palanthas;neutral;;0;2;10
-1;Solostaran;general;elf;qualinesti;neutral;;0;3;12
-1;Barenn;general;human;sanction;neutral;;0;1;10
-1;Sunchaser the Steadfast;general;goblin;sikket;neutral;;0;1;8
-1;Lorac;general;elf;silvanesti;neutral;;0;3;12
-1;Lord Aurik;general;solamnic;solanthus;neutral;;0;2;10
-1;Lord Mayor;general;human;tarsis;neutral;;0;1;10
-1;Hornfel;general;dwarf;thorbardin;neutral;;0;3;8
-1;Crod Blackmaw;general;goblin;throt;neutral;;0;1;8
-1;Raderic Tankreed;general;human;vingaard;neutral;;0;1;10
-1;Zhak Pillarstone;general;dwarf;zhakar;neutral;;0;2;8
-1;Verminaard;highlord;human;red;highlord;;0;3;10
-1;Phair Caron;highlord;human;red;highlord;;0;2;10
-1;Kitiara;highlord;human;blue;highlord;;0;4;10
-1;Topus;highlord;human;blue;highlord;;0;2;10
-1;Salah Khan;highlord;human;green;highlord;;0;2;10
-1;Hullek Skullsmasher;highlord;ogre;green;highlord;;0;1;10
-1;Lucien;highlord;ogre;black;highlord;;0;2;10
-1;Marcus Cadrio;highlord;human;black;highlord;;0;2;10
-1;Feal-Thas;highlord;elf;white;highlord;;0;1;10
-1;Fewmaster Toede;highlord;goblin;white;highlord;;0;1;10
-1;Ariakas;emperor;human;;highlord;;0;4;10
-1;Rashften the Oath-Breaker;general;ogre;thank;neutral;;0;1;10
-1;Laurana the Golden General;general;elf;;whitestone;;0;5;10
-2;;cav;human;taman;highlord;;4;0;8
-8;;inf;human;taman;highlord;;6;0;4
+﻿id;quantity;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
+;5;inf;ogre;kern;neutral;mountain;6;0;4
+;4;inf;kender;goodlund;neutral;forest;4;0;3
+;6;inf;kender;hylo;neutral;forest;4;0;3
+;5;inf;dwarf;kaolyn;neutral;;5;0;3
+;5;inf;human;khur;neutral;;4;0;4
+;1;cav;human;khur;neutral;;4;0;8
+;4;inf;minotaur;kothas;neutral;;8;0;5
+;4;fleet;minotaur;kothas;neutral;;5;0;35
+;4;inf;human;lemish;neutral;;4;0;4
+;2;cav;human;lemish;neutral;;4;0;8
+;8;inf;ogre;blode;neutral;mountain;6;0;4
+;4;inf;elf;qualinesti;neutral;forest;5;0;5
+;4;wing;griffon;qualinesti;neutral;;2;0;18
+;4;inf;elf;silvanesti;neutral;forest;6;0;5
+;4;wing;pegasus;silvanesti;neutral;;2;0;18
+;4;fleet;elf;silvanesti;neutral;;3;0;50
+;3;inf;human;sanction;neutral;;4;0;4
+;4;fleet;human;sanction;neutral;;4;0;40
+;3;inf;solamnic;solanthus;neutral;;6;0;5
+;2;cav;solamnic;solanthus;neutral;;6;0;8
+;3;inf;human;tarsis;neutral;;4;0;4
+;3;cav;human;tarsis;neutral;;4;0;8
+;4;inf;dwarf;thorbardin;neutral;mountain;5;0;3
+;8;inf;goblin;throt;neutral;;4;0;3
+;3;inf;human;vingaard;neutral;;4;0;4
+;1;cav;human;vingaard;neutral;;4;0;8
+;5;inf;dwarf;zhakar;neutral;mountain;5;0;3
+;4;wing;griffon;zhakar;neutral;;2;0;18
+;4;inf;goblin;sikket;neutral;;4;0;3
+;1;fleet;goblin;sikket;neutral;;4;0;35
+;4;inf;goblin;thank;neutral;;4;0;3
+;4;inf;human;balifor;neutral;;4;0;4
+;2;fleet;human;balifor;neutral;;4;0;40
+;3;inf;human;abanasinia;neutral;;4;0;4
+;3;inf;human;haltigoth;neutral;;4;0;4
+;3;inf;human;kharolis;neutral;;4;0;4
+;1;cav;human;kharolis;neutral;;4;0;8
+;1;fleet;human;kharolis;neutral;;4;0;40
+;4;inf;human;nightlund;neutral;;4;0;4
+;2;fleet;human;nightlund;neutral;;4;0;40
+;2;inf;human;icereach;neutral;;4;0;4
+;2;inf;thanoi;icereach;neutral;ice;6;0;5
+;20;inf;draconian;;highlord;;6;0;6
+;4;inf;human;nordmaar;neutral;;4;0;4
+;2;cav;human;nordmaar;neutral;;4;0;8
+;4;inf;minotaur;mithas;neutral;;8;0;5
+;4;fleet;minotaur;mithas;neutral;;5;0;35
+;2;inf;solamnic;nergoth;neutral;;6;0;5
+;2;cav;solamnic;nergoth;neutral;;6;0;8
+;2;inf;solamnic;gunthar;neutral;;8;0;5
+;3;inf;human;gunthar;neutral;;4;0;5
+;2;cav;solamnic;gunthar;neutral;;8;0;8
+;1;fleet;human;gunthar;neutral;;4;0;40
+;3;inf;solamnic;caergoth;neutral;;6;0;5
+;2;cav;solamnic;caergoth;neutral;;6;0;8
+;5;inf;human;palanthas;neutral;;4;0;4
+;4;fleet;human;palanthas;neutral;;5;0;40
+;3;inf;human;tower;neutral;;4;0;5
+;3;inf;human;coastlund;neutral;;4;0;5
+;1;cav;solamnic;coastlund;neutral;;6;0;8
+;3;inf;human;hinterlund;neutral;;4;0;5
+;1;cav;solamnic;hinterlund;neutral;;6;0;8
+;4;inf;human;blodehelm;neutral;;4;0;4
+;2;cav;human;blodehelm;neutral;;4;0;8
+;4;inf;ogre;daltigoth;neutral;mountain;6;0;4
+;1;fleet;human;daltigoth;neutral;;4;0;40
+;2;inf;pirate;maelstrom;neutral;;8;0;0
+;6;fleet;pirate;maelstrom;neutral;;4;0;45
+;2;inf;undead;dargaard;neutral;;10;0;8
+;1;wing;dragon;black;highlord;;2;0;16
+;1;wing;dragon;white;highlord;;2;0;16
+;2;wing;dragon;green;highlord;;2;0;16
+;2;wing;dragon;red;highlord;;2;0;16
+;2;wing;dragon;blue;highlord;;2;0;16
+Orin Woodwind;1;general;human;abanasinia;neutral;;0;2;10
+Orwell Harwich;1;general;human;balifor;neutral;;0;1;10
+King Vogor Stoneshaker;1;general;ogre;blode;neutral;;0;2;10
+King Wilhelm;1;general;human;blodehelm;neutral;;0;2;10
+Lord Eleszar;1;general;solamnic;caergoth;neutral;;0;2;10
+Stormogre;1;general;ogre;daltigoth;neutral;;0;2;10
+Lord Soth;1;general;undead;dargaard;neutral;;0;3;10
+Kronin Thistleknot;1;general;kender;goodlund;neutral;;0;1;8
+Gunthar Uth Winstan;1;general;solamnic;gunthar;neutral;;0;4;10
+Regent Kurrin;1;general;human;haltigoth;neutral;;0;2;10
+Lord Hargoth;1;general;solamnic;coastlund;neutral;;0;2;10
+Loraliee Spellslinger;1;general;kender;hylo;neutral;;0;2;8
+Harald Haakan;1;general;human;icereach;neutral;;0;2;10
+Calof Miat;1;general;human;nightlund;neutral;;0;1;10
+Erran Flowstone;1;general;dwarf;kaolyn;neutral;;0;2;8
+Khan Guugar;1;general;ogre;kern;neutral;;0;2;10
+Duke Berlan Drafford;1;general;human;kharolis;neutral;;0;1;10
+Khan Sharuk;1;general;human;khur;neutral;;0;1;10
+Garik Es-Karos;1;admiral;minotaur;kothas;neutral;;0;3;10
+Lord Tyrian;1;general;human;lemish;neutral;;0;2;10
+Lord Heltann;1;general;solamnic;hinterlund;neutral;;0;1;10
+Grand Mariner Felura Kar-Erian;1;admiral;pirate;maelstrom;neutral;;0;2;10
+Chot Es-Kalin;1;admiral;minotaur;mithas;neutral;;0;3;10
+Emperor Mercadior Redic V;1;general;solamnic;nergoth;neutral;;0;3;10
+King Huemac Kerian;1;general;human;nordmaar;neutral;;0;2;10
+Lord Amothus;1;general;human;palanthas;neutral;;0;2;10
+Solostaran;1;general;elf;qualinesti;neutral;;0;3;12
+Barenn;1;general;human;sanction;neutral;;0;1;10
+Sunchaser the Steadfast;1;general;goblin;sikket;neutral;;0;1;8
+Lorac;1;general;elf;silvanesti;neutral;;0;3;12
+Lord Aurik;1;general;solamnic;solanthus;neutral;;0;2;10
+Lord Mayor;1;general;human;tarsis;neutral;;0;1;10
+Hornfel;1;general;dwarf;thorbardin;neutral;;0;3;8
+Crod Blackmaw;1;general;goblin;throt;neutral;;0;1;8
+Raderic Tankreed;1;general;human;vingaard;neutral;;0;1;10
+Zhak Pillarstone;1;general;dwarf;zhakar;neutral;;0;2;8
+Verminaard;1;highlord;human;red;highlord;;0;3;10
+Phair Caron;1;highlord;human;red;highlord;;0;2;10
+Kitiara;1;highlord;human;blue;highlord;;0;4;10
+Topus;1;highlord;human;blue;highlord;;0;2;10
+Salah Khan;1;highlord;human;green;highlord;;0;2;10
+Hullek Skullsmasher;1;highlord;ogre;green;highlord;;0;1;10
+Lucien;1;highlord;ogre;black;highlord;;0;2;10
+Marcus Cadrio;1;highlord;human;black;highlord;;0;2;10
+Feal-Thas;1;highlord;elf;white;highlord;;0;1;10
+Fewmaster Toede;1;highlord;goblin;white;highlord;;0;1;10
+Ariakas;1;emperor;human;;highlord;;0;4;10
+Rashften the Oath-Breaker;1;general;ogre;thank;neutral;;0;1;10
+Laurana the Golden General;1;general;elf;;whitestone;;0;5;10
+;2;cav;human;taman;highlord;;4;0;8
+;8;inf;human;taman;highlord;;6;0;4

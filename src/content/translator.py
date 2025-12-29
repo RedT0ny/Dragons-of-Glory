@@ -12,34 +12,23 @@ class Translator:
             return yaml.safe_load(f)
 
     def format_unit_name(self, unit, mode='log'):
-        """
-        Formats the unit name. 
-        If named: "III Lord Soth"
-        If generic: "III Silvanesti Elf Infantry"
-        """
         ordinal_roman = to_roman(unit.ordinal)
         
-        # 1. Determine if it's a named unit or generic
-        # A unit is "generic" if the CSV name field was empty or set to the format string
-        is_generic = not unit.name or "ordinal" in unit.name.lower()
-        key_type = "generic" if is_generic else "named"
-        template = self.translations['units'][f'{mode}_format_{key_type}']
+        # If the unit's ID exists in our 'unit_names' translation table, it's a named unit.
+        # Otherwise, it's a generic unit.
+        named_display = self.translations.get('unit_names', {}).get(unit.id)
         
-        # 2. Get Translated components for generic names
-        # We fetch from the 'races', 'unit_types', and 'countries' sections of en.yaml/es.yaml
-        land_name = self.get_country_name(unit.country) if unit.country else ""
-        race_name = self.translations.get('races', {}).get(unit.race, {}).get('name', unit.race)
-        type_name = self.translations.get('unit_types', {}).get(unit.unit_type, {}).get('name', unit.unit_type)
-
-        # 3. Fill the template
-        # Template example: "{ordinal} {land} {race} {type}"
-        return template.format(
-            ordinal=ordinal_roman,
-            name=unit.name,
-            land=land_name,
-            race=race_name,
-            type=type_name
-        ).strip().replace("  ", " ") # Clean up double spaces if land is missing
+        if named_display:
+            template = self.translations['units'][f'{mode}_format_named']
+            return template.format(ordinal=ordinal_roman, name=named_display)
+        else:
+            template = self.translations['units'][f'{mode}_format_generic']
+            return template.format(
+                ordinal=ordinal_roman,
+                land=self.get_country_name(unit.country) if unit.country else "",
+                race=self.translations.get('races', {}).get(unit.race, {}).get('name', unit.race),
+                type=self.translations.get('unit_types', {}).get(unit.unit_type, {}).get('name', unit.unit_type)
+            ).strip().replace("  ", " ")
 
     def get_country_name(self, country_id: str) -> str:
         """Returns the translated name of the country."""

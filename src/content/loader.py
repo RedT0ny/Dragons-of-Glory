@@ -38,8 +38,7 @@ def parse_countries_csv(path: str) -> Dict[str, CountrySpec]:
 
 @dataclass
 class UnitSpec:
-    id: str
-    name: Optional[str]
+    id: str             # The only ID we need (from CSV or generated)
     unit_type: Optional[str]
     race: Optional[str]
     country: Optional[str]
@@ -50,7 +49,7 @@ class UnitSpec:
     tactical_rating: Optional[int]
     movement: Optional[int]
     quantity: int = 1
-    ordinal: int = 1  # Added this field
+    ordinal: int = 1
     status: str = "inactive"
 
 def _slugify(s: str) -> str:
@@ -75,16 +74,21 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
             race = get_val("race")
 
             # ID generation
-            if name:
-                base_id = _slugify(name)
+            csv_id = get_val("id")
+                
+            if csv_id:
+                # If CSV provides an ID, use it! (e.g. 'lord_soth')
+                base_id = _slugify(csv_id)
             else:
-                base_key = f"{u_type or 'u'}_{race or 'r'}_{land or 'x'}"
+                # Use 'no_land' or similar if land is missing to keep IDs clean
+                land_key = _slugify(land) if land else "no_land"
+                base_key = f"{u_type or 'u'}_{race or 'r'}_{land_key}"
                 unnamed_counters[base_key] = unnamed_counters.get(base_key, 0) + 1
-                base_id = f"{_slugify(base_key)}_{unnamed_counters[base_key]}"
-                name = f"{(race or 'Unit').title()} {u_type or ''}".strip()
+                base_id = f"{base_key}_{unnamed_counters[base_key]}"
 
             specs.append(UnitSpec(
-                id=base_id, name=name, unit_type=u_type, race=race,
+                id=base_id, # This is now GUARANTEED to be a string
+                name=name, unit_type=u_type, race=race,
                 country=country, dragonflight=df, 
                 allegiance=(get_val("allegiance") or "").title() or None,
                 terrain_affinity=get_val("terrain_affinity"),
