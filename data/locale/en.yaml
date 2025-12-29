@@ -92,6 +92,9 @@ countries:
   solanthus:
     name: "Solanthus"
     adjective: "Solanthus"
+  taman:
+    name: "Taman Busuk"
+    adjective: "Taman Busuk"
   tarsis:
     name: "Tarsis"
     adjective: "Tarsis"
@@ -171,6 +174,16 @@ races:
     name: "Undead"
     plural: "Undead"
     adjective: "Undead"
+capitals:
+  solace: "Solace"
+  silvanost: "Silvanost"
+  neraka: "Neraka"
+ui:
+  allegiance: "Allegiance"
+  strength: "Military Strength"
+  neutral: "Neutral"
+  whitestone: "Whitestone"
+  highlord: "Highlord"
 units:
   log_format_generic: "{ordinal} {land} {race} {type}"
   log_format_named: "{ordinal} {name}"

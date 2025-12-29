@@ -1,32 +1,156 @@
-import os, json
+import csv
+import json
+import re
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict
-try:
-    import yaml  # Add PyYAML in requirements if not present
-    _has_yaml = True
-except ImportError:
-    _has_yaml = False
+from typing import Any, Dict, List, Optional, Tuple
+from collections import defaultdict
+import yaml
 
-def load_data(path: str | Path) -> Dict[str, Any]:
-    path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(path)
-    if path.suffix.lower() in (".yaml", ".yml"):
-        if not _has_yaml:
-            raise RuntimeError("PyYAML not installed")
-        with open(path, "r", encoding="utf-8") as f:
-            return yaml.safe_load(f) or {}
-    elif path.suffix.lower() == ".json":
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    else:
-        raise ValueError(f"Unsupported data format: {path.suffix}")
+DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
 
-# Logic to be added to your loader/game_state initialization:
-def load_map_features(hex_grid, data):
-    for hex_coord, terrain in data['terrain'].items():
-        hex_grid.grid[hex_coord] = terrain
-        
-    for hexside, side_type in data['hexsides'].items():
-        # hexside would be a tuple of two adjacent hex coordinates
-        hex_grid.hexside_data[hexside] = side_type
+@dataclass
+class CountrySpec:
+    id: str
+    name: str
+    capital: str
+    color: str
+    allegiance: str
+    alignment: Tuple[int, int] # (WS bonus, HL bonus)
+    strength: int
+
+def parse_countries_csv(path: str) -> Dict[str, CountrySpec]:
+    countries = {}
+    with open(path, newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh, delimiter=";")
+        for row in reader:
+            cid = _slugify(row["id"])
+            countries[cid] = CountrySpec(
+                id=cid,
+                name=row["name"],
+                capital=row["capital"],
+                color=row["color"],
+                allegiance=row["allegiance"].title(),
+                alignment=(int(row.get("alignment_ws", 0)), int(row.get("alignment_hl", 0))),
+                strength=int(row.get("strength", 0))
+            )
+    return countries
+
+@dataclass
+class UnitSpec:
+    id: str
+    name: Optional[str]
+    unit_type: Optional[str]
+    race: Optional[str]
+    country: Optional[str]
+    dragonflight: Optional[str]
+    allegiance: Optional[str]
+    terrain_affinity: Optional[str]
+    combat_rating: Optional[int]
+    tactical_rating: Optional[int]
+    movement: Optional[int]
+    quantity: int = 1
+    ordinal: int = 1  # Added this field
+    status: str = "inactive"
+
+def _slugify(s: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
+
+def parse_units_csv(path: str) -> List[UnitSpec]:
+    specs = []
+    with open(path, newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh, delimiter=";")
+        unnamed_counters = {}
+        for row in reader:
+            # Helper to extract and clean
+            get_val = lambda k: (row.get(k) or "").strip() or None
+            get_int = lambda k: int(row[k]) if row.get(k) and row[k].isdigit() else None
+
+            land = get_val("land")
+            df = land.lower() if land and land.lower() in DRAGONFLIGHTS else None
+            country = None if df else land
+            
+            name = get_val("name")
+            u_type = get_val("type")
+            race = get_val("race")
+
+            # ID generation
+            if name:
+                base_id = _slugify(name)
+            else:
+                base_key = f"{u_type or 'u'}_{race or 'r'}_{land or 'x'}"
+                unnamed_counters[base_key] = unnamed_counters.get(base_key, 0) + 1
+                base_id = f"{_slugify(base_key)}_{unnamed_counters[base_key]}"
+                name = f"{(race or 'Unit').title()} {u_type or ''}".strip()
+
+            specs.append(UnitSpec(
+                id=base_id, name=name, unit_type=u_type, race=race,
+                country=country, dragonflight=df, 
+                allegiance=(get_val("allegiance") or "").title() or None,
+                terrain_affinity=get_val("terrain_affinity"),
+                combat_rating=get_int("combat_rating"),
+                tactical_rating=get_int("tactical_rating"),
+                movement=get_int("movement"),
+                quantity=get_int("quantity") or 1
+            ))
+    return specs
+
+def resolve_scenario_units(scenario_path: str, units_csv_path: str) -> List[UnitSpec]:
+    raw_specs = parse_units_csv(units_csv_path)
+    all_counters = []
+    for s in raw_specs:
+        for i in range(1, s.quantity + 1):
+            # Create a unique copy for every single counter
+            new_id = f"{s.id}_{i}" if s.quantity > 1 else s.id
+            new_spec = UnitSpec(**{**asdict(s), "id": new_id, "quantity": 1, "ordinal": i})
+            all_counters.append(new_spec)
+
+    # 2. Index for lookup
+    idx = {
+        "id": {u.id: u for u in all_counters},
+        "name": {u.name.lower(): u for u in all_counters if u.name},
+        "country": defaultdict(list),
+        "type": defaultdict(list),
+        "df": defaultdict(list)
+    }
+    for u in sorted(all_counters, key=lambda x: x.id):
+        if u.country: idx["country"][u.country.lower()].append(u)
+        if u.unit_type: idx["type"][u.unit_type.lower()].append(u)
+        if u.dragonflight: idx["df"][u.dragonflight.lower()].append(u)
+
+    # 3. Process Scenario
+    with open(scenario_path, "r", encoding="utf-8") as f:
+        sc = yaml.safe_load(f)
+
+    selected = []
+    players = sc.get("scenario", {}).get("players", {})
+    for _, p_cfg in players.items():
+        # Handle Countries
+        for cname, rules in p_cfg.get("countries", {}).items():
+            lc = cname.lower()
+            if rules.get("units_by_country") == "all":
+                selected.extend(idx["country"][lc])
+            
+            # Unit type picking (e.g. 4 inf, 1 cav)
+            for utype, uinfo in rules.get("units_by_type", {}).items():
+                qty = int(uinfo.get("quantity", 0))
+                # Check if this is a dragonflight color or a regular country
+                candidates = idx["df"][lc] if lc in DRAGONFLIGHTS else \
+                             [u for u in idx["country"][lc] if u.unit_type and u.unit_type.lower() == utype.lower()]
+                selected.extend(candidates[:qty])
+
+        # Handle Explicit picks
+        for item in (p_cfg.get("explicit_units") or []):
+            key = str(item).lower()
+            if key in idx["id"]: selected.append(idx["id"][key])
+            elif key in idx["name"]: selected.append(idx["name"][key])
+
+    # 4. Finalize
+    unique_units = []
+    seen = set()
+    for u in selected:
+        if u.id not in seen:
+            u.status = "active"
+            unique_units.append(u)
+            seen.add(u.id)
+    return unique_units

@@ -1,7 +1,8 @@
 class Country:
-    def __init__(self, name, capital, allegiance, alignment=(0, 0), color=None, is_ai=False):
-        self.name = name
+    def __init__(self, id, capital, strength, allegiance='neutral', alignment=(0, 0), color=None, is_ai=False):
+        self.id = id
         self.capital = capital
+        self.strength = strength
         self.allegiance = allegiance  # 'Whitestone', 'Highlord', or 'Neutral'
         self.alignment = alignment    # Activation Bonus/malus (WS, HL)
         self.color = color
@@ -10,9 +11,15 @@ class Country:
         self.units = []
         self.territories = []
 
+    def get_name(self, translator):
+        return translator.get_country_name(self.id)
+
+    def get_capital_name(self, translator):
+        return translator.get_capital_name(self.capital)
+
     def add_unit(self, unit):
         """Assigns a unit to this country and updates the unit's origin."""
-        unit.land = self.name
+        unit.land = self.id
         unit.allegiance = self.allegiance
         self.units.append(unit)
 
@@ -31,10 +38,9 @@ class Country:
         """Sets the territories controlled by this country."""
         self.territories = territories
 
-
     def surrender(self):
         """Handles the surrender of the country by clearing its units."""
         self.units = [] # It should actually get the country units and mark them as 'inactive'.
 
     def __repr__(self):
-        return f"<Country {self.name} [{self.allegiance}] - Strength: {self.total_military_strength}>"
+        return f"<Country {self.id} [{self.allegiance}] - Strength: {self.total_military_strength}>"

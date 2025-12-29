@@ -3,14 +3,18 @@ countries:
   abanasinia:
     name: 'abanasinia'
     capital: 'haven'
+    allegiance: 'neutral'
     alignment: (5,-1)
-    territories: []
+    color: (135, 206, 250, 255)
+    territories: [(),(),()]
     locations: []
     strength: '12'
   blode:
     name: 'blode'
     capital: 'bloten'
+    allegiance: 'neutral'
     alignment: (-2,7)
+    color: (34, 139, 34, 255)
     territories: []
     locations: []
     strength: '48'

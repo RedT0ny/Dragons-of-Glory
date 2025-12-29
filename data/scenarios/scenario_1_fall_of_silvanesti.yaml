@@ -1,0 +1,68 @@
+# language: yaml
+scenario:
+  id: "scenario_1_fall_of_silvanesti"
+  name: "The Fall of Silvanesti"
+  map_subset:
+    x_range: [32, 64]
+    y_range: [24, 48]
+  initial_setup:
+    highlord:
+      countries:
+        taman:
+          units_by_type:
+            inf:
+              quantity: 4
+            cav:
+              quantity: 1
+        khur:
+          units_by_type:
+            inf:
+              quantity: 4
+            cav:
+              quantity: 1
+        green:
+          units_by_type:
+            dragon:
+              quantity: 2
+        blue:
+          units_by_type:
+            dragon:
+              quantity: 1
+        red:
+          units_by_type:
+            dragon:
+              quantity: 1
+    whitestone:
+      countries:
+        silvanesti:
+          units_by_country: all
+    neutral:
+      countries: none
+  start:
+    start_turn: 4
+    initiative: silvanesti
+  strategic_event_counters:
+    cup_start: all
+    pregame_draw:
+      draw_order_starting_with: highlord
+      draws_per_player: 2
+      discard_activation_counters: true
+      events_apply_before_game_start: true
+  victory_conditions:
+    highlord:
+      major:
+        - description: "Captures the Silvanesti capital before it moves."
+      marginal:
+        - description: "If the capital moves, occupies the original capital city hex before the end of Turn 9."
+    whitesone:
+      denies_hl:
+        marginal:
+          - description: "Prevents the HL player from taking the capital city location before the end of Turn 9."
+        major:
+          - description: "Prevents HL from taking the capital city location without having to move the Whitesone capital."
+
+  notes: >
+    This scenario is played on the southeast quadrant of the map.
+    Entire green wing (2 dragons), half red wing and half blue wing (1 dragon each) are active.
+    Khur: 4 inf and 1 cav. Red: 1 dragon. Taman: 4 inf and 1 cav.
+    Only Highlord units and armies from designated countries start active per activation rules.
