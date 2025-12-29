@@ -1,0 +1,32 @@
+"""
+Example recommended compact scenario YAML (put in data/scenarios/scenario_1_fall_of_silvanesti.yaml):
+
+scenario:
+  id: example_scenario
+  players:
+    highlord:
+      countries:
+        taman:
+          units_by_type:
+            inf: { quantity: 4 }
+            cav: { quantity: 1 }
+        khur:
+          units_by_type:
+            inf: { quantity: 5 }   # use all 5 inf from khur (or specify 4 if partial)
+            general: { quantity: 1 }  # include the general
+        green:
+          dragonflight: { quantity: 2 }  # full green flight
+        red:
+          dragonflight: { quantity: 1 }  # half flight
+        blue:
+          dragonflight: { quantity: 1 }  # half flight
+      explicit_units:   # explicit picks by unit id or name
+        - verminaard
+        - kitiara
+        - phair_caron
+        - marcus_cadrio
+    whitestone:
+      countries:
+        silvanesti:
+          units_by_country: all
+"""
