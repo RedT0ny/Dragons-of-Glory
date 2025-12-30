@@ -11,7 +11,7 @@ countries:
   blodehelm:
     name: "Blodehelm"
     adjective: "Blodehelm"
-  caergoth:
+  southlund:
     name: "Caergoth"
     adjective: "Caergothian"
   daltigoth:
@@ -23,9 +23,9 @@ countries:
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
-  gunthar:
-    name: "Gunthar"
-    adjective: "Gunthar"
+  sancrist:
+    name: "Sancrist"
+    adjective: "Sancrist"
   haltigoth:
     name: "Haltigoth"
     adjective: "Haltigothian"
@@ -174,8 +174,9 @@ races:
     name: "Undead"
     plural: "Undead"
     adjective: "Undead"
-capitals:
-  solace: "Solace"
+locations:
+  haven: "Haven"
+  caste_wistan: "Castle uth Wistan"
   silvanost: "Silvanost"
   neraka: "Neraka"
 ui:
@@ -228,7 +229,7 @@ unit_names:
   erran: "Erran Flowstone"
   garik: "Garik Es-Karos"
   felura: "Grand Mariner Felura Kar-Erian"
-  gunthar: "Gunthar Uth Winstan"
+  gunthar: "Gunthar uth Wistan"
   harald: "Harald Haakan"
   hornfel: "Hornfel"
   hullek: "Hullek Skullsmasher"
@@ -242,7 +243,7 @@ unit_names:
   amothus: "Lord Amothus"
   aurik: "Lord Aurik"
   eleszar: "Lord Eleszar"
-  hargoth: "Lord Hargoth"
+  lord_hargoth: "Lord Hargoth"
   heltann: "Lord Heltann"
   mayor: "Lord Mayor"
   soth: "Lord Soth"
