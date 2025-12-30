@@ -213,54 +213,52 @@ unit_types:
   leader:
     name: "Leader"
 unit_names:
+  ariakas: "Ariakas"
+  barenn: "Barenn"
+  calof: "Calof Miat"
+  chot: "Chot Es-Kalin"
+  blackmaw: "Crod Blackmaw"
+  kitiara: "Kitiara"
+  lorac: "Lorac"
+  fealthas: "Feal-Thas"
+  toede: "Toede"
+  kronin: "Kronin Thistleknot"
+  berlan: "Duke Berlan Drafford"
+  mercadior: "Mercadior Redic V"
+  erran: "Erran Flowstone"
+  garik: "Garik Es-Karos"
+  felura: "Grand Mariner Felura Kar-Erian"
+  gunthar: "Gunthar Uth Winstan"
+  harald: "Harald Haakan"
+  hornfel: "Hornfel"
+  hullek: "Hullek Skullsmasher"
+  guugar: "Khan Guugar"
+  sharuk: "Khan Sharuk"
+  huemac: "King Huemac Kerian"
+  vogor: "King Vogor Stoneshaker"
+  wilhelm: "King Wilhelm"
+  laurana: "Laurana the Golden General"
+  loraliee: "Loraliee Spellslinger"
+  amothus: "Lord Amothus"
+  aurik: "Lord Aurik"
+  eleszar: "Lord Eleszar"
+  hargoth: "Lord Hargoth"
+  heltann: "Lord Heltann"
+  mayor: "Lord Mayor"
+  soth: "Lord Soth"
+  tyrian: "Lord Tyrian"
+  lucien: "Lucien"
+  marcus: "Marcus Cadrio"
+  orin: "Orin Woodwind"
+  orwell: "Orwell Harwich"
+  phair: "Phair Caron"
+  tankreed: "Raderic Tankreed"
+  rashften: "Rashften the Oath-Breaker"
+  kurrin: "Regent Kurrin"
+  salahkhan: "Salah Khan"
+  solostaran: "Solostaran"
+  stormogre: "Stormogre"
+  sunchaser: "Sunchaser the Steadfast"
+  topus: "Topus"
   verminaard: "Verminaard"
-Ariakas
-Barenn
-Calof Miat
-Chot Es-Kalin
-Crod Blackmaw
-Duke Berlan Drafford
-Emperor Mercadior Redic V
-Erran Flowstone
-Feal-Thas
-Fewmaster Toede
-Garik Es-Karos
-Grand Mariner Felura Kar-Erian
-Gunthar Uth Winstan
-Harald Haakan
-Hornfel
-Hullek Skullsmasher
-Khan Guugar
-Khan Sharuk
-King Huemac Kerian
-King Vogor Stoneshaker
-King Wilhelm
-Kitiara
-Kronin Thistleknot
-Laurana the Golden General
-Lorac
-Loraliee Spellslinger
-Lord Amothus
-Lord Aurik
-Lord Eleszar
-Lord Hargoth
-Lord Heltann
-Lord Mayor
-Lord Soth
-Lord Tyrian
-Lucien
-Marcus Cadrio
-Orin Woodwind
-Orwell Harwich
-Phair Caron
-Raderic Tankreed
-Rashften the Oath-Breaker
-Regent Kurrin
-Salah Khan
-Solostaran
-Stormogre
-Sunchaser the Steadfast
-Topus
-Verminaard
-Zhak Pillarstone
-draconian
+  zhak: "Zhak Pillarstone"

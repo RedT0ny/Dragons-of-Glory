@@ -1,6 +1,7 @@
 from src.game.combat import CombatResolver
 from src.game.map import Hex, HexGrid
-
+from src.content.loader import load_countries_yaml
+from src.game.country import Country, Location
 
 class GameState:
     """
@@ -30,7 +31,21 @@ class GameState:
         self.events = []
 
     def start_game(self):
-        pass
+        # 1. Get the raw data from the loader
+        country_specs = load_countries_yaml("data/countries.yaml")
+
+        # 2. Convert raw data into live game objects
+        for cid, spec in country_specs.items():
+            new_country = Country(
+                id = spec.id,
+                capital_id = spec.capital_id,
+                # ... pass other spec attributes
+            )
+            # Convert LocationSpecs to Location objects
+            for l_spec in spec.locations:
+                new_country.add_location(Location(l_spec.id, l_spec.loc_type, l_spec.coords))
+
+            self.countries[cid] = new_country
 
     def end_game(self):
         pass

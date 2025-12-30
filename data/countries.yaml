@@ -1,20 +1,406 @@
-notes: List of countries
-countries:
-  abanasinia:
-    name: 'abanasinia'
-    capital: 'haven'
-    allegiance: 'neutral'
-    alignment: (5,-1)
-    color: (135, 206, 250, 255)
-    territories: [(),(),()]
-    locations: []
-    strength: '12'
-  blode:
-    name: 'blode'
-    capital: 'bloten'
-    allegiance: 'neutral'
-    alignment: (-2,7)
-    color: (34, 139, 34, 255)
-    territories: []
-    locations: []
-    strength: '48'
+# Master Country Data for Dragons of Glory
+# format:
+# country_id:
+#   capital_id: main_city_id
+#   color: "#HEX"
+#   allegiance: neutral | whitestone | highlord
+#   alignment: [WS_bonus, HL_bonus]
+#   strength: base_power
+#   locations:
+#     loc_id: {type: city|fortress, coords: [col, row]}
+#   territories: [[col, row], ...]
+
+abanasinia:
+  capital_id: haven
+  color: "#AABBCC"
+  allegiance: neutral
+  alignment: [5, -1]
+  strength: 12
+  locations:
+    haven: {type: city, coords: [22, 36]}
+  territories: []
+
+balifor:
+  capital_id: port_balifor
+  color: "#D2B48C"
+  allegiance: neutral
+  alignment: [3, 4]
+  strength: 16
+  locations:
+    port_balifor: {type: city, coords: [46, 31]}
+  territories: []
+
+blode:
+  capital_id: bloten
+  color: "#8B4513"
+  allegiance: neutral
+  alignment: [-2, 7]
+  strength: 48
+  locations:
+    bloten: {type: city, coords: [36, 32]}
+  territories: []
+
+blodehelm:
+  capital_id: vantal
+  color: "#A52A2A"
+  allegiance: neutral
+  alignment: [0, 0]
+  strength: 24
+  locations:
+    vantal: {type: city, coords: [34, 34]}
+  territories: []
+
+caergoth:
+  capital_id: caergoth_city
+  color: "#708090"
+  allegiance: neutral
+  alignment: [3, -2]
+  strength: 30
+  locations:
+    caergoth_city: {type: city, coords: [0, 0]}
+  territories: []
+
+daltigoth:
+  capital_id: daltigoth_city
+  color: "#556B2F"
+  allegiance: neutral
+  alignment: [-2, 4]
+  strength: 24
+  locations:
+    daltigoth_city: {type: city, coords: [0, 0]}
+  territories: []
+
+dargaard:
+  capital_id: dargaard_keep
+  color: "#2F4F4F"
+  allegiance: neutral
+  alignment: [0, 0]
+  strength: 0
+  locations:
+    dargaard_keep: {type: fortress, coords: [31, 13]}
+  territories: [31, 13]
+
+goodlund:
+  capital_id: kendermore
+  color: "#DAA520"
+  allegiance: neutral
+  alignment: [5, -2]
+  strength: 16
+  locations:
+    kendermore: {type: city, coords: [52, 28]}
+  territories: []
+
+gunthar:
+  capital_id: sancrist
+  color: "#B0C4DE"
+  allegiance: neutral
+  alignment: [4, -3]
+  strength: 44
+  locations:
+    sancrist: {type: city, coords: [0, 0]}
+  territories: []
+
+haltigoth:
+  capital_id: haltigoth_city
+  color: "#BC8F8F"
+  allegiance: neutral
+  alignment: [4, 4]
+  strength: 12
+  locations:
+    haltigoth_city: {type: city, coords: [0, 0]}
+  territories: []
+
+coastlund:
+  capital_id: hargoth
+  color: "#4682B4"
+  allegiance: neutral
+  alignment: [3, -2]
+  strength: 18
+  locations:
+    hargoth: {type: city, coords: [19, 16]}
+  territories: []
+
+hylo:
+  capital_id: kenderhome
+  color: "#F0E68C"
+  allegiance: neutral
+  alignment: [4, -2]
+  strength: 24
+  locations:
+    kenderhome: {type: city, coords: [16, 19]}
+  territories: []
+
+icereach:
+  capital_id: icewall_castle
+  color: "#F0F8FF"
+  allegiance: neutral
+  alignment: [1, 4]
+  strength: 20
+  locations:
+    icewall_castle: {type: fortress, coords: [28, 52]}
+  territories: []
+
+nightlund:
+  capital_id: maelgoth
+  color: "#483D8B"
+  allegiance: neutral
+  alignment: [3, -2]
+  strength: 18
+  locations:
+    maelgoth: {type: city, coords: [28, 14]}
+  territories: []
+
+kaolyn:
+  capital_id: kaolyn_city
+  color: "#A9A9A9"
+  allegiance: neutral
+  alignment: [4, 1]
+  strength: 25
+  locations:
+    kaolyn_city: {type: city, coords: [0, 0]}
+  territories: []
+
+kern:
+  capital_id: kernen
+  color: "#8B4513"
+  allegiance: neutral
+  alignment: [-2, 7]
+  strength: 30
+  locations:
+    kernen: {type: city, coords: [0, 0]}
+  territories: []
+
+kharolis:
+  capital_id: alsis
+  color: "#CD853F"
+  allegiance: neutral
+  alignment: [0, 0]
+  strength: 12
+  locations:
+    alsis: {type: city, coords: [0, 0]}
+  territories: []
+
+khur:
+  capital_id: khuri_khan
+  color: "#F4A460"
+  allegiance: neutral
+  alignment: [3, 6]
+  strength: 24
+  locations:
+    khuri_khan: {type: city, coords: [0, 0]}
+  territories: []
+
+kothas:
+  capital_id: kothas_city
+  color: "#696969"
+  allegiance: neutral
+  alignment: [1, 7]
+  strength: 32
+  locations:
+    kothas_city: {type: city, coords: [0, 0]}
+  territories: []
+
+lemish:
+  capital_id: lemish_city
+  color: "#556B2F"
+  allegiance: neutral
+  alignment: [1, 5]
+  strength: 24
+  locations:
+    lemish_city: {type: city, coords: [0, 0]}
+  territories: []
+
+hinterlund:
+  capital_id: hinterlund_city
+  color: "#BDB76B"
+  allegiance: neutral
+  alignment: [0, 0]
+  strength: 18
+  locations:
+    hinterlund_city: {type: city, coords: [0, 0]}
+  territories: []
+
+maelstrom:
+  capital_id: maelstrom_city
+  color: "#000080"
+  allegiance: neutral
+  alignment: [4, 4]
+  strength: 32
+  locations:
+    maelstrom_city: {type: city, coords: [0, 0]}
+  territories: []
+
+mithas:
+  capital_id: mithas_city
+  color: "#778899"
+  allegiance: neutral
+  alignment: [1, 7]
+  strength: 32
+  locations:
+    mithas_city: {type: city, coords: [0, 0]}
+  territories: []
+
+nergoth:
+  capital_id: n_ergoth_city
+  color: "#C0C0C0"
+  allegiance: neutral
+  alignment: [3, -2]
+  strength: 30
+  locations:
+    n_ergoth_city: {type: city, coords: [0, 0]}
+  territories: []
+
+nordmaar:
+  capital_id: north_keep
+  color: "#006400"
+  allegiance: neutral
+  alignment: [3, 3]
+  strength: 24
+  locations:
+    north_keep: {type: city, coords: [0, 0]}
+  territories: []
+
+palanthas:
+  capital_id: palanthas_city
+  color: "#FFFFFF"
+  allegiance: neutral
+  alignment: [5, -1]
+  strength: 20
+  locations:
+    palanthas_city: {type: city, coords: [0, 0]}
+  territories: []
+
+qualinesti:
+  capital_id: qualinost
+  color: "#228B22"
+  allegiance: neutral
+  alignment: [6, -2]
+  strength: 28
+  locations:
+    qualinost: {type: city, coords: [0, 0]}
+    qualimori: {type: city, coords: [11, 34]}
+  territories: []
+
+sanction:
+  capital_id: sanction_city
+  color: "#4B0082"
+  allegiance: neutral
+  alignment: [0, 6]
+  strength: 12
+  locations:
+    sanction_city: {type: city, coords: [0, 0]}
+  territories: []
+
+sikket:
+  capital_id: sikket_city
+  color: "#DEB887"
+  allegiance: neutral
+  alignment: [0, 0]
+  strength: 16
+  locations:
+    sikket_city: {type: city, coords: [0, 0]}
+  territories: []
+
+silvanesti:
+  capital_id: silvanost
+  color: "#228B22"
+  allegiance: whitestone
+  alignment: [5, -2]
+  strength: 38
+  locations:
+    silvanost: {type: city, coords: [48, 40]}
+    silvamori: {type: city, coords: [10, 34]}
+  territories: []
+
+solanthus:
+  capital_id: solanthus_city
+  color: "#87CEEB"
+  allegiance: neutral
+  alignment: [3, -2]
+  strength: 30
+  locations:
+    solanthus_city: {type: city, coords: [0, 0]}
+  territories: []
+
+taman:
+  capital_id: neraka
+  color: "#8B0000"
+  allegiance: highlord
+  alignment: [0, 0]
+  strength: 20
+  locations:
+    neraka: {type: city, coords: [0, 0]}
+  territories: []
+
+tarsis:
+  capital_id: tarsis_city
+  color: "#EEE8AA"
+  allegiance: neutral
+  alignment: [5, 2]
+  strength: 24
+  locations:
+    tarsis_city: {type: city, coords: [0, 0]}
+  territories: []
+
+thorbardin:
+  capital_id: life_tree
+  color: "#696969"
+  allegiance: neutral
+  alignment: [3, 3]
+  strength: 20
+  locations:
+    thorbardin_city: {type: city, coords: [0, 0]}
+  territories: []
+
+tower:
+  capital_id: high_clerist_tower
+  color: "#F5F5F5"
+  allegiance: whitestone
+  alignment: [0, 0]
+  strength: 0
+  locations:
+    high_clerist_tower: {type: fortress, coords: [23, 16]}
+  territories:
+    - [23, 16]
+    - [24, 16]
+    - [23, 17]
+
+thank:
+  capital_id: than_khal
+  color: "#556B2F"
+  allegiance: neutral
+  alignment: [2, 4]
+  strength: 16
+  locations:
+    than_khal: {type: city, coords: [17, 48]}
+  territories: []
+
+throt:
+  capital_id: throtl
+  color: "#556B2F"
+  allegiance: neutral
+  alignment: [-2, 7]
+  strength: 32
+  locations:
+    throt_city: {type: city, coords: [0, 0]}
+  territories: []
+
+vingaard:
+  capital_id: vingaard_keep
+  color: "#708090"
+  allegiance: neutral
+  alignment: [5, 3]
+  strength: 16
+  locations:
+    vingaard_keep: {type: city, coords: [0, 0]}
+  territories: []
+
+zhakar:
+  capital_id: zhakar_city
+  color: "#2F4F4F"
+  allegiance: neutral
+  alignment: [3, 5]
+  strength: 33
+  locations:
+    zhakar_city: {type: city, coords: [0, 0]}
+  territories: []

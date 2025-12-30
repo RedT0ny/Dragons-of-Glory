@@ -3,8 +3,8 @@ scenario:
   id: "scenario_1_fall_of_silvanesti"
   name: "The Fall of Silvanesti"
   map_subset:
-    x_range: [32, 64]
-    y_range: [24, 48]
+    x_range: [35, 52]
+    y_range: [32, 47]
   initial_setup:
     highlord:
       countries:

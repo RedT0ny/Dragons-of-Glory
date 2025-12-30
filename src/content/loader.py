@@ -1,40 +1,31 @@
 import csv
+import yaml
 import json
 import re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
-import yaml
 
 DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
 
 @dataclass
+class LocationSpec:
+    id: str
+    loc_type: str
+    coords: Tuple[int, int]
+    name: Optional[str] = None
+
+@dataclass
 class CountrySpec:
     id: str
-    name: str
-    capital: str
-    color: str
-    allegiance: str
-    alignment: Tuple[int, int] # (WS bonus, HL bonus)
+    capital_id: str
     strength: int
-
-def parse_countries_csv(path: str) -> Dict[str, CountrySpec]:
-    countries = {}
-    with open(path, newline="", encoding="utf-8") as fh:
-        reader = csv.DictReader(fh, delimiter=";")
-        for row in reader:
-            cid = _slugify(row["id"])
-            countries[cid] = CountrySpec(
-                id=cid,
-                name=row["name"],
-                capital=row["capital"],
-                color=row["color"],
-                allegiance=row["allegiance"].title(),
-                alignment=(int(row.get("alignment_ws", 0)), int(row.get("alignment_hl", 0))),
-                strength=int(row.get("strength", 0))
-            )
-    return countries
+    allegiance: str
+    alignment: Tuple[int, int]
+    color: str
+    locations: List[LocationSpec]
+    territories: List[Tuple[int, int]]
 
 @dataclass
 class UnitSpec:
@@ -54,6 +45,34 @@ class UnitSpec:
 
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
+
+
+def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
+    """
+    Returns a dictionary of raw data specs,
+    not game objects.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    specs = {}
+    for cid, info in data.items():
+        locations = [
+            LocationSpec(id=lid, **linfo)
+            for lid, linfo in info.get("locations", {}).items()
+        ]
+
+        specs[cid] = CountrySpec(
+            id=cid,
+            capital_id=info.get("capital_id"),
+            strength=info.get("strength", 0),
+            allegiance=info.get("allegiance", "neutral"),
+            alignment=tuple(info.get("alignment", [0, 0])),
+            color=info.get("color"),
+            locations=locations,
+            territories=[tuple(t) for t in info.get("territories", [])]
+        )
+    return specs
 
 def parse_units_csv(path: str) -> List[UnitSpec]:
     specs = []
