@@ -215,7 +215,8 @@ dargaard:
   strength: 0
   locations:
     dargaard_keep: {type: fortress, coords: [31, 13]}
-  territories: [31, 13]
+  territories:
+    - [31, 13]
 
 goodlund:
   capital_id: kendermore
@@ -301,7 +302,8 @@ haltigoth:
   strength: 12
   locations:
     haltigoth_city: {type: city, coords: [31, 25]}
-  territories: [31, 25]
+  territories:
+    - [31, 25]
 
 coastlund:
   capital_id: hargoth
@@ -912,7 +914,7 @@ palanthas:
   alignment: [5, -1]
   strength: 20
   locations:
-    palanthas_city: {type: port, coords: [0, 0]}
+    palanthas_city: {type: port, coords: [23, 14]}
   territories:
     - [25, 10]
     - [21, 11]
@@ -1331,7 +1333,7 @@ thank:
 
 throt:
   capital_id: throtl
-  color: "#556B2F"
+  color: "#F08080"
   allegiance: neutral
   alignment: [-2, 7]
   strength: 32
