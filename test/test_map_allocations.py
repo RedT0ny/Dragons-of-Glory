@@ -6,7 +6,7 @@ import os
 # Configuration for the hexagonal grid
 HEX_RADIUS = 12.2
 MAP_WIDTH = 65  # Max col observed in yaml + buffer
-MAP_HEIGHT = 55 # Max row observed in yaml + buffer
+MAP_HEIGHT = 53 # Max row observed in yaml + buffer
 SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 1000
 

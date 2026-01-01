@@ -22,20 +22,25 @@ class Event:
         self.is_active = False
 
 class Artifact:
-    def __init__(self, name, description, bonus, is_consumable=False):
+    def __init__(self, name, description, bonus, requirements=None, is_consumable=False):
         self.name = name
         self.description = description
-        self.bonus = bonus
-        self.owner = None
+        self.bonus = bonus # Can be int or a function
+        self.requirements = requirements or [] # e.g. ["solamnic"] or ["has_silver_arm"]
         self.is_consumable = is_consumable
+        self.owner = None
+
+    def can_equip(self, unit):
+        # Check race requirements
+        if "solamnic" in self.requirements and unit.race != "solamnic":
+            return False
+        # Add logic for specific artifact dependencies here
+        return True
 
     def apply_to(self, unit):
-        self.owner = unit
-        if isinstance(self.bonus, dict):
-            for stat, value in self.bonus.items():
-                setattr(unit, stat, getattr(unit, stat, 0) + value)
-        elif callable(self.bonus):
-            self.bonus(unit)
+        if self.can_equip(unit):
+            unit.equipment.append(self)
+            self.owner = unit
 
     def remove_from(self, unit):
         if isinstance(self.bonus, dict):

@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1680</width>
-    <height>960</height>
+    <width>2438</width>
+    <height>1231</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -132,13 +132,52 @@
      <enum>Qt::Orientation::Horizontal</enum>
     </property>
    </widget>
+   <widget class="QGroupBox" name="groupBox">
+    <property name="geometry">
+     <rect>
+      <x>1500</x>
+      <y>400</y>
+      <width>881</width>
+      <height>651</height>
+     </rect>
+    </property>
+    <property name="title">
+     <string>GroupBox</string>
+    </property>
+    <widget class="QWidget" name="verticalLayoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>39</x>
+       <y>29</y>
+       <width>661</width>
+       <height>431</height>
+      </rect>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="QGraphicsView" name="graphicsView_2"/>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="QPushButton" name="pushButton">
+          <property name="text">
+           <string>PushButton</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1680</width>
+     <width>2438</width>
      <height>33</height>
     </rect>
    </property>
@@ -179,6 +218,8 @@
     </widget>
     <addaction name="actionSettings"/>
     <addaction name="menuChoose_side"/>
+    <addaction name="separator"/>
+    <addaction name="actionAfter_separator"/>
    </widget>
    <widget class="QMenu" name="menuEdit">
     <property name="title">
@@ -191,6 +232,8 @@
     </property>
     <addaction name="actionGame_manual"/>
     <addaction name="actionAbout"/>
+    <addaction name="separator"/>
+    <addaction name="actionCaca"/>
    </widget>
    <addaction name="menuFIle"/>
    <addaction name="menuEdit"/>
@@ -267,6 +310,16 @@
   <action name="actionAbout">
    <property name="text">
     <string>About</string>
+   </property>
+  </action>
+  <action name="actionCaca">
+   <property name="text">
+    <string>Cuidado</string>
+   </property>
+  </action>
+  <action name="actionAfter_separator">
+   <property name="text">
+    <string>After separator</string>
    </property>
   </action>
  </widget>

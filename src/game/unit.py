@@ -33,13 +33,43 @@ class Unit:
         self.race = race
         self.allegiance = 'neutral'  # Whitesone, Highlord, neutral
         self.land = land
-        self.combat_rating = combat_rating # Combat rating for the unit
+        self._base_combat_rating = combat_rating # Combat rating for the unit
         self.tactical_rating = tactical_rating  # Tactical rating for the unit
-        self.movement = movement  # Movement points for the unit
+        self._base_movement = movement  # Use internal var for setter/getter
         self.position = (None,None) # Current position on the map (hex coordinates)
-        self.equipment = None
-        self.status = status  # inactive, active, depleted, reserve, destroyed
+        self.equipment = []
+        self.status = status # inactive, active, depleted, reserve, destroyed
+        self.is_transported = False  # New flag to track transport state
         self.attacked_this_turn = False
+
+    @property
+    def combat_rating(self):
+        """Calculates total combat rating including equipment bonuses."""
+        total = self._base_combat_rating
+        for item in self.equipment:
+            if isinstance(item.bonus, int):
+                total += item.bonus
+            # Handle complex logic like "doubled strength" via a flag or callback
+        return total
+
+    @property
+    def movement(self):
+        """Returns movement points, halved if transporting units (except for Citadels)."""
+        # Wizards move anywhere, we can handle that in the move logic, 
+        # but for consistency we return their base.
+        if self.unit_type == "wizard":
+            return self._base_movement
+
+        # Check if carrying anything
+        has_passengers = hasattr(self, 'passengers') and self.passengers
+        
+        if has_passengers and self.unit_type != "citadel":
+            return self._base_movement // 2
+        return self._base_movement
+
+    @movement.setter
+    def movement(self, value):
+        self._base_movement = value
 
     @property
     def is_on_map(self):
@@ -96,21 +126,100 @@ class Leader(Unit):
     """
     Leader unit class.
 
-    :ivar tactical_rating: Tactical rating for leaders.
-    :type tactical_rating: int
+Leader unit types: admiral, emperor, general, highlord, wizard
+
+:ivar tactical_rating: Tactical rating for leaders.
+:type tactical_rating: int
     """
-    def __init__(self, name, unit_type, tactical_rating, movement, race):
-        super().__init__(name, unit_type, 0, tactical_rating, movement, race)
-    # Note: Don't implement tactical radius and command control for the moment.
+    def __init__(self, name, unit_type, tactical_rating, movement, race, land=None):
+        super().__init__(name, unit_type, 0, tactical_rating, movement, race, land)
 
     def is_leader(self):
         return True
 
+class Wizard(Leader):
+    """
+    Wizards can move to any hex on the map (except enemy hexes) once per turn.
+    """
+    def __init__(self, name, race, land, allegiance):
+        super().__init__(name, "wizard", tactical_rating=3, movement=99, race=race, land=land)
+        self.allegiance = allegiance
+
+class Fleet(Unit):
+    def __init__(self, name, race, land, allegiance, movement, combat_rating):
+        super().__init__(name, "fleet", combat_rating, 0, movement, race, land)
+        self.allegiance = allegiance
+        self.passengers = [] # List of units currently aboard
+
+    def can_carry(self, unit):
+        """Ships carry one ground army and any number of leaders."""
+        if unit.is_leader():
+            return True
+        
+        # Check if an army is already aboard
+        has_army = any(not p.is_leader() for p in self.passengers)
+        if not unit.is_leader() and not has_army:
+            return True
+        return False
+
+    def load_unit(self, unit):
+        if self.can_carry(unit):
+            self.passengers.append(unit)
+            unit.is_transported = True
+
+class Wing(Unit):
+    def __init__(self, name, race, land, allegiance, movement, combat_rating):
+        super().__init__(name, "wing", combat_rating, 0, movement, race, land)
+        self.allegiance = allegiance
+        self.passengers = []
+
+    def can_carry(self, unit):
+        # Griffons and Pegasi: 1 Infantry AND 1 Leader
+        if self.race in ("griffon", "pegasus"):
+            is_inf = (unit.unit_type == "inf")
+            is_ldr = unit.is_leader()
+            
+            if is_inf and any(p.unit_type == "inf" for p in self.passengers):
+                return False
+            if is_ldr and any(p.is_leader() for p in self.passengers):
+                return False
+            return is_inf or is_ldr
+
+        # Dragons: 1 Leader (Color/Race matching)
+        if self.race == "dragon":
+            if not unit.is_leader() or len(self.passengers) >= 1:
+                return False
+            
+            if self.allegiance == "highlord":
+                # Must match color (land) or be Ariakas (emperor)
+                return unit.land == self.land or unit.unit_type == "emperor"
+            
+            if self.allegiance == "whitestone":
+                # Must be Elf or Solamnic
+                return unit.race in ("elf", "solamnic")
+        return False
+
+    def load_unit(self, unit):
+        if self.can_carry(unit):
+            self.passengers.append(unit)
+            unit.is_transported = True
+
+    class FlyingCitadel(Unit):
+        def __init__(self, name, allegiance):
+        # Citadels move 4 hexes, ignore terrain, and have no combat rating themselves
+            super().__init__(name, "citadel", 0, 0, 4, race="magic")
+            self.allegiance = allegiance
+            self.passengers = []
+
+        def can_carry(self, unit):
+            # Up to three HL armies of any type.
+            armies_aboard = [p for p in self.passengers if p.unit_type in ("inf", "cav")]
+            return unit.allegiance == "highlord" and len(armies_aboard) < 3
+
 class Hero(Unit):
-    def __init__(self, name, allegiance, movement, combat_rating, tactical_rating=0):
-        super().__init__(name, allegiance, movement)
-        self.combat_rating = combat_rating
-        self.tactical_rating = tactical_rating
+    def __init__(self, name, unit_type, combat_rating, tactical_rating, movement):
+        super().__init__(name, unit_type, combat_rating, tactical_rating, movement)
+
 
 class Army(Unit):
     """
@@ -128,26 +237,5 @@ class Army(Unit):
             The type of terrain where the army has an advantage. Set to None by default.
     """
     def __init__(self, name, allegiance, movement, combat_rating, race):
-        super().__init__(name, allegiance, movement, race)
-        self.combat_rating = combat_rating
+        super().__init__(name, allegiance, movement, combat_rating, 0, race)
         self.terrain_affinity = None  # Terrain affinity for the unit
-
-class Fleet(Unit):
-    def __init__(self, name, allegiance, color, movement, combat_rating,):
-        super().__init__(name, allegiance, color, movement, combat_rating)
-        self.combat_rating = combat_rating
-        self.carrying_army = None  # Can carry one army
-
-    def carry_army(self, army):
-        self.carrying_army = army
-
-class Wing(Unit):
-    def __init__(self, name, allegiance, color, movement, combat_rating):
-        super().__init__(name, allegiance, color, movement, combat_rating)
-        self.carrying_army = None
-
-    def carry_army(self, army):
-        if self.race != "dragon":
-            self.carrying_army = army
-
-
