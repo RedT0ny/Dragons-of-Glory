@@ -6,322 +6,169 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>2438</width>
-    <height>1231</height>
+    <width>1200</width>
+    <height>800</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Dragons of Glory</string>
   </property>
-  <widget class="QWidget" name="centralwidget">
-   <widget class="QScrollArea" name="scrollArea">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>0</y>
-      <width>1491</width>
-      <height>751</height>
-     </rect>
-    </property>
-    <property name="widgetResizable">
-     <bool>true</bool>
-    </property>
-    <widget class="QWidget" name="scrollAreaWidgetContents">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>0</y>
-       <width>1487</width>
-       <height>747</height>
-      </rect>
-     </property>
-     <widget class="QGraphicsView" name="graphicsView">
-      <property name="geometry">
-       <rect>
-        <x>0</x>
-        <y>0</y>
-        <width>1491</width>
-        <height>751</height>
-       </rect>
-      </property>
-     </widget>
-     <widget class="QScrollBar" name="verticalScrollBar">
-      <property name="geometry">
-       <rect>
-        <x>1470</x>
-        <y>-1</y>
-        <width>20</width>
-        <height>751</height>
-       </rect>
-      </property>
-      <property name="orientation">
-       <enum>Qt::Orientation::Vertical</enum>
-      </property>
-     </widget>
-    </widget>
-   </widget>
-   <widget class="QScrollArea" name="scrollArea_2">
-    <property name="geometry">
-     <rect>
-      <x>1500</x>
-      <y>0</y>
-      <width>171</width>
-      <height>751</height>
-     </rect>
-    </property>
-    <property name="widgetResizable">
-     <bool>true</bool>
-    </property>
-    <widget class="QWidget" name="scrollAreaWidgetContents_2">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>0</y>
-       <width>167</width>
-       <height>747</height>
-      </rect>
-     </property>
-     <widget class="QScrollBar" name="verticalScrollBar_2">
-      <property name="geometry">
-       <rect>
-        <x>150</x>
-        <y>-1</y>
-        <width>20</width>
-        <height>751</height>
-       </rect>
-      </property>
-      <property name="orientation">
-       <enum>Qt::Orientation::Vertical</enum>
-      </property>
-     </widget>
-    </widget>
-   </widget>
-   <widget class="QScrollArea" name="scrollArea_3">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
-      <y>760</y>
-      <width>1491</width>
-      <height>131</height>
-     </rect>
-    </property>
-    <property name="widgetResizable">
-     <bool>true</bool>
-    </property>
-    <widget class="QWidget" name="scrollAreaWidgetContents_3">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>0</y>
-       <width>1487</width>
-       <height>127</height>
-      </rect>
-     </property>
-    </widget>
-   </widget>
-   <widget class="QScrollBar" name="horizontalScrollBar">
-    <property name="geometry">
-     <rect>
-      <x>-10</x>
-      <y>740</y>
-      <width>1501</width>
-      <height>16</height>
-     </rect>
-    </property>
-    <property name="orientation">
-     <enum>Qt::Orientation::Horizontal</enum>
-    </property>
-   </widget>
-   <widget class="QGroupBox" name="groupBox">
-    <property name="geometry">
-     <rect>
-      <x>1500</x>
-      <y>400</y>
-      <width>881</width>
-      <height>651</height>
-     </rect>
-    </property>
-    <property name="title">
-     <string>GroupBox</string>
-    </property>
-    <widget class="QWidget" name="verticalLayoutWidget">
-     <property name="geometry">
-      <rect>
-       <x>39</x>
-       <y>29</y>
-       <width>661</width>
-       <height>431</height>
-      </rect>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout">
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="mainVerticalLayout">
+    <item>
+     <layout class="QHBoxLayout" name="contentHorizontalLayout" stretch="4,1">
       <item>
-       <widget class="QGraphicsView" name="graphicsView_2"/>
+       <!-- Placeholder for AnsalonMapView -->
+       <widget class="QWidget" name="map_view" native="true">
+        <property name="styleSheet">
+         <string notr="true">background-color: #222;</string>
+        </property>
+       </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout">
-        <item>
-         <widget class="QPushButton" name="pushButton">
-          <property name="text">
-           <string>PushButton</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
+       <widget class="QFrame" name="info_panel">
+        <property name="minimumSize">
+         <size>
+          <width>250</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>250</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="frameShadow">
+         <enum>QFrame::Sunken</enum>
+        </property>
+        <layout class="QVBoxLayout" name="infoPanelLayout">
+         <item>
+          <widget class="QLabel" name="mini_map">
+           <property name="minimumSize">
+            <size>
+             <width>230</width>
+             <height>150</height>
+            </size>
+           </property>
+           <property name="styleSheet">
+            <string notr="true">background-color: #333; color: white;</string>
+           </property>
+           <property name="text">
+            <string>Mini-map Area</string>
+           </property>
+           <property name="alignment">
+            <set>Qt::AlignCenter</set>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QGridLayout" name="btn_grid">
+           <!-- Grid of buttons as seen in InfoPanel -->
+           <item row="0" column="0"><widget class="QPushButton" name="btnMove"><property name="text"><string>Move</string></property></widget></item>
+           <item row="0" column="1"><widget class="QPushButton" name="btnAttack"><property name="text"><string>Attack</string></property></widget></item>
+           <item row="0" column="2"><widget class="QPushButton" name="btnActivate"><property name="text"><string>Activate</string></property></widget></item>
+           <item row="1" column="0"><widget class="QPushButton" name="btnPrev"><property name="text"><string>Prev</string></property></widget></item>
+           <item row="1" column="1"><widget class="QPushButton" name="btnUndo"><property name="text"><string>Undo</string></property></widget></item>
+           <item row="1" column="2"><widget class="QPushButton" name="btnCombine"><property name="text"><string>Combine</string></property></widget></item>
+           <item row="2" column="0"><widget class="QPushButton" name="btnNext"><property name="text"><string>Next</string></property></widget></item>
+           <item row="2" column="1"><widget class="QPushButton" name="btnRedo"><property name="text"><string>Redo</string></property></widget></item>
+           <item row="2" column="2"><widget class="QPushButton" name="btnEndTurn"><property name="text"><string>End Turn</string></property></widget></item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="selection_label">
+           <property name="styleSheet">
+            <string notr="true">font-weight: bold; font-size: 14px;</string>
+           </property>
+           <property name="text">
+            <string>Terrain (col, row)
+Location (if any)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="unit_box">
+           <property name="frameShape">
+            <enum>QFrame::Box</enum>
+           </property>
+           <layout class="QVBoxLayout" name="unitLayout">
+            <item>
+             <widget class="QLabel" name="unit_name_label">
+              <property name="text"><string>Unit Name</string></property>
+              <property name="alignment"><set>Qt::AlignCenter</set></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="unit_img">
+              <property name="minimumSize"><size><width>150</width><height>150</height></size></property>
+              <property name="styleSheet"><string notr="true">border: 1px solid black;</string></property>
+              <property name="text"><string>Unit Picture</string></property>
+              <property name="alignment"><set>Qt::AlignCenter</set></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="unit_stats_label">
+              <property name="text"><string>Rating: X
+Mov: remaining (total)
+country_name
+unit_status</string></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="verticalSpacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
       </item>
      </layout>
-    </widget>
-   </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="log_area">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>100</height>
+       </size>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::Panel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Sunken</enum>
+      </property>
+      <property name="text">
+       <string>Game log...</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>2438</width>
-     <height>33</height>
+     <width>1200</width>
+     <height>22</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuFIle">
-    <property name="title">
-     <string>FIle</string>
-    </property>
-    <widget class="QMenu" name="menuNew_Game">
-     <property name="title">
-      <string>New Game</string>
-     </property>
-     <widget class="QMenu" name="menuScenario">
-      <property name="title">
-       <string>Scenario</string>
-      </property>
-      <addaction name="actionSilvanesti"/>
-      <addaction name="actionAbanasinia"/>
-      <addaction name="actionNeraka"/>
-     </widget>
-     <addaction name="actionCampaign"/>
-     <addaction name="menuScenario"/>
-    </widget>
-    <addaction name="menuNew_Game"/>
-    <addaction name="actionSave_Game"/>
-    <addaction name="actionLoad_Game"/>
-    <addaction name="actionQuit"/>
-   </widget>
-   <widget class="QMenu" name="menuOptions">
-    <property name="title">
-     <string>Settings</string>
-    </property>
-    <widget class="QMenu" name="menuChoose_side">
-     <property name="title">
-      <string>Choose side</string>
-     </property>
-     <addaction name="actionHighlord"/>
-     <addaction name="actionWhitestone"/>
-    </widget>
-    <addaction name="actionSettings"/>
-    <addaction name="menuChoose_side"/>
-    <addaction name="separator"/>
-    <addaction name="actionAfter_separator"/>
-   </widget>
-   <widget class="QMenu" name="menuEdit">
-    <property name="title">
-     <string>View</string>
-    </property>
-   </widget>
-   <widget class="QMenu" name="menuHelp">
-    <property name="title">
-     <string>Info</string>
-    </property>
-    <addaction name="actionGame_manual"/>
-    <addaction name="actionAbout"/>
-    <addaction name="separator"/>
-    <addaction name="actionCaca"/>
-   </widget>
-   <addaction name="menuFIle"/>
-   <addaction name="menuEdit"/>
-   <addaction name="menuOptions"/>
-   <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
-  <widget class="QToolBar" name="toolBar">
-   <property name="windowTitle">
-    <string>toolBar</string>
-   </property>
-   <attribute name="toolBarArea">
-    <enum>TopToolBarArea</enum>
-   </attribute>
-   <attribute name="toolBarBreak">
-    <bool>false</bool>
-   </attribute>
-  </widget>
-  <action name="actionCampaign">
-   <property name="text">
-    <string>Campaign</string>
-   </property>
-  </action>
-  <action name="actionSilvanesti">
-   <property name="text">
-    <string>Silvanesti</string>
-   </property>
-  </action>
-  <action name="actionAbanasinia">
-   <property name="text">
-    <string>Abanasinia</string>
-   </property>
-  </action>
-  <action name="actionNeraka">
-   <property name="text">
-    <string>Neraka</string>
-   </property>
-  </action>
-  <action name="actionSave_Game">
-   <property name="text">
-    <string>Save Game</string>
-   </property>
-  </action>
-  <action name="actionLoad_Game">
-   <property name="text">
-    <string>Load Game</string>
-   </property>
-  </action>
-  <action name="actionQuit">
-   <property name="text">
-    <string>Quit</string>
-   </property>
-  </action>
-  <action name="actionSettings">
-   <property name="text">
-    <string>Difficulty</string>
-   </property>
-  </action>
-  <action name="actionWhitestone">
-   <property name="text">
-    <string>Whitestone</string>
-   </property>
-  </action>
-  <action name="actionHighlord">
-   <property name="text">
-    <string>Highlord</string>
-   </property>
-  </action>
-  <action name="actionGame_manual">
-   <property name="text">
-    <string>Game manual</string>
-   </property>
-  </action>
-  <action name="actionAbout">
-   <property name="text">
-    <string>About</string>
-   </property>
-  </action>
-  <action name="actionCaca">
-   <property name="text">
-    <string>Cuidado</string>
-   </property>
-  </action>
-  <action name="actionAfter_separator">
-   <property name="text">
-    <string>After separator</string>
-   </property>
-  </action>
  </widget>
  <resources/>
  <connections/>

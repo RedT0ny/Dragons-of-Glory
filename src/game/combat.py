@@ -11,15 +11,15 @@ class CombatResolver:
         self.terrain_type = terrain_type
         # Use the centralized loader
         self.crt_data = load_data("data/crt.csv") # csv or yaml?
-    """
-    Calculates the odds of a combat based on the attacker's combat rating and the defender's combat rating.
-    
-    Returns:
-        str: The odds string in the format "X:Y" where X is the attacker's odds and Y is the defender's odds.
-    """
-    def calculate_odds(self, attacker_cs, defender_cs):
 
-        # Rule 7.2: Minimum 1/3 odds, Maximum 6/1 odds logic
+    def calculate_odds(self, attacker_cs, defender_cs):
+        """
+        Calculates the odds of a combat based on the attacker's combat rating and the defender's combat rating.
+        Rule 7.2: Minimum 1/3 odds, Maximum 6/1 odds logic
+
+        Returns:
+            str: The odds string in the format "X:Y" where X is the attacker's odds and Y is the defender's odds.
+        """
         if defender_cs <= 0: return "6:1"
         ratio = attacker_cs / defender_cs
         # ... logic to map ratio to CRT columns ...

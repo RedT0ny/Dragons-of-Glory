@@ -1,7 +1,5 @@
-import csv
-import yaml
-import json
-import re
+import csv, yaml, json
+import os, re
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -46,6 +44,29 @@ class UnitSpec:
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
 
+def load_data(file_path):
+    """
+    Centralized loader to handle various data formats (YAML, CSV).
+    """
+    if not os.path.exists(file_path):
+        print(f"Warning: File not found at {file_path}")
+        return {}
+
+    ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if ext in ['.yaml', '.yml']:
+            with open(file_path, 'r') as f:
+                return yaml.safe_load(f)
+        elif ext == '.csv':
+            with open(file_path, 'r') as f:
+                reader = csv.DictReader(f)
+                return [row for row in reader]
+    except Exception as e:
+        print(f"Error loading {file_path}: {e}")
+        return {}
+
+    return {}
 
 def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
     """
