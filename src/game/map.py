@@ -69,9 +69,26 @@ class HexGrid:
         self.offset_q = offset_q
         self.offset_r = offset_r
         
-        self.grid = {} # Shared master terrain data
-        self.hexside_data = {} # Shared master hexside data
+        self.grid = {}  # (q, r) -> terrain_type
+        self.hexside_data = {} # ((q1,r1), (q2,r2)) -> border_type
         self.unit_map = {} 
+        self.special_hexes = {} # (q, r) -> "fortified_city", etc.
+
+    def load_from_csv(self, terrain_csv_path):
+        """Loads terrain data from a CSV grid."""
+        import csv
+        with open(terrain_csv_path, mode='r') as f:
+            reader = csv.reader(f)
+            header = next(reader) # Skip column headers
+            for row_idx, row in enumerate(reader):
+                for col_idx, terrain in enumerate(row[1:]): # skip row header
+                    hex_obj = Hex.offset_to_axial(col_idx, row_idx)
+                    self.grid[(hex_obj.q, hex_obj.r)] = terrain
+
+    def add_hexside(self, q1, r1, q2, r2, side_type):
+        """Registers a special border between two hexes (River/Mountain)."""
+        key = tuple(sorted([(q1, r1), (q2, r2)]))
+        self.hexside_data[key] = side_type
 
     def to_master_coords(self, q, r):
         """Converts local scenario coordinates to master map coordinates."""
@@ -79,7 +96,18 @@ class HexGrid:
 
     def get_terrain(self, hex_coord):
         master_q, master_r = self.to_master_coords(hex_coord.q, hex_coord.r)
-        return self.grid.get((master_q, master_r), "plain")
+        raw_terrain = self.grid.get((master_q, master_r), "plain")
+        
+        # If it starts with 'c_', it's coastal. Return the part after 'c_'.
+        if raw_terrain.startswith("c_"):
+            return raw_terrain[2:]
+        return raw_terrain
+
+    def is_coastal(self, hex_coord):
+        """Helper to specifically check for coastal rules."""
+        master_q, master_r = self.to_master_coords(hex_coord.q, hex_coord.r)
+        raw_terrain = self.grid.get((master_q, master_r), "")
+        return raw_terrain.startswith("c_")
 
     def get_hexside(self, from_hex, to_hex):
         m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
@@ -155,23 +183,26 @@ class HexGrid:
 
     def get_neighbors(self, hex_coord, unit):
         """
-        Returns accessible neighbors considering Rule 5 Zone of Control.
+        Returns accessible neighbors considering Rule 5 and Sea Barriers.
         """
         neighbors = []
-            
-            # Rule 5: If ground army starts adjacent to enemy, can only move if 
-            # first move puts it in a hex NOT adjacent to an enemy. (Cavalry/Flyers exempt)
         currently_in_zoc = self.is_adjacent_to_enemy(hex_coord, unit)
-        # Cavalry and Leaders are exempt from ZOC-to-ZOC restrictions
-        is_exempt = unit.unit_type == 'cavalry' or unit.is_leader() or unit.unit_type == 'wing'
+        is_exempt = unit.unit_type in ['cavalry', 'wing'] or unit.is_leader()
 
         for neighbor in hex_coord.neighbors():
-            # Basic Bounds
+            # 1. Basic Bounds Check
             col, row = neighbor.axial_to_offset()
             if not (0 <= col < self.width and 0 <= row < self.height):
                 continue
 
-            # Rule 5: Cannot occupy enemy hex
+            # 2. Check for Sea Barriers (Rule 5)
+            # If ground unit, check if the hexside between current and neighbor is 'sea'
+            if unit.unit_type != 'wing':
+                hexside = self.get_hexside(hex_coord, neighbor)
+                if hexside == "sea":  # Explicitly mark water-only boundaries in config
+                    continue
+
+            # 3. Cannot occupy enemy hex
             if self.has_enemy_army(neighbor, unit.allegiance):
                 continue
 

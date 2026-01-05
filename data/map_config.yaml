@@ -1,0 +1,27 @@
+master_map:
+  name: "Ansalon"
+  width: 65
+  height: 53
+  hex_size: 93  # Short diagonal in px
+  terrain_types:
+  - "mountain"
+  - "grassland"
+  - "desert"
+  - "steppe"
+  - "forest"
+  - "marsh"
+  - "ocean"
+  - "jungle"
+  - "maelstrom"
+  
+  # Hexside data for Movement Rule 5 (Mountains/Rivers)
+  # Format: [q1, r1, q2, r2, type]
+  hexsides:
+    - [10, 5, 11, 5, "river"]
+    - [12, 8, 12, 9, "mountain"]
+    - [47, 11, 47, 10, "sea"]
+    - [47, 11, 46, 11, "sea"]
+  
+  # Named locations for Rule 5 (Fortified Cities)
+  special_locations:
+    - { coord: [35, 40], name: "Kalaman", type: "fortified_city" }

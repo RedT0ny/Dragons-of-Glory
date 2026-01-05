@@ -61,9 +61,9 @@ class MainWindow(QMainWindow):
         content_layout = QHBoxLayout()
         
         # Hex Map
-        self.map_view = AnsalonMapView()
+        self.map_view = AnsalonMapView(self.game_state)
         content_layout.addWidget(self.map_view, stretch=4)
-        
+    
         # Sidebar
         self.info_panel = InfoPanel()
         content_layout.addWidget(self.info_panel, stretch=1)
@@ -76,5 +76,5 @@ class MainWindow(QMainWindow):
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         main_layout.addWidget(self.log_area)
 
-        # Initialize visual grid
-        self.map_view.draw_grid(20, 20, 30)
+        # Initialize visual grid from the game state
+        self.map_view.sync_with_model()
