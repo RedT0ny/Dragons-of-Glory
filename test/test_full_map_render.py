@@ -2,7 +2,7 @@ import sys
 import math
 import os
 from PySide6.QtWidgets import QApplication, QWidget, QGraphicsScene, QGraphicsView, QGraphicsItem
-from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
+from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen, QPixmap
 from PySide6.QtCore import Qt, QPointF, QTimer, QRectF
 
 # Add src to path to use existing loaders
@@ -27,14 +27,27 @@ HEXSIDE_COLORS = {
     "bridge": QColor(255, 69, 0, 255)         # Red-Orange
 }
 
+# Define Terrain Visuals
+TERRAIN_VISUALS = {
+    "grassland": {"color": QColor(238, 244, 215), "pattern": Qt.NoBrush},
+    "steppe": {"color": QColor(180, 190, 100), "pattern": Qt.BDiagPattern},
+    "forest": {"color": QColor(34, 139, 34), "pattern": Qt.Dense6Pattern},
+    "jungle": {"color": QColor(0, 85, 0), "pattern": Qt.Dense7Pattern},
+    "mountain": {"color": QColor(139, 115, 85), "pattern": Qt.CrossPattern},
+    "swamp": {"color": QColor(85, 107, 47), "pattern": Qt.HorPattern},
+    "desert": {"color": QColor(244, 164, 96), "pattern": Qt.Dense7Pattern},
+    "ocean": {"color": QColor(135, 206, 250), "pattern": Qt.SolidPattern}
+}
+
 class HexagonItem(QGraphicsItem):
-    def __init__(self, center, radius, color, parent=None):
+    def __init__(self, center, radius, color, terrain_type="grassland", parent=None):
         super().__init__(parent)
         self.center = center
         self.radius = radius
-        self.color = color
+        # Ensure color is a QColor object even if a tuple is passed
+        self.color = QColor(*color) if isinstance(color, (tuple, list)) else color
+        self.terrain_type = terrain_type
         self.points = []
-        
         # Create pointy-top hexagon path
         self.path = QPainterPath()
         for i in range(6):
@@ -51,9 +64,21 @@ class HexagonItem(QGraphicsItem):
         return self.path.boundingRect()
 
     def paint(self, painter, option, widget):
-        painter.setBrush(QBrush(QColor(*self.color)))
-        painter.setPen(QPen(QColor(100, 100, 100, 50), 0.5))
+        # Draw terrain base and pattern
+        visual = TERRAIN_VISUALS.get(self.terrain_type, TERRAIN_VISUALS["grassland"])
+        
+        # Layer 1: Terrain Color + Pattern
+        base_brush = QBrush(visual["color"], visual["pattern"])
+        painter.setBrush(base_brush)
+        painter.setPen(QPen(QColor(100, 100, 100, 40), 0.5))
         painter.drawPath(self.path)
+
+        # Layer 2: Country Overlay (if applicable)
+        # Now alpha() will work because self.color is guaranteed to be a QColor
+        if self.color.alpha() > 0:
+            painter.setBrush(QBrush(self.color))
+            painter.setPen(Qt.NoPen)
+            painter.drawPath(self.path)
 
 class HexsideItem(QGraphicsItem):
     def __init__(self, start_pt, end_pt, side_type):
@@ -81,34 +106,43 @@ class MapViewer(QGraphicsView):
         
         self.load_all_data()
 
+    def get_hex_center(self, col, row):
+        """Calculates pixel center for a pointy-top hex using odd-r offset coordinates."""
+        x = HEX_RADIUS * math.sqrt(3) * (col + 0.5 * (row & 1))
+        y = HEX_RADIUS * 3/2 * row
+        return QPointF(x + X_OFFSET, y + Y_OFFSET)
+
     def load_all_data(self):
         data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
         
         # 1. Load Countries and territories
         self.country_specs = load_countries_yaml(os.path.join(data_dir, "countries.yaml"))
         
-        # 2. Load Map Config (Hexsides and Special Locations)
+        # 2. Load Map Config
         self.map_cfg = load_data(os.path.join(data_dir, "map_config.yaml"))
         
-    def get_hex_center(self, col, row):
-        x = HEX_RADIUS * math.sqrt(3) * (col + 0.5 * (row & 1))
-        y = HEX_RADIUS * 3/2 * row
-        return QPointF(x + X_OFFSET, y + Y_OFFSET)
+        # 3. Load Actual Terrain from CSV
+        from src.content.loader import load_terrain_csv
+        self.terrain_data = load_terrain_csv(os.path.join(data_dir, "ansalon_map.csv"))
 
     def draw_map(self):
-        # Draw all hexes first
+        # Draw all hexes with terrain from CSV
         for row in range(MAP_HEIGHT):
             for col in range(MAP_WIDTH):
                 center = self.get_hex_center(col, row)
-                self.scene.addItem(HexagonItem(center, HEX_RADIUS, (240, 240, 240, 255)))
+                # Look up terrain from our new CSV data
+                t_type = self.terrain_data.get(f"{col},{row}", "ocean")
+                self.scene.addItem(HexagonItem(center, HEX_RADIUS, QColor(0,0,0,0), terrain_type=t_type))
 
         # Overlay Country territories
         for cid, spec in self.country_specs.items():
             color = QColor(spec.color)
-            rgba = (color.red(), color.green(), color.blue(), 100)
+            rgba = QColor(color.red(), color.green(), color.blue(), 100)
             for col, row in spec.territories:
                 center = self.get_hex_center(col, row)
-                self.scene.addItem(HexagonItem(center, HEX_RADIUS, rgba))
+                # Ensure we pass the terrain type here so patterns show through the color
+                t_type = self.terrain_data.get(f"{col},{row}", "grassland")
+                self.scene.addItem(HexagonItem(center, HEX_RADIUS, rgba, terrain_type=t_type))
 
         # Draw Hexsides (Rivers, Mountains, etc)
         hexsides = self.map_cfg.get('master_map', {}).get('hexsides', {})
