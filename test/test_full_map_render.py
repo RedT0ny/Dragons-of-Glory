@@ -29,14 +29,16 @@ HEXSIDE_COLORS = {
 
 # Define Terrain Visuals
 TERRAIN_VISUALS = {
-    "grassland": {"color": QColor(238, 244, 215), "pattern": Qt.NoBrush},
-    "steppe": {"color": QColor(180, 190, 100), "pattern": Qt.BDiagPattern},
+    "grassland": {"color": QColor(238, 244, 215), "pattern": Qt.SolidPattern},
+    "steppe": {"color": QColor(180, 190, 100), "pattern": Qt.HorPattern},
     "forest": {"color": QColor(34, 139, 34), "pattern": Qt.Dense6Pattern},
-    "jungle": {"color": QColor(0, 85, 0), "pattern": Qt.Dense7Pattern},
+    "jungle": {"color": QColor(0, 85, 0), "pattern": Qt.Dense5Pattern},
     "mountain": {"color": QColor(139, 115, 85), "pattern": Qt.CrossPattern},
-    "swamp": {"color": QColor(85, 107, 47), "pattern": Qt.HorPattern},
+    "swamp": {"color": QColor(85, 107, 47), "pattern": Qt.BDiagPattern},
     "desert": {"color": QColor(244, 164, 96), "pattern": Qt.Dense7Pattern},
-    "ocean": {"color": QColor(135, 206, 250), "pattern": Qt.SolidPattern}
+    "ocean": {"color": QColor(135, 206, 250), "pattern": Qt.SolidPattern},
+    "maelstrom": {"color": QColor(130, 9, 9), "pattern": Qt.Dense4Pattern},
+    "glacier": {"color": QColor(231, 173, 255), "pattern": Qt.DiagCrossPattern},
 }
 
 class HexagonItem(QGraphicsItem):
