@@ -7,7 +7,7 @@
 #   alignment: [WS_bonus, HL_bonus]
 #   strength: base_power
 #   locations:
-#     loc_id: {type: city|fortress, coords: [col, row]}
+#     loc_id: {loc_type: city|fortress, coords: [col, row]}
 #   territories: [[col, row], ...]
 
 abanasinia:
@@ -17,7 +17,7 @@ abanasinia:
   alignment: [5, -1]
   strength: 12
   locations:
-    haven: {type: city, coords: [22, 36]}
+    haven: {loc_type: city, coords: [22, 36]}
   territories:
     - [23, 32]
     - [24, 32]
@@ -48,7 +48,7 @@ balifor:
   alignment: [3, 4]
   strength: 16
   locations:
-    port_balifor: {type: port, coords: [46, 31]}
+    port_balifor: {loc_type: port, coords: [46, 31]}
   territories:
     - [49, 26]
     - [46, 27]
@@ -90,7 +90,7 @@ blode:
   alignment: [-2, 7]
   strength: 48
   locations:
-    bloten: {type: city, coords: [36, 32]}
+    bloten: {loc_type: city, coords: [36, 32]}
   territories:
     - [36, 32]
     - [36, 33]
@@ -110,8 +110,8 @@ blodehelm:
   alignment: [0, 0]
   strength: 24
   locations:
-    vantal: {type: city, coords: [34, 34]}
-    shrentak: {type: port, coords: [33, 37]}
+    vantal: {loc_type: city, coords: [34, 34]}
+    shrentak: {loc_type: port, coords: [33, 37]}
   territories:
     - [32, 28]
     - [33, 28]
@@ -170,8 +170,8 @@ southlund:
   alignment: [3, -2]
   strength: 30
   locations:
-    caergoth: {type: port, coords: [19, 29]}
-    starport: {type: port, coords: [21, 26]}
+    caergoth: {loc_type: port, coords: [19, 29]}
+    starport: {loc_type: port, coords: [21, 26]}
   territories:
     - [21, 26]
     - [22, 26]
@@ -201,7 +201,7 @@ daltigoth:
   alignment: [-2, 4]
   strength: 24
   locations:
-    daltigoth_city: {type: port, coords: [12, 33]}
+    daltigoth_city: {loc_type: port, coords: [12, 33]}
   territories:
     - [12, 33]
     - [13, 33]
@@ -214,7 +214,7 @@ dargaard:
   alignment: [0, 0]
   strength: 0
   locations:
-    dargaard_keep: {type: fortress, coords: [31, 13]}
+    dargaard_keep: {loc_type: fortress, coords: [31, 13]}
   territories:
     - [31, 13]
 
@@ -225,7 +225,7 @@ goodlund:
   alignment: [5, -2]
   strength: 16
   locations:
-    kendermore: {type: city, coords: [52, 28]}
+    kendermore: {loc_type: city, coords: [52, 28]}
   territories:
     - [51, 25]
     - [52, 25]
@@ -275,7 +275,7 @@ sancrist:
   alignment: [4, -3]
   strength: 44
   locations:
-    castle_wistan: {type: port, coords: [3, 26]}
+    castle_wistan: {loc_type: port, coords: [3, 26]}
   territories:
     - [2, 24]
     - [4, 24]
@@ -301,7 +301,7 @@ haltigoth:
   alignment: [4, 4]
   strength: 12
   locations:
-    haltigoth_city: {type: city, coords: [31, 25]}
+    haltigoth_city: {loc_type: city, coords: [31, 25]}
   territories:
     - [31, 25]
 
@@ -312,7 +312,7 @@ coastlund:
   alignment: [3, -2]
   strength: 18
   locations:
-    hargoth: {type: city, coords: [19, 16]}
+    hargoth: {loc_type: city, coords: [19, 16]}
   territories:
     - [17, 9]
     - [18, 9]
@@ -363,7 +363,7 @@ hylo:
   alignment: [4, -2]
   strength: 24
   locations:
-    kenderhome: {type: city, coords: [16, 19]}
+    kenderhome: {loc_type: city, coords: [16, 19]}
   territories:
     - [13, 15]
     - [14, 15]
@@ -389,7 +389,7 @@ icereach:
   alignment: [1, 4]
   strength: 20
   locations:
-    icewall_castle: {type: fortress, coords: [28, 52]}
+    icewall_castle: {loc_type: fortress, coords: [28, 52]}
   territories:
     - [27, 52]
     - [28, 52]
@@ -402,7 +402,7 @@ nightlund:
   alignment: [3, -2]
   strength: 18
   locations:
-    kalaman: {type: port, coords: [34, 12]}
+    kalaman: {loc_type: port, coords: [34, 12]}
   territories:
     - [31, 12]
     - [32, 12]
@@ -438,7 +438,7 @@ kaolyn:
   alignment: [4, 1]
   strength: 25
   locations:
-    garnet_thax: {type: undercity, coords: [24, 26]}
+    garnet_thax: {loc_type: undercity, coords: [24, 26]}
   territories:
     - [25, 24]
     - [26, 24]
@@ -456,8 +456,8 @@ kern:
   alignment: [-2, 7]
   strength: 30
   locations:
-    kernen: {type: city, coords: [43, 19]}
-    ogrebend: {type: port, coords: [48, 22]}
+    kernen: {loc_type: city, coords: [43, 19]}
+    ogrebend: {loc_type: port, coords: [48, 22]}
   territories:
     - [49, 9]
     - [48, 10]
@@ -561,7 +561,7 @@ kharolis:
   alignment: [4, 2]
   strength: 16
   locations:
-    alsip: {type: port, coords: [14, 43]}
+    alsip: {loc_type: port, coords: [14, 43]}
   territories:
     - [15, 40]
     - [15, 41]
@@ -592,8 +592,8 @@ khur:
   alignment: [3, 6]
   strength: 24
   locations:
-    khuri_khan: {type: port, coords: [41, 28]}
-    delphon: {type: city, coords: [44, 26]}
+    khuri_khan: {loc_type: port, coords: [41, 28]}
+    delphon: {loc_type: city, coords: [44, 26]}
   territories:
     - [41, 22]
     - [40, 23]
@@ -653,7 +653,7 @@ kothas:
   alignment: [1, 7]
   strength: 32
   locations:
-    kalpethis: {type: port, coords: [61, 16]}
+    kalpethis: {loc_type: port, coords: [61, 16]}
   territories:
     - [60, 15]
     - [61, 15]
@@ -670,8 +670,8 @@ lemish:
   alignment: [1, 5]
   strength: 24
   locations:
-    lemish_city: {type: city, coords: [27, 26]}
-    fearfold: {type: fortress, coords: [28, 21]}
+    lemish_city: {loc_type: city, coords: [27, 26]}
+    fearfold: {loc_type: fortress, coords: [28, 21]}
   territories:
     - [28, 21]
     - [29, 21]
@@ -707,7 +707,7 @@ hinterlund:
   alignment: [3, -2]
   strength: 18
   locations:
-    maelgoth: {type: port, coords: [28, 14]}
+    maelgoth: {loc_type: port, coords: [28, 14]}
   territories:
     - [31, 8]
     - [30, 9]
@@ -742,7 +742,7 @@ saifhum:
   alignment: [4, 4]
   strength: 32
   locations:
-    sea_reach: {type: port, coords: [53, 11]}
+    sea_reach: {loc_type: port, coords: [53, 11]}
   territories:
     - [54, 8]
     - [52, 9]
@@ -765,7 +765,7 @@ mithas:
   alignment: [1, 7]
   strength: 32
   locations:
-    nethosak: {type: port, coords: [60, 11]}
+    nethosak: {loc_type: port, coords: [60, 11]}
   territories:
     - [61, 10]
     - [62, 10]
@@ -786,8 +786,8 @@ nergoth:
   alignment: [3, -2]
   strength: 30
   locations:
-    gwynned: {type: port, coords: [11, 21]}
-    lancton: {type: city, coords: [13, 18]}
+    gwynned: {loc_type: port, coords: [11, 21]}
+    lancton: {loc_type: city, coords: [13, 18]}
   territories:
     - [11, 16]
     - [12, 16]
@@ -830,8 +830,8 @@ nordmaar:
   alignment: [3, 3]
   strength: 24
   locations:
-    north_keep: {type: city, coords: [43, 6]}
-    jachim: {type: port, coords: [44, 5]}
+    north_keep: {loc_type: city, coords: [43, 6]}
+    jachim: {loc_type: port, coords: [44, 5]}
   territories:
     - [40, 1]
     - [40, 2]
@@ -914,7 +914,7 @@ palanthas:
   alignment: [5, -1]
   strength: 20
   locations:
-    palanthas_city: {type: port, coords: [23, 14]}
+    palanthas_city: {loc_type: port, coords: [23, 14]}
   territories:
     - [25, 10]
     - [21, 11]
@@ -941,9 +941,9 @@ qualinesti:
   alignment: [6, -2]
   strength: 28
   locations:
-    qualinost: {type: city, coords: [21, 37]}
-    porliost: {type: port, coords: [17, 37]}
-    qualimori: {type: port, coords: [11, 34]}
+    qualinost: {loc_type: city, coords: [21, 37]}
+    porliost: {loc_type: port, coords: [17, 37]}
+    qualimori: {loc_type: port, coords: [11, 34]}
   territories:
     - [19, 35]
     - [20, 35]
@@ -970,8 +970,9 @@ sanction:
   alignment: [0, 6]
   strength: 12
   locations:
-    port_sanction: {type: port, coords: [36, 26]}
-  territories: [36, 26]
+    port_sanction: {loc_type: port, coords: [36, 26]}
+  territories:
+    - [36, 26]
 
 sikket:
   capital_id: manic
@@ -980,7 +981,7 @@ sikket:
   alignment: [1, 1]
   strength: 16
   locations:
-    manic: {type: port, coords: [17, 24]}
+    manic: {loc_type: port, coords: [17, 24]}
   territories:
     - [15, 21]
     - [17, 21]
@@ -1007,11 +1008,11 @@ silvanesti:
   alignment: [5, -2]
   strength: 38
   locations:
-    silvanost: {type: port, coords: [48, 40]}
-    shalost: {type: fortress, coords: [41, 40]}
-    west_eli: {type: fortress, coords: [44, 45]}
-    east_eli: {type: fortress, coords: [45, 45]}
-    silvamori: {type: port, coords: [10, 34]}
+    silvanost: {loc_type: port, coords: [48, 40]}
+    shalost: {loc_type: fortress, coords: [41, 40]}
+    west_eli: {loc_type: fortress, coords: [44, 45]}
+    east_eli: {loc_type: fortress, coords: [45, 45]}
+    silvamori: {loc_type: port, coords: [10, 34]}
   territories:
     - [43, 35]
     - [44, 35]
@@ -1134,8 +1135,8 @@ solanthus:
   alignment: [3, -2]
   strength: 30
   locations:
-    solanthus_city: {type: city, coords: [25, 22]}
-    thelgaard: {type: fortress, coords: [22, 23]}
+    solanthus_city: {loc_type: city, coords: [25, 22]}
+    thelgaard: {loc_type: fortress, coords: [22, 23]}
   territories:
     - [26, 19]
     - [20, 20]
@@ -1183,7 +1184,7 @@ taman:
   alignment: [0, 0]
   strength: 20
   locations:
-    neraka: {type: city, coords: [38, 23]}
+    neraka: {loc_type: city, coords: [38, 23]}
   territories:
     - [36, 16]
     - [37, 16]
@@ -1239,7 +1240,7 @@ tarsis:
   alignment: [5, 2]
   strength: 24
   locations:
-    tarsis_city: {type: city, coords: [24, 46]}
+    tarsis_city: {loc_type: city, coords: [24, 46]}
   territories:
     - [19, 44]
     - [22, 44]
@@ -1289,7 +1290,7 @@ thorbardin:
   alignment: [3, 3]
   strength: 20
   locations:
-    hybardin: {type: undercity, coords: [22, 41]}
+    hybardin: {loc_type: undercity, coords: [22, 41]}
   territories:
     - [19, 41]
     - [20, 41]
@@ -1304,7 +1305,7 @@ tower:
   alignment: [0, 0]
   strength: 0
   locations:
-    high_clerist_tower: {type: fortress, coords: [23, 16]}
+    high_clerist_tower: {loc_type: fortress, coords: [23, 16]}
   territories:
     - [23, 16]
     - [24, 16]
@@ -1317,7 +1318,7 @@ thank:
   alignment: [2, 4]
   strength: 16
   locations:
-    than_khal: {type: city, coords: [17, 48]}
+    than_khal: {loc_type: city, coords: [17, 48]}
   territories:
     - [15, 46]
     - [16, 46]
@@ -1338,7 +1339,7 @@ throt:
   alignment: [-2, 7]
   strength: 32
   locations:
-    throtl: {type: city, coords: [32, 18]}
+    throtl: {loc_type: city, coords: [32, 18]}
   territories:
     - [32, 18]
     - [29, 19]
@@ -1359,7 +1360,7 @@ vingaard:
   alignment: [5, 3]
   strength: 16
   locations:
-    vingaard_keep: {type: city, coords: [26, 17]}
+    vingaard_keep: {loc_type: city, coords: [26, 17]}
   territories:
     - [27, 15]
     - [25, 16]
@@ -1381,7 +1382,7 @@ zhakar:
   alignment: [3, 5]
   strength: 33
   locations:
-    zhakar_city: {type: undercity, coords: [38, 28]}
+    zhakar_city: {loc_type: undercity, coords: [38, 28]}
   territories:
     - [39, 26]
     - [36, 27]

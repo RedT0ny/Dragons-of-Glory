@@ -148,6 +148,7 @@ class Wizard(Leader):
 class Fleet(Unit):
     def __init__(self, name, race, land, allegiance, movement, combat_rating):
         super().__init__(name, "fleet", combat_rating, 0, movement, race, land)
+        self.river_hexside = None # Optional attribute when navigating river hexsides
         self.allegiance = allegiance
         self.passengers = [] # List of units currently aboard
 
@@ -166,6 +167,9 @@ class Fleet(Unit):
         if self.can_carry(unit):
             self.passengers.append(unit)
             unit.is_transported = True
+
+    def set_river_hexside(self, hexside):
+        self.river_hexside = hexside
 
 class Wing(Unit):
     def __init__(self, name, race, land, allegiance, movement, combat_rating):

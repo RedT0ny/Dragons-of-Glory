@@ -33,10 +33,17 @@ class Hex:
         return Hex(self.q + other.q, self.r + other.r)
 
     def neighbors(self):
-        """Returns the 6 neighboring hexagons."""
+        """
+        Returns the 6 neighboring hexagons using axial (q, r) offsets
+        for a pointy-top grid.
+        """
         directions = [
-            Hex(1, 0), Hex(1, -1), Hex(0, -1),
-            Hex(-1, 0), Hex(-1, 1), Hex(0, 1)
+            Hex(1, 0),   # 0: E
+            Hex(1, -1),  # 1: NE
+            Hex(0, -1),  # 2: NW
+            Hex(-1, 0),  # 3: W
+            Hex(-1, 1),  # 4: SW
+            Hex(0, 1)    # 5: SE
         ]
         return [self + d for d in directions]
 
@@ -70,8 +77,10 @@ class HexGrid:
         self.offset_r = offset_r
         
         self.grid = {}  # (q, r) -> terrain_type
-        self.hexside_data = {} # ((q1,r1), (q2,r2)) -> border_type
-        self.unit_map = {} 
+        self.hexside_data = {}  # ((q1,r1), (q2,r2)) -> border_type
+        # Add a way to quickly find which hexsides are rivers
+        self.navigable_edges = set()
+        self.unit_map = {}
         self.special_hexes = {} # (q, r) -> "fortified_city", etc.
 
     def load_from_csv(self, terrain_csv_path):
@@ -89,6 +98,42 @@ class HexGrid:
         """Registers a special border between two hexes (River/Mountain)."""
         key = tuple(sorted([(q1, r1), (q2, r2)]))
         self.hexside_data[key] = side_type
+
+        # Rule 4: Ships can only move along Deep Rivers.
+        # Fords and Bridges are for ground units and usually block large ships.
+        if side_type == "deep_river":
+            self.navigable_edges.add(key)
+
+    def is_ship_bridge(self, from_hex, to_hex, alliance):
+        """
+        Rule 4: A ship in a river hexside acts as a bridge for
+        friendly armies during any Turn in which it does not move.
+        """
+        key = tuple(sorted([(from_hex.q, from_hex.r), (to_hex.q, to_hex.r)]))
+
+        # 1. Must be a deep_river to have a ship there
+        if key not in self.navigable_edges:
+            return False
+
+        # 2. Check all units in the two adjacent hexes
+        for hex_coord in [from_hex, to_hex]:
+            units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
+            for u in units:
+                if u.unit_type == "fleet" and u.allegiance == alliance:
+                    # Check if this ship is stationed on THIS specific hexside
+                    if getattr(u, 'river_hexside', None) == key:
+                        # Optional: Add check for 'has_moved_this_turn' if you track that
+                        return True
+        return False
+
+    def add_hexside_by_offset(self, col, row, direction_idx, side_type):
+        """
+        Helper for config loading.
+        Takes offset (col, row) and a direction (0-5) to find the neighbor.
+        """
+        origin = Hex.offset_to_axial(col, row)
+        neighbor = origin.neighbors()[direction_idx]
+        self.add_hexside(origin.q, origin.r, neighbor.q, neighbor.r, side_type)
 
     def to_master_coords(self, q, r):
         """Converts local scenario coordinates to master map coordinates."""
@@ -138,46 +183,75 @@ class HexGrid:
 
     def get_movement_cost(self, unit, from_hex, to_hex):
         """
-        Rule 5 & 6: Data-driven movement costs using terrain_affinity.
+        Dispatches to the correct movement logic based on unit class.
         """
-        # Rule 5: Wizards and Leaders move anywhere (cost 0 for pathfinding)
-        if unit.is_leader():
-            return 0
+        if unit.unit_type == "wizard":
+            return 0  # Rule 5: Wizards ignore hex costs
+
+        if unit.unit_type == "wing":
+            return self._get_wing_movement_cost(unit, from_hex, to_hex)
+        if unit.unit_type == "fleet":
+            return self._get_fleet_movement_cost(from_hex, to_hex)
+
+        return self._get_ground_movement_cost(unit, from_hex, to_hex)
+
+    def _get_wing_movement_cost(self, unit, from_hex, to_hex):
+        """Rule 6: Flying creatures."""
+        terrain = self.get_terrain(to_hex)
+        if terrain == "desert": return float('inf')  # Cannot enter desert
+
+        cost = 1
+        # It costs one extra Movement Point for an air army to fly over a mountain hexside.
+        if self.get_hexside(from_hex, to_hex) == "mountain":
+            cost += 1
+        return cost
+
+    def _get_fleet_movement_cost(self, from_hex, to_hex):
+        """Rule 4: Ships count hexsides moved along (deep rivers)."""
+        if self.get_hexside(from_hex, to_hex) == "deep_river":
+            return 1
+        # Ships move normally in Sea/Coastal hexes
+        if self.get_terrain(to_hex) == "ocean" or self.is_coastal(to_hex):
+            return 1
+        return float('inf')
+
+    def _get_ground_movement_cost(self, unit, from_hex, to_hex):
+        """Rule 5: Moving Ground troops. Restrictions and Hexside Barriers"""
 
         terrain = self.get_terrain(to_hex)
         hexside_type = self.get_hexside(from_hex, to_hex)
-        
-        # Rule 6: Flying Creatures (Wing)
-        if unit.unit_type == "wing":
-            if terrain == "desert": return float('inf')
-            cost = 1
-            if hexside_type == "mountain": cost += 1
-            return cost
 
         # Rule 5: Ground Army Restrictions
         if terrain in ["sea", "desert", "marsh"]:
             return float('inf')
 
-        # Rule 5: Hexside Barriers
-        if hexside_type in ["mountain", "deep_river"]:
-            # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
-            if hexside_type == "mountain" and unit.terrain_affinity == "mountain":
-                pass 
-            else:
-                return float('inf')
-
         # Calculate Costs
         cost = 1
-        
+
+        # Mountains are impassable, unless there is a pass
+        if terrain == "mountain":
+            if hexside_type != "pass":
+                return float('inf')
+            else:
+                cost += 1
+
         # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
         if terrain == "forest":
-            cost = 1 if unit.terrain_affinity == "forest" else 2
+            if unit.terrain_affinity == "forest":
+                pass
+            else:
+                cost += 1
 
-        # Hexside Penalties
+        # Rule 5: Hexside Barriers
         if hexside_type == "river":
             cost += 2
-        elif hexside_type == "mountain":
-            cost += 1 # Affinity users pay 1 extra to cross the barrier
+
+        if hexside_type == "mountain":
+            # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
+            if unit.terrain_affinity in ["mountain","all"]:
+                cost += 1
+            else:
+                return float('inf')
 
         return cost
 

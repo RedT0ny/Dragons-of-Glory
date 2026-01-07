@@ -2,21 +2,28 @@ class Location:
     """
     Represents a strategic point on the map.
     Example: Location('solace', 'city', (12, 15), name='Solace')
+    Location types:
+        - 'city': A fortified city.
+        - 'port': A port city.
+        - 'fortress': A fortress.
+
     """
-    def __init__(self, loc_id, loc_type, coords, loc_name=None):
+    def __init__(self, loc_id, loc_type, coords):
         self.id = loc_id
-        self.loc_type = loc_type  # 'city' or 'fortress'
+        self.loc_type = loc_type
         self.coords = coords      # (col, row) offset coordinates
-        self.name = loc_name
         self.occupier = None      # 'highlord', 'whitestone', or None
         self.is_capital = False
 
     def get_defense_modifier(self):
         """
-        Returns the combat rating bonus provided by the location.
-        As per Dragon #107 Advanced Rules.
+        TODO: Returns the combat rating bonus provided by the location.
+        City or port: -2 roll modifier, defender's strength is doubled.
+        (Applies also to flying citadels)
+        fortress: -4 roll modifier, defender's strength is tripled.
+        ugndercity: -10 roll modifier, no flight or cav bonuses
         """
-        return 2 if self.loc_type == 'fortress' else 1
+        pass
 
     def __repr__(self):
         prefix = "Capital " if self.is_capital else ""
@@ -25,6 +32,7 @@ class Location:
 class Country:
     def __init__(self, country_id, capital_id, strength, allegiance='neutral', alignment=(0, 0), color=None):
         self.id = country_id
+        self.conquerable = False # Default for rule 9: Conquest
         self.capital_id = capital_id  # The ID of the location currently serving as capital
         self.strength = strength      # Base political/economic strength
         self.allegiance = allegiance  # 'whitestone', 'highlord', or 'neutral'
@@ -94,6 +102,8 @@ class Country:
 
     def is_conquered(self):
         """Victory Check: Conquered if ALL locations are held by the enemy side."""
+        if not self.conquerable: return False
+
         enemy = 'highlord' if self.allegiance == 'whitestone' else 'whitestone'
         if not self.locations: 
             return False

@@ -6,13 +6,21 @@ from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
 
 DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
+# Mappings for pointy-top axial neighbors
+DIRECTION_MAP = {
+    "E":  0,
+    "NE": 1,
+    "NW": 2,
+    "W":  3,
+    "SW": 4,
+    "SE": 5
+}
 
 @dataclass
 class LocationSpec:
     id: str
     loc_type: str
     coords: Tuple[int, int]
-    name: Optional[str] = None
 
 @dataclass
 class CountrySpec:
@@ -79,7 +87,11 @@ def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
     specs = {}
     for cid, info in data.items():
         locations = [
-            LocationSpec(id=lid, **linfo)
+            LocationSpec(
+                id=lid,
+                loc_type=linfo.get("loc_type", "city"),
+                coords=tuple(linfo.get("coords", [0, 0]))
+            )
             for lid, linfo in info.get("locations", {}).items()
         ]
 
@@ -94,6 +106,33 @@ def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
             territories=[tuple(t) for t in info.get("territories", [])]
         )
     return specs
+
+def load_special_locations(path: str) -> List[LocationSpec]:
+    """
+    Loads neutral/special locations grouped by type from map_config.yaml.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    # Access the grouped dictionary from map_config.yaml
+    special_data = data.get("master_map", {}).get("special_locations", {})
+    specs = []
+
+    for loc_type, locations in special_data.items():
+        for loc_info in locations:
+            specs.append(LocationSpec(
+                id=loc_info["id"],
+                loc_type=loc_type,
+                coords=tuple(loc_info["coords"])
+            ))
+    return specs
+
+def load_hexsides(grid, hexside_list):
+    for entry in hexside_list:
+        # entry format: [col, row, direction_str, type]
+        col, row, direction_str, side_type = entry
+        dir_idx = DIRECTION_MAP[direction_str]
+        grid.add_hexside_by_offset(col, row, dir_idx, side_type)
 
 def parse_units_csv(path: str) -> List[UnitSpec]:
     specs = []
