@@ -7,14 +7,14 @@ from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QBrush, QPen,
 from PySide6.QtCore import Qt, QPointF, QTimer, QRectF
 
 # Configuration for the hexagonal grid
-HEX_RADIUS = 11.15 #12.2 for test_map
+HEX_RADIUS = 14.2 #12.2 for test_map
 MAP_WIDTH = 65  # Max col observed in yaml + buffer
 MAP_HEIGHT = 53  # Max row observed in yaml + buffer
 SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 1000
-X_OFFSET = 26 # 30 for test_map
-Y_OFFSET = 120 # 20 for test_map
-MAP_FILE = "DOG_map.jpg" # test_map.png
+SCREEN_HEIGHT = 1138
+X_OFFSET = 12 # 30 for test_map
+Y_OFFSET = 15 # 20 for test_map
+MAP_FILE = "ansalon_baseline.jpg" # test_map.png
 
 class HexagonItem(QGraphicsItem):
     def __init__(self, center, radius, color, parent=None):
