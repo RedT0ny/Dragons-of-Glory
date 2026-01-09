@@ -2,6 +2,7 @@ from src.game.combat import CombatResolver
 from src.game.map import Hex, HexGrid
 from src.content.loader import load_countries_yaml
 from src.game.country import Country, Location
+from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS
 
 class GameState:
     """
@@ -31,8 +32,8 @@ class GameState:
         self.events = []
 
     def start_game(self):
-        # 1. Get the raw data from the loader
-        country_specs = load_countries_yaml("data/countries.yaml")
+        # 1. Use the absolute path from config instead of a hardcoded string
+        country_specs = load_countries_yaml(COUNTRIES_DATA)
 
         # 2. Convert raw data into live game objects
         for cid, spec in country_specs.items():
@@ -90,8 +91,8 @@ class GameState:
         self.turn += 1
 
         for unit in self.units:
-            # Rule 5: Reset MP to the base allowance defined in units.csv
-            unit.movement_points = unit.movement
+            # Use the global constant for default movement points
+            unit.movement_points = getattr(unit, 'movement', DEFAULT_MOVEMENT_POINTS)
 
             # Reset combat and movement flags
             unit.attacked_this_turn = False

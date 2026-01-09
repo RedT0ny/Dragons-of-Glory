@@ -1,4 +1,5 @@
 import random
+from src.content.config import CRT_DATA, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
 
 class CombatResolver:
@@ -10,7 +11,7 @@ class CombatResolver:
         self.defenders = defenders
         self.terrain_type = terrain_type
         # Use the centralized loader
-        self.crt_data = load_data("data/crt.csv") # csv or yaml?
+        self.crt_data = load_data(CRT_DATA) # csv or yaml?
 
     def calculate_odds(self, attacker_cs, defender_cs):
         """
@@ -48,11 +49,10 @@ class CombatResolver:
         # 3. Roll 1d10
         roll = random.randint(1, 10)
 
-        final_roll = max(-5, min(16, roll + drm))
-        
-        # 4. Look up result from YAML data
-        # Note: YAML keys might be ints or strings depending on formatting; 
-        # ensure consistency.
+        # min -5, max 16
+        final_roll = max(MIN_COMBAT_ROLL, min(MAX_COMBAT_ROLL, roll + drm))
+
+        # 4. Look up result from CRT data
         result = self.crt_data[final_roll][odds_str]
 
         self.apply_results(result, self.attackers, True)

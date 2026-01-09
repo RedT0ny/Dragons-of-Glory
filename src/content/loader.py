@@ -4,17 +4,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
-
-DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
-# Mappings for pointy-top axial neighbors
-DIRECTION_MAP = {
-    "E":  0,
-    "NE": 1,
-    "NW": 2,
-    "W":  3,
-    "SW": 4,
-    "SE": 5
-}
+from .config import DRAGONFLIGHTS, DIRECTION_MAP
 
 @dataclass
 class LocationSpec:

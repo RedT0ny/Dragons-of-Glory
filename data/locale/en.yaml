@@ -1,3 +1,5 @@
+general:
+  app_name: "Dragons of Glory"
 countries:
   abanasinia:
     name: "Abanasinia"

@@ -1,5 +1,4 @@
-from operator import truediv
-
+from src.content.config import UnitState, UnitType, UnitRace, NEUTRAL, WS, HL
 
 class Unit:
     """
@@ -7,7 +6,7 @@ class Unit:
 
     :ivar name: The name of the unit.
     :type name: str
-    :ivar unit_type: The type of the unit ('infantry', 'cavalry', 'general', 'admiral', 'hero', 'fleet', 'flight').
+    :ivar unit_type: The type of the unit ('infantry', 'cavalry', 'general', 'admiral', 'hero', 'fleet', 'wing').
     :type unit_type: str
     :ivar race: The race of the unit (e.g., 'draconian', 'dragon', 'goblin', 'hogboblin', 'human', 'solamnic', 'dwarf', 'elf', 'griffon', 'kender', 'minotaur', 'ogre', 'pegasus', 'thanoi', 'undead').
     :type race: str
@@ -26,12 +25,12 @@ class Unit:
     :ivar status: The current status of the unit (e.g., 'inactive', 'active', 'depleted', 'reserve', 'destroyed').
     :type status: str
     """
-    def __init__(self, name, unit_type, combat_rating, tactical_rating, movement, race='human', land=None,
-                 status='inactive'):
+    def __init__(self, name, unit_type: UnitType, combat_rating, tactical_rating, movement, 
+                 race: UnitRace = UnitRace.HUMAN, land=None, status=UnitState.INACTIVE):
         self.name = name
         self.unit_type = unit_type
         self.race = race
-        self.allegiance = 'neutral'  # Whitesone, Highlord, neutral
+        self.allegiance = NEUTRAL # Whitesone, Highlord, neutral
         self.land = land
         self._base_combat_rating = combat_rating # Combat rating for the unit
         self.tactical_rating = tactical_rating  # Tactical rating for the unit
@@ -55,15 +54,15 @@ class Unit:
     @property
     def movement(self):
         """Returns movement points, halved if transporting units (except for Citadels)."""
-        # Wizards move anywhere, we can handle that in the move logic, 
+        # Wizards move anywhere, we can handle that in the move logic,
         # but for consistency we return their base.
-        if self.unit_type == "wizard":
+        if self.unit_type == UnitType.WIZARD:
             return self._base_movement
 
         # Check if carrying anything
         has_passengers = hasattr(self, 'passengers') and self.passengers
-        
-        if has_passengers and self.unit_type != "citadel":
+    
+        if has_passengers and self.unit_type != UnitType.CITADEL:
             return self._base_movement // 2
         return self._base_movement
 
@@ -74,7 +73,7 @@ class Unit:
     @property
     def is_on_map(self):
         """Checks if the unit is currently active or depleted on the hex grid."""
-        return self.status in ('active', 'depleted')
+        return self.status in UnitState.on_map_states()
 
     def apply_combat_loss(self, dmg_type, must_retreat=False):
         """
@@ -87,9 +86,11 @@ class Unit:
         :ivar must_retreat: True if the unit must retreat after taking damage.
         :type must_retreat: bool
         """
-        # Rule: Leaders, Heroes, and Wings cannot be depleted or replaced
-        if isinstance(self, (Leader, Hero, Wing)):
-            self.status = 'destroyed'
+        one_hit_units = {UnitType.GENERAL, UnitType.ADMIRAL, UnitType.HERO, UnitType.WING, UnitType.EMPEROR}
+        
+        if self.unit_type in one_hit_units:
+            self.status = UnitState.DESTROYED
+            return
 
         if dmg_type == 'E':
             self.eliminate()
@@ -102,15 +103,16 @@ class Unit:
         return
 
     def eliminate(self):
-        self.status = 'reserve'
+        self.status = UnitState.RESERVE
 
     def deplete(self):
-        if self.status == 'active':
-            self.status = 'depleted'
-        elif self.status == 'depleted':
-            self.status = 'reserve'
-        elif self.status == 'reserve':
-            self.status = 'destroyed'
+        # We can now use a clean state-machine approach
+        state_flow = {
+            UnitState.ACTIVE: UnitState.DEPLETED,
+            UnitState.DEPLETED: UnitState.RESERVE,
+            UnitState.RESERVE: UnitState.DESTROYED
+        }
+        self.status = state_flow.get(self.status, self.status)
 
     def move(self, new_position):
         self.position = new_position

@@ -18,7 +18,6 @@
     <item>
      <layout class="QHBoxLayout" name="contentHorizontalLayout" stretch="4,1">
       <item>
-       <!-- Placeholder for AnsalonMapView -->
        <widget class="QWidget" name="map_view" native="true">
         <property name="styleSheet">
          <string notr="true">background-color: #222;</string>
@@ -40,10 +39,10 @@
          </size>
         </property>
         <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
+         <enum>QFrame::Shape::StyledPanel</enum>
         </property>
         <property name="frameShadow">
-         <enum>QFrame::Sunken</enum>
+         <enum>QFrame::Shadow::Sunken</enum>
         </property>
         <layout class="QVBoxLayout" name="infoPanelLayout">
          <item>
@@ -61,22 +60,75 @@
             <string>Mini-map Area</string>
            </property>
            <property name="alignment">
-            <set>Qt::AlignCenter</set>
+            <set>Qt::AlignmentFlag::AlignCenter</set>
            </property>
           </widget>
          </item>
          <item>
           <layout class="QGridLayout" name="btn_grid">
-           <!-- Grid of buttons as seen in InfoPanel -->
-           <item row="0" column="0"><widget class="QPushButton" name="btnMove"><property name="text"><string>Move</string></property></widget></item>
-           <item row="0" column="1"><widget class="QPushButton" name="btnAttack"><property name="text"><string>Attack</string></property></widget></item>
-           <item row="0" column="2"><widget class="QPushButton" name="btnActivate"><property name="text"><string>Activate</string></property></widget></item>
-           <item row="1" column="0"><widget class="QPushButton" name="btnPrev"><property name="text"><string>Prev</string></property></widget></item>
-           <item row="1" column="1"><widget class="QPushButton" name="btnUndo"><property name="text"><string>Undo</string></property></widget></item>
-           <item row="1" column="2"><widget class="QPushButton" name="btnCombine"><property name="text"><string>Combine</string></property></widget></item>
-           <item row="2" column="0"><widget class="QPushButton" name="btnNext"><property name="text"><string>Next</string></property></widget></item>
-           <item row="2" column="1"><widget class="QPushButton" name="btnRedo"><property name="text"><string>Redo</string></property></widget></item>
-           <item row="2" column="2"><widget class="QPushButton" name="btnEndTurn"><property name="text"><string>End Turn</string></property></widget></item>
+           <item row="0" column="0">
+            <widget class="QPushButton" name="btnMove">
+             <property name="text">
+              <string>Move</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QPushButton" name="btnAttack">
+             <property name="text">
+              <string>Attack</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="2">
+            <widget class="QPushButton" name="btnActivate">
+             <property name="text">
+              <string>Activate</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QPushButton" name="btnPrev">
+             <property name="text">
+              <string>Prev</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QPushButton" name="btnUndo">
+             <property name="text">
+              <string>Undo</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="2">
+            <widget class="QPushButton" name="btnCombine">
+             <property name="text">
+              <string>Combine</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QPushButton" name="btnNext">
+             <property name="text">
+              <string>Next</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
+            <widget class="QPushButton" name="btnRedo">
+             <property name="text">
+              <string>Redo</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="2">
+            <widget class="QPushButton" name="btnEndTurn">
+             <property name="text">
+              <string>End Turn</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </item>
          <item>
@@ -93,29 +145,46 @@ Location (if any)</string>
          <item>
           <widget class="QFrame" name="unit_box">
            <property name="frameShape">
-            <enum>QFrame::Box</enum>
+            <enum>QFrame::Shape::Box</enum>
            </property>
            <layout class="QVBoxLayout" name="unitLayout">
             <item>
              <widget class="QLabel" name="unit_name_label">
-              <property name="text"><string>Unit Name</string></property>
-              <property name="alignment"><set>Qt::AlignCenter</set></property>
+              <property name="text">
+               <string>Unit Name</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignmentFlag::AlignCenter</set>
+              </property>
              </widget>
             </item>
             <item>
              <widget class="QLabel" name="unit_img">
-              <property name="minimumSize"><size><width>150</width><height>150</height></size></property>
-              <property name="styleSheet"><string notr="true">border: 1px solid black;</string></property>
-              <property name="text"><string>Unit Picture</string></property>
-              <property name="alignment"><set>Qt::AlignCenter</set></property>
+              <property name="minimumSize">
+               <size>
+                <width>150</width>
+                <height>150</height>
+               </size>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">border: 1px solid black;</string>
+              </property>
+              <property name="text">
+               <string>Unit Picture</string>
+              </property>
+              <property name="alignment">
+               <set>Qt::AlignmentFlag::AlignCenter</set>
+              </property>
              </widget>
             </item>
             <item>
              <widget class="QLabel" name="unit_stats_label">
-              <property name="text"><string>Rating: X
+              <property name="text">
+               <string>Rating: X
 Mov: remaining (total)
 country_name
-unit_status</string></property>
+unit_status</string>
+              </property>
              </widget>
             </item>
            </layout>
@@ -123,8 +192,19 @@ unit_status</string></property>
          </item>
          <item>
           <spacer name="verticalSpacer">
-           <property name="orientation"><enum>Qt::Vertical</enum></property>
+           <property name="orientation">
+            <enum>Qt::Orientation::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>0</width>
+             <height>0</height>
+            </size>
+           </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QTableView" name="tableView"/>
          </item>
         </layout>
        </widget>
@@ -146,10 +226,10 @@ unit_status</string></property>
        </size>
       </property>
       <property name="frameShape">
-       <enum>QFrame::Panel</enum>
+       <enum>QFrame::Shape::Panel</enum>
       </property>
       <property name="frameShadow">
-       <enum>QFrame::Sunken</enum>
+       <enum>QFrame::Shadow::Sunken</enum>
       </property>
       <property name="text">
        <string>Game log...</string>
@@ -164,7 +244,7 @@ unit_status</string></property>
      <x>0</x>
      <y>0</y>
      <width>1200</width>
-     <height>22</height>
+     <height>33</height>
     </rect>
    </property>
   </widget>

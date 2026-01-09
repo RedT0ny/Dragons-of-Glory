@@ -1,4 +1,5 @@
 import heapq
+from src.content.config import HexDirection
 
 class Hex:
     """
@@ -37,15 +38,16 @@ class Hex:
         Returns the 6 neighboring hexagons using axial (q, r) offsets
         for a pointy-top grid.
         """
-        directions = [
-            Hex(1, 0),   # 0: E
-            Hex(1, -1),  # 1: NE
-            Hex(0, -1),  # 2: NW
-            Hex(-1, 0),  # 3: W
-            Hex(-1, 1),  # 4: SW
-            Hex(0, 1)    # 5: SE
-        ]
-        return [self + d for d in directions]
+        # Mapping our Enum to logical coordinate offsets
+        lookup = {
+            HexDirection.EAST:       Hex(1, 0),
+            HexDirection.NORTH_EAST: Hex(1, -1),
+            HexDirection.NORTH_WEST: Hex(0, -1),
+            HexDirection.WEST:       Hex(-1, 0),
+            HexDirection.SOUTH_WEST: Hex(-1, 1),
+            HexDirection.SOUTH_EAST: Hex(0, 1)
+        }
+        return [self + offset for offset in lookup.values()]
 
     def distance_to(self, other):
         """Cálculo de distancia Manhattan para hexágonos."""

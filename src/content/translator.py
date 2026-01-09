@@ -1,13 +1,21 @@
 import yaml
-from utils import to_roman
+import os
+from .utils import to_roman
+from .config import LOCALE_DIR, DEFAULT_LANG
 
 class Translator:
-    def __init__(self, lang_code='en'):
+    def __init__(self, lang_code=DEFAULT_LANG):
         self.lang_code = lang_code
         self.translations = self._load_translations()
 
     def _load_translations(self):
-        path = f"data/locale/{self.lang_code}.yaml"
+        path = os.path.join(LOCALE_DIR, f"{self.lang_code}.yaml")
+    
+        # Fallback if the system locale file is missing
+        if not os.path.exists(path):
+            print(f"Locale '{self.lang_code}' not found, falling back to '{DEFAULT_LANG}'.")
+            path = os.path.join(LOCALE_DIR, f"{DEFAULT_LANG}.yaml")
+        
         with open(path, 'r', encoding='utf-8') as f:
             return yaml.safe_load(f)
 

@@ -3,6 +3,8 @@ from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen, QPixmap
 from PySide6.QtCore import Qt, QPointF, QRectF
 
+from src.content.config import HEX_RADIUS, MAP_IMAGE_PATH
+
 
 class HexagonItem(QGraphicsItem):
     def __init__(self, q, r, radius, color=(200, 200, 200, 100), parent=None):
@@ -94,16 +96,39 @@ class AnsalonMapView(QGraphicsView):
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
-        
+
         # Background Map
-        self.bg_item = self.scene.addPixmap(QPixmap("assets/img/DoG_map.jpg"))
+        self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
+
+    def wheelEvent(self, event):
+        """
+        Overrides the wheel event to provide Zooming when Ctrl is held.
+        Otherwise, falls back to default scrolling behavior.
+        """
+        if event.modifiers() == Qt.ControlModifier:
+            # Zoom factor
+            zoom_in_factor = 1.25
+            zoom_out_factor = 1 / zoom_in_factor
+
+            # Determine if we zoom in or out
+            if event.angleDelta().y() > 0:
+                zoom_factor = zoom_in_factor
+            else:
+                zoom_factor = zoom_out_factor
+
+            # Apply the scale
+            self.scale(zoom_factor, zoom_factor)
+            event.accept()
+        else:
+            # Fallback to default behavior (Vertical/Horizontal scrolling)
+            super().wheelEvent(event)
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
         self.scene.clear()
-        # Re-add background
-        self.bg_item = self.scene.addPixmap(QPixmap("assets/img/DoG_map.jpg"))
+        # Re-add background using central path
+        self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
 
         # Get the logical grid from the model
@@ -113,34 +138,33 @@ class AnsalonMapView(QGraphicsView):
 
         # Check if grid is a HexGrid object and get its internal dictionary
         grid_data = grid.grid if hasattr(grid, 'grid') else {}
-        radius = 30 # Should probably be a constant
 
         for (q, r), hex_data in grid_data.items():
             # 1. Draw the Hex
-            hex_item = HexagonItem(q, r, radius)
+            hex_item = HexagonItem(q, r, HEX_RADIUS)
             self.scene.addItem(hex_item)
 
             # 2. Check for units at this coordinate in the model
             units = self.game_state.get_units_at((q, r))
             for unit in units:
-                self.draw_unit(unit, q, r, radius)
+                self.draw_unit(unit, q, r, HEX_RADIUS)
 
-    def highlight_movement_range(self, reachable_coords):
-        """
-        Loops through all HexagonItems in the scene and highlights them 
-        if their coordinates are in the reachable_coords list.
-        """
-        for item in self.scene.items():
-            if isinstance(item, HexagonItem):
-                is_reachable = (item.q, item.r) in reachable_coords
-                item.set_highlight(is_reachable)
+        def highlight_movement_range(self, reachable_coords):
+            """
+            Loops through all HexagonItems in the scene and highlights them
+            if their coordinates are in the reachable_coords list.
+            """
+            for item in self.scene.items():
+                if isinstance(item, HexagonItem):
+                    is_reachable = (item.q, item.r) in reachable_coords
+                    item.set_highlight(is_reachable)
 
-    def draw_unit(self, unit, q, r, radius):
-        """Helper to place a Unit graphics item on the map."""
-        unit_item = UnitGraphicsItem(unit, radius)
-        # Position calculation logic (Pointy-top)
-        x = radius * (math.sqrt(3) * q + math.sqrt(3)/2 * r)
-        y = radius * (3/2 * r)
-        unit_item.setPos(x, y)
-        unit_item.setZValue(1) # Ensure units stay above hexes
-        self.scene.addItem(unit_item)
+        def draw_unit(self, unit, q, r, radius):
+            """Helper to place a Unit graphics item on the map."""
+            unit_item = UnitGraphicsItem(unit, radius)
+            # Position calculation logic (Pointy-top)
+            x = radius * (math.sqrt(3) * q + math.sqrt(3)/2 * r)
+            y = radius * (3/2 * r)
+            unit_item.setPos(x, y)
+            unit_item.setZValue(1) # Ensure units stay above hexes
+            self.scene.addItem(unit_item)
