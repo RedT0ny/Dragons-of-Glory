@@ -63,6 +63,14 @@ class HexDirection(Enum):
     WEST = 4
     NORTH_WEST = 5
 
+class RequirementType(Enum):
+    RACE = "race"
+    TRAIT = "trait"
+    ITEM = "item"
+    ALLEGIANCE = "allegiance"
+    UNIT_TYPE = "unit_type"
+    CUSTOM = "custom"
+
 DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
 
 # --- ALLEGIANCES ---
@@ -98,3 +106,27 @@ MAP_IMAGE_PATH = os.path.join(ASSETS_DIR, "img", "test_map.png")
 # --- GAME CONSTANTS ---
 MAX_UNITS_PER_HEX = 2
 DEFAULT_MOVEMENT_POINTS = 5  # Example for Rule 5
+
+# --- ARTIFACT CONFIG ---
+ARTIFACT_REQUIREMENTS = {
+    "race_requirements": {
+        "solamnic": UnitRace.SOLAMNIC,
+        "draconian": UnitRace.DRACONIAN,
+        "dragon": UnitRace.DRAGON,
+        "elf": UnitRace.ELF,
+        "dwarf": UnitRace.DWARF,
+        "human": UnitRace.HUMAN,
+        "kender": UnitRace.KENDER,
+        "ogre": UnitRace.OGRE,
+    },
+    "trait_requirements": {
+        "has_silver_arm": lambda unit: hasattr(unit, 'traits') and 'silver_arm' in unit.traits,
+        "is_leader": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type in [UnitType.GENERAL, UnitType.ADMIRAL, UnitType.EMPEROR],
+        "is_magical": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type == UnitType.WIZARD,
+    },
+    "allegiance_requirements": {
+        "whitestone": WS,
+        "highlord": HL,
+        "neutral": NEUTRAL,
+    }
+}
