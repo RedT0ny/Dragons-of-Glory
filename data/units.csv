@@ -1,4 +1,4 @@
-﻿id;quantity;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
+﻿unit_id;quantity;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
 ;5;inf;ogre;kern;neutral;mountain;6;0;4
 ;4;inf;kender;goodlund;neutral;forest;4;0;3
 ;6;inf;kender;hylo;neutral;forest;4;0;3
@@ -130,4 +130,4 @@ dracart;1;wizard;human;;highlord;;0;3;99
 par_salian;1;wizard;human;;whitestone;;0;3;99
 justarius;1;wizard;solamnic;;whitestone;;0;3;99
 fizban;1;wizard;human;;whitestone;;0;3;99
-;3;citadel;;;highlord;;0;0;4
+;3;citadel;magic;;highlord;;0;0;4

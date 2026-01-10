@@ -31,6 +31,7 @@ class UnitRace(Enum):
     GRIFFON = "griffon"
     MINOTAUR = "minotaur"
     SOLAMNIC = "solamnic"
+    MAGIC = "magic"
 
 class UnitState(Enum):
     INACTIVE = auto()

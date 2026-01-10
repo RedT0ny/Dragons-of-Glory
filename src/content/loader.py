@@ -2,7 +2,7 @@ import csv, yaml, json
 import os, re
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, NamedTuple
 from collections import defaultdict
 from .config import DRAGONFLIGHTS, DIRECTION_MAP
 
@@ -39,8 +39,102 @@ class UnitSpec:
     ordinal: int = 1
     status: str = "inactive"
 
+class ScenarioSpec(NamedTuple):
+    id: str
+    name: str
+    description: str
+    map_subset: Optional[Dict[str, List[int]]]
+    start_turn: int
+    end_turn: int
+    initiative_start: str
+    possible_events: List[str]
+    setup: Dict[str, Any]
+    victory_conditions: Dict[str, Any]
+    notes: str
+
+class SaveGameSpec(NamedTuple):
+    metadata: Dict[str, Any]
+    world_state: Dict[str, Any]
+
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
+
+def load_scenario_yaml(path: str) -> ScenarioSpec:
+    """
+    Loads a scenario definition from YAML and returns a structured ScenarioSpec.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        raw_data = yaml.safe_load(f)
+
+    data = raw_data.get("scenario", {})
+    
+    # Extract setup data
+    setup_raw = data.get("initial_setup", {})
+    
+    # We maintain the structure for players and neutral countries
+    setup = {
+        "neutral_countries": setup_raw.get("neutral", {}).get("countries", []),
+        "highlord": setup_raw.get("highlord", {}),
+        "whitestone": setup_raw.get("whitestone", {})
+    }
+
+    # Consolidated victory conditions from both players if defined at player level
+    # or from a top-level victory_conditions key (like in the campaign)
+    v_conds = data.get("victory_conditions", {})
+    if not v_conds:
+        v_conds = {
+            "highlord": setup["highlord"].get("victory_conditions", {}),
+            "whitestone": setup["whitestone"].get("victory_conditions", {})
+        }
+
+    return ScenarioSpec(
+        id=data.get("id", "unknown"),
+        name=data.get("name", "Unnamed Scenario"),
+        description=data.get("description", ""),
+        map_subset=data.get("map_subset"),
+        start_turn=data.get("start_turn", 1),
+        end_turn=data.get("end_turn", 30),
+        initiative_start=data.get("initiative_start", "highlord"),
+        possible_events=data.get("possible_events", []),
+        setup=setup,
+        victory_conditions=v_conds,
+        notes=data.get("notes", "")
+    )
+
+def save_game_state(path: str, scenario_id: str, turn: int, phase: str, active_player: str, units: List[Dict[str, Any]], activated_countries: List[str]):
+    """
+    Serializes the current game state into a YAML file.
+    """
+    data = {
+        "metadata": {
+            "scenario_id": scenario_id,
+            "turn": turn,
+            "phase": phase,
+            "active_player": active_player,
+            "save_timestamp": os.path.getmtime(path) if os.path.exists(path) else None # Placeholder for actual time
+        },
+        "world_state": {
+            "activated_countries": activated_countries,
+            "units": units
+        }
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        yaml.dump(data, f, default_flow_style=False)
+
+def load_game_state(path: str) -> SaveGameSpec:
+    """
+    Loads a saved game file and returns a structured SaveGameSpec.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Save file not found: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    return SaveGameSpec(
+        metadata=data.get("metadata", {}),
+        world_state=data.get("world_state", {})
+    )
 
 def load_data(file_path):
     """
@@ -172,7 +266,7 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
             df = land.lower() if land and land.lower() in DRAGONFLIGHTS else None
             country = None if df else land
             
-            name = get_val("name")
+
             u_type = get_val("type")
             race = get_val("race")
 
@@ -191,7 +285,7 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
 
             specs.append(UnitSpec(
                 id=base_id, # This is now GUARANTEED to be a string
-                name=name, unit_type=u_type, race=race,
+                unit_type=u_type, race=race,
                 country=country, dragonflight=df, 
                 allegiance=(get_val("allegiance") or "").title() or None,
                 terrain_affinity=get_val("terrain_affinity"),

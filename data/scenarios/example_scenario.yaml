@@ -1,32 +1,67 @@
-"""
-Example recommended compact scenario YAML (put in data/scenarios/scenario_1_fall_of_silvanesti.yaml):
-
+# Example scenario YAML
 scenario:
-  id: example_scenario
-  players:
+  id: "unique_scenario_id"
+  name: "Scenario Name"
+  description: >
+    Folded block scalar for historical flavor.
+
+  # Map Configuration
+  # If null or omitted, assume full map [0,0] to [64,52]
+  map_subset:
+    x_range: [35, 52]
+    y_range: [32, 47]
+
+  # Timeline and Turn Logic
+  start_turn: 1
+  end_turn: 30
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Global Events
+  possible_events: ["E1", "E10", "E20"]
+
+  # Allegiance-based Setup
+  initial_setup:
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: ["abanasinia", "khur", "solanthus"]
+
     highlord:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
+
       countries:
         taman:
-          units_by_type:
-            inf: { quantity: 4 }
-            cav: { quantity: 1 }
-        khur:
-          units_by_type:
-            inf: { quantity: 5 }   # use all 5 inf from khur (or specify 4 if partial)
-            general: { quantity: 1 }  # include the general
-        green:
-          dragonflight: { quantity: 2 }  # full green flight
+          # "all" is a keyword to pull every unit matching this country in units.csv
+          units: all
         red:
-          dragonflight: { quantity: 1 }  # half flight
-        blue:
-          dragonflight: { quantity: 1 }  # half flight
-      explicit_units:   # explicit picks by unit id or name
-        - verminaard
-        - kitiara
-        - phair_caron
-        - marcus_cadrio
+          # Explicit partial setup
+          units_by_type:
+            dragon: { quantity: 1 }
+
+      # Specific units (Leaders/Wizards) not tied to a country's regular army
+      explicit_units: ["verminaard", "kitiara", "ladonna"]
+      artifacts: ["staff_of_magius"]
+
+      victory_conditions:
+        major: "Description of victory"
+        marginal: "Description of victory"
+
     whitestone:
+      # Example of specific deployment region (subset of countries)
+      deployment_area:
+        countries: ["qualinesti", "abanasinia"]
+
       countries:
-        silvanesti:
-          units_by_country: all
-"""
+        qualinesti:
+          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
+        abanasinia:
+          units: all
+
+      explicit_units: ["fizban", "laurana"]
+      artifacts: ["blue_crystal_staff"]
+
+      victory_conditions:
+        major: "Protect the capital"
+
+  notes: >
+    Any additional special rules or setup instructions.

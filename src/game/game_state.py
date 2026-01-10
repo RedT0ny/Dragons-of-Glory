@@ -1,8 +1,8 @@
 from src.game.combat import CombatResolver
 from src.game.map import Hex, HexGrid
-from src.content.loader import load_countries_yaml
 from src.game.country import Country, Location
 from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS
+from src.content import loader
 
 class GameState:
     """
@@ -33,7 +33,7 @@ class GameState:
 
     def start_game(self):
         # 1. Use the absolute path from config instead of a hardcoded string
-        country_specs = load_countries_yaml(COUNTRIES_DATA)
+        country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
 
         # 2. Convert raw data into live game objects
         for cid, spec in country_specs.items():
@@ -149,3 +149,18 @@ class GameState:
 
     def get_units_at(self, position):
         return [u for u in self.units if u.position == position]
+
+def save_game(self, filename: str):
+    # Gather unit data using the to_dict method we discussed earlier
+    unit_data = [u.to_dict() for u in self.units.values()]
+    activated = [c.id for c in self.countries.values() if c.is_activated]
+    
+    loader.save_game_state(
+        path=filename,
+        scenario_id=self.current_scenario.spec.id,
+        turn=self.turn,
+        phase=self.phase,
+        active_player=self.active_player,
+        units=unit_data,
+        activated_countries=activated
+    )

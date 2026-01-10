@@ -1,0 +1,59 @@
+# language: yaml
+scenario:
+  id: "campaign_0_war_of_the_lance"
+  name: "War of the Lance"
+  description: >
+    This is the complete game, covering the whole of the War of the Lance. 
+    It starts with the events on Ansalon before the Dragon Highlords moved 
+    toward conquest and allows both players to influence the full course of the war.
+  map_subset: #Entire Ansalon
+    x_range: [0, 64]
+    y_range: [0, 52]
+  initial_setup:
+    highlord:
+      starting_location: "Neraka"
+      units:
+        - leaders: all
+        - armies: all  # Note: except draconians
+        - dragons: all
+      # Draconians are specifically excluded in initial setup per rules
+      exclude_units:
+        - draconians
+    whitestone:
+      starting_armies: none
+      notes: "Must Activate countries to get armies."
+
+  start:
+    turn: 1
+    initiative: highlord
+
+  strategic_event_counters:
+    cup_start: "E1"
+    additions:
+      - turn: 10
+        counters: "E10"
+      - turn: 20
+        counters: "E20"
+
+  victory_conditions:
+    type: "country_count"
+    turn_limit: 30
+    determination:
+      calculation: "Count countries held by each side at end of Turn 30. Only countries starting with armies or activated with armies count."
+      holding_definition: >
+        A country is held if: The capital was never occupied by an enemy force, 
+        OR friendly forces were the last to occupy the capital.
+      nonhuman_exception: >
+        Nonhuman countries are occupied if the original location of the capital 
+        is captured, regardless of capital movement.
+    levels:
+      total_victory: 20
+      victory: 19
+      partial_victory: 18
+      marginal_victory: 17
+      poor_victory: 16
+      indecisive: 15 # or fewer
+
+  notes: >
+    The player with the most countries held consults the victory table.
+    Areas without armies (e.g., Estwilde) do not count toward the total.

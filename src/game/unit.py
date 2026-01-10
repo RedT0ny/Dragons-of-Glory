@@ -3,43 +3,49 @@ from src.content.config import UnitState, UnitType, UnitRace, NEUTRAL, WS, HL
 class Unit:
     """
     Base class for all units in the game.
-
-    :ivar name: The name of the unit.
-    :type name: str
+    
+    :ivar id: The name of the unit.
+    :type id: str
     :ivar unit_type: The type of the unit ('infantry', 'cavalry', 'general', 'admiral', 'hero', 'fleet', 'wing').
-    :type unit_type: str
-    :ivar race: The race of the unit (e.g., 'draconian', 'dragon', 'goblin', 'hogboblin', 'human', 'solamnic', 'dwarf', 'elf', 'griffon', 'kender', 'minotaur', 'ogre', 'pegasus', 'thanoi', 'undead').
-    :type race: str
-    :ivar allegiance: The allegiance of the unit (e.g., 'Highlord', 'Neutral', 'Whitesone').
-    :type allegiance: str
-    :ivar land: The country or faction the unit belongs to.
-    :type land: str
+    :type unit_type: UnitType
     :ivar combat_rating: The combat rating of the unit.
     :type combat_rating: int
     :ivar tactical_rating: The tactical rating of the unit.
     :type tactical_rating: int
     :ivar movement: The movement points available for the unit.
     :type movement: int
-    :ivar position: The current position of the unit on the map (e.g., hex coordinates).
-    :type position: duple(int, int)
+    :ivar race: The race of the unit (e.g., 'draconian', 'dragon', 'goblin', 'hogboblin', 'human', 'solamnic', 'dwarf', 'elf', 'griffon', 'kender', 'minotaur', 'ogre', 'pegasus', 'thanoi', 'undead').
+    :type race: UnitRace
+    :ivar land: The country or faction the unit belongs to.
+    :type land: str
     :ivar status: The current status of the unit (e.g., 'inactive', 'active', 'depleted', 'reserve', 'destroyed').
-    :type status: str
+    :type status: UnitState
+    :ivar allegiance: The allegiance of the unit (e.g., 'Highlord', 'Neutral', 'Whitesone').
+    :type allegiance: str
+    :ivar position: The axial coordinates of the unit.
+    :type position: duple(int, int)
+    :ivar ordinal: The unit's order of battle.
+    :type ordinal: int
+    :ivar equipment: A list of equipment the unit is equipped with.
+    :type equipment: list[Equipment]
     """
-    def __init__(self, name, unit_type: UnitType, combat_rating, tactical_rating, movement, 
-                 race: UnitRace = UnitRace.HUMAN, land=None, status=UnitState.INACTIVE):
-        self.name = name
+    def __init__(self, unit_id, unit_type: UnitType, combat_rating, tactical_rating, movement, 
+                 race: UnitRace = UnitRace.HUMAN, land=None, status=UnitState.INACTIVE, allegiance = NEUTRAL, position=(None, None), ordinal=1):
+        self.id = unit_id  # The slug from units.csv (e.g. 'verminaard') or generated (e.g. 'inf_human_khur')
+        self.ordinal = ordinal # e.g. 1, 2, 3...
         self.unit_type = unit_type
         self.race = race
-        self.allegiance = NEUTRAL # Whitesone, Highlord, neutral
+        self.allegiance = allegiance # Whitesone, Highlord, neutral
         self.land = land
         self._base_combat_rating = combat_rating # Combat rating for the unit
         self.tactical_rating = tactical_rating  # Tactical rating for the unit
         self._base_movement = movement  # Use internal var for setter/getter
-        self.position = (None,None) # Current position on the map (hex coordinates)
-        self.equipment = []
+        self.position = position  # Stored as Axial (q, r)
         self.status = status # inactive, active, depleted, reserve, destroyed
+        self.equipment = []
         self.is_transported = False  # New flag to track transport state
         self.attacked_this_turn = False
+        self.moved_this_turn = False
 
     @property
     def combat_rating(self):
@@ -124,6 +130,34 @@ class Unit:
     def get_land(self):
         return self.land
 
+    def to_dict(self) -> dict:
+        """
+        Serializes unit state using Axial coordinates.
+        """
+        return {
+            "unit_id": self.id,
+            "ordinal": self.ordinal, # Needed to maintain "The III Khur" identity
+            "position": list(self.position), # [q, r]
+            "status": self.status.name,      # Use name for readability in YAML
+            "is_transported": self.is_transported,
+            "attacked_this_turn": self.attacked_this_turn,
+            "moved_this_turn": self.moved_this_turn
+        }
+
+    def load_state(self, state_data: dict):
+        """Restores state, ensuring position is a tuple."""
+        pos = state_data.get("position")
+        self.position = tuple(pos) if pos else (None, None)
+        
+        # Restore Enum from string name if needed
+        status_str = state_data.get("status")
+        if status_str and hasattr(UnitState, status_str):
+            self.status = UnitState[status_str]
+            
+        self.is_transported = state_data.get("is_transported", False)
+        self.attacked_this_turn = state_data.get("attacked_this_turn", False)
+        self.moved_this_turn = state_data.get("moved_this_turn", False)
+
 class Leader(Unit):
     """
     Leader unit class.
@@ -133,8 +167,8 @@ Leader unit types: admiral, emperor, general, highlord, wizard
 :ivar tactical_rating: Tactical rating for leaders.
 :type tactical_rating: int
     """
-    def __init__(self, name, unit_type, tactical_rating, movement, race, land=None):
-        super().__init__(name, unit_type, 0, tactical_rating, movement, race, land)
+    def __init__(self, unit_id, unit_type, tactical_rating, movement, race, land=None):
+        super().__init__(unit_id, unit_type, 0, tactical_rating, movement, race, land)
 
     def is_leader(self):
         return True
@@ -143,13 +177,13 @@ class Wizard(Leader):
     """
     Wizards can move to any hex on the map (except enemy hexes) once per turn.
     """
-    def __init__(self, name, race, land, allegiance):
-        super().__init__(name, "wizard", tactical_rating=3, movement=99, race=race, land=land)
+    def __init__(self, unit_id, race, land, allegiance):
+        super().__init__(unit_id, UnitType.WIZARD, tactical_rating=3, movement=99, race=race, land=land)
         self.allegiance = allegiance
 
 class Fleet(Unit):
-    def __init__(self, name, race, land, allegiance, movement, combat_rating):
-        super().__init__(name, "fleet", combat_rating, 0, movement, race, land)
+    def __init__(self, unit_id, race, land, allegiance, movement, combat_rating):
+        super().__init__(unit_id, UnitType.FLEET, combat_rating, 0, movement, race, land)
         self.river_hexside = None # Optional attribute when navigating river hexsides
         self.allegiance = allegiance
         self.passengers = [] # List of units currently aboard
@@ -174,35 +208,34 @@ class Fleet(Unit):
         self.river_hexside = hexside
 
 class Wing(Unit):
-    def __init__(self, name, race, land, allegiance, movement, combat_rating):
-        super().__init__(name, "wing", combat_rating, 0, movement, race, land)
-        self.allegiance = allegiance
+    def __init__(self, unit_id, combat_rating, movement, race, land, status, allegiance, position, ordinal):
+        super().__init__(unit_id, UnitType.WING, combat_rating, 0, movement, race, land, status, allegiance, position, ordinal)
         self.passengers = []
 
     def can_carry(self, unit):
         # Griffons and Pegasi: 1 Infantry AND 1 Leader
-        if self.race in ("griffon", "pegasus"):
-            is_inf = (unit.unit_type == "inf")
+        if self.race in (UnitRace.GRIFFON, UnitRace.PEGASUS):
+            is_inf = (unit.unit_type == UnitType.INFANTRY)
             is_ldr = unit.is_leader()
             
-            if is_inf and any(p.unit_type == "inf" for p in self.passengers):
+            if is_inf and any(p.unit_type == UnitType.INFANTRY for p in self.passengers):
                 return False
             if is_ldr and any(p.is_leader() for p in self.passengers):
                 return False
             return is_inf or is_ldr
 
         # Dragons: 1 Leader (Color/Race matching)
-        if self.race == "dragon":
+        if self.race == UnitRace.DRAGON:
             if not unit.is_leader() or len(self.passengers) >= 1:
                 return False
             
-            if self.allegiance == "highlord":
+            if self.allegiance == HL:
                 # Must match color (land) or be Ariakas (emperor)
-                return unit.land == self.land or unit.unit_type == "emperor"
+                return unit.land == self.land or unit.unit_type == UnitType.EMPEROR
             
-            if self.allegiance == "whitestone":
+            if self.allegiance == WS:
                 # Must be Elf or Solamnic
-                return unit.race in ("elf", "solamnic")
+                return unit.race in (UnitRace.ELF, UnitRace.SOLAMNIC)
         return False
 
     def load_unit(self, unit):
@@ -211,20 +244,20 @@ class Wing(Unit):
             unit.is_transported = True
 
     class FlyingCitadel(Unit):
-        def __init__(self, name, allegiance):
+        def __init__(self, unit_id, allegiance):
         # Citadels move 4 hexes, ignore terrain, and have no combat rating themselves
-            super().__init__(name, "citadel", 0, 0, 4, race="magic")
+            super().__init__(unit_id, UnitType.CITADEL, 0, 0, 4, race=UnitRace.MAGIC)
             self.allegiance = allegiance
             self.passengers = []
 
         def can_carry(self, unit):
             # Up to three HL armies of any type.
-            armies_aboard = [p for p in self.passengers if p.unit_type in ("inf", "cav")]
-            return unit.allegiance == "highlord" and len(armies_aboard) < 3
+            armies_aboard = [p for p in self.passengers if p.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)]
+            return unit.allegiance == HL and len(armies_aboard) < 3
 
 class Hero(Unit):
-    def __init__(self, name, unit_type, combat_rating, tactical_rating, movement):
-        super().__init__(name, unit_type, combat_rating, tactical_rating, movement)
+    def __init__(self, unit_id, combat_rating, tactical_rating, movement, race, land, status, allegiance, position, ordinal):
+        super().__init__(unit_id, UnitType.HERO, combat_rating, tactical_rating, movement, race, land, status, allegiance, position, ordinal)
 
 
 class Army(Unit):
@@ -242,6 +275,6 @@ class Army(Unit):
         terrain_affinity: Optional[str]
             The type of terrain where the army has an advantage. Set to None by default.
     """
-    def __init__(self, name, allegiance, movement, combat_rating, race):
-        super().__init__(name, allegiance, movement, combat_rating, 0, race)
+    def __init__(self, unit_id, unit_type, combat_rating, movement, race, land, status, allegiance, position, ordinal):
+        super().__init__(unit_id, unit_type, combat_rating, 0, movement, race, land, status, allegiance, position, ordinal)
         self.terrain_affinity = None  # Terrain affinity for the unit
