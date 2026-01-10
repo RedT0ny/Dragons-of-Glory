@@ -102,7 +102,7 @@ MIN_ODDS_RATIO = 0.33
 # These are only used by the View (gui/ folder)
 HEX_RADIUS = 30
 UNIT_ICON_SIZE = 20
-MAP_IMAGE_PATH = os.path.join(ASSETS_DIR, "img", "test_map.png")
+MAP_IMAGE_PATH = os.path.join(ASSETS_DIR, "img", "ansalon_baseline.jpg")
 
 # --- GAME CONSTANTS ---
 MAX_UNITS_PER_HEX = 2
