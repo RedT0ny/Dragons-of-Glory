@@ -1,11 +1,36 @@
 from typing import List, Dict, Any, Set
-from src.content.loader import ScenarioSpec
+from collections import defaultdict
+from src.content.specs import ScenarioSpec, UnitSpec
 
 class Scenario:
-    def __init__(self, spec: ScenarioSpec, all_countries: Dict[str, Any], all_units: List[Dict[str, Any]]):
+    def __init__(self, spec: ScenarioSpec, global_unit_pool: List[UnitSpec], all_countries: Dict[str, Any]):
         self.spec = spec
         self.all_countries = all_countries
-        self.all_units = all_units
+
+        # 1. Expand the pool: Turn 'quantity' from CSV into individual UnitSpec objects
+        self._expanded_pool = []
+        for s in global_unit_pool:
+            for i in range(1, s.quantity + 1):
+                new_id = f"{s.id}_{i}" if s.quantity > 1 else s.id
+                # Create a copy with the unique ID and ordinal
+                # This logic is moved here from resolve_scenario_units
+                self._expanded_pool.append(UnitSpec(
+                    id=new_id, unit_type=s.unit_type, race=s.race,
+                    country=s.country, dragonflight=s.dragonflight,
+                    allegiance=s.allegiance, terrain_affinity=s.terrain_affinity,
+                    combat_rating=s.combat_rating, tactical_rating=s.tactical_rating,
+                    movement=s.movement, quantity=1, ordinal=i
+                ))
+
+        # 2. Index the pool for lightning-fast resolution
+        self._idx = {
+            "id": {u.id: u for u in self._expanded_pool},
+            "country": defaultdict(list),
+            "df": defaultdict(list)
+        }
+        for u in self._expanded_pool:
+            if u.country: self._idx["country"][u.country.lower()].append(u)
+            if u.dragonflight: self._idx["df"][u.dragonflight.lower()].append(u)
 
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
         """
@@ -29,32 +54,29 @@ class Scenario:
                 hexes.update(self.all_countries[cid].territories)
         return hexes
 
-    def get_starting_units(self, allegiance: str) -> List[Dict[str, Any]]:
+    def get_starting_units(self, allegiance: str) -> List[UnitSpec]:
         """
-        Resolves 'units: all' and explicit units into a flat list of unit data.
+        The intelligence is now here. We look at the 'setup' dictionary
+        and use our index to find the matching units.
         """
         player_setup = self.spec.setup.get(allegiance, {})
-        resolved_units = []
+        selected = []
 
-        # 1. Handle Country-based units
+        # Logic for 'units: all' by country
         for country_id, config in player_setup.get("countries", {}).items():
+            lc = country_id.lower()
             if config == "all" or (isinstance(config, dict) and config.get("units") == "all"):
-                # Filter units.csv for this country
-                resolved_units.extend([
-                    u for u in self.all_units if u.get('land') == country_id
-                ])
-            elif isinstance(config, dict) and "units_by_type" in config:
-                # Handle specific quantities (like Scenario 1's 4 inf, 1 cav)
-                # Logic to pick N units of type T from the pool goes here
-                pass
+                # Use our index instead of looping over everything
+                selected.extend(self._idx["country"].get(lc, []))
+                # Also check if it's a dragonflight color
+                selected.extend(self._idx["df"].get(lc, []))
 
-        # 2. Handle Explicit units (Leaders, Wizards)
-        explicit_ids = player_setup.get("explicit_units", [])
-        resolved_units.extend([
-            u for u in self.all_units if u.get('id') in explicit_ids
-        ])
+        # Logic for Explicit units
+        for unit_id in player_setup.get("explicit_units", []):
+            u = self._idx["id"].get(unit_id.lower())
+            if u: selected.append(u)
 
-        return resolved_units
+        return selected
 
     @property
     def map_bounds(self):

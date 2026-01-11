@@ -11,10 +11,20 @@ ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 
 # --- DATA FILES ---
 COUNTRIES_DATA = os.path.join(DATA_DIR, "countries.yaml")
-UNITS_DATA = os.path.join(DATA_DIR, "units.csv")
 CRT_DATA = os.path.join(DATA_DIR, "crt.csv")
+MAP_CONFIG_DATA = os.path.join(DATA_DIR, "map_config.yaml")
+MAP_TERRAIN_DATA = os.path.join(DATA_DIR, "ansalon_map.csv")
+UNITS_DATA = os.path.join(DATA_DIR, "units.csv")
+EVENTS_DATA = os.path.join(DATA_DIR, "events.yaml")
+ARTIFACTS_DATA = os.path.join(DATA_DIR, "artifacts.yaml")
 
 # --- ENUMS ---
+class EventType(Enum):
+    PLAYER_BONUS = "bonus"
+    REINFORCEMENTS = "units"
+    PREREQUISITE = "pre_req"
+    ARTIFACT = "artifact"
+
 class UnitRace(Enum):
     DWARF = "dwarf"
     ELF = "elf"
@@ -100,7 +110,13 @@ MIN_ODDS_RATIO = 0.33
 
 # --- GUI SETTINGS ---
 # These are only used by the View (gui/ folder)
-HEX_RADIUS = 30
+HEX_RADIUS = 11.15
+MAP_WIDTH = 65
+MAP_HEIGHT = 53
+SCREEN_WIDTH = 1400
+SCREEN_HEIGHT = 900
+X_OFFSET = 30
+Y_OFFSET = 30
 UNIT_ICON_SIZE = 20
 MAP_IMAGE_PATH = os.path.join(ASSETS_DIR, "img", "ansalon_baseline.jpg")
 
@@ -131,3 +147,5 @@ ARTIFACT_REQUIREMENTS = {
         "neutral": NEUTRAL,
     }
 }
+
+

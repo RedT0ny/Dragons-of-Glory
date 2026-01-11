@@ -6,6 +6,7 @@ class Location:
         - 'city': A fortified city.
         - 'port': A port city.
         - 'fortress': A fortress.
+        - 'undercity': An underground city (typically a dwarven fortress).
 
     """
     def __init__(self, loc_id, loc_type, coords):

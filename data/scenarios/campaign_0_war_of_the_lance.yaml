@@ -6,9 +6,7 @@ scenario:
     This is the complete game, covering the whole of the War of the Lance. 
     It starts with the events on Ansalon before the Dragon Highlords moved 
     toward conquest and allows both players to influence the full course of the war.
-  map_subset: #Entire Ansalon
-    x_range: [0, 64]
-    y_range: [0, 52]
+  #map_subset: Not required as it covers the entire Ansalon
   initial_setup:
     highlord:
       starting_location: "Neraka"

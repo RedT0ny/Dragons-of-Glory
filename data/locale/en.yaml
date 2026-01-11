@@ -233,6 +233,16 @@ locations:
   throtl: "Throtl"
   vingaard_keep: "Vingaard Keep"
   zhakar_city: "Zhakar"
+scenarios:
+  campaign_0_war_of_the_lance: "The War of the Lance"
+  campaign_1_historical: "Dragonlance Chronicles"
+  scenario_1_fall_of_silvanesti: "Fall of Silvanesti"
+  scenario_2_solamnic_plain: "The Solamnic Plain"
+  scenario_3_kender_strike: "The Kender Strike Back"
+  scenario_4_siege_of_kalaman: "The Siege of Kalaman"
+  scenario_5_invasion_of_abanasinia: "Invasion of Abanasinia and the Qualinesti War"
+  scenario_6_pirates_of_the_maelstrom: "Pirates of the Maelstrom"
+  scenario_7_battle_for_neraka: "The Battle for Neraka"
 ui:
   allegiance: "Allegiance"
   strength: "Military Strength"

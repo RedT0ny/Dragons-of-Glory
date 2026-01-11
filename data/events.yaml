@@ -1,0 +1,40 @@
+# Scripted events that can happen
+E1_FIND_METAL:
+  type: "pre_req"
+  description: "Pure Dragon Metal found in the mountains."
+  trigger: { turn: 5 }
+  effects: { grant_prerequisite: "pure_metal" }
+
+E10_CREATE_LANCE:
+  type: "artifact"
+  description: "The first Dragonlances are forged!"
+  trigger:
+    turn: 10
+    requires: ["pure_metal", "hammer_of_kharas"]
+  effects:
+    grant_artifact: "dragonlance"
+    allegiance: "whitestone"
+
+  E20_GOOD_DRAGONS:
+    type: "units"
+    description: "The Good Dragons emerge to aid the forces of good."
+    trigger: { turn: 20 }
+    effects: { add_units: "good_dragons" }
+
+  E20_SOTHS_LEGIONS:
+    type: "units"
+    description: "Lord Soth, Knight of the Black Rose, offers his allegiance to Takhisis."
+    trigger: { turn: 20 }
+    effects: { add_units: "soths_legions" }
+
+  E20_FLYING_CITADEL:
+    type: "units"
+    description: "Using a dark ritual, a flying citadel is summoned."
+    trigger: { turn: 20 }
+    effects: { add_units: "citadel" }
+
+  E20_GOLDEN_GENERAL:
+    type: "units"
+    description: "Laurana, the Golden General, has been appointed commander-in-chief of the Whitestone forces"
+    trigger: { turn: 20 }
+    effects: { add_units: "golden_general" }

@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from ..content.config import (
     RequirementType, 
     ARTIFACT_REQUIREMENTS, 
@@ -6,31 +7,35 @@ from ..content.config import (
 )
 
 class Event:
-    def __init__(self, name, description, trigger, effect):
-        self.name = name
+    def __init__(self, event_id: str, description: str, trigger: Callable[[Any], bool], effect: Any) -> None:
+        self.id = event_id
         self.description = description
         self.trigger = trigger
         self.effect = effect
+        self.occurrence_count = 0  # Track how many times it has fired
         self.is_active = True
 
     def check_trigger(self, game_state):
-        return self.is_active and self.trigger(game_state)
+        if not self.is_active or self.occurrence_count >= self.spec.max_occurrences:
+            return False
+        return self.trigger(game_state)
 
     def activate(self, game_state):
-        if self.check_trigger(game_state):
-            if callable(self.effect):
-                self.effect(game_state)
-            elif isinstance(self.effect, list):
-                for e in self.effect:
-                    e(game_state)
-            self.deactivate()
+        # Conditionally applies effect then deactivates if triggered
+        if self.check_trigger(game_state): # E.g. If effects key is "grant_artifact", look artifact up in the global pool and give it to the player.
+            self.effect(game_state)
+            self.occurrence_count += 1
+
+            # Auto-deactivate if we hit the limit
+            if self.occurrence_count >= self.spec.max_occurrences:
+                self.deactivate()
 
     def deactivate(self):
         self.is_active = False
 
 class Artifact:
-    def __init__(self, name, description, bonus, requirements=None, is_consumable=False):
-        self.name = name
+    def __init__(self, artifact_id, description, bonus, requirements=None, is_consumable=False):
+        self.id = artifact_id
         self.description = description
         self.bonus = bonus # Can be int, dict, or a function
         self.requirements = requirements or [] # List of requirement dictionaries

@@ -4,11 +4,10 @@ A python implementation of Dragonlance classic "Dragons of Glory", with Dragon #
 
 
 
-
-
-
-
 Notes:
+
+
+
 
 Every country has a color for their units. The country can be neutral, aligned with Whitestone or aligned with Highlord.
 How to show the unit allegiance without changing the original color?
@@ -20,5 +19,4 @@ Options:
 5. Use a different background color.
 6. Use a different border color.
 7. Use a different shadow color.
-8. Use a different texture.
 

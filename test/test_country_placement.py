@@ -3,18 +3,20 @@ import yaml
 import math
 import os
 from PySide6.QtWidgets import QApplication, QWidget, QGraphicsScene, QGraphicsView, QGraphicsItem
-from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QBrush, QPen, QPolygonF
+from PySide6.QtGui import QPixmap, QPainter, QPainterPath, QColor, QBrush, QPen, QTransform
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtCore import Qt, QPointF, QTimer, QRectF
 
 # Configuration for the hexagonal grid
-HEX_RADIUS = 14.2 #12.2 for test_map
+HEX_RADIUS = 61.77 #12.2 for test_map
 MAP_WIDTH = 65  # Max col observed in yaml + buffer
 MAP_HEIGHT = 53  # Max row observed in yaml + buffer
 SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 1138
-X_OFFSET = 12 # 30 for test_map
-Y_OFFSET = 15 # 20 for test_map
+X_OFFSET = 55 # 30 for test_map
+Y_OFFSET = 62 # 20 for test_map
 MAP_FILE = "ansalon_baseline.jpg" # test_map.png
+LOCATION_SIZE = 60
 
 class HexagonItem(QGraphicsItem):
     def __init__(self, center, radius, color, parent=None):
@@ -63,61 +65,47 @@ class LocationItem(QGraphicsItem):
         self.center = center
         self.loc_type = loc_type
         self.is_capital = is_capital
-        self.size = 6
+        self.size = LOCATION_SIZE  # Increased size for SVG visibility
         
+        # Load the SVG renderer
+        icon_path = os.path.join(os.path.dirname(__file__), "..", "assets", "icon", f"{self.loc_type}.svg")
+        if os.path.exists(icon_path):
+            self.renderer = QSvgRenderer(icon_path)
+        else:
+            self.renderer = None
+
     def boundingRect(self):
         """Return bounding rectangle for the location symbol."""
         size = self.size + 4  # Add some padding
         return QRectF(self.center.x() - size, self.center.y() - size, 
                       size * 2, size * 2)
-        
+
     def paint(self, painter, option, widget):
-        """Draw the location symbol."""
+        """Draw the location symbol using SVG."""
         painter.setRenderHint(QPainter.Antialiasing)
-        
-        # Draw location symbol based on type
-        if self.loc_type == 'city':
+
+        # Draw the SVG icon if available
+        if self.renderer and self.renderer.isValid():
             rect = QRectF(self.center.x() - self.size/2, 
                          self.center.y() - self.size/2, 
                          self.size, self.size)
+            self.renderer.render(painter, rect)
+        else:
+            # Fallback: Draw a simple circle if SVG is missing
             painter.setBrush(QBrush(QColor(255, 255, 255)))
-            painter.setPen(Qt.NoPen)
-            painter.drawRect(rect)
-            
-        elif self.loc_type == 'fortress':
-            points = [
-                QPointF(self.center.x(), self.center.y() - self.size),
-                QPointF(self.center.x() + self.size, self.center.y()),
-                QPointF(self.center.x(), self.center.y() + self.size),
-                QPointF(self.center.x() - self.size, self.center.y())
-            ]
-            painter.setBrush(QBrush(QColor(255, 255, 255)))
-            painter.setPen(Qt.NoPen)
-            painter.drawPolygon(points)
-            
-        elif self.loc_type == 'port':
-            painter.setBrush(QBrush(QColor(255, 255, 255)))
-            painter.setPen(Qt.NoPen)
-            painter.drawEllipse(self.center, self.size/2 + 1, self.size/2 + 1)
-            
-        else:  # default/town
-            points = [
-                QPointF(self.center.x(), self.center.y() - self.size),
-                QPointF(self.center.x() - self.size, self.center.y() + self.size),
-                QPointF(self.center.x() + self.size, self.center.y() + self.size)
-            ]
-            painter.setBrush(QBrush(QColor(255, 255, 255)))
-            painter.setPen(Qt.NoPen)
-            painter.drawPolygon(points)
-            
-        # Draw capital indicator
+            painter.setPen(QPen(Qt.black, 1))
+            painter.drawEllipse(self.center, self.size/4, self.size/4)
+
+        # Draw capital indicator (Gold star/dot)
         if self.is_capital:
             painter.setBrush(QBrush(QColor(255, 215, 0)))
-            painter.setPen(Qt.NoPen)
-            painter.drawEllipse(QPointF(self.center.x(), self.center.y() - self.size - 2), 2, 2)
+            painter.setPen(QPen(Qt.black, 0.5))
+            # Draws capital indicator as a gold dot
+            painter.drawEllipse(QPointF(self.center.x() + self.size/3, self.center.y() - self.size/3), 4, 4)
 
 class MapViewer(QGraphicsView):
     def __init__(self):
+        """Initializes scene; configures rendering and mouse interaction; loads data"""
         super().__init__()
         self.scene = QGraphicsScene()
         self.setScene(self.scene)
@@ -132,28 +120,24 @@ class MapViewer(QGraphicsView):
         self.load_map_image()
         
     def load_map_image(self):
-        """Load and scale the map background image."""
+        """Load the full resolution map background image."""
         current_dir = os.path.dirname(os.path.abspath(__file__))
         map_path = os.path.join(current_dir, "..", "assets", "img", MAP_FILE)
-        
+    
         if os.path.exists(map_path):
             self.map_pixmap = QPixmap(map_path)
             if not self.map_pixmap.isNull():
-                # Scale to fit while maintaining aspect ratio
-                img_rect = self.map_pixmap.rect()
-                ratio = min(SCREEN_WIDTH / img_rect.width(), SCREEN_HEIGHT / img_rect.height())
-                new_size = (int(img_rect.width() * ratio), int(img_rect.height() * ratio))
-                self.map_pixmap = self.map_pixmap.scaled(new_size[0], new_size[1], 
-                                                         Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                
-                # Add to scene
+                # DO NOT scale the pixmap here. Add it at full resolution.
                 self.scene.addPixmap(self.map_pixmap)
-                self.setSceneRect(0, 0, new_size[0], new_size[1])
+                
+                # Set the scene size to the actual image size
+                img_rect = self.map_pixmap.rect()
+                self.setSceneRect(QRectF(img_rect))
+                
+                # Initially scale the VIEW to fit the screen, not the image itself
+                ratio = min(SCREEN_WIDTH / img_rect.width(), SCREEN_HEIGHT / img_rect.height())
+                self.setTransform(QTransform.fromScale(ratio, ratio))
                 return
-        
-        print(f"Error: Could not load map image at {map_path}")
-        # Create empty scene if no image
-        self.scene.setSceneRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
         
     def load_data(self):
         """Load country data from YAML file."""
@@ -184,7 +168,7 @@ class MapViewer(QGraphicsView):
                 coords = tuple(loc_info.get('coords', []))
                 if coords:
                     self.location_map[coords] = {
-                        'type': loc_info.get('type', 'city'),
+                        'type': loc_info.get('loc_type', 'city'),
                         'is_capital': (loc_id == capital_id)
                     }
                     

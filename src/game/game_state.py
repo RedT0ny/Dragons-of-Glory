@@ -29,7 +29,10 @@ class GameState:
         self.map = None  # Will be initialized by load_scenario
         self.turn = 0
         self.countries = []
-        self.events = []
+        self.events = [] # Live Event objects
+        self.completed_event_ids = set() # Track for serialization
+        self.prerequisites = set() # Track things like "pure_metal"
+        self.artifact_pool = {} # ID -> ArtifactSpec blueprint
 
     def start_game(self):
         # 1. Use the absolute path from config instead of a hardcoded string
@@ -105,9 +108,15 @@ class GameState:
 
     def check_events(self):
         """Iterates through active events to see if turn-based triggers fire."""
-        for event in self.events:
+        for event in self.events[:]: # Iterate over a copy to allow removal
             if event.check_trigger(self):
                 event.activate(self)
+
+                # Logic: If the event has hit its specific limit, remove it from the active pool
+                # and track it as completed.
+                if event.occurrence_count >= event.spec.max_occurrences:
+                    self.completed_event_ids.add(event.id)
+                    self.events.remove(event)
 
     def add_unit(self, unit):
         pass
@@ -150,17 +159,24 @@ class GameState:
     def get_units_at(self, position):
         return [u for u in self.units if u.position == position]
 
-def save_game(self, filename: str):
-    # Gather unit data using the to_dict method we discussed earlier
-    unit_data = [u.to_dict() for u in self.units.values()]
-    activated = [c.id for c in self.countries.values() if c.is_activated]
-    
-    loader.save_game_state(
-        path=filename,
-        scenario_id=self.current_scenario.spec.id,
-        turn=self.turn,
-        phase=self.phase,
-        active_player=self.active_player,
-        units=unit_data,
-        activated_countries=activated
-    )
+    def save_game(self, filename: str):
+        # Gather unit data using the to_dict method
+        unit_data = [u.to_dict() for u in self.units.values()]
+        activated = [c.id for c in self.countries.values() if c.is_activated]
+
+        world_state = {
+            "turn": self.turn,
+            "completed_events": list(self.completed_event_ids),
+            "prerequisites": list(self.prerequisites),
+            "units": [u.to_dict() for u in self.units]
+        }
+
+        loader.save_game_state(
+            path=filename,
+            scenario_id=self.current_scenario.spec.id,
+            turn=self.turn,
+            phase=self.phase,
+            active_player=self.active_player,
+            units=unit_data,
+            activated_countries=activated
+        )

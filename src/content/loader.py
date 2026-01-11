@@ -1,60 +1,9 @@
 import csv, yaml, json
 import os, re
-from dataclasses import dataclass, asdict
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, NamedTuple
+from dataclasses import asdict
 from collections import defaultdict
 from .config import DRAGONFLIGHTS, DIRECTION_MAP
-
-@dataclass
-class LocationSpec:
-    id: str
-    loc_type: str
-    coords: Tuple[int, int]
-
-@dataclass
-class CountrySpec:
-    id: str
-    capital_id: str
-    strength: int
-    allegiance: str
-    alignment: Tuple[int, int]
-    color: str
-    locations: List[LocationSpec]
-    territories: List[Tuple[int, int]]
-
-@dataclass
-class UnitSpec:
-    id: str             # The only ID we need (from CSV or generated)
-    unit_type: Optional[str]
-    race: Optional[str]
-    country: Optional[str]
-    dragonflight: Optional[str]
-    allegiance: Optional[str]
-    terrain_affinity: Optional[str]
-    combat_rating: Optional[int]
-    tactical_rating: Optional[int]
-    movement: Optional[int]
-    quantity: int = 1
-    ordinal: int = 1
-    status: str = "inactive"
-
-class ScenarioSpec(NamedTuple):
-    id: str
-    name: str
-    description: str
-    map_subset: Optional[Dict[str, List[int]]]
-    start_turn: int
-    end_turn: int
-    initiative_start: str
-    possible_events: List[str]
-    setup: Dict[str, Any]
-    victory_conditions: Dict[str, Any]
-    notes: str
-
-class SaveGameSpec(NamedTuple):
-    metadata: Dict[str, Any]
-    world_state: Dict[str, Any]
+from .specs import *
 
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
@@ -89,7 +38,6 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
 
     return ScenarioSpec(
         id=data.get("id", "unknown"),
-        name=data.get("name", "Unnamed Scenario"),
         description=data.get("description", ""),
         map_subset=data.get("map_subset"),
         start_turn=data.get("start_turn", 1),
@@ -120,6 +68,36 @@ def save_game_state(path: str, scenario_id: str, turn: int, phase: str, active_p
     }
     with open(path, "w", encoding="utf-8") as f:
         yaml.dump(data, f, default_flow_style=False)
+
+def load_map_config(path: str) -> MapConfigSpec:
+    """
+    Loads the master map configuration from YAML.
+    """
+    with open(path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
+    
+    data = raw.get("master_map", {})
+    
+    # Flatten special locations into LocationSpecs
+    special_locs = []
+    loc_groups = data.get("special_locations", {})
+    for loc_type, loc_list in loc_groups.items():
+        for loc in loc_list:
+            special_locs.append(LocationSpec(
+                id=loc["id"],
+                loc_type=loc_type,
+                coords=tuple(loc["coords"])
+            ))
+
+    return MapConfigSpec(
+        name=data.get("name", "Unknown"),
+        width=data.get("width", 0),
+        height=data.get("height", 0),
+        hex_size=data.get("hex_size", 0),
+        terrain_types=data.get("terrain_types", []),
+        hexsides=data.get("hexsides", {}),
+        special_locations=special_locs
+    )
 
 def load_game_state(path: str) -> SaveGameSpec:
     """
@@ -355,3 +333,34 @@ def resolve_scenario_units(scenario_path: str, units_csv_path: str) -> List[Unit
             unique_units.append(u)
             seen.add(u.id)
     return unique_units
+
+def load_artifacts_yaml(path: str) -> Dict[str, ArtifactSpec]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    
+    specs = {}
+    for aid, info in data.items():
+        specs[aid] = ArtifactSpec(
+            id=aid,
+            description=info.get("description", ""),
+            bonus=info.get("bonus", {}),
+            requirements=info.get("requirements", []),
+            is_consumable=info.get("is_consumable", False)
+        )
+    return specs
+
+def load_events_yaml(path: str) -> Dict[str, EventSpec]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    
+    specs = {}
+    for eid, info in data.items():
+        specs[eid] = EventSpec(
+            id=eid,
+            event_type=info.get("type", "bonus"),
+            description=info.get("description", ""),
+            trigger_conditions=info.get("trigger", {}),
+            effects=info.get("effects", {}),
+            allegiance=info.get("allegiance")
+        )
+    return specs

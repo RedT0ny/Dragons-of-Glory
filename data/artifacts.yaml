@@ -1,0 +1,13 @@
+# Catalog of all possible items
+staff_of_magius:
+  description: "A powerful staff for a wizard."
+  bonus: { tactical_rating: 1, fear_immunity: true }
+  requirements:
+    - { type: "trait", value: "is_magical" }
+  is_consumable: false
+
+dragonlance:
+  description: "A legendary weapon against dragons."
+  bonus: { combat_rating: 5 } # Handled in Unit.combat_rating property
+  requirements:
+    - { type: "race", value: "solamnic" }

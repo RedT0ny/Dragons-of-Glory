@@ -1,15 +1,55 @@
 # language: yaml
 scenario:
   id: "scenario_1_fall_of_silvanesti"
-  name: "The Fall of Silvanesti"
+  description: >
+    No continuous civilized government lasted longer than the Silvanesti kingdom of the High Elves. Established in the 
+    distant past by Silvanos, the great father of elven civilization, Silvanesti was rooted in the Age of Twilight. 
+    From that time on, no force has been able to bring about the ruin of this nation. It survived two previous dragon 
+    wars despite its major participation in both. It even survived the Cataclysm intact.
+    But in the summer of 349 AC, events quickly conspired to bring an end to its glorious reign. Large elements of the 
+    1st, 2d, and 3d Blue Flight Dragonarmies and the 3d through 7th Red Flights surged south over the Khur border into 
+    the Silvanesti forests. These armies were supported by the newly organized Khuri-tarak Empire forces from Khur under 
+    command of the Dragon Highlords. 
+    Despite the early use of dragons from the air to soften the entrenched elves and the widespread use of magic by the 
+    Highlords, the offensive quickly became mired in the dense forests of Silvanesti. The elves, using the terrain to 
+    maximum advantage and practicing a flexible and responsive defense, constantly held the great armies at bay.
+    This was accomplished at great cost. The policy of feigned retreat and surround, while working to their great 
+    defensive advantage against the over-zealous dragon troops, gradually decimated the elves. Heavy losses quickly 
+    taxed the resources of both sides.
+    After several months of inconclusive yet deadly combat, the supply lines from Silvanost, capital of Silvanesti, 
+    suddenly failed. The reasons for this are still not clear and the elves do not speak on the subject to those not of 
+    their race. For whatever reason, it is clear that the government in Silvanesti failed and its citizens fled west by 
+    any means at their disposal. The elven armies in the field, however, while out of supply and poorly organized, were 
+    still a force to be wary of. While they could no longer protect their homeland from the invaders, they could buy 
+    time for the flight of their people. The forces in the north were almost exclusively Wildrunner elves and their more 
+    flamboyant nature was well suited to the task at hand. Despite the loss of supply, their withdrawal from Silvanesti 
+    was a costly one for the Dragon Highlords.
+
+  # Map Configuration
   map_subset:
-    x_range: [35, 52]
-    y_range: [32, 47]
+    x_range: [ 35, 52 ]
+    y_range: [ 32, 47 ]
+
+  # Timeline and Turn Logic
+  start_turn: 4
+  end_turn: 9
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Global Events
+  possible_events: [ "E1" ]
+
+  # Allegiance-based Setup
   initial_setup:
+
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: None
+
     highlord:
-      starting_location:
-        x: 45
-        y: 42
+      # Specific deployment region (subset of countries)
+      deployment_area:
+        countries: [ "khur" ]
+
       countries:
         taman:
           units_by_type:
@@ -35,37 +75,28 @@ scenario:
           units_by_type:
             dragon:
               quantity: 1
+
+      explicit_units: [ "ariakas","phair","topus","salahkhan"]
+
+      artifacts: None
+
+      victory_conditions:
+        major: "Capture Silvanost before it is evacuated"
+        marginal: "Capture Silvanost before turn 9"
+
     whitestone:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
+
       countries:
         silvanesti:
-          units_by_country: all
-    neutral:
-      countries: none
-  start:
-    start_turn: 4
-    initiative: silvanesti
-  strategic_event_counters:
-    cup_start: all
-    pregame_draw:
-      draw_order_starting_with: highlord
-      draws_per_player: 2
-      discard_activation_counters: true
-      events_apply_before_game_start: true
-  victory_conditions:
-    highlord:
-      major:
-        - description: "Captures the Silvanesti capital before it moves."
-      marginal:
-        - description: "If the capital moves, occupies the original capital city hex before the end of Turn 9."
-    whitesone:
-      denies_hl:
-        marginal:
-          - description: "Prevents the HL player from taking the capital city location before the end of Turn 9."
-        major:
-          - description: "Prevents HL from taking the capital city location without having to move the Whitesone capital."
+          units: all
+
+      artifacts: ["dragon_orb"]
+
+      victory_conditions:
+        major: "Prevents Highlord from taking Silvanost without moving the capital"
+        marginal: "After moving the capital to Silvamori, prevents Silvanost from being taken before end of turn 9"
 
   notes: >
-    This scenario is played on the southeast quadrant of the map.
-    Entire green wing (2 dragons), half red wing and half blue wing (1 dragon each) are active.
-    Khur: 4 inf and 1 cav. Red: 1 dragon. Taman: 4 inf and 1 cav.
-    Only Highlord units and armies from designated countries start active per activation rules.
+    Silvanesti Leader (Lorac) starts with a dragon orb.

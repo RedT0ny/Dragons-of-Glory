@@ -7,16 +7,7 @@ from PySide6.QtCore import Qt, QPointF, QTimer, QRectF
 
 # Add src to path to use existing loaders
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
-from src.content.loader import load_countries_yaml, load_data
-
-# Configuration from your map_config.yaml logic
-HEX_RADIUS = 11.15
-MAP_WIDTH = 65
-MAP_HEIGHT = 53
-SCREEN_WIDTH = 1400
-SCREEN_HEIGHT = 900
-X_OFFSET = 30
-Y_OFFSET = 30
+from src.content.config import HEX_RADIUS, MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Colors for hexsides
 HEXSIDE_COLORS = {
@@ -115,17 +106,18 @@ class MapViewer(QGraphicsView):
         return QPointF(x + X_OFFSET, y + Y_OFFSET)
 
     def load_all_data(self):
-        data_dir = os.path.join(os.path.dirname(__file__), "..", "data")
+        # Use centralized loaders from src.content.loader
+        from src.content import loader
+        from src.content.config import COUNTRIES_DATA, MAP_CONFIG_DATA, MAP_TERRAIN_DATA
         
-        # 1. Load Countries and territories
-        self.country_specs = load_countries_yaml(os.path.join(data_dir, "countries.yaml"))
-        
-        # 2. Load Map Config
-        self.map_cfg = load_data(os.path.join(data_dir, "map_config.yaml"))
-        
-        # 3. Load Actual Terrain from CSV
-        from src.content.loader import load_terrain_csv
-        self.terrain_data = load_terrain_csv(os.path.join(data_dir, "ansalon_map.csv"))
+        # 1. Load Countries
+        self.country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
+    
+        # 2. Load Map Config (using the new structured loader)
+        self.map_cfg = loader.load_map_config(MAP_CONFIG_DATA)
+    
+        # 3. Load Terrain CSV
+        self.terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
 
     def draw_map(self):
         # Draw all hexes with terrain from CSV
@@ -147,7 +139,7 @@ class MapViewer(QGraphicsView):
                 self.scene.addItem(HexagonItem(center, HEX_RADIUS, rgba, terrain_type=t_type))
 
         # Draw Hexsides (Rivers, Mountains, etc)
-        hexsides = self.map_cfg.get('master_map', {}).get('hexsides', {})
+        hexsides = self.map_cfg.hexsides
         for side_type, entries in hexsides.items():
             for col, row, direction in entries:
                 center = self.get_hex_center(col, row)
@@ -165,6 +157,7 @@ class MapViewer(QGraphicsView):
 
     def get_vertex(self, center, i):
         angle_rad = math.radians(60 * i - 30)
+        # Computes vertex from center using trigonometric functions
         return QPointF(center.x() + HEX_RADIUS * math.cos(angle_rad),
                        center.y() + HEX_RADIUS * math.sin(angle_rad))
 
