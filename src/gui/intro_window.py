@@ -1,7 +1,10 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QLabel, QHBoxLayout, QFrame, QSizePolicy
+import os
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton, 
+                             QLabel, QHBoxLayout, QFrame, QSizePolicy, QFileDialog, QDialog)
 from PySide6.QtGui import QPixmap, QFont, QAction
 from PySide6.QtCore import Qt, Signal
 from src.content.config import COVER_PICTURE, APP_NAME
+from src.gui.new_game_dialog import Ui_Dialog
 
 
 class IntroWindow(QMainWindow):
@@ -74,11 +77,11 @@ class IntroWindow(QMainWindow):
             btn = QPushButton(self.translator.get_text("intro", key))
             btn.setStyleSheet(style)
             btn.setCursor(Qt.PointingHandCursor)
-            
+
             # FIX: Set the size policy so it doesn't expand horizontally
             # This makes the button only as wide as the text + padding
             btn.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
-            
+
             btn.clicked.connect(callback)
             menu_container.addWidget(btn)
 
@@ -90,14 +93,33 @@ class IntroWindow(QMainWindow):
         # (You can implement the flag QHBoxLayout here later)
 
     def on_continue(self):
-        # Logic for Load Game dialog
-        pass
+        """Opens a native file dialog to load a game."""
+        save_dir = os.path.join(os.getcwd(), "saves")
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir, exist_ok=True)
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self.translator.get_text("intro", "menu_continue"),
+            save_dir,
+            "Save Files (*.yaml *.json)"
+        )
+
+        if file_path:
+            print(f"Loading game from: {file_path}")
+            # Emit a signal or call the controller to load the state
+            # self.ready_to_load.emit(file_path)
 
     def on_new_game(self):
-        # This will eventually trigger your Scenario Dialog
-        print("Opening Scenario Selection...")
-        # After selection, you would emit ready_to_start.emit(spec, config)
-        # self.close()
+        """Opens the Scenario Selection dialog."""
+        dialog = QDialog(self)
+        ui = Ui_Dialog()
+        ui.setupUi(dialog)
+
+        if dialog.exec():
+            # After the user clicks "Start Game" in the dialog
+            print("Scenario selected, preparing game...")
+            # Logic to extract data from 'ui' and emit ready_to_start would go here
 
     def on_settings(self):
         pass

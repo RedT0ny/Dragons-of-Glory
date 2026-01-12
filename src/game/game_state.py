@@ -1,7 +1,6 @@
 from src.game.combat import CombatResolver
-from src.game.map import Hex, HexGrid
 from src.game.country import Country, Location
-from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS
+from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content import loader, factory
 
 class GameState:
@@ -28,6 +27,7 @@ class GameState:
         self.units = []
         self.map = None  # Will be initialized by load_scenario
         self.turn = 0
+        self.current_turn_side = HL # Default starting side
         self.countries = []
         self.events = [] # Live Event objects
         self.completed_event_ids = set() # Track for serialization
@@ -74,6 +74,15 @@ class GameState:
         # (Assuming your loader has a method to generate a HexGrid from spec settings)
         self.map = scenario_obj.map
         self.turn = scenario_obj.start_turn
+        self.current_turn_side = HL
+
+    def end_phase(self):
+        """Swaps the current turn side."""
+        if self.current_turn_side == HL:
+            self.current_turn_side = WS
+        else:
+            self.current_turn_side = HL
+            self.next_turn()
 
     def next_turn(self):
         """

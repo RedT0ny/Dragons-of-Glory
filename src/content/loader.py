@@ -275,6 +275,10 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
     return specs
 
 def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[UnitSpec]:
+    #Avoid crashing if no scenario is passed as argument
+    if spec is None: return []
+
+    # 1. Expand all unit specs from CSV
     raw_specs = parse_units_csv(units_csv_path)
     all_counters = []
     for s in raw_specs:

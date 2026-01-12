@@ -2,6 +2,9 @@
 <ui version="4.0">
  <class>Dialog</class>
  <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModality::NonModal</enum>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -13,9 +16,15 @@
   <property name="windowTitle">
    <string>New Game</string>
   </property>
+  <property name="windowOpacity">
+   <double>0.700000000000000</double>
+  </property>
+  <property name="modal">
+   <bool>true</bool>
+  </property>
   <layout class="QHBoxLayout" name="horizontalLayout">
    <item>
-    <widget class="QGroupBox" name="scenarioGroupBox">
+    <widget class="QGroupBox" name="scGroupBox">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
        <horstretch>0</horstretch>
@@ -36,7 +45,7 @@
      </property>
      <layout class="QFormLayout" name="formLayout">
       <item row="0" column="0" colspan="2">
-       <widget class="QListView" name="listView"/>
+       <widget class="QListView" name="scListView"/>
       </item>
      </layout>
     </widget>
@@ -72,7 +81,7 @@
          </spacer>
         </item>
         <item>
-         <widget class="QLabel" name="scenarioPicLabel">
+         <widget class="QLabel" name="scPicture">
           <property name="sizePolicy">
            <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
             <horstretch>0</horstretch>
@@ -112,7 +121,7 @@
        </layout>
       </item>
       <item>
-       <widget class="QPlainTextEdit" name="descTextEdit"/>
+       <widget class="QTextEdit" name="scDescription"/>
       </item>
       <item>
        <widget class="QFrame" name="detailsFrame">
@@ -124,7 +133,7 @@
         </property>
         <layout class="QGridLayout" name="gridLayout">
          <item row="7" column="3">
-          <widget class="QPushButton" name="pushButton_2">
+          <widget class="QPushButton" name="notesButton">
            <property name="text">
             <string>Notes</string>
            </property>
@@ -157,21 +166,21 @@
           <widget class="QLineEdit" name="hlCountries"/>
          </item>
          <item row="3" column="0">
-          <widget class="QLabel" name="label_4">
+          <widget class="QLabel" name="labelHL">
            <property name="text">
             <string>Highlord:</string>
            </property>
           </widget>
          </item>
          <item row="4" column="3" colspan="2">
-          <widget class="QLabel" name="label_6">
+          <widget class="QLabel" name="labelOther">
            <property name="text">
             <string>Other Info</string>
            </property>
           </widget>
          </item>
          <item row="2" column="0">
-          <widget class="QLabel" name="label_2">
+          <widget class="QLabel" name="labelEnd">
            <property name="text">
             <string>End:</string>
            </property>
@@ -203,21 +212,21 @@
           <widget class="QLineEdit" name="lineEdit"/>
          </item>
          <item row="5" column="0" colspan="2">
-          <widget class="QLabel" name="label_5">
+          <widget class="QLabel" name="labelWS">
            <property name="text">
             <string>Whitestone:</string>
            </property>
           </widget>
          </item>
          <item row="1" column="3">
-          <widget class="QLabel" name="label_3">
+          <widget class="QLabel" name="labelInitiative">
            <property name="text">
             <string>Initiative:</string>
            </property>
           </widget>
          </item>
          <item row="1" column="0">
-          <widget class="QLabel" name="label">
+          <widget class="QLabel" name="labelStart">
            <property name="text">
             <string>Start:</string>
            </property>

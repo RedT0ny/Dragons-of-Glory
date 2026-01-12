@@ -2,7 +2,6 @@ import sys
 import locale
 from PySide6.QtWidgets import QApplication
 
-from src.game import game_state
 from src.gui.main_window import MainWindow
 from src.game.game_state import GameState
 from src.content.translator import Translator
@@ -30,7 +29,7 @@ def initialize_app():
 
 def initialize_model():
     model = GameState()
-    model.load_scenario(None) # Logic encapsulated in GameState
+    #model.load_scenario(None) # Logic encapsulated in GameState
     return model
 
 def initialize_view(model: GameState):
