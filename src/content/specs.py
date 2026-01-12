@@ -4,6 +4,8 @@ Defines various data structures for game specifications using dataclass and Name
 This module outlines the data models for game configurations, including
 locations, countries, units, scenarios, saved game states, and map configurations.
 
+Shall only be used by Loader.py to read data from CSV/JSON/YAML files into these structures.
+
 Classes:
 - LocationSpec: Represents the details of a specific location on the map.
 - CountrySpec: Represents a country and its associated properties.

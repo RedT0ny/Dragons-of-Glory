@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFrame, QScrollArea, QGridLayout)
 from PySide6.QtCore import Qt
+
+from src.content.config import APP_NAME
 from src.gui.map_view import AnsalonMapView
 
 class InfoPanel(QFrame):
@@ -49,7 +51,7 @@ class MainWindow(QMainWindow):
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
-        self.setWindowTitle("Dragons of Glory")
+        self.setWindowTitle(APP_NAME)
         self.resize(1200, 800)
         
         # Main Layout

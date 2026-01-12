@@ -8,6 +8,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 DATA_DIR = os.path.join(BASE_DIR, "data")
 LOCALE_DIR = os.path.join(DATA_DIR, "locale")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+FONTS_DIR = os.path.join(ASSETS_DIR, "font")
+ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
+IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
 
 # --- DATA FILES ---
 COUNTRIES_DATA = os.path.join(DATA_DIR, "countries.yaml")
@@ -118,7 +121,8 @@ SCREEN_HEIGHT = 900
 X_OFFSET = 30
 Y_OFFSET = 30
 UNIT_ICON_SIZE = 20
-MAP_IMAGE_PATH = os.path.join(ASSETS_DIR, "img", "ansalon_baseline.jpg")
+COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
+MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "ansalon_baseline.jpg")
 
 # --- GAME CONSTANTS ---
 MAX_UNITS_PER_HEX = 2

@@ -2,8 +2,9 @@ import csv, yaml, json
 import os, re
 from dataclasses import asdict
 from collections import defaultdict
-from .config import DRAGONFLIGHTS, DIRECTION_MAP
+from .config import DRAGONFLIGHTS, DIRECTION_MAP, UNITS_DATA, COUNTRIES_DATA
 from .specs import *
+
 
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
@@ -174,8 +175,7 @@ def load_terrain_csv(path: str) -> Dict[str, str]:
 
 def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
     """
-    Returns a dictionary of raw data specs,
-    not game objects.
+    Returns a dictionary of country raw data specs,
     """
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
@@ -274,7 +274,7 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
             ))
     return specs
 
-def resolve_scenario_units(scenario_path: str, units_csv_path: str) -> List[UnitSpec]:
+def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[UnitSpec]:
     raw_specs = parse_units_csv(units_csv_path)
     all_counters = []
     for s in raw_specs:
@@ -287,52 +287,27 @@ def resolve_scenario_units(scenario_path: str, units_csv_path: str) -> List[Unit
     # 2. Index for lookup
     idx = {
         "id": {u.id: u for u in all_counters},
-        "name": {u.name.lower(): u for u in all_counters if u.name},
         "country": defaultdict(list),
         "type": defaultdict(list),
-        "df": defaultdict(list)
     }
     for u in sorted(all_counters, key=lambda x: x.id):
         if u.country: idx["country"][u.country.lower()].append(u)
         if u.unit_type: idx["type"][u.unit_type.lower()].append(u)
-        if u.dragonflight: idx["df"][u.dragonflight.lower()].append(u)
 
-    # 3. Process Scenario
-    with open(scenario_path, "r", encoding="utf-8") as f:
-        sc = yaml.safe_load(f)
-
-    selected = []
-    players = sc.get("scenario", {}).get("players", {})
-    for _, p_cfg in players.items():
-        # Handle Countries
-        for cname, rules in p_cfg.get("countries", {}).items():
+    # 3. Filter based on ScenarioSpec
+    selected_specs = []
+    for allegiance in ["highlord", "whitestone"]:
+        p_cfg = spec.setup.get(allegiance, {})
+        for cname, config in p_cfg.get("countries", {}).items():
             lc = cname.lower()
-            if rules.get("units_by_country") == "all":
-                selected.extend(idx["country"][lc])
-            
-            # Unit type picking (e.g. 4 inf, 1 cav)
-            for utype, uinfo in rules.get("units_by_type", {}).items():
-                qty = int(uinfo.get("quantity", 0))
-                # Check if this is a dragonflight color or a regular country
-                candidates = idx["df"][lc] if lc in DRAGONFLIGHTS else \
-                             [u for u in idx["country"][lc] if u.unit_type and u.unit_type.lower() == utype.lower()]
-                selected.extend(candidates[:qty])
+            if config == "all" or (isinstance(config, dict) and config.get("units") == "all"):
+                selected_specs.extend(idx["country"].get(lc, []))
+                selected_specs.extend(idx["df"].get(lc, []))
+        for uid in p_cfg.get("explicit_units", []):
+            u = idx["id"].get(uid.lower())
+            if u: selected_specs.append(u)
 
-        # Handle Explicit picks
-        for item in (p_cfg.get("explicit_units") or []):
-            key = str(item).lower()
-            if key in idx["id"]: selected.append(idx["id"][key])
-            elif key in idx["name"]: selected.append(idx["name"][key])
-
-    # 4. Finalize
-    unique_units = []
-    seen = set()
-    for u in selected:
-        if u.id not in seen:
-            u.status = "active"
-            unique_units.append(u)
-            seen.add(u.id)
-    return unique_units
+    return selected_specs
 
 def load_artifacts_yaml(path: str) -> Dict[str, ArtifactSpec]:
     with open(path, "r", encoding="utf-8") as f:

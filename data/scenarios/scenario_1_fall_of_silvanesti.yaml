@@ -36,7 +36,7 @@ scenario:
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  possible_events: [ "E1" ]
+  active_events: [ "Dragon Orb" ]
 
   # Allegiance-based Setup
   initial_setup:

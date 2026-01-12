@@ -1,57 +1,64 @@
 # language: yaml
 scenario:
   id: "campaign_0_war_of_the_lance"
-  name: "War of the Lance"
   description: >
     This is the complete game, covering the whole of the War of the Lance. 
     It starts with the events on Ansalon before the Dragon Highlords moved 
     toward conquest and allows both players to influence the full course of the war.
-  #map_subset: Not required as it covers the entire Ansalon
+
+  # Map Configuration: None as it covers entire Ansalon.
+
+  # Timeline and Turn Logic
+  start_turn: 1
+  end_turn: 30
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Active Global Events
+  active_events: null
+
+  # Allegiance-based Setup
   initial_setup:
+
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: [ "khur", "taman", "silvanesti" ]
+
     highlord:
-      starting_location: "Neraka"
-      units:
-        - leaders: all
-        - armies: all  # Note: except draconians
-        - dragons: all
-      # Draconians are specifically excluded in initial setup per rules
-      exclude_units:
-        - draconians
+      # Specific deployment region (subset of countries)
+      deployment_area:
+        countries: [ "taman" ]
+
+      countries:
+        taman:
+          units: all
+        green:
+          units: all
+        blue:
+          units: all
+        red:
+          units: all
+
+      explicit_units: [ "ariakas" ]
+
+      artifacts: null
+
+      victory_conditions:
+        major: "Control more than 30 countries"
+        marginal: "Countrol more than 20 countries"
+
     whitestone:
-      starting_armies: none
-      notes: "Must Activate countries to get armies."
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
 
-  start:
-    turn: 1
-    initiative: highlord
+      countries: null
 
-  strategic_event_counters:
-    cup_start: "E1"
-    additions:
-      - turn: 10
-        counters: "E10"
-      - turn: 20
-        counters: "E20"
+      artifacts: null
 
-  victory_conditions:
-    type: "country_count"
-    turn_limit: 30
-    determination:
-      calculation: "Count countries held by each side at end of Turn 30. Only countries starting with armies or activated with armies count."
-      holding_definition: >
-        A country is held if: The capital was never occupied by an enemy force, 
-        OR friendly forces were the last to occupy the capital.
-      nonhuman_exception: >
-        Nonhuman countries are occupied if the original location of the capital 
-        is captured, regardless of capital movement.
-    levels:
-      total_victory: 20
-      victory: 19
-      partial_victory: 18
-      marginal_victory: 17
-      poor_victory: 16
-      indecisive: 15 # or fewer
+      victory_conditions:
+        major: "Control more than 30 countries"
+        marginal: "Countrol more than 20 countries"
 
   notes: >
+    Whitestone starts without countries, they will join by diplomacy or as a result of the highlord's invasion.' 
     The player with the most countries held consults the victory table.
-    Areas without armies (e.g., Estwilde) do not count toward the total.
+    Dragonflights do not count towards the number of countries controlled.

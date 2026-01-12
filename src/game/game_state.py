@@ -2,7 +2,7 @@ from src.game.combat import CombatResolver
 from src.game.map import Hex, HexGrid
 from src.game.country import Country, Location
 from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS
-from src.content import loader
+from src.content import loader, factory
 
 class GameState:
     """
@@ -60,31 +60,20 @@ class GameState:
     def load_state(self, filename):
         pass
 
-    def load_scenario(self, scenario_data, master_map_data):
+    def load_scenario(self, scenario_spec):
         """
         Initializes the game state from scenario data.
         """
-        map_conf = scenario_data['scenario']['map_settings']
+        # The factory does all the heavy lifting
+        scenario_obj = factory.create_scenario(scenario_spec)
 
-        # 1. Initialize HexGrid with offsets
-        # Convert offset_col/row to axial q/r if necessary
-        start_hex = Hex.offset_to_axial(map_conf['offset_col'], map_conf['offset_row'])
+        self.units = scenario_obj.units
+        self.countries = scenario_obj.countries
 
-        self.map = HexGrid(
-            width=map_conf['width'],
-            height=map_conf['height'],
-            offset_q=start_hex.q,
-            offset_r=start_hex.r
-        )
-
-        # 2. Populate Map Data
-        self.map.grid = master_map_data['terrain_map']
-        self.map.hexside_data = master_map_data['hexside_map']
-
-        # 3. Setup Countries and Units
-        # (This is where you'd loop through scenario_data['setup'] to
-        # create countries and place units on the map)
-        pass
+        # 2. Setup the map
+        # (Assuming your loader has a method to generate a HexGrid from spec settings)
+        self.map = scenario_obj.map
+        self.turn = scenario_obj.start_turn
 
     def next_turn(self):
         """

@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+    <class>IntroWindow</class>
+    <widget class="QMainWindow" name="IntroWindow">
+        <property name="geometry">
+            <rect>
+                <x>0</x>
+                <y>0</y>
+                <width>1920</width>
+                <height>1080</height>
+            </rect>
+        </property>
+        <property name="minimumSize">
+            <size>
+                <width>1920</width>
+                <height>1080</height>
+            </size>
+        </property>
+        <property name="maximumSize">
+            <size>
+                <width>1920</width>
+                <height>1080</height>
+            </size>
+        </property>
+        <property name="windowTitle">
+            <string>Dragons of Glory</string>
+        </property>
+        <widget class="QWidget" name="centralWidget">
+            <property name="styleSheet">
+                <string notr="true">#centralWidget {
+                    background-image: url(assets/img/cover.png);
+                    background-position: center;
+                    background-repeat: no-repeat;
+                    }</string>
+            </property>
+            <layout class="QVBoxLayout" name="mainVerticalLayout">
+                <property name="leftMargin">
+                    <number>100</number>
+                </property>
+                <property name="topMargin">
+                    <number>100</number>
+                </property>
+                <property name="rightMargin">
+                    <number>100</number>
+                </property>
+                <property name="bottomMargin">
+                    <number>100</number>
+                </property>
+                <item>
+                    <spacer name="verticalSpacer">
+                        <property name="orientation">
+                            <enum>Qt::Vertical</enum>
+                        </property>
+                        <property name="sizeHint" stdset="0">
+                            <size>
+                                <width>20</width>
+                                <height>40</height>
+                            </size>
+                        </property>
+                    </spacer>
+                </item>
+                <item>
+                    <layout class="QHBoxLayout" name="bottomRowLayout">
+                        <item>
+                            <layout class="QVBoxLayout" name="menuLayout">
+                                <property name="spacing">
+                                    <number>20</number>
+                                </property>
+                                <item>
+                                    <widget class="QPushButton" name="btnContinue">
+                                        <property name="sizePolicy">
+                                            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                                                <horstretch>0</horstretch>
+                                                <verstretch>0</verstretch>
+                                            </sizepolicy>
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">QPushButton {
+                                                color: #D4AF37;
+                                                font-family: &quot;Libra&quot;;
+                                                font-size: 48px;
+                                                background: transparent;
+                                                border: none;
+                                                text-align: left;
+                                                padding: 5px 20px;
+                                                border-radius: 10px;
+                                                }
+                                                QPushButton:hover {
+                                                color: #FFD700;
+                                                background-color: rgba(0, 0, 0, 150);
+                                                }</string>
+                                        </property>
+                                        <property name="text">
+                                            <string>Continue</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QPushButton" name="btnNewGame">
+                                        <property name="sizePolicy">
+                                            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                                                <horstretch>0</horstretch>
+                                                <verstretch>0</verstretch>
+                                            </sizepolicy>
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">QPushButton {
+                                                color: #D4AF37;
+                                                font-family: &quot;Libra&quot;;
+                                                font-size: 48px;
+                                                background: transparent;
+                                                border: none;
+                                                text-align: left;
+                                                padding: 5px 20px;
+                                                border-radius: 10px;
+                                                }
+                                                QPushButton:hover {
+                                                color: #FFD700;
+                                                background-color: rgba(0, 0, 0, 150);
+                                                }</string>
+                                        </property>
+                                        <property name="text">
+                                            <string>New Game</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QPushButton" name="btnSettings">
+                                        <property name="sizePolicy">
+                                            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                                                <horstretch>0</horstretch>
+                                                <verstretch>0</verstretch>
+                                            </sizepolicy>
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">QPushButton {
+                                                color: #D4AF37;
+                                                font-family: &quot;Libra&quot;;
+                                                font-size: 48px;
+                                                background: transparent;
+                                                border: none;
+                                                text-align: left;
+                                                padding: 5px 20px;
+                                                border-radius: 10px;
+                                                }
+                                                QPushButton:hover {
+                                                color: #FFD700;
+                                                background-color: rgba(0, 0, 0, 150);
+                                                }</string>
+                                        </property>
+                                        <property name="text">
+                                            <string>Settings</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                                <item>
+                                    <widget class="QPushButton" name="btnQuit">
+                                        <property name="sizePolicy">
+                                            <sizepolicy hsizetype="Maximum" vsizetype="Fixed">
+                                                <horstretch>0</horstretch>
+                                                <verstretch>0</verstretch>
+                                            </sizepolicy>
+                                        </property>
+                                        <property name="styleSheet">
+                                            <string notr="true">QPushButton {
+                                                color: #D4AF37;
+                                                font-family: &quot;Libra&quot;;
+                                                font-size: 48px;
+                                                background: transparent;
+                                                border: none;
+                                                text-align: left;
+                                                padding: 5px 20px;
+                                                border-radius: 10px;
+                                                }
+                                                QPushButton:hover {
+                                                color: #FFD700;
+                                                background-color: rgba(0, 0, 0, 150);
+                                                }</string>
+                                        </property>
+                                        <property name="text">
+                                            <string>Quit</string>
+                                        </property>
+                                    </widget>
+                                </item>
+                            </layout>
+                        </item>
+                        <item>
+                            <spacer name="horizontalSpacer">
+                                <property name="orientation">
+                                    <enum>Qt::Horizontal</enum>
+                                </property>
+                                <property name="sizeHint" stdset="0">
+                                    <size>
+                                        <width>40</width>
+                                        <height>20</height>
+                                    </size>
+                                </property>
+                            </spacer>
+                        </item>
+                        <item>
+                            <layout class="QHBoxLayout" name="flagLayout">
+                                <property name="alignment">
+                                    <set>Qt::AlignBottom|Qt::AlignRight</set>
+                                </property>
+                                <!-- Flag icons will be added here via code -->
+                            </layout>
+                        </item>
+                    </layout>
+                </item>
+            </layout>
+        </widget>
+    </widget>
+    <resources/>
+    <connections/>
+</ui>
