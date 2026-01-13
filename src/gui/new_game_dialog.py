@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
                                QLineEdit, QListView, QPushButton, QSizePolicy,
                                QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
 from src.content.config import SCENARIOS_DIR
+from src.content.loader import load_scenario_yaml
+import os
 
 
 class Ui_Dialog(object):
@@ -96,6 +98,7 @@ class Ui_Dialog(object):
 
         self.scDescription = QTextEdit(self.detailsGroupBox)
         self.scDescription.setObjectName(u"scDescription")
+        self.scDescription.setReadOnly(True)
 
         self.verticalLayout.addWidget(self.scDescription)
 
@@ -113,22 +116,26 @@ class Ui_Dialog(object):
         self.hlVictory = QTextEdit(self.detailsFrame)
         self.hlVictory.setObjectName(u"hlVictory")
         self.hlVictory.setMaximumSize(QSize(263, 50))
+        self.hlVictory.setReadOnly(True)
 
         self.gridLayout.addWidget(self.hlVictory, 4, 0, 1, 3)
 
         self.wsVictory = QTextEdit(self.detailsFrame)
         self.wsVictory.setObjectName(u"wsVictory")
         self.wsVictory.setMaximumSize(QSize(263, 50))
+        self.wsVictory.setReadOnly(True)
 
         self.gridLayout.addWidget(self.wsVictory, 6, 0, 1, 3)
 
-        self.lineEdit_3 = QLineEdit(self.detailsFrame)
-        self.lineEdit_3.setObjectName(u"lineEdit_3")
+        self.endTurn = QLineEdit(self.detailsFrame)
+        self.endTurn.setObjectName(u"endTurn")
+        self.endTurn.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.lineEdit_3, 2, 1, 1, 2)
+        self.gridLayout.addWidget(self.endTurn, 2, 1, 1, 2)
 
         self.hlCountries = QLineEdit(self.detailsFrame)
         self.hlCountries.setObjectName(u"hlCountries")
+        self.hlCountries.setReadOnly(True)
 
         self.gridLayout.addWidget(self.hlCountries, 3, 1, 1, 2)
 
@@ -147,10 +154,11 @@ class Ui_Dialog(object):
 
         self.gridLayout.addWidget(self.labelEnd, 2, 0, 1, 1)
 
-        self.lineEdit_2 = QLineEdit(self.detailsFrame)
-        self.lineEdit_2.setObjectName(u"lineEdit_2")
+        self.initiative = QLineEdit(self.detailsFrame)
+        self.initiative.setObjectName(u"initiative")
+        self.initiative.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.lineEdit_2, 1, 4, 1, 1)
+        self.gridLayout.addWidget(self.initiative, 1, 4, 1, 1)
 
         self.startButton = QPushButton(self.detailsFrame)
         self.startButton.setObjectName(u"startButton")
@@ -161,10 +169,11 @@ class Ui_Dialog(object):
 
         self.gridLayout.addWidget(self.startButton, 7, 2, 1, 1)
 
-        self.lineEdit = QLineEdit(self.detailsFrame)
-        self.lineEdit.setObjectName(u"lineEdit")
+        self.startTurn = QLineEdit(self.detailsFrame)
+        self.startTurn.setObjectName(u"startTurn")
+        self.startTurn.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.lineEdit, 1, 1, 1, 2)
+        self.gridLayout.addWidget(self.startTurn, 1, 1, 1, 2)
 
         self.labelWS = QLabel(self.detailsFrame)
         self.labelWS.setObjectName(u"labelWS")
@@ -183,6 +192,7 @@ class Ui_Dialog(object):
 
         self.wsCountries = QLineEdit(self.detailsFrame)
         self.wsCountries.setObjectName(u"wsCountries")
+        self.wsCountries.setReadOnly(True)
 
         self.gridLayout.addWidget(self.wsCountries, 5, 2, 1, 1)
 
@@ -213,3 +223,94 @@ class Ui_Dialog(object):
         self.labelStart.setText(QCoreApplication.translate("Dialog", u"Start:", None))
     # retranslateUi
 
+
+class NewGameDialog(QDialog):
+    """
+    Custom dialog class that wraps the auto-generated UI.
+    Handles logic for loading and displaying scenario information.
+    """
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.ui = Ui_Dialog()
+        self.ui.setupUi(self)
+        
+        self._current_scenario_spec = None
+        
+        # Connect signals
+        self.ui.scListView.selectionModel().selectionChanged.connect(self._on_scenario_selected)
+        self.ui.startButton.clicked.connect(self.accept)
+        
+    def _on_scenario_selected(self, selected, deselected):
+        """Handle scenario selection from the list view."""
+        indexes = selected.indexes()
+        if not indexes:
+            self._clear_details()
+            return
+            
+        # Get the selected file path
+        model = self.ui.scListView.model()
+        file_path = model.filePath(indexes[0])
+        
+        # Load the scenario spec
+        try:
+            self._current_scenario_spec = load_scenario_yaml(file_path)
+            self._display_scenario_details(self._current_scenario_spec)
+        except Exception as e:
+            print(f"Error loading scenario: {e}")
+            self._clear_details()
+    
+    def _display_scenario_details(self, spec):
+        """Display scenario details in the UI from the ScenarioSpec."""
+        # Description
+        self.ui.scDescription.setPlainText(spec.description)
+        
+        # Turn information
+        self.ui.startTurn.setText(str(spec.start_turn))
+        self.ui.endTurn.setText(str(spec.end_turn))
+        self.ui.initiative.setText(spec.initiative_start.title())
+        
+        # Highlord countries
+        hl_setup = spec.setup.get("highlord", {})
+        hl_countries = list(hl_setup.get("countries", {}).keys())
+        self.ui.hlCountries.setText(", ".join(c.title() for c in hl_countries) if hl_countries else "None")
+        
+        # Whitestone countries
+        ws_setup = spec.setup.get("whitestone", {})
+        ws_countries = list(ws_setup.get("countries", {}).keys())
+        self.ui.wsCountries.setText(", ".join(c.title() for c in ws_countries) if ws_countries else "None")
+        
+        # Victory conditions
+        vc = spec.victory_conditions
+        hl_vc = vc.get("highlord", {})
+        ws_vc = vc.get("whitestone", {})
+        
+        hl_text = ""
+        if "major" in hl_vc:
+            hl_text += f"Major: {hl_vc['major']}\n"
+        if "marginal" in hl_vc:
+            hl_text += f"Marginal: {hl_vc['marginal']}"
+        self.ui.hlVictory.setPlainText(hl_text.strip())
+        
+        ws_text = ""
+        if "major" in ws_vc:
+            ws_text += f"Major: {ws_vc['major']}\n"
+        if "marginal" in ws_vc:
+            ws_text += f"Marginal: {ws_vc['marginal']}"
+        self.ui.wsVictory.setPlainText(ws_text.strip())
+    
+    def _clear_details(self):
+        """Clear all detail fields."""
+        self.ui.scDescription.clear()
+        self.ui.startTurn.clear()
+        self.ui.endTurn.clear()
+        self.ui.initiative.clear()
+        self.ui.hlCountries.clear()
+        self.ui.wsCountries.clear()
+        self.ui.hlVictory.clear()
+        self.ui.wsVictory.clear()
+        self._current_scenario_spec = None
+    
+    def get_selected_scenario_spec(self):
+        """Returns the currently selected ScenarioSpec, or None if nothing is selected."""
+        return self._current_scenario_spec

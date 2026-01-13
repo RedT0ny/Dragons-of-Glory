@@ -1,0 +1,112 @@
+# Example scenario YAML
+scenario:
+  id: "scenario_2_solamnic_plain"
+  description: >
+    *** The Solamnic Plain ***
+    
+    The Solamnic Plain was more than just a political and geographical barrier, it was the heartland of food production 
+    in western Ansalon. Control of the plain thus became the major focus of the war effort. 
+    
+    Powerful armies of the Blue and Red Dragon Wings entered the plain in the early summer of 351 AC.
+    The Blue Wing forces crossed the Estwilde to Kalaman and then turned west, rounding the north end of the Dargaard 
+    Mountains and following the Vingaard River across the plain to the southwest crossings near Vingaard Keep. 
+    The Red Wing forces, combined with hobgoblins, pressed through the Throtyl Gap and moved west toward Solanthus.
+    
+    Despite solemn treaties, the Lemish forces joined the rapidly advancing Dragonarmy and laid siege to Solanthus at 
+    the north point of the Garnet Mountains. Fortunately, elements of the Solamnic forces in Caergoth were able to 
+    engage the enemy in the Thelgaard Gap and thereby protect the western shores of Solamnia. 
+    
+    On the northern front, the Blue Dragon Wing quickly laid siege to Vingaard Keep, the gateway to the northwest 
+    plains. The Vingaard troops were unable to hold the citadel and the largely mercenary force retreated west to the 
+    High Clerist Tower. 
+    
+    Both the northern and southern Dragon Wings had dangerously extended their supply routes. Their advance was slowed 
+    sufficiently that they were forced into a winter war. In the south this became a bitter and desperate struggle 
+    between two determined forces. 
+    
+    In the north, one objective burned in the hearts of the Dragon Highlords: Palanthas. The only major port untouched 
+    by the Cataclysm, its fleets retained the might and glory of ancient times. This was a prize that could not be 
+    ignored. Yet the value of the prize was ignored by the Palanthians themselves. They stubbornly clung to the belief
+    that they would be spared by the dragon empire because they were a center of culture. This remarkable and misguided 
+    view nearly cost that great city all it held dear. 
+    
+    Dragons gave the Dragon Highlords mastery of the skies and made the defense difficult, almost hopeless. Yet in the 
+    darkest hour, the dragons of good again returned to the world and allied with the forces of the Whitestone. 
+    This was the turn of the tide...
+
+  # Map Configuration
+  # If null or omitted, assume full map [0,0] to [64,52]
+  map_subset:
+    x_range: [35, 52]
+    y_range: [32, 47]
+
+  # Timeline and Turn Logic
+  start_turn: 10
+  end_turn: 25
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Global Events
+  active_events: [ "highlord wizard", "whitestone wizard" ]
+
+  # Allegiance-based Setup
+  initial_setup:
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: ["kaolyn", "lemish", "palanthas", "vingaard"]
+
+    highlord:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
+
+      countries:
+        mithas:
+          units_by_type:
+            minotaur:
+              quantity: 3
+            fleet:
+              quantity: 3
+            admiral:
+              quantity: 1
+        taman:
+          units: all
+        sanction:
+          units: all
+        red:
+          units: all
+        green:
+          units: all
+        blue:
+          units: all
+        red:
+          units: all
+
+      # Specific units (Leaders/Wizards) not tied to a country's regular army
+      explicit_units: [ "ariakas", "chot", "dracart" ]
+      artifacts: null
+
+      victory_conditions:
+        major: "Control Caergoth, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
+
+    whitestone:
+      deployment_area: null
+
+      countries:
+        caergoth:
+          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
+        tower:
+          units: all
+        nergoth:
+          units: all
+        sancrist:
+          units: all
+        solanthus:
+          units: all
+
+      explicit_units: ["justarius"]
+      artifacts: null
+
+      victory_conditions:
+        major: "Prevent HL from controlling Caergoth, Lemish, Palanthas, Solanthus and Vingaard."
+
+  notes: >
+    Whitestone armies must be deployed in their home countries.

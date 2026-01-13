@@ -4,7 +4,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton,
 from PySide6.QtGui import QPixmap, QFont, QAction
 from PySide6.QtCore import Qt, Signal
 from src.content.config import COVER_PICTURE, APP_NAME
-from src.gui.new_game_dialog import Ui_Dialog
+from src.gui.new_game_dialog import NewGameDialog
 
 
 class IntroWindow(QMainWindow):
@@ -112,9 +112,7 @@ class IntroWindow(QMainWindow):
 
     def on_new_game(self):
         """Opens the Scenario Selection dialog."""
-        dialog = QDialog(self)
-        ui = Ui_Dialog()
-        ui.setupUi(dialog)
+        dialog = NewGameDialog(self)
 
         if dialog.exec():
             # After the user clicks "Start Game" in the dialog
