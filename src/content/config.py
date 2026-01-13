@@ -12,6 +12,7 @@ FONTS_DIR = os.path.join(ASSETS_DIR, "font")
 ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
 SCENARIOS_DIR = os.path.join(DATA_DIR, "scenarios")
+SAVEGAME_DIR = os.path.join(BASE_DIR, "saves")
 
 # --- DATA FILES ---
 COUNTRIES_DATA = os.path.join(DATA_DIR, "countries.yaml")

@@ -21,10 +21,11 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
                                QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
 from src.content.config import SCENARIOS_DIR
 from src.content.loader import load_scenario_yaml
+from src.gui.notes_dialog import NotesDialog
 import os
 
 
-class Ui_Dialog(object):
+class Ui_newGameDialog(object):
     def setupUi(self, Dialog):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
@@ -232,7 +233,7 @@ class NewGameDialog(QDialog):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.ui = Ui_Dialog()
+        self.ui = Ui_newGameDialog()
         self.ui.setupUi(self)
         
         self._current_scenario_spec = None
@@ -240,7 +241,17 @@ class NewGameDialog(QDialog):
         # Connect signals
         self.ui.scListView.selectionModel().selectionChanged.connect(self._on_scenario_selected)
         self.ui.startButton.clicked.connect(self.accept)
-        
+        self.ui.notesButton.clicked.connect(self._on_notes_clicked)
+
+    def _on_notes_clicked(self):
+        """Open the notes dialog for the current scenario."""
+        if not self._current_scenario_spec:
+            return
+
+        notes = getattr(self._current_scenario_spec, 'notes', "No notes available for this scenario.")
+        dialog = NotesDialog(notes, self)
+        dialog.exec()
+
     def _on_scenario_selected(self, selected, deselected):
         """Handle scenario selection from the list view."""
         indexes = selected.indexes()

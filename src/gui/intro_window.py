@@ -3,8 +3,9 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton,
                              QLabel, QHBoxLayout, QFrame, QSizePolicy, QFileDialog, QDialog)
 from PySide6.QtGui import QPixmap, QFont, QAction
 from PySide6.QtCore import Qt, Signal
-from src.content.config import COVER_PICTURE, APP_NAME
+from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR
 from src.gui.new_game_dialog import NewGameDialog
+from src.gui.side_selection_dialog import SideSelectionDialog
 
 
 class IntroWindow(QMainWindow):
@@ -94,7 +95,7 @@ class IntroWindow(QMainWindow):
 
     def on_continue(self):
         """Opens a native file dialog to load a game."""
-        save_dir = os.path.join(os.getcwd(), "saves")
+        save_dir = SAVEGAME_DIR
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
@@ -112,12 +113,23 @@ class IntroWindow(QMainWindow):
 
     def on_new_game(self):
         """Opens the Scenario Selection dialog."""
-        dialog = NewGameDialog(self)
+        sc_dialog = NewGameDialog(self)
 
-        if dialog.exec():
-            # After the user clicks "Start Game" in the dialog
-            print("Scenario selected, preparing game...")
-            # Logic to extract data from 'ui' and emit ready_to_start would go here
+        if sc_dialog.exec():
+            spec = sc_dialog.get_selected_scenario_spec()
+            if not spec:
+                return
+
+            # Chain to side selection
+            side_dialog = SideSelectionDialog(self)
+            if side_dialog.exec():
+                player_config = side_dialog.get_player_config()
+
+                print(f"Starting {spec.id}...")
+                print(f"Config: {player_config}")
+
+                # Finally, emit the signal to start the game
+                self.ready_to_start.emit(spec, player_config)
 
     def on_settings(self):
         pass
