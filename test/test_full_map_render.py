@@ -15,7 +15,8 @@ HEXSIDE_COLORS = {
     "deep_river": QColor(0, 0, 139, 255),     # Dark Blue
     "mountain": QColor(139, 69, 19, 200),     # Saddle Brown
     "pass": QColor(255, 215, 0, 255),         # Gold
-    "bridge": QColor(255, 69, 0, 255)         # Red-Orange
+    "bridge": QColor(255, 69, 0, 255),        # Red-Orange
+    "sea": QColor(135, 206, 250)              # Ocean blue
 }
 
 # Define Terrain Visuals
@@ -33,13 +34,14 @@ TERRAIN_VISUALS = {
 }
 
 class HexagonItem(QGraphicsItem):
-    def __init__(self, center, radius, color, terrain_type="grassland", parent=None):
+    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, parent=None):
         super().__init__(parent)
         self.center = center
         self.radius = radius
         # Ensure color is a QColor object even if a tuple is passed
         self.color = QColor(*color) if isinstance(color, (tuple, list)) else color
         self.terrain_type = terrain_type
+        self.coastal_directions = coastal_directions or []  # List of direction indices
         self.points = []
         # Create pointy-top hexagon path
         self.path = QPainterPath()
@@ -67,11 +69,35 @@ class HexagonItem(QGraphicsItem):
         painter.drawPath(self.path)
 
         # Layer 2: Country Overlay (if applicable)
-        # Now alpha() will work because self.color is guaranteed to be a QColor
         if self.color.alpha() > 0:
             painter.setBrush(QBrush(self.color))
             painter.setPen(Qt.NoPen)
             painter.drawPath(self.path)
+        
+        # Layer 3: Coastal Wedges (if this is a coastal hex)
+        if self.coastal_directions:
+            self.draw_coastal_wedges(painter)
+    
+    def draw_coastal_wedges(self, painter):
+        """Draw triangular wedges for all sea hexsides."""
+        ocean_color = TERRAIN_VISUALS["ocean"]["color"]
+        wedge_color = QColor(ocean_color.red(), ocean_color.green(), ocean_color.blue(), 255)
+        
+        for direction_idx in self.coastal_directions:
+            # Get the two vertices of the hexside facing the sea
+            v1 = self.points[direction_idx]
+            v2 = self.points[(direction_idx + 1) % 6]
+            
+            # Create a triangular wedge from center to the two vertices
+            wedge_path = QPainterPath()
+            wedge_path.moveTo(self.center)
+            wedge_path.lineTo(v1)
+            wedge_path.lineTo(v2)
+            wedge_path.closeSubpath()
+    
+            painter.setBrush(QBrush(wedge_color))
+            painter.setPen(Qt.NoPen)  # Remove the border
+            painter.drawPath(wedge_path)
 
 class HexsideItem(QGraphicsItem):
     def __init__(self, start_pt, end_pt, side_type):
@@ -116,17 +142,29 @@ class MapViewer(QGraphicsView):
         # 2. Load Map Config (using the new structured loader)
         self.map_cfg = loader.load_map_config(MAP_CONFIG_DATA)
     
-        # 3. Load Terrain CSV
+        # 3. Load Terrain CSV (now preserves c_ prefix)
         self.terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
 
     def draw_map(self):
+        # Build a map of coastal hexes and their sea directions
+        coastal_info = self.get_coastal_hexside_directions()
+        
         # Draw all hexes with terrain from CSV
         for row in range(MAP_HEIGHT):
             for col in range(MAP_WIDTH):
                 center = self.get_hex_center(col, row)
-                # Look up terrain from our new CSV data
-                t_type = self.terrain_data.get(f"{col},{row}", "ocean")
-                self.scene.addItem(HexagonItem(center, HEX_RADIUS, QColor(0,0,0,0), terrain_type=t_type))
+                # Look up terrain from CSV (now with c_ prefix preserved)
+                raw_terrain = self.terrain_data.get(f"{col},{row}", "ocean")
+            
+                # Extract coastal flag and actual terrain type
+                is_coastal = raw_terrain.startswith("c_")
+                t_type = raw_terrain[2:] if is_coastal else raw_terrain
+            
+                # Get coastal directions from map_config (may be empty list)
+                coastal_dirs = coastal_info.get((col, row))
+            
+                self.scene.addItem(HexagonItem(center, HEX_RADIUS, QColor(0,0,0,0), 
+                                              terrain_type=t_type, coastal_directions=coastal_dirs))
 
         # Overlay Country territories
         for cid, spec in self.country_specs.items():
@@ -134,9 +172,16 @@ class MapViewer(QGraphicsView):
             rgba = QColor(color.red(), color.green(), color.blue(), 100)
             for col, row in spec.territories:
                 center = self.get_hex_center(col, row)
-                # Ensure we pass the terrain type here so patterns show through the color
-                t_type = self.terrain_data.get(f"{col},{row}", "grassland")
-                self.scene.addItem(HexagonItem(center, HEX_RADIUS, rgba, terrain_type=t_type))
+                # Get terrain with c_ prefix preserved
+                raw_terrain = self.terrain_data.get(f"{col},{row}", "grassland")
+                is_coastal = raw_terrain.startswith("c_")
+                t_type = raw_terrain[2:] if is_coastal else raw_terrain
+            
+                # Get coastal directions from map_config
+                coastal_dirs = coastal_info.get((col, row))
+            
+                self.scene.addItem(HexagonItem(center, HEX_RADIUS, rgba, 
+                                              terrain_type=t_type, coastal_directions=coastal_dirs))
 
         # Draw Hexsides (Rivers, Mountains, etc)
         hexsides = self.map_cfg.hexsides
@@ -164,6 +209,59 @@ class MapViewer(QGraphicsView):
     def wheelEvent(self, event):
         factor = 1.2 if event.angleDelta().y() > 0 else 0.8
         self.scale(factor, factor)
+        
+    def get_coastal_hexside_directions(self):
+        """
+        Returns a dict mapping (col, row) -> list of direction_indices for coastal hexes.
+        For each sea hexside, colors wedges on BOTH the land hex and the adjacent ocean hex.
+        """
+        from collections import defaultdict
+        coastal_dirs = defaultdict(list)
+
+        # Get all hexsides marked as 'sea' from map config
+        sea_hexsides = self.map_cfg.hexsides.get("sea", [])
+
+        # Direction string to index mapping for pointy-top
+        dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
+        
+        # Opposite direction mapping (E opposite is W, NE opposite is SW, etc.)
+        opposite_dir = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
+        
+        # Direction offsets for pointy-top hex in offset coordinates
+        # These represent how to get to the neighbor in each direction
+        def get_neighbor_offset(col, row, direction_idx):
+            """Calculate the neighbor hex coordinates based on direction."""
+            # For odd-r offset coordinates (pointy-top)
+            parity = row & 1  # 0 if even row, 1 if odd row
+            
+            # Direction offsets: [even_row_offset, odd_row_offset]
+            # Format: (col_delta, row_delta)
+            offsets = {
+                0: [(1, 0), (1, 0)],      # E
+                1: [(0, 1), (1, 1)],      # SE
+                2: [(-1, 1), (0, 1)],     # SW
+                3: [(-1, 0), (-1, 0)],    # W
+                4: [(-1, -1), (0, -1)],   # NW
+                5: [(0, -1), (1, -1)]     # NE
+            }
+            
+            offset = offsets[direction_idx][parity]
+            return col + offset[0], row + offset[1]
+
+        for col, row, direction in sea_hexsides:
+            direction_idx = dir_map.get(direction)
+            if direction_idx is not None:
+                # Add wedge to the land hex (the one specified in config)
+                coastal_dirs[(col, row)].append(direction_idx)
+                
+                # Calculate the adjacent ocean hex
+                neighbor_col, neighbor_row = get_neighbor_offset(col, row, direction_idx)
+                
+                # Add the opposite wedge to the ocean hex
+                opposite_idx = opposite_dir[direction_idx]
+                coastal_dirs[(neighbor_col, neighbor_row)].append(opposite_idx)
+
+        return coastal_dirs
 
 class TestWindow(QWidget):
     def __init__(self):

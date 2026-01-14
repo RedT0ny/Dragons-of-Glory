@@ -143,6 +143,7 @@ def load_terrain_csv(path: str) -> Dict[str, str]:
     """
     Reads ansalon_map.csv (semicolon matrix format) and returns 
     a dict mapping "col,row" -> terrain_type.
+    Preserves the 'c_' prefix for coastal hexes.
     """
     terrain_map = {}
     if not os.path.exists(path):
@@ -152,7 +153,7 @@ def load_terrain_csv(path: str) -> Dict[str, str]:
         # Use semicolon as the delimiter based on your CSV content
         reader = csv.reader(f, delimiter=';')
         rows = list(reader)
-        
+    
         if not rows:
             return terrain_map
 
@@ -163,14 +164,14 @@ def load_terrain_csv(path: str) -> Dict[str, str]:
             for col_idx, raw_terrain in enumerate(row_data[1:]):
                 # Clean the terrain string
                 terrain = raw_terrain.strip().lower()
-                
+            
                 # Rule: Remove 'c_' prefix for visual patterns
-                if terrain.startswith("c_"):
-                    terrain = terrain[2:]
-                
+                #if terrain.startswith("c_"):
+                #    terrain = terrain[2:]
+
                 key = f"{col_idx},{row_idx}"
                 terrain_map[key] = terrain
-                
+            
     return terrain_map
 
 def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
