@@ -43,7 +43,7 @@ scenario:
 
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: None
+      countries: null
 
     highlord:
       # Specific deployment region (subset of countries)

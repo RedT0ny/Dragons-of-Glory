@@ -30,7 +30,22 @@ class Scenario:
 # ... existing code ...
     @property
     def map_bounds(self):
-        """Returns the subset range or full map defaults."""
+        """
+        Returns the subset range or full map defaults.
+        Full map defaults to Ansalon dimensions: width=65, height=53.
+        """
         if self._map_subset:
+            # Returns exactly what's in the YAML: {'x_range': [min, max], 'y_range': [min, max]}
             return self._map_subset
-        return {"x_range": [0, 64], "y_range": [0, 52]}
+            
+        # Fallback to the master map configuration dimensions
+        return {
+            "x_range": [0, 64], 
+            "y_range": [0, 52]
+        }
+
+    def is_hex_in_bounds(self, q: int, r: int) -> bool:
+        """Helper to check if a specific offset coordinate is within this scenario's map."""
+        bounds = self.map_bounds
+        return (bounds["x_range"][0] <= q <= bounds["x_range"][1] and 
+                bounds["y_range"][0] <= r <= bounds["y_range"][1])

@@ -15,6 +15,8 @@ class IntroWindow(QMainWindow):
     """
     # Signal emitted when the user successfully starts a new game configuration
     ready_to_start = Signal(object, dict) # (ScenarioSpec, player_config)
+    # Signal emitted when a save file is selected
+    ready_to_load = Signal(str) # (file_path)
 
     def __init__(self, translator):
         super().__init__()
@@ -109,7 +111,7 @@ class IntroWindow(QMainWindow):
         if file_path:
             print(f"Loading game from: {file_path}")
             # Emit a signal or call the controller to load the state
-            # self.ready_to_load.emit(file_path)
+            self.ready_to_load.emit(file_path)
 
     def on_new_game(self):
         """Opens the Scenario Selection dialog."""

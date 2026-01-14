@@ -71,9 +71,12 @@ class GameState:
         self.countries = scenario_obj.countries
 
         # 2. Setup the map
-        # (Assuming your loader has a method to generate a HexGrid from spec settings)
-        self.map = scenario_obj.map
-        self.turn = scenario_obj.start_turn
+        # Use the map_subset from the scenario object
+        # Note: If you have a HexGrid/Map class, you'd initialize it here using scenario_obj._map_subset
+        self.map = getattr(scenario_obj, 'map', None) 
+        
+        # Default to turn 1 if start_turn is missing from the scenario object
+        self.turn = getattr(scenario_obj, 'start_turn', 1)
         self.current_turn_side = HL
 
     def end_phase(self):

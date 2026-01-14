@@ -1,3 +1,10 @@
+general:
+  app_name: "Dragons of Glory"
+intro:
+  menu_continue: "Continue"
+  menu_new_game: "New Game"
+  menu_settings: "Settings"
+  menu_quit: "Quit"
 countries:
   abanasinia:
     name: "Abanasinia"

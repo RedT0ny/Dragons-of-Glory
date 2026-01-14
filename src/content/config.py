@@ -124,7 +124,7 @@ X_OFFSET = 30
 Y_OFFSET = 30
 UNIT_ICON_SIZE = 20
 COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
-MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "ansalon_baseline.jpg")
+MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "ansalon_hexmap.jpg")
 
 # --- GAME CONSTANTS ---
 MAX_UNITS_PER_HEX = 2

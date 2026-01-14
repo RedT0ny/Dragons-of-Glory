@@ -52,7 +52,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.game_state = game_state
         self.setWindowTitle(APP_NAME)
-        self.resize(1200, 800)
+        self.resize(1920, 1080)
         
         # Main Layout
         central_widget = QWidget()

@@ -61,7 +61,7 @@ class ScenarioSpec:
     start_turn: int
     end_turn: int
     initiative_start: str
-    possible_events: List[str]
+    active_events: List[str]
     setup: Dict[str, Any]
     victory_conditions: Dict[str, Any]
     notes: str = "" # Added a default value to prevent errors if notes are missing

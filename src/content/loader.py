@@ -44,7 +44,7 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         start_turn=data.get("start_turn", 1),
         end_turn=data.get("end_turn", 30),
         initiative_start=data.get("initiative_start", "highlord"),
-        possible_events=data.get("possible_events", []),
+        active_events=data.get("active_events", []),
         setup=setup,
         victory_conditions=v_conds,
         notes=data.get("notes", "")
@@ -306,7 +306,6 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
             lc = cname.lower()
             if config == "all" or (isinstance(config, dict) and config.get("units") == "all"):
                 selected_specs.extend(idx["country"].get(lc, []))
-                selected_specs.extend(idx["df"].get(lc, []))
         for uid in p_cfg.get("explicit_units", []):
             u = idx["id"].get(uid.lower())
             if u: selected_specs.append(u)
