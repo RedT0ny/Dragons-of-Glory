@@ -9,12 +9,12 @@ class Location:
         - 'undercity': An underground city (typically a dwarven fortress).
 
     """
-    def __init__(self, loc_id, loc_type, coords):
+    def __init__(self, loc_id, loc_type, coords, is_capital=False):
         self.id = loc_id
         self.loc_type = loc_type
         self.coords = coords      # (col, row) offset coordinates
         self.occupier = None      # 'highlord', 'whitestone', or None
-        self.is_capital = False
+        self.is_capital = is_capital
 
     def get_defense_modifier(self):
         """

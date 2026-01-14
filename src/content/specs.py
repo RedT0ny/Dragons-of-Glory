@@ -25,6 +25,7 @@ class LocationSpec:
     id: str
     loc_type: str
     coords: Tuple[int, int]
+    is_capital: bool = False
 
 @dataclass
 class CountrySpec:

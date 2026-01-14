@@ -187,7 +187,8 @@ def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
             LocationSpec(
                 id=lid,
                 loc_type=linfo.get("loc_type", "city"),
-                coords=tuple(linfo.get("coords", [0, 0]))
+                coords=tuple(linfo.get("coords", [0, 0])),
+                is_capital=lid == info.get("capital_id")
             )
             for lid, linfo in info.get("locations", {}).items()
         ]

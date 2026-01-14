@@ -1,10 +1,13 @@
 import math
+import os
+
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen, QPixmap
 from PySide6.QtCore import Qt, QPointF, QRectF
 
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH, COUNTRIES_DATA, MAP_CONFIG_DATA, MAP_TERRAIN_DATA,
-                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET)
+                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, WS, LOCATION_SIZE, ICONS_DIR)
 from src.content import loader
 
 # Define Terrain Visuals
@@ -31,7 +34,7 @@ HEXSIDE_COLORS = {
 }
 
 class HexagonItem(QGraphicsItem):
-    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, parent=None):
+    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None):
         super().__init__(parent)
         self.center = center
         self.radius = radius
@@ -39,6 +42,7 @@ class HexagonItem(QGraphicsItem):
         self.color = QColor(*color) if isinstance(color, (tuple, list)) else color
         self.terrain_type = terrain_type
         self.coastal_directions = coastal_directions or []
+        self.pass_directions = pass_directions or []
         self.is_highlighted = False # Track if this hex is a valid move
         self.points = []
         
@@ -84,8 +88,12 @@ class HexagonItem(QGraphicsItem):
         if DEBUG:
             if self.coastal_directions:
                 self.draw_coastal_wedges(painter)
-            
-        # Layer 4: Highlight if selected/reachable
+
+        # Layer 4: Mountain Passes (if this is a mountain hex)
+        if self.pass_directions:
+            self.draw_mountain_passes(painter)
+
+        # Layer 6: Highlight if selected/reachable
         if self.is_highlighted:
             painter.setBrush(QBrush(QColor(255, 255, 0, 100)))
             painter.setPen(QPen(QColor(255, 255, 0), 2))
@@ -112,6 +120,38 @@ class HexagonItem(QGraphicsItem):
             painter.setPen(Qt.NoPen)
             painter.drawPath(wedge_path)
 
+    def draw_mountain_passes(self, painter):
+        """Draw triangular wedges for all sea hexsides."""
+        pass_color = HEXSIDE_COLORS["pass"]
+
+        for direction_idx in self.pass_directions:
+            # Get the two vertices of the hexside facing the sea
+            v1 = self.points[direction_idx]
+            v2 = self.points[(direction_idx + 1) % 6]
+
+            # Calculate the center of this hexside
+            hexside_center = QPointF((v1.x() + v2.x()) / 2, (v1.y() + v2.y()) / 2)
+
+            # Vector from current center to hexside center
+            vector = QPointF(hexside_center.x() - self.center.x(),
+                             hexside_center.y() - self.center.y())
+
+            # Extend the vector to get to adjacent hex center
+            # For regular hexagons, adjacent center is 2x the distance
+            adjacent_center = QPointF(self.center.x() + 2 * vector.x(),
+                                      self.center.y() + 2 * vector.y())
+
+            # Create the line path
+            line_path = QPainterPath()
+            line_path.moveTo(self.center)
+            line_path.lineTo(hexside_center)
+            line_path.lineTo(adjacent_center)
+
+            # Draw the line
+            pen = QPen(pass_color, 8)
+            pen.setStyle(Qt.PenStyle.DotLine)
+            painter.setPen(pen)
+            painter.drawPath(line_path)
 
 class HexsideItem(QGraphicsItem):
     def __init__(self, start_pt, end_pt, side_type):
@@ -130,6 +170,52 @@ class HexsideItem(QGraphicsItem):
         painter.drawLine(self.start_pt, self.end_pt)
 
 
+class LocationItem(QGraphicsItem):
+    def __init__(self, center, loc_id, loc_type, is_capital, parent=None):
+        super().__init__(parent)
+        self.center = center
+        self.loc_id = loc_id
+        self.loc_type = loc_type
+        self.is_capital = is_capital
+        self.size = LOCATION_SIZE  # Increased size for SVG visibility
+
+        # Load the SVG renderer
+        icon_path = os.path.join(ICONS_DIR, f"{self.loc_type}.svg")
+        if os.path.exists(icon_path):
+            self.renderer = QSvgRenderer(icon_path)
+        else:
+            self.renderer = None
+
+    def boundingRect(self):
+        """Return bounding rectangle for the location symbol."""
+        size = self.size + 4  # Add some padding
+        return QRectF(self.center.x() - size, self.center.y() - size,
+                      size * 2, size * 2)
+
+    def paint(self, painter, option, widget):
+        """Draw the location symbol using SVG."""
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Draw the SVG icon if available
+        if self.renderer and self.renderer.isValid():
+            rect = QRectF(self.center.x() - self.size / 2,
+                          self.center.y() - self.size / 2,
+                          self.size, self.size)
+            self.renderer.render(painter, rect)
+        else:
+            # Fallback: Draw a simple circle if SVG is missing
+            painter.setBrush(QBrush(QColor(255, 255, 255)))
+            painter.setPen(QPen(Qt.black, 1))
+            painter.drawEllipse(self.center, self.size / 4, self.size / 4)
+
+        # Draw capital indicator (Gold star/dot)
+        if self.is_capital:
+            painter.setBrush(QBrush(QColor(255, 215, 0)))
+            painter.setPen(QPen(Qt.black, 0.5))
+            # Draws capital indicator as a gold dot
+            painter.drawEllipse(QPointF(self.center.x() + self.size / 3, self.center.y() - self.size / 3), 4, 4)
+
+
 class UnitGraphicsItem(QGraphicsItem):
     """Visual representation of a Unit from the model."""
     def __init__(self, unit, radius, parent=None):
@@ -141,7 +227,7 @@ class UnitGraphicsItem(QGraphicsItem):
         return QRectF(-self.radius*0.6, -self.radius*0.6, self.radius*1.2, self.radius*1.2)
 
     def paint(self, painter, option, widget):
-        painter.setBrush(QBrush(QColor("blue") if self.unit.side == "Good" else QColor("red")))
+        painter.setBrush(QBrush(QColor("blue") if self.unit.allegiance == WS else QColor("red")))
         painter.setPen(QPen(Qt.black, 2))
         painter.drawRect(-15, -15, 30, 30)
     
@@ -174,6 +260,7 @@ class AnsalonMapView(QGraphicsView):
         """Load all map configuration data."""
         self.country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
         self.map_cfg = loader.load_map_config(MAP_CONFIG_DATA)
+        self.location_map = self.create_location_map()
         self.terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
 
     def get_hex_center(self, col, row):
@@ -188,6 +275,21 @@ class AnsalonMapView(QGraphicsView):
         return QPointF(center.x() + HEX_RADIUS * math.cos(angle_rad),
                        center.y() + HEX_RADIUS * math.sin(angle_rad))
 
+    def get_neighbor_offset(self, col, row, direction_idx):
+        """Calculate the neighbor hex coordinates based on direction."""
+        parity = row & 1
+        offsets = {
+            0: [(1, 0), (1, 0)],
+            1: [(0, 1), (1, 1)],
+            2: [(-1, 1), (0, 1)],
+            3: [(-1, 0), (-1, 0)],
+            4: [(-1, -1), (0, -1)],
+            5: [(0, -1), (1, -1)]
+        }
+        offset = offsets[direction_idx][parity]
+        return col + offset[0], row + offset[1]
+
+
     def get_coastal_hexside_directions(self):
         """
         Returns a dict mapping (col, row) -> list of direction_indices for coastal hexes.
@@ -199,30 +301,38 @@ class AnsalonMapView(QGraphicsView):
         sea_hexsides = self.map_cfg.hexsides.get("sea", [])
         dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
         opposite_dir = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
-        
-        def get_neighbor_offset(col, row, direction_idx):
-            """Calculate the neighbor hex coordinates based on direction."""
-            parity = row & 1
-            offsets = {
-                0: [(1, 0), (1, 0)],
-                1: [(0, 1), (1, 1)],
-                2: [(-1, 1), (0, 1)],
-                3: [(-1, 0), (-1, 0)],
-                4: [(-1, -1), (0, -1)],
-                5: [(0, -1), (1, -1)]
-            }
-            offset = offsets[direction_idx][parity]
-            return col + offset[0], row + offset[1]
 
         for col, row, direction in sea_hexsides:
             direction_idx = dir_map.get(direction)
             if direction_idx is not None:
                 coastal_dirs[(col, row)].append(direction_idx)
-                neighbor_col, neighbor_row = get_neighbor_offset(col, row, direction_idx)
+                neighbor_col, neighbor_row = self.get_neighbor_offset(col, row, direction_idx)
                 opposite_idx = opposite_dir[direction_idx]
                 coastal_dirs[(neighbor_col, neighbor_row)].append(opposite_idx)
 
         return coastal_dirs
+
+    def get_mountain_pass_directions(self):
+        """
+        Returns a dict mapping (col, row) -> list of direction_indices for mountain passes.
+        Paints a line joining the centers of the adjacent hexes.
+        """
+        from collections import defaultdict
+        pass_dirs = defaultdict(list)
+
+        pass_hexsides = self.map_cfg.hexsides.get("pass", [])
+        dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
+        opposite_dir = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
+
+        for col, row, direction in pass_hexsides:
+            direction_idx = dir_map.get(direction)
+            if direction_idx is not None:
+                pass_dirs[(col, row)].append(direction_idx)
+                neighbor_col, neighbor_row = self.get_neighbor_offset(col, row, direction_idx)
+                opposite_idx = opposite_dir[direction_idx]
+                pass_dirs[(neighbor_col, neighbor_row)].append(opposite_idx)
+
+        return pass_dirs
 
     def wheelEvent(self, event):
         """Zoom with Ctrl+Wheel."""
@@ -265,10 +375,15 @@ class AnsalonMapView(QGraphicsView):
                 
                 # Get coastal directions
                 coastal_dirs = coastal_info.get((col, row))
+
+                # Get mountain pass directions
+                mountain_passes = self.get_mountain_pass_directions().get((col, row), [])
                 
                 # Draw base hex with transparent overlay
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),
-                                      terrain_type=t_type, coastal_directions=coastal_dirs)
+                                      terrain_type=t_type, coastal_directions=coastal_dirs,
+                                       pass_directions=mountain_passes
+                                       )
                 self.scene.addItem(hex_item)
 
         # Overlay country territories
@@ -283,13 +398,15 @@ class AnsalonMapView(QGraphicsView):
                 coastal_dirs = coastal_info.get((col, row))
                 
                 country_hex = HexagonItem(center, HEX_RADIUS, rgba,
-                                         terrain_type=t_type, coastal_directions=coastal_dirs)
+                                         terrain_type=t_type, coastal_directions=coastal_dirs,
+                                          pass_directions=mountain_passes
+                                          )
                 self.scene.addItem(country_hex)
 
         # Draw Hexsides (Rivers, Mountains, etc)
         hexsides = self.map_cfg.hexsides
         for side_type, entries in hexsides.items():
-            if side_type == "sea":  # Skip sea hexsides (already drawn as wedges)
+            if side_type in ["sea", "pass"]:  # Skip sea hexsides and mountain passes (already drawn as wedges or vectors)
                 continue
             for col, row, direction in entries:
                 center = self.get_hex_center(col, row)
@@ -301,12 +418,51 @@ class AnsalonMapView(QGraphicsView):
                     p2 = self.get_vertex(center, (idx + 1) % 6)
                     self.scene.addItem(HexsideItem(p1, p2, side_type))
 
+        # Draw locations
+        self.draw_locations()
+
         # Draw units if map is initialized
         if self.game_state.map:
             for unit in self.game_state.units:
                 if hasattr(unit, 'position') and unit.is_on_map:
                     col, row = unit.position
                     self.draw_unit(unit, col, row)
+
+    def create_location_map(self):
+        """Create location map, handling conflicts by preferring special locations."""
+        location_map = {}
+
+        # Add country locations first
+        for country_spec in self.country_specs.values():
+            for loc_spec in country_spec.locations:
+                coords = loc_spec.coords
+                if coords:
+                    location_map[coords] = {
+                        'type': loc_spec.loc_type,
+                        'is_capital': loc_spec.is_capital,
+                        'country_id': country_spec.id,
+                        'location_id': loc_spec.id,
+                    }
+
+        # Add special locations
+        for loc_spec in self.map_cfg.special_locations:
+            coords = loc_spec.coords
+            if coords:
+                location_map[coords] = {
+                    'type': loc_spec.loc_type,
+                    'is_capital': False,
+                    'country_id': None,
+                    'location_id': loc_spec.id,
+                }
+
+        return location_map
+
+    def draw_locations(self):
+        """Draw location symbols."""
+        for coords, loc in self.location_map.items():
+            center = self.get_hex_center(coords[0], coords[1])
+            loc_item = LocationItem(center, loc['location_id'], loc['type'], loc['is_capital'])
+            self.scene.addItem(loc_item)
 
     def draw_unit(self, unit, col, row):
         """Helper to place a Unit graphics item on the map."""

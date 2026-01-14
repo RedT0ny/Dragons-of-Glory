@@ -932,13 +932,14 @@ master_map:
       - [62, 14, SE]
         
   # Special locations
-  city:
-    - { id: "lost_names", coords: [30, 6] }
-  fortress:
-    - { id: "pax_tharkas", coords: [22, 38] }
-    - { id: "winston_tower", coords: [58, 7] }
-  port:
-    - { id: "zhea_harbor", coords: [14, 31] }
-  undercity:
-    - { id: "mount_nevermind", coords: [42, 28] }
-
+  special_locations:
+    city:
+      - { id: "lost_names", coords: [30, 6] }
+    fortress:
+      - { id: "pax_tharkas", coords: [22, 38] }
+      - { id: "winston_tower", coords: [58, 7] }
+      - { id: "wayreth", coords: [18, 40] }
+    port:
+      - { id: "zhea_harbor", coords: [14, 31] }
+    undercity:
+      - { id: "mount_nevermind", coords: [42, 28] }
