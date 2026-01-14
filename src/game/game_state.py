@@ -71,9 +71,16 @@ class GameState:
         self.countries = scenario_obj.countries
 
         # 2. Setup the map
-        # Use the map_subset from the scenario object
-        # Note: If you have a HexGrid/Map class, you'd initialize it here using scenario_obj._map_subset
-        self.map = getattr(scenario_obj, 'map', None) 
+        # Create a simple map object that holds width/height
+        class SimpleMap:
+            def __init__(self, width, height):
+                self.width = width
+                self.height = height
+
+        self.map = SimpleMap(
+            width=getattr(scenario_obj, 'map_width', 65),
+            height=getattr(scenario_obj, 'map_height', 53)
+        )
         
         # Default to turn 1 if start_turn is missing from the scenario object
         self.turn = getattr(scenario_obj, 'start_turn', 1)

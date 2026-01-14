@@ -29,7 +29,7 @@ def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
         ))
 
     # 3. Create the Scenario
-    return Scenario(
+    scenario = Scenario(
         scenario_id=scenario_spec.id,
         description=scenario_spec.description,
         units=live_units,
@@ -37,3 +37,14 @@ def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
         setup=scenario_spec.setup,
         map_subset=scenario_spec.map_subset
     )
+
+    # 4. Attach map bounds to scenario for easy access
+    if scenario_spec.map_subset:
+        scenario.map_width = scenario_spec.map_subset['x_range'][1] - scenario_spec.map_subset['x_range'][0] + 1
+        scenario.map_height = scenario_spec.map_subset['y_range'][1] - scenario_spec.map_subset['y_range'][0] + 1
+    else:
+        from src.content.config import MAP_WIDTH, MAP_HEIGHT
+        scenario.map_width = MAP_WIDTH
+        scenario.map_height = MAP_HEIGHT
+
+    return scenario

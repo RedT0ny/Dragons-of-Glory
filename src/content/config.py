@@ -1,6 +1,9 @@
 import os
 from enum import Enum, auto
 
+# --- DEBUG flag ---
+DEBUG = False
+
 # --- PATHS ---
 # Get the absolute path to the project root (Dragons-of-Glory/)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -115,16 +118,19 @@ MIN_ODDS_RATIO = 0.33
 
 # --- GUI SETTINGS ---
 # These are only used by the View (gui/ folder)
-HEX_RADIUS = 11.15
+HEX_RADIUS = 61.77
 MAP_WIDTH = 65
 MAP_HEIGHT = 53
-SCREEN_WIDTH = 1400
-SCREEN_HEIGHT = 900
-X_OFFSET = 30
-Y_OFFSET = 30
+SCREEN_WIDTH = 1920
+SCREEN_HEIGHT = 1080
+X_OFFSET = 244
+Y_OFFSET = 198
 UNIT_ICON_SIZE = 20
 COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
 MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "ansalon_hexmap.jpg")
+LOCATION_SIZE = 60
+
+
 
 # --- GAME CONSTANTS ---
 MAX_UNITS_PER_HEX = 2
