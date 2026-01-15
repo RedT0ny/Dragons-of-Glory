@@ -90,7 +90,7 @@ class RequirementType(Enum):
     UNIT_TYPE = "unit_type"
     CUSTOM = "custom"
 
-DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
+DRAGONFLIGHTS = {"red", "blue", "green", "black", "white", "gold", "silver", "bronze", "copper", "brass"}
 
 # --- ALLEGIANCES ---
 WS = "whitestone"

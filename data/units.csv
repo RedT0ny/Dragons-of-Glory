@@ -1,4 +1,4 @@
-﻿unit_id;quantity;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
+﻿id;quantity;type;race;land;allegiance;terrain_affinity;combat_rating;tactical_rating;movement
 ;5;inf;ogre;kern;neutral;mountain;6;0;4
 ;4;inf;kender;goodlund;neutral;forest;4;0;3
 ;6;inf;kender;hylo;neutral;forest;4;0;3
@@ -73,6 +73,11 @@
 ;2;wing;dragon;green;highlord;;2;0;16
 ;2;wing;dragon;red;highlord;;2;0;16
 ;2;wing;dragon;blue;highlord;;2;0;16
+;1;wing;dragon;gold;whitestone;;4;0;16
+;1;wing;dragon;silver;whitestone;;4;0;16
+;1;wing;dragon;bronze;whitestone;;2;0;16
+;2;wing;dragon;copper;whitestone;;2;0;16
+;2;wing;dragon;brass;whitestone;;2;0;16
 orin;1;general;human;abanasinia;neutral;;0;2;10
 orwell;1;general;human;balifor;neutral;;0;1;10
 vogor;1;general;ogre;blode;neutral;;0;2;10

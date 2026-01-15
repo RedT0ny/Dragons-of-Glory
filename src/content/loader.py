@@ -234,7 +234,7 @@ def load_hexsides(grid, hexside_list):
 
 def parse_units_csv(path: str) -> List[UnitSpec]:
     specs = []
-    with open(path, newline="", encoding="utf-8") as fh:
+    with open(path, newline="", encoding="utf-8-sig") as fh:
         reader = csv.DictReader(fh, delimiter=";")
         unnamed_counters = {}
         for row in reader:
@@ -295,10 +295,12 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
         "id": {u.id: u for u in all_counters},
         "country": defaultdict(list),
         "type": defaultdict(list),
+        "df": defaultdict(list)
     }
     for u in sorted(all_counters, key=lambda x: x.id):
         if u.country: idx["country"][u.country.lower()].append(u)
         if u.unit_type: idx["type"][u.unit_type.lower()].append(u)
+        if u.dragonflight: idx["df"][u.dragonflight.lower()].append(u)
 
     # 3. Filter based on ScenarioSpec
     selected_specs = []
