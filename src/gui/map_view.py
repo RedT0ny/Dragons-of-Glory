@@ -2,36 +2,16 @@ import math
 import os
 
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem
+from PySide6.QtSvgWidgets import QGraphicsSvgItem
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsItem, QGraphicsColorizeEffect
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen, QPixmap
 from PySide6.QtCore import Qt, QPointF, QRectF
 
+from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, HL
+from src.content.specs import UnitType, UnitRace
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH, COUNTRIES_DATA, MAP_CONFIG_DATA, MAP_TERRAIN_DATA,
-                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, WS, LOCATION_SIZE, ICONS_DIR)
+                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 from src.content import loader
-
-# Define Terrain Visuals
-TERRAIN_VISUALS = {
-    "grassland": {"color": QColor(238, 244, 215), "pattern": Qt.Dense7Pattern},
-    "steppe": {"color": QColor(180, 190, 100), "pattern": Qt.Dense7Pattern},
-    "forest": {"color": QColor(34, 139, 34), "pattern": Qt.Dense7Pattern},
-    "jungle": {"color": QColor(0, 85, 0), "pattern": Qt.Dense7Pattern},
-    "mountain": {"color": QColor(139, 115, 85), "pattern": Qt.Dense7Pattern},
-    "swamp": {"color": QColor(85, 107, 47), "pattern": Qt.Dense7Pattern},
-    "desert": {"color": QColor(244, 164, 96), "pattern": Qt.Dense7Pattern},
-    "ocean": {"color": QColor(135, 206, 250), "pattern": Qt.Dense7Pattern},
-    "maelstrom": {"color": QColor(130, 9, 9), "pattern": Qt.Dense7Pattern},
-    "glacier": {"color": QColor(231, 173, 255), "pattern": Qt.Dense7Pattern},
-}
-
-# Colors for hexsides
-HEXSIDE_COLORS = {
-    "river": QColor(100, 149, 237, 200),
-    "deep_river": QColor(0, 0, 139, 255),
-    "mountain": QColor(139, 69, 19, 200),
-    "pass": QColor(255, 215, 0, 255),
-    "bridge": QColor(255, 69, 0, 255)
-}
 
 class HexagonItem(QGraphicsItem):
     def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None):
@@ -95,7 +75,7 @@ class HexagonItem(QGraphicsItem):
 
         # Layer 6: Highlight if selected/reachable
         if self.is_highlighted:
-            painter.setBrush(QBrush(QColor(255, 255, 0, 100)))
+            painter.setBrush(QBrush(UI_COLORS["highlighted_hex"]))
             painter.setPen(QPen(QColor(255, 255, 0), 2))
             painter.drawPath(self.path)
 
@@ -216,29 +196,139 @@ class LocationItem(QGraphicsItem):
             painter.drawEllipse(QPointF(self.center.x() + self.size / 3, self.center.y() - self.size / 3), 4, 4)
 
 
-class UnitGraphicsItem(QGraphicsItem):
+class UnitCounter(QGraphicsItem):
     """Visual representation of a Unit from the model."""
-    def __init__(self, unit, radius, parent=None):
+
+    def __init__(self, unit, color, parent=None):
         super().__init__(parent)
         self.unit = unit
-        self.radius = radius
+        self.color = color
+        size = UNIT_SIZE
+        self.unit_rect = QRectF(-size, -size, size*2, size*2)
+        # Single SVG file containing both symbols and groups
+        self.renderer = QSvgRenderer(os.path.join(ICONS_DIR, "units.svg"))
 
-    def boundingRect(self):
-        return QRectF(-self.radius*0.6, -self.radius*0.6, self.radius*1.2, self.radius*1.2)
+        # Create icon ONCE, not in paint()
+        self.icon = self.create_unit_icon()
+        if self.icon:
+            self.icon.setParentItem(self)
+            # Center the icon
+            self.center_icon()
+
+    def center_icon(self):
+        """Center the icon within unit_rect."""
+        """Scale icon to appropriate size and center it."""
+        if not self.icon:
+            return
+
+        # Get icon's natural size
+        icon_rect = self.icon.boundingRect()
+
+        # Target size: 60-80% of unit size
+        target_size = UNIT_SIZE * 0.9
+
+        # Calculate scale (maintain aspect ratio)
+        scale_x = target_size / icon_rect.width()
+        scale_y = target_size / icon_rect.height()
+        scale = min(scale_x, scale_y)
+
+        # Apply scale transform
+        self.icon.setScale(scale)
+
+        # Recalculate bounds after scaling
+        icon_rect = self.icon.sceneBoundingRect()
+
+        # Center in unit_rect
+        self.icon.setPos(self.unit_rect.center() - icon_rect.center())
 
     def paint(self, painter, option, widget):
-        painter.setBrush(QBrush(QColor("blue") if self.unit.allegiance == WS else QColor("red")))
-        painter.setPen(QPen(Qt.black, 2))
-        painter.drawRect(-15, -15, 30, 30)
-    
-        painter.setPen(Qt.white)
+        # Draw background rectangle
+        painter.setBrush(QBrush(self.color))
+        painter.setPen(QPen(Qt.white if self.unit.allegiance == WS else Qt.black, 2))
+        painter.drawRoundedRect(self.unit_rect, 5, 5)
+
+        # Draw unit ID at top
+        painter.setPen(Qt.white if self.unit.allegiance == WS else Qt.black)
         font = painter.font()
-        font.setPointSize(8)
+        font.setPointSize(9)
         font.setBold(True)
         painter.setFont(font)
-        stats_text = f"{self.unit.combat_rating}-{self.unit.movement}"
-        painter.drawText(-14, 12, stats_text)
 
+        id_text = f"{self.unit.id}"
+        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, id_text)
+
+        # Draw stats at bottom
+        # Choose combat or tactical rating
+        rating = self.unit.combat_rating if self.unit.combat_rating != 0 else self.unit.tactical_rating
+        stats_text = f"{rating}      {self.unit.movement}"
+        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats_text)
+
+    def boundingRect(self):
+        """Return bounding rectangle for the unit with padding."""
+        padding = 4  # For selection, hover effects
+        return self.unit_rect.adjusted(-padding, -padding, padding, padding)
+
+    def create_unit_icon(self):
+        # Determine which SVG element to use
+        element_id = self._get_element_id()
+
+        # Create the SVG item
+        icon = QGraphicsSvgItem()
+        icon.setSharedRenderer(self.renderer)
+        try:
+            icon.setElementId(element_id)
+        except:
+            print(f"SVG element '{element_id}' not found, using fallback")
+            icon.setElementId("noicon")
+
+        # Apply coloring
+        if not self._is_precolored_group(element_id):
+            self._apply_allegiance_colors(icon)
+
+        return icon
+
+    def _get_element_id(self):
+        """Determine which SVG element to reference."""
+        if self.unit.unit_type in [UnitType.WIZARD, UnitType.HIGHLORD,
+                                   UnitType.EMPEROR, UnitType.CITADEL,
+                                   UnitType.FLEET, UnitType.CAVALRY]:
+            return self.unit.unit_type.value
+        elif self.unit.unit_type in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
+            if self.unit.race == UnitRace.SOLAMNIC:
+                return "knight"
+            if self.unit.id in ["soth", "laurana"]:
+                return self.unit.id
+            elif self.unit.race == UnitRace.ELF:
+                return "elflord"
+            else:
+                return "leader"
+        elif self.unit.race == UnitRace.DRAGON:
+            if self.unit.land in EVIL_DRAGONFLIGHTS:
+                return "evil_dragon"
+            else:
+                return "good_dragon"
+        elif self.unit.race in [UnitRace.HUMAN, UnitRace.SOLAMNIC]:
+            return self.unit.unit_type.value  # FIXED
+        return self.unit.race.value
+
+    def _is_precolored_group(self, element_id):
+        """Check if this is a fixed-color group, like lord Soth, undead or locations"""
+        return element_id.startswith('full-') or element_id.startswith('loc-')
+
+    def _apply_allegiance_colors(self, icon):
+        """Simple colorization based on allegiance."""
+        allegiance = getattr(self.unit, 'allegiance', WS)
+
+        effect = QGraphicsColorizeEffect()
+
+        if allegiance == HL:
+            effect.setColor(Qt.black)
+        elif allegiance == WS:
+            effect.setColor(Qt.white)
+        else:  # NEUTRAL
+            effect.setColor(Qt.gray)  # Gray
+
+        icon.setGraphicsEffect(effect)
 
 class AnsalonMapView(QGraphicsView):
     def __init__(self, game_state, parent=None):
@@ -262,6 +352,12 @@ class AnsalonMapView(QGraphicsView):
         self.map_cfg = loader.load_map_config(MAP_CONFIG_DATA)
         self.location_map = self.create_location_map()
         self.terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
+
+        # Create country color lookup: {"country_id": QColor}
+        self.country_colors = {
+            spec.id: QColor(spec.color)
+            for spec in self.country_specs.values()
+        }
 
     def get_hex_center(self, col, row):
         """Calculates pixel center for a pointy-top hex using odd-r offset coordinates."""
@@ -428,6 +524,22 @@ class AnsalonMapView(QGraphicsView):
                     col, row = unit.position
                     self.draw_unit(unit, col, row)
 
+        if DEBUG:
+            self.draw_units()
+
+
+    def draw_units(self):
+        """Draw units on the map for debugging purposes."""
+        col = 25
+        row = 25
+        max_col = 31
+        for unit in self.game_state.units:
+            self.draw_unit(unit, col, row)
+            col += 1
+            if col >= max_col:
+                col = 25
+                row += 1
+
     def create_location_map(self):
         """Create location map, handling conflicts by preferring special locations."""
         location_map = {}
@@ -467,7 +579,12 @@ class AnsalonMapView(QGraphicsView):
     def draw_unit(self, unit, col, row):
         """Helper to place a Unit graphics item on the map."""
         center = self.get_hex_center(col, row)
-        unit_item = UnitGraphicsItem(unit, HEX_RADIUS)
+
+        # Get the color for this unit's country (fallback to allegiance colors if no country)
+        color = self.country_colors.get(unit.land,
+                                        QColor("blue") if unit.allegiance == WS else QColor("red"))
+
+        unit_item = UnitCounter(unit, color)
         unit_item.setPos(center)
         unit_item.setZValue(10)  # Ensure units stay above hexes
         self.scene.addItem(unit_item)

@@ -1,6 +1,7 @@
 from src.game.combat import CombatResolver
 from src.game.country import Country, Location
-from src.content.config import COUNTRIES_DATA, UNITS_DATA, DEFAULT_MOVEMENT_POINTS, HL, WS
+from src.content.config import COUNTRIES_DATA
+from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content import loader, factory
 
 class GameState:

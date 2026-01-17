@@ -6,7 +6,10 @@ A python implementation of Dragonlance classic "Dragons of Glory", with Dragon #
 
 Notes:
 
-
+constants.py        ← Pure strings/numbers, NO imports (Not required?)
+specs.py           ← Imports constants, defines domain
+config.py          ← Imports specs, defines runtime
+main.py            ← Imports everything
 
 
 Every country has a color for their units. The country can be neutral, aligned with Whitestone or aligned with Highlord.

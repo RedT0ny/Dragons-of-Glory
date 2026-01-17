@@ -61,7 +61,7 @@ scenario:
       countries:
         mithas:
           units_by_type:
-            minotaur:
+            inf:
               quantity: 3
             fleet:
               quantity: 3
@@ -76,8 +76,6 @@ scenario:
         green:
           units: all
         blue:
-          units: all
-        red:
           units: all
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army

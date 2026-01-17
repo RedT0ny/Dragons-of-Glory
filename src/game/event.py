@@ -1,5 +1,5 @@
 from typing import Any, Callable
-from ..content.config import (
+from ..content.specs import (
     RequirementType, 
     ARTIFACT_REQUIREMENTS, 
     UnitRace, 

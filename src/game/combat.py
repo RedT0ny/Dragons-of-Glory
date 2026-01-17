@@ -1,5 +1,6 @@
 import random
-from src.content.config import CRT_DATA, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
+from src.content.config import CRT_DATA
+from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
 
 class CombatResolver:

@@ -1,4 +1,5 @@
-from src.content.config import UnitState, UnitType, UnitRace, NEUTRAL, WS, HL
+from src.content.specs import UnitState, UnitType, UnitRace
+from src.content.constants import WS, HL, NEUTRAL
 
 class Unit:
     """

@@ -1,12 +1,12 @@
-from .specs import *
 from . import loader
+from .specs import *
 from .config import UNITS_DATA, COUNTRIES_DATA
 from src.game.scenario import Scenario
 from src.game.unit import Unit
 
 def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
     """
-    The true Factory: Creates live objects from blueprints.
+    Creates live objects from blueprints.
     """
     # 1. Get Blueprints from Loader
     unit_blueprints = loader.resolve_scenario_units(scenario_spec, UNITS_DATA)
@@ -15,17 +15,23 @@ def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
     # 2. Breathe life into Units
     live_units = []
     for s in unit_blueprints:
+        # Convert string values to Enums
+        unit_type_enum = loader._string_to_enum(s.unit_type, UnitType)
+        race_enum = loader._string_to_enum(s.race, UnitRace)
+        status_enum = loader._string_to_enum(s.status, UnitState) if s.status else UnitState.INACTIVE
+
         # Factory logic: Choose the right class/init based on spec data
         live_units.append(Unit(
             unit_id=s.id,
-            unit_type=s.unit_type,
+            unit_type=unit_type_enum,
             combat_rating=s.combat_rating,
             tactical_rating=s.tactical_rating,
             movement=s.movement,
-            race=s.race,
+            race=race_enum,
             land=s.country,
             allegiance=s.allegiance,
-            ordinal=s.ordinal
+            ordinal=s.ordinal,
+            status=status_enum
         ))
 
     # 3. Create the Scenario

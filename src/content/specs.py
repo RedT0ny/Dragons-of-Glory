@@ -19,6 +19,8 @@ Classes:
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+from enum import Enum, auto
+from src.content.constants import WS, HL, NEUTRAL
 
 @dataclass
 class LocationSpec:
@@ -99,3 +101,92 @@ class EventSpec:
     effects: Dict[str, Any] # e.g., {"add_units": ["silver_dragon"], "grant_artifact": "dragonlance"}
     allegiance: Optional[str] = None # Who benefits?
     max_occurrences: int = 1  # Default to 1 (one-time event)
+
+# --- ENUMS ---
+class EventType(Enum):
+    PLAYER_BONUS = "bonus"
+    REINFORCEMENTS = "units"
+    PREREQUISITE = "pre_req"
+    ARTIFACT = "artifact"
+
+class UnitRace(Enum):
+    DWARF = "dwarf"
+    ELF = "elf"
+    OGRE = "ogre"
+    HUMAN = "human"
+    DRACONIAN = "draconian"
+    DRAGON = "dragon"
+    GOBLIN = "goblin"
+    HOGBOBLIN = "hogboblin"
+    KENDER = "kender"
+    PEGASUS = "pegasus"
+    THANOI = "thanoi"
+    UNDEAD = "undead"
+    GRIFFON = "griffon"
+    MINOTAUR = "minotaur"
+    SOLAMNIC = "solamnic"
+    MAGIC = "magic"
+
+class UnitState(Enum):
+    INACTIVE = auto()
+    ACTIVE = auto()
+    DEPLETED = auto()
+    RESERVE = auto()
+    DESTROYED = auto()
+
+    @classmethod
+    def on_map_states(cls):
+        return {cls.ACTIVE, cls.DEPLETED}
+
+class UnitType(Enum):
+    INFANTRY = "inf"
+    CAVALRY = "cav"
+    WIZARD = "wizard"
+    GENERAL = "general"
+    ADMIRAL = "admiral"
+    EMPEROR = "emperor"
+    FLEET = "fleet"
+    CITADEL = "citadel"
+    HERO = "hero"
+    WING = "wing"
+    HIGHLORD = "highlord"
+
+class HexDirection(Enum):
+    NORTH_EAST = 0
+    EAST = 1
+    SOUTH_EAST = 2
+    SOUTH_WEST = 3
+    WEST = 4
+    NORTH_WEST = 5
+
+class RequirementType(Enum):
+    RACE = "race"
+    TRAIT = "trait"
+    ITEM = "item"
+    ALLEGIANCE = "allegiance"
+    UNIT_TYPE = "unit_type"
+    CUSTOM = "custom"
+
+# --- ARTIFACT CONFIG ---
+ARTIFACT_REQUIREMENTS = {
+    "race_requirements": {
+        "solamnic": UnitRace.SOLAMNIC,
+        "draconian": UnitRace.DRACONIAN,
+        "dragon": UnitRace.DRAGON,
+        "elf": UnitRace.ELF,
+        "dwarf": UnitRace.DWARF,
+        "human": UnitRace.HUMAN,
+        "kender": UnitRace.KENDER,
+        "ogre": UnitRace.OGRE,
+    },
+    "trait_requirements": {
+        "has_silver_arm": lambda unit: hasattr(unit, 'traits') and 'silver_arm' in unit.traits,
+        "is_leader": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type in [UnitType.GENERAL, UnitType.ADMIRAL, UnitType.EMPEROR],
+        "is_magical": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type == UnitType.WIZARD,
+    },
+    "allegiance_requirements": {
+        "whitestone": WS,
+        "highlord": HL,
+        "neutral": NEUTRAL,
+    }
+}

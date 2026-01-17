@@ -1,6 +1,5 @@
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any
 from collections import defaultdict
-# REMOVED: from src.content.specs import ScenarioSpec, UnitSpec
 
 class Scenario:
     def __init__(self, scenario_id: str, description: str, units: List[Any], countries: Dict[str, Any], setup: Dict[str, Any], map_subset: Dict[str, Any] = None):
@@ -27,7 +26,7 @@ class Scenario:
 
     # ... existing get_deployment_hexes and get_starting_units methods ...
     # They stay the same but reference self.setup and self.all_countries instead of self.spec
-# ... existing code ...
+
     @property
     def map_bounds(self):
         """

@@ -1,5 +1,5 @@
 import heapq
-from src.content.config import HexDirection
+from src.content.specs import HexDirection
 
 class Hex:
     """

@@ -2,12 +2,34 @@ import csv, yaml, json
 import os, re
 from dataclasses import asdict
 from collections import defaultdict
-from .config import DRAGONFLIGHTS, DIRECTION_MAP, UNITS_DATA, COUNTRIES_DATA
-from .specs import *
+from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP
+from src.content.specs import *
 
 
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
+
+def _string_to_enum(value: Optional[str], enum_class) -> Optional[any]:
+    """
+    Converts a string value to its corresponding Enum member.
+    Returns None if value is None or not found in the enum.
+    """
+    if not value:
+        return None
+
+    # Try direct value match (e.g., "inf" -> UnitType.INFANTRY)
+    try:
+        return enum_class(value.lower())
+    except (ValueError, AttributeError):
+        pass
+
+    # Try name match (e.g., "infantry" -> UnitType.INFANTRY)
+    try:
+        return enum_class[value.upper()]
+    except (KeyError, AttributeError):
+        pass
+
+    return None
 
 def load_scenario_yaml(path: str) -> ScenarioSpec:
     """
@@ -258,16 +280,15 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
                 base_id = _slugify(csv_id)
             else:
                 # Use 'no_land' or similar if land is missing to keep IDs clean
-                land_key = _slugify(land) if land else "no_land"
-                base_key = f"{u_type or 'u'}_{race or 'r'}_{land_key}"
-                unnamed_counters[base_key] = unnamed_counters.get(base_key, 0) + 1
-                base_id = f"{base_key}_{unnamed_counters[base_key]}"
+                land_key = _slugify(land) if land else ""
+                base_key = f"{land_key}_{race or 'r'}_{u_type or 'u'}"
+                base_id = f"{base_key}"
 
             specs.append(UnitSpec(
                 id=base_id, # This is now GUARANTEED to be a string
                 unit_type=u_type, race=race,
                 country=country, dragonflight=df, 
-                allegiance=(get_val("allegiance") or "").title() or None,
+                allegiance=(get_val("allegiance") or "") or None,
                 terrain_affinity=get_val("terrain_affinity"),
                 combat_rating=get_int("combat_rating"),
                 tactical_rating=get_int("tactical_rating"),
@@ -295,24 +316,72 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
         "id": {u.id: u for u in all_counters},
         "country": defaultdict(list),
         "type": defaultdict(list),
+        "race": defaultdict(list),
         "df": defaultdict(list)
     }
     for u in sorted(all_counters, key=lambda x: x.id):
         if u.country: idx["country"][u.country.lower()].append(u)
         if u.unit_type: idx["type"][u.unit_type.lower()].append(u)
+        if u.race: idx["race"][u.race.lower()].append(u)
         if u.dragonflight: idx["df"][u.dragonflight.lower()].append(u)
 
     # 3. Filter based on ScenarioSpec
     selected_specs = []
-    for allegiance in ["highlord", "whitestone"]:
+    for allegiance in [HL, WS]:
         p_cfg = spec.setup.get(allegiance, {})
+
+        # Process countries
         for cname, config in p_cfg.get("countries", {}).items():
             lc = cname.lower()
+
+            # Case 1: "units: all" - Get all units from this country
             if config == "all" or (isinstance(config, dict) and config.get("units") == "all"):
-                selected_specs.extend(idx["country"].get(lc, []))
+                # Try country first
+                matching_units = idx["country"].get(lc, [])
+
+                # If no country match, try dragonflight
+                if not matching_units:
+                    matching_units = idx["df"].get(lc, [])
+
+                for unit_spec in matching_units:
+                    unit_spec.allegiance = allegiance  # Modify in-place
+                    selected_specs.append(unit_spec)
+
+            # Case 2: "units_by_type" - Get specific types/races with quantities
+            elif isinstance(config, dict) and "units_by_type" in config:
+                units_by_type = config["units_by_type"]
+
+                for type_or_race, type_config in units_by_type.items():
+                    requested_qty = type_config.get("quantity", 1) if isinstance(type_config, dict) else 1
+                    type_or_race_lower = type_or_race.lower()
+
+                    # Try to find units matching this type or race from this country/dragonflight
+                    matching_units = []
+
+                    # First check if it's a unit type (e.g., "fleet", "admiral")
+                    if type_or_race_lower in idx["type"]:
+                        matching_units = [u for u in idx["type"][type_or_race_lower]
+                                          if (u.country and u.country.lower() == lc) or
+                                          (u.dragonflight and u.dragonflight.lower() == lc)]
+
+                    # Then check if it's a race (e.g., "minotaur")
+                    if not matching_units and type_or_race_lower in idx["race"]:
+                        matching_units = [u for u in idx["race"][type_or_race_lower]
+                                          if (u.country and u.country.lower() == lc) or
+                                          (u.dragonflight and u.dragonflight.lower() == lc)]
+
+                    # Take only the requested quantity
+                    for unit_spec in matching_units[:requested_qty]:
+                        unit_spec.allegiance = allegiance
+                        selected_specs.append(unit_spec)
+
+        # Process explicit units (heroes, wizards, etc.)
+
         for uid in p_cfg.get("explicit_units", []):
             u = idx["id"].get(uid.lower())
-            if u: selected_specs.append(u)
+            if u:
+                u.allegiance = allegiance  # Modify in-place
+                selected_specs.append(u)
 
     return selected_specs
 
