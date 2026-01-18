@@ -15,7 +15,7 @@ SCREEN_WIDTH = 1600
 SCREEN_HEIGHT = 1138
 X_OFFSET = 55 # 30 for test_map
 Y_OFFSET = 62 # 20 for test_map
-MAP_FILE = "ansalon_baseline.jpg" # test_map.png
+MAP_FILE = "atlas_map.jpg" # test_map.png
 LOCATION_SIZE = 60
 
 class HexagonItem(QGraphicsItem):
