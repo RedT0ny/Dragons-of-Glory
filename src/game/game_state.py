@@ -2,6 +2,7 @@ from src.game.combat import CombatResolver
 from src.game.country import Country, Location
 from src.content.config import COUNTRIES_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
+from src.content.specs import GamePhase, UnitState
 from src.content import loader, factory
 
 class GameState:
@@ -28,29 +29,19 @@ class GameState:
         self.units = []
         self.map = None  # Will be initialized by load_scenario
         self.turn = 0
-        self.current_turn_side = HL # Default starting side
-        self.countries = []
+
+        # Battle Turn State
+        self.phase = GamePhase.REPLACEMENTS
+        self.active_player = HL        # Who is currently acting (Default highlord).
+        self.initiative_winner = None  # Who won initiative this turn
+        self.second_player_has_acted = False # Track if we are in Step 7
+
+        # Game State
+        self.countries = {}
         self.events = [] # Live Event objects
         self.completed_event_ids = set() # Track for serialization
-        self.prerequisites = set() # Track things like "pure_metal"
+        self.prerequisites = set() # Track pre-requirements for events, like artifacts
         self.artifact_pool = {} # ID -> ArtifactSpec blueprint
-
-    def start_game(self):
-        # 1. Use the absolute path from config instead of a hardcoded string
-        country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
-
-        # 2. Convert raw data into live game objects
-        for cid, spec in country_specs.items():
-            new_country = Country(
-                id = spec.id,
-                capital_id = spec.capital_id,
-                # ... pass other spec attributes
-            )
-            # Convert LocationSpecs to Location objects
-            for l_spec in spec.locations:
-                new_country.add_location(Location(l_spec.id, l_spec.loc_type, l_spec.coords))
-
-            self.countries[cid] = new_country
 
     def end_game(self):
         pass
@@ -65,13 +56,13 @@ class GameState:
         """
         Initializes the game state from scenario data.
         """
-        # The factory does all the heavy lifting
+        # 3. Setup scenario object
         scenario_obj = factory.create_scenario(scenario_spec)
 
         self.units = scenario_obj.units
         self.countries = scenario_obj.countries
 
-        # 2. Setup the map
+        # 4. Setup the map
         # Create a simple map object that holds width/height
         class SimpleMap:
             def __init__(self, width, height):
@@ -82,37 +73,64 @@ class GameState:
             width=getattr(scenario_obj, 'map_width', 65),
             height=getattr(scenario_obj, 'map_height', 53)
         )
-        
-        # Default to turn 1 if start_turn is missing from the scenario object
-        self.turn = getattr(scenario_obj, 'start_turn', 1)
-        self.current_turn_side = HL
 
-    def end_phase(self):
-        """Swaps the current turn side."""
-        if self.current_turn_side == HL:
-            self.current_turn_side = WS
-        else:
-            self.current_turn_side = HL
-            self.next_turn()
+        # 5. Default to turn 1 if start_turn is missing from the scenario object
+        self.turn = getattr(scenario_obj, 'start_turn', 1)
+        self.phase = GamePhase.REPLACEMENTS
+        self.active_player = HL
+
+    def set_initiative(self, winner):
+        """Called by Controller after Step 4 dice roll."""
+        self.initiative_winner = winner
+        self.active_player = winner # Winner goes first
+
+    def advance_phase(self):
+        """
+        The State Machine: Determines the next phase based on current state.
+        This ensures the strict order of the Battle Turn.
+        """
+        if self.phase == GamePhase.REPLACEMENTS:
+            self.phase = GamePhase.STRATEGIC_EVENTS
+
+        elif self.phase == GamePhase.STRATEGIC_EVENTS:
+            self.phase = GamePhase.ACTIVATION
+
+        elif self.phase == GamePhase.ACTIVATION:
+            self.phase = GamePhase.INITIATIVE
+
+        elif self.phase == GamePhase.INITIATIVE:
+            # Controller must have set_initiative() before calling this
+            self.phase = GamePhase.MOVEMENT
+            self.second_player_has_acted = False
+
+        elif self.phase == GamePhase.MOVEMENT:
+            self.phase = GamePhase.COMBAT
+
+        elif self.phase == GamePhase.COMBAT:
+            if not self.second_player_has_acted:
+                # End of First Player's turn (Step 6 done).
+                # Start Second Player's turn (Step 7).
+                self.phase = GamePhase.MOVEMENT
+                self.active_player = WS if self.active_player == HL else HL
+                self.second_player_has_acted = True
+            else:
+                # End of Second Player's turn. Turn over (Step 8).
+                self.next_turn()
 
     def next_turn(self):
-        """
-        Advances the game to the next turn.
-        Resets unit capacities and increments turn counter.
-        """
+        """Advances the game to the next turn (Step 8)."""
         self.turn += 1
+        self.phase = GamePhase.REPLACEMENTS
+        self.active_player = HL # Reset to default for start of turn
+        self.initiative_winner = None
 
+        # Reset unit flags
         for unit in self.units:
-            # Use the global constant for default movement points
-            unit.movement_points = getattr(unit, 'movement', DEFAULT_MOVEMENT_POINTS)
-
-            # Reset combat and movement flags
+            unit.movement_points = getattr(unit, 'movement', 0) # Reset MPs
             unit.attacked_this_turn = False
+            # Handle status recovery/exhaustion here if needed
 
-            # If you implement Rules for 'exhaustion' or 'depletion',
-            # this is where you handle recovery.
-
-        # Optional: Trigger scenario events for the new turn
+        # Check events
         self.check_events()
 
     def check_events(self):

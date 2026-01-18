@@ -129,14 +129,24 @@ class UnitRace(Enum):
 
 class UnitState(Enum):
     INACTIVE = auto()
-    ACTIVE = auto()
-    DEPLETED = auto()
-    RESERVE = auto()
-    DESTROYED = auto()
+    READY = auto()      # Ready to be deployed (reinforcement or rebuilt)
+    ACTIVE = auto()     # On map, full strength
+    DEPLETED = auto()   # On map, reduced strength
+    RESERVE = auto()    # In replacement pool (eliminated but recyclable)
+    DESTROYED = auto()  # Permanently out of the game
 
     @classmethod
     def on_map_states(cls):
         return {cls.ACTIVE, cls.DEPLETED}
+
+class GamePhase(Enum):
+    REPLACEMENTS = auto()      # Step 1: Replacements
+    STRATEGIC_EVENTS = auto()  # Step 2: Strategic Events
+    ACTIVATION = auto()        # Step 3: Country activation by diplomacy
+    INITIATIVE = auto()        # Step 4: Initiative roll
+    MOVEMENT = auto()          # Step 5 & 7 (Movement portion)
+    COMBAT = auto()            # Step 6 & 7 (Combat portion)
+    END_TURN = auto()          # Step 8: End of turn cleanup
 
 class UnitType(Enum):
     INFANTRY = "inf"

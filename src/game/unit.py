@@ -93,7 +93,7 @@ class Unit:
         :ivar must_retreat: True if the unit must retreat after taking damage.
         :type must_retreat: bool
         """
-        one_hit_units = {UnitType.GENERAL, UnitType.ADMIRAL, UnitType.HERO, UnitType.WING, UnitType.EMPEROR}
+        one_hit_units = {UnitType.GENERAL, UnitType.ADMIRAL, UnitType.HERO, UnitType.WING, UnitType.EMPEROR, UnitType.WIZARD, UnitType.CITADEL}
         
         if self.unit_type in one_hit_units:
             self.status = UnitState.DESTROYED
@@ -110,16 +110,26 @@ class Unit:
         return
 
     def eliminate(self):
+        """Moves unit to the replacement pool (Reserve)."""
+        # If it was already in Reserve or Destroyed, stay there (or move to Destroyed if appropriate)
+        if self.status in [UnitState.RESERVE, UnitState.DESTROYED]:
+            return
         self.status = UnitState.RESERVE
+        self.position = (None, None) # Remove from map
 
     def deplete(self):
-        # We can now use a clean state-machine approach
+        """Steps the unit down one health level."""
         state_flow = {
             UnitState.ACTIVE: UnitState.DEPLETED,
             UnitState.DEPLETED: UnitState.RESERVE,
-            UnitState.RESERVE: UnitState.DESTROYED
+            UnitState.RESERVE: UnitState.DESTROYED # Should rarely happen via deplete, but safe fallback
         }
-        self.status = state_flow.get(self.status, self.status)
+        new_status = state_flow.get(self.status)
+
+        if new_status:
+            self.status = new_status
+            if self.status == UnitState.RESERVE:
+                self.position = (None, None) # Remove from map if it fell to Reserve
 
     def move(self, new_position):
         self.position = new_position

@@ -1,10 +1,11 @@
 import math
 
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
-from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
+from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF
 
 from src.content.constants import WS
+from src.content.specs import UnitState, GamePhase
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH, COUNTRIES_DATA, MAP_CONFIG_DATA, MAP_TERRAIN_DATA,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET)
 from src.content import loader
@@ -18,6 +19,9 @@ class AnsalonMapView(QGraphicsView):
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
+
+        # Deployment state
+        self.deploying_unit = None
 
         # Load map data
         self.load_all_data()
@@ -118,6 +122,122 @@ class AnsalonMapView(QGraphicsView):
             event.accept()
         else:
             super().wheelEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent):
+        """Handle clicks for deployment or depleted unit interaction."""
+        super().mousePressEvent(event)
+
+        if event.button() != Qt.LeftButton:
+            return
+
+        scene_pos = self.mapToScene(event.position().toPoint())
+
+        # 1. Handle Deployment from Replacement Dialog
+        if self.deploying_unit:
+            self.handle_deployment_click(scene_pos)
+            return
+
+        # 2. Handle Depleted Unit Stacking (only in Replacements Phase)
+        if self.game_state.phase == GamePhase.REPLACEMENTS:
+            self.handle_depleted_stack_click(scene_pos)
+
+    def handle_deployment_click(self, scene_pos):
+        # Find hex at this position
+        # Simple proximity check or utilizing QGraphicsItem detection
+        items = self.scene.items(scene_pos)
+        target_hex = None
+        for item in items:
+            if isinstance(item, HexagonItem) and item.is_highlighted:
+                target_hex = item
+                break
+
+        if target_hex:
+            # Convert scene pos back to hex coords?
+            # Or assume we stored valid coords.
+            # For now, let's assume we can map back or stored the hex item mapping.
+            # Simplified: Just place it (Logic would go to Controller ideally)
+
+            # Update Unit State
+            self.deploying_unit.status = UnitState.ACTIVE
+
+            # Reverse engineer coords from center (approximate)
+            # Or better, store coords in HexagonItem
+            # For this snippet, assuming we have a way to set position:
+            # self.game_state.move_unit(self.deploying_unit, hex_coords)
+
+            self.deploying_unit = None
+            self.clear_highlights()
+            self.sync_with_model()
+
+            # Show dialog again? Or let user maximize it.
+
+    def handle_depleted_stack_click(self, scene_pos):
+        # Find units at this location
+        # This requires spatial query
+        # Simplified:
+        items = self.scene.items(scene_pos)
+        clicked_units = []
+        for item in items:
+            if isinstance(item, UnitCounter):
+                clicked_units.append(item.unit)
+
+        if not clicked_units:
+            return
+
+        # Filter for Depleted + Same Nationality + Active Player
+        candidates = [u for u in clicked_units
+                      if u.status == UnitState.DEPLETED
+                      and u.allegiance == self.game_state.active_player]
+
+        # Group by country
+        from collections import defaultdict
+        by_country = defaultdict(list)
+        for u in candidates:
+            by_country[u.land].append(u)
+
+        for country, units in by_country.items():
+            if len(units) >= 2:
+                # Trigger Merge Dialog
+                self.show_merge_dialog(units[0], units[1])
+                break # Handle one pair at a time
+
+    def show_merge_dialog(self, unit1, unit2):
+        from src.gui.replacements_dialog import UnitSelectionDialog
+        dlg = UnitSelectionDialog(unit1, unit2, self)
+        dlg.setWindowTitle("Reinforce Unit")
+        if dlg.exec():
+            # Selected becomes ACTIVE (Full)
+            dlg.selected_unit.status = UnitState.ACTIVE
+
+            # Discarded goes to RESERVE (Pool)
+            dlg.discarded_unit.status = UnitState.RESERVE
+            dlg.discarded_unit.position = (None, None) # Remove from map
+
+            self.sync_with_model()
+
+    def highlight_deployment_targets(self, valid_coords_list, unit):
+        """Highlights hexes where the 'ready' unit can be placed."""
+        self.clear_highlights()
+        self.deploying_unit = unit
+
+        # This requires HexagonItem to store its coords or a lookup
+        # For this implementation, we iterate scene items (inefficient but works for small map)
+        # or use get_hex_center if we have coords.
+
+        for col, row in valid_coords_list:
+            center = self.get_hex_center(col, row)
+            # Find item at center
+            items = self.scene.items(center)
+            for item in items:
+                if isinstance(item, HexagonItem):
+                    item.set_highlight(True)
+                    break
+
+    def clear_highlights(self):
+        self.deploying_unit = None
+        for item in self.scene.items():
+            if isinstance(item, HexagonItem):
+                item.set_highlight(False)
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
