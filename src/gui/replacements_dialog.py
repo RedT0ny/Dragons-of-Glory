@@ -1,58 +1,51 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, 
-                               QTableWidgetItem, QHeaderView, QLabel, QWidget, 
-                               QPushButton, QScrollArea, QFrame)
+                                   QTableWidgetItem, QHeaderView, QLabel, QWidget, 
+                                   QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene)
 from PySide6.QtCore import Qt, QSize, Signal
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
 from src.content.specs import UnitState, GamePhase
 from src.content.constants import WS, HL, NEUTRAL, UI_COLORS
 from src.gui.map_items import UnitCounter
-from PySide6.QtWidgets import QGraphicsScene
 
-class UnitLabel(QLabel):
-    """A clickable label representing a unit in the replacement dialog."""
+class UnitLabel(QGraphicsView):
+    """A clickable preview representing a unit using the UnitCounter class."""
     clicked = Signal(object) # Emits the Unit object
 
     def __init__(self, unit, parent=None):
         super().__init__(parent)
         self.unit = unit
-        self.setFixedSize(60, 60)
-        self.setCursor(Qt.PointingHandCursor)
-        self.setStyleSheet("border: 1px solid #555; border-radius: 4px; background-color: rgba(0,0,0,50);")
         
-        # Render unit to pixmap
-        self.setPixmap(self._render_unit_pixmap())
-
-    def _render_unit_pixmap(self):
-        """Renders the UnitCounter QGraphicsItem to a QPixmap."""
-        scene = QGraphicsScene()
-        # Create a temp UnitCounter. We need a color. 
-        # Using a default grey or trying to lookup country color would be better, 
-        # but for now we rely on the unit's own properties or standard colors.
+        # Setup Scene
+        self.scene = QGraphicsScene(self)
+        self.setScene(self.scene)
+        
+        # UI settings for a "label-like" appearance
+        self.setFixedSize(70, 70)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setFrameShape(QFrame.NoFrame)
+        self.setStyleSheet("background: transparent;")
+        self.setRenderHint(QPainter.Antialiasing)
+        
+        # Add the actual UnitCounter
+        # Try to find country color, default to neutral grey
         color = QColor(200, 200, 200) 
-        item = UnitCounter(self.unit, color)
-        scene.addItem(item)
+        self.counter = UnitCounter(self.unit, color)
+        self.scene.addItem(self.counter)
         
-        pixmap = QPixmap(60, 60)
-        pixmap.fill(Qt.transparent)
-        
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.Antialiasing)
-        # We need to render the item. UnitCounter is centered at 0,0 usually.
-        # We move it to center of scene rect
-        item.setPos(30, 30)
-        scene.render(painter, target=pixmap.rect(), source=scene.itemsBoundingRect())
-        painter.end()
-        return pixmap
+        # Center the counter in the view
+        self.setSceneRect(-35, -35, 70, 70)
+        self.setCursor(Qt.PointingHandCursor)
 
     def mousePressEvent(self, event):
         self.clicked.emit(self.unit)
-        # Simple selection effect
-        self.setStyleSheet("border: 2px solid yellow; border-radius: 4px; background-color: rgba(255,255,0,50);")
+        # Visual feedback for selection
+        self.setStyleSheet("background-color: rgba(255, 255, 0, 50); border: 1px solid yellow; border-radius: 4px;")
+        super().mousePressEvent(event)
 
     def deselect(self):
-        self.setStyleSheet("border: 1px solid #555; border-radius: 4px; background-color: rgba(0,0,0,50);")
-
+        self.setStyleSheet("background: transparent; border: none;")
 
 class UnitSelectionDialog(QDialog):
     """Pop-up to choose between two units."""
@@ -63,12 +56,12 @@ class UnitSelectionDialog(QDialog):
         self.unit2 = unit2
         self.selected_unit = None
         self.discarded_unit = None
-        
+
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose which unit to return to service.\nThe other will be permanently eliminated."))
-        
+
         h_layout = QHBoxLayout()
-        
+
         # Unit 1 Option
         u1_layout = QVBoxLayout()
         lbl1 = UnitLabel(unit1)
@@ -78,7 +71,7 @@ class UnitSelectionDialog(QDialog):
         u1_layout.addWidget(lbl1, alignment=Qt.AlignCenter)
         u1_layout.addWidget(btn1)
         h_layout.addLayout(u1_layout)
-        
+
         # Unit 2 Option
         u2_layout = QVBoxLayout()
         lbl2 = UnitLabel(unit2)
@@ -88,9 +81,9 @@ class UnitSelectionDialog(QDialog):
         u2_layout.addWidget(lbl2, alignment=Qt.AlignCenter)
         u2_layout.addWidget(btn2)
         h_layout.addLayout(u2_layout)
-        
+
         layout.addLayout(h_layout)
-        
+
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(self.reject)
         layout.addWidget(cancel_btn)
@@ -102,15 +95,17 @@ class UnitSelectionDialog(QDialog):
 
 
 class ReplacementsDialog(QDialog):
-    def __init__(self, game_state, view, parent=None):
+    def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False):
         super().__init__(parent)
         self.game_state = game_state
         self.view = view # We need access to map view for "Ready" unit clicks
+        self.filter_country_id = filter_country_id
+        self.allow_territory_deploy = allow_territory_deploy
+
         self.setWindowTitle("Replacements Pool")
-        self.resize(1000, 600)
-        # Modeless so user can interact with map
-        self.setModal(False) 
-        
+        self.resize(1000, 600)        # Modeless so user can interact with map
+        self.setModal(False)
+
         self.selected_reserve_unit = None
         self.current_unit_labels = {} # Map unit_id -> UnitLabel
 
@@ -119,54 +114,63 @@ class ReplacementsDialog(QDialog):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        
+
         self.table = QTableWidget()
         self.table.setColumnCount(4) # Country Name, Reserve, Ready, Destroyed
         self.table.setHorizontalHeaderLabels(["Country", "Reserve (Pool)", "Ready (Deploy)", "Destroyed"])
-        
+
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
         header.setSectionResizeMode(2, QHeaderView.Stretch)
         header.setSectionResizeMode(3, QHeaderView.Stretch)
-        
+
         self.table.verticalHeader().setVisible(False)
-        
+
         layout.addWidget(self.table)
-        
+
         btn_layout = QHBoxLayout()
         self.btn_minimize = QPushButton("Minimize / Show Map")
         self.btn_minimize.clicked.connect(self.showMinimized)
         btn_layout.addWidget(self.btn_minimize)
-        
+
         layout.addLayout(btn_layout)
 
     def populate_table(self):
         """Populates table with grouped, allegiance‑sorted country data"""
         self.table.setRowCount(0)
         self.current_unit_labels.clear()
-        
+
         # Sort countries: Player Allegiance, Enemy, Neutral
         player_side = self.game_state.active_player
         enemy_side = WS if player_side == HL else HL
-        
-        countries = list(self.game_state.countries.values())
-        
-        # Grouping
-        player_countries = [c for c in countries if c.allegiance == player_side]
-        enemy_countries = [c for c in countries if c.allegiance == enemy_side]
-        neutral_countries = [c for c in countries if c.allegiance == NEUTRAL]
-        
-        all_groups = [
-            ("Your Allies", player_countries, True),
-            ("Enemy Forces", enemy_countries, False),
-            ("Neutrals", neutral_countries, False) # Can't replace neutrals typically until active
-        ]
-        
+
+        if self.filter_country_id:
+            # If filtered, we only care about this specific country
+            target_c = self.game_state.countries.get(self.filter_country_id)
+            if target_c:
+                all_groups = [("New Ally", [target_c], True)]
+            else:
+                all_groups = []
+        else:
+            countries = list(self.game_state.countries.values())
+
+            # Grouping
+            player_countries = [c for c in countries if c.allegiance == player_side]
+            enemy_countries = [c for c in countries if c.allegiance == enemy_side]
+            neutral_countries = [c for c in countries if c.allegiance == NEUTRAL]
+
+            all_groups = [
+                ("Your Allies", player_countries, True),
+                ("Enemy Forces", enemy_countries, False),
+                ("Neutrals", neutral_countries, False) # Can't replace neutrals typically until active
+            ]
+
         row_idx = 0
+        # Populates table with country groups and unit counts
         for group_name, group_countries, is_interactive in all_groups:
             if not group_countries: continue
-            
+
             # Group Header
             self.table.insertRow(row_idx)
             header_item = QTableWidgetItem(group_name)
@@ -210,11 +214,18 @@ class ReplacementsDialog(QDialog):
         layout = QHBoxLayout(container)
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setAlignment(Qt.AlignLeft)
-        
+
+        # Get country color from map_view lookup if possible
+        country_color = QColor(200, 200, 200)
+        if units:
+            country_color = self.view.country_colors.get(units[0].land, country_color)
+
         for unit in units:
             lbl = UnitLabel(unit)
+            # Update the counter color inside the label
+            lbl.counter.color = country_color
+
             self.current_unit_labels[unit.id] = lbl
-            
             if interactive:
                 if category == "reserve":
                     lbl.clicked.connect(self.on_reserve_unit_clicked)
@@ -222,9 +233,9 @@ class ReplacementsDialog(QDialog):
                     lbl.clicked.connect(self.on_ready_unit_clicked)
             else:
                 lbl.setCursor(Qt.ForbiddenCursor)
-                
+
             layout.addWidget(lbl)
-            
+
         self.table.setCellWidget(row, col, container)
         # Adjust row height if needed
         self.table.setRowHeight(row, 70)
@@ -232,17 +243,17 @@ class ReplacementsDialog(QDialog):
     def on_reserve_unit_clicked(self, unit):
         """Handle logic for pairing units in reserve."""
         sender_lbl = self.current_unit_labels.get(unit.id)
-        
+
         if self.selected_reserve_unit is None:
             # Select first unit
             self.selected_reserve_unit = unit
             sender_lbl.setStyleSheet("border: 2px solid yellow; border-radius: 4px; background-color: rgba(255,255,0,50);")
-        
+
         elif self.selected_reserve_unit == unit:
             # Deselect
             self.selected_reserve_unit = None
             sender_lbl.deselect()
-            
+
         elif self.selected_reserve_unit.land == unit.land:
             # Pair found!
             self.show_conscription_choice(self.selected_reserve_unit, unit)
@@ -255,7 +266,7 @@ class ReplacementsDialog(QDialog):
             # Different country, switch selection
             prev_lbl = self.current_unit_labels.get(self.selected_reserve_unit.id)
             if prev_lbl: prev_lbl.deselect()
-            
+
             self.selected_reserve_unit = unit
             sender_lbl.setStyleSheet("border: 2px solid yellow; border-radius: 4px; background-color: rgba(255,255,0,50);")
 
@@ -270,17 +281,23 @@ class ReplacementsDialog(QDialog):
     def on_ready_unit_clicked(self, unit):
         """Minimize and show map targets."""
         self.showMinimized()
-        
+
         # Center map on country capital or units
         country = self.game_state.countries.get(unit.land)
         if country:
             # Logic to find valid deployment hexes
-            # Cities or Fortresses of the country, not enemy occupied
             valid_hexes = []
-            for loc_id, loc in country.locations.items():
-                # Assuming simple check for now. TODO: Check occupation
-                valid_hexes.append(loc.coords)
-            
+
+            if self.allow_territory_deploy:
+                # Allowed anywhere in territory (for newly activated countries)
+                # We convert set of tuples to list
+                valid_hexes = list(country.territories)
+            else:
+                # Cities or Fortresses of the country, not enemy occupied
+                for loc_id, loc in country.locations.items():
+                    # Assuming simple check for now. TODO: Check occupation
+                    valid_hexes.append(loc.coords)
+
             self.view.highlight_deployment_targets(valid_hexes, unit)
 
     def refresh(self):

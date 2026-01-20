@@ -36,6 +36,6 @@ X_OFFSET = 244
 Y_OFFSET = 198
 UNIT_ICON_SIZE = 20
 COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
-MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "ansalon_hexmap.jpg")
+MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "map.jpg")
 LOCATION_SIZE = 60
 UNIT_SIZE = HEX_RADIUS * 0.4

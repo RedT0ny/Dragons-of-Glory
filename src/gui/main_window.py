@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QLabel, QPushButton, QFrame, QScrollArea, QGridLayout)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 
 from src.content.config import APP_NAME
 from src.gui.map_view import AnsalonMapView
 
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
+    end_phase_clicked = Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFixedWidth(250)
@@ -23,9 +24,12 @@ class InfoPanel(QFrame):
         
         # Control Buttons
         btn_grid = QGridLayout()
-        btns = ["Move", "Attack", "Activate", "Prev", "Undo", "Combine", "Next", "Redo", "End Turn"]
+        btns = ["Move", "Attack", "Activate", "Prev", "Undo", "Combine", "Next", "Redo", "End Phase"]
         for i, name in enumerate(btns):
-            btn_grid.addWidget(QPushButton(name), i // 3, i % 3)
+            btn = QPushButton(name)
+            if name == "End Phase":
+                btn.clicked.connect(self.end_phase_clicked.emit)
+            btn_grid.addWidget(btn, i // 3, i % 3)
         layout.addLayout(btn_grid)
         
         # Selection Info
@@ -80,3 +84,7 @@ class MainWindow(QMainWindow):
 
         # Initialize visual grid from the game state
         self.map_view.sync_with_model()
+
+    def set_controller(self, controller):
+        """Connects UI signals to the controller."""
+        self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)

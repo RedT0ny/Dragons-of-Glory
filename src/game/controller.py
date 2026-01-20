@@ -84,9 +84,49 @@ class GameController(QObject):
             self.game_state.advance_phase()
 
         elif current_phase == GamePhase.ACTIVATION:
-            # TODO: Handle activation rolls
+            if not is_ai:
+                from src.gui.diplomacy_dialog import DiplomacyDialog
+                from PySide6.QtWidgets import QDialog, QMessageBox
+
+                dlg = DiplomacyDialog(self.game_state)
+                # If player successfully activates a country
+                if dlg.exec() == QDialog.Accepted and dlg.activated_country_id:
+                    country_id = dlg.activated_country_id
+
+                    # Stop auto-timer so player can deploy
+                    self.ai_timer.stop()
+
+                    # Open Replacements for this country
+                    from src.gui.replacements_dialog import ReplacementsDialog
+                    self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
+                                                                  parent=self.view,
+                                                                  filter_country_id=country_id,
+                                                                  allow_territory_deploy=True)
+                    self.replacements_dialog.show()
+
+                    # Center map on country
+                    country = self.game_state.countries.get(country_id)
+                    if country and country.territories:
+                        # Find valid center (simplified: take first hex)
+                        first_hex = list(country.territories)[0]
+                        # This assumes view has method to center, or we just rely on user.
+                        # view.centerOn(view.get_hex_center(*first_hex)) if exposed.
+
+                    # Instruction Popup
+                    QMessageBox.information(self.replacements_dialog, "Deployment",
+                                            f"{country.id.title()} joined the war!\n\n"
+                                            "Deploy the country forces anywhere in their territory.\n"
+                                            "Click 'Minimize' to interact with map.\n"
+                                            "Click 'End Turn' (End Phase) in main window when finished.")
+
+                    # We return here to let the player interact.
+                    # Phase will assume to be "paused" until "End Phase" clicked.
+                    return
+
+                    # If AI, or human failed/cancelled activation, move on
             print("Step 3: Activation")
             self.game_state.advance_phase()
+
 
         elif current_phase == GamePhase.INITIATIVE:
             # Logic: Roll Dice, determine winner

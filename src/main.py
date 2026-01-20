@@ -66,7 +66,9 @@ class GameApp:
             highlord_ai=player_config.get("highlord_ai", False),
             whitestone_ai=player_config.get("whitestone_ai", False)
         )
-        
+
+        self.view.set_controller(self.controller)
+
         self.intro.close()
         self.view.show()
         self.controller.start_game()

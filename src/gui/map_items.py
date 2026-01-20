@@ -13,7 +13,7 @@ from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 
 class HexagonItem(QGraphicsItem):
-    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None):
+    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None, country_id=None):
         super().__init__(parent)
         self.center = center
         self.radius = radius
@@ -24,6 +24,7 @@ class HexagonItem(QGraphicsItem):
         self.pass_directions = pass_directions or []
         self.is_highlighted = False # Track if this hex is a valid move
         self.points = []
+        self.country_id = country_id
     
         # Create pointy-top hexagon path
         self.path = QPainterPath()

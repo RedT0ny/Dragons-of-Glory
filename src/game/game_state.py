@@ -46,8 +46,27 @@ class GameState:
     def end_game(self):
         pass
 
-    def save_state(self, filename):
-        pass
+    def save_state(self, filename: str):
+        # Gather unit data using the to_dict method
+        unit_data = [u.to_dict() for u in self.units.values()]
+        activated = [c.id for c in self.countries.values() if c.is_activated]
+
+        world_state = {
+            "turn": self.turn,
+            "completed_events": list(self.completed_event_ids),
+            "prerequisites": list(self.prerequisites),
+            "units": [u.to_dict() for u in self.units]
+        }
+
+        loader.save_game_state(
+            path=filename,
+            scenario_id=self.current_scenario.spec.id,
+            turn=self.turn,
+            phase=self.phase,
+            active_player=self.active_player,
+            units=unit_data,
+            activated_countries=activated
+        )
 
     def load_state(self, filename):
         pass
@@ -185,25 +204,3 @@ class GameState:
 
     def get_units_at(self, position):
         return [u for u in self.units if u.position == position]
-
-    def save_game(self, filename: str):
-        # Gather unit data using the to_dict method
-        unit_data = [u.to_dict() for u in self.units.values()]
-        activated = [c.id for c in self.countries.values() if c.is_activated]
-
-        world_state = {
-            "turn": self.turn,
-            "completed_events": list(self.completed_event_ids),
-            "prerequisites": list(self.prerequisites),
-            "units": [u.to_dict() for u in self.units]
-        }
-
-        loader.save_game_state(
-            path=filename,
-            scenario_id=self.current_scenario.spec.id,
-            turn=self.turn,
-            phase=self.phase,
-            active_player=self.active_player,
-            units=unit_data,
-            activated_countries=activated
-        )

@@ -23,12 +23,12 @@ class AnsalonMapView(QGraphicsView):
         # Deployment state
         self.deploying_unit = None
 
+        # Optimization: Track unit items to remove them individually
+        self.unit_items = []
+        self.map_rendered = False
+
         # Load map data
         self.load_all_data()
-
-        # Background Map
-        self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
-        self.bg_item.setZValue(-1)
 
     def load_all_data(self):
         """Load all map configuration data."""
@@ -54,6 +54,10 @@ class AnsalonMapView(QGraphicsView):
         angle_rad = math.radians(60 * i - 30)
         return QPointF(center.x() + HEX_RADIUS * math.cos(angle_rad),
                        center.y() + HEX_RADIUS * math.sin(angle_rad))
+
+    def should_draw_country(self, country_id):
+        """Hook to filter which countries are drawn. By default, draw all."""
+        return True
 
     def get_neighbor_offset(self, col, row, direction_idx):
         """Calculate the neighbor hex coordinates based on direction."""
@@ -239,11 +243,8 @@ class AnsalonMapView(QGraphicsView):
             if isinstance(item, HexagonItem):
                 item.set_highlight(False)
 
-    def sync_with_model(self):
-        """Redraws the map based on the current GameState model."""
-        self.scene.clear()
-        
-        # Re-add background
+    def draw_static_map(self):
+        """Draws the static elements of the map (terrain, borders, locations)."""
         self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
 
@@ -259,31 +260,37 @@ class AnsalonMapView(QGraphicsView):
         # Build coastal information
         coastal_info = self.get_coastal_hexside_directions()
 
+        # Build mountain pass information
+        mountain_passes_map = self.get_mountain_pass_directions()
+
         # Draw all hexes with terrain
         for row in range(map_height):
             for col in range(map_width):
                 center = self.get_hex_center(col, row)
                 raw_terrain = self.terrain_data.get(f"{col},{row}", "ocean")
-                
+
                 # Extract coastal flag and terrain type
                 is_coastal = raw_terrain.startswith("c_")
                 t_type = raw_terrain[2:] if is_coastal else raw_terrain
-                
+
                 # Get coastal directions
                 coastal_dirs = coastal_info.get((col, row))
 
                 # Get mountain pass directions
-                mountain_passes = self.get_mountain_pass_directions().get((col, row), [])
-                
+                mountain_passes = mountain_passes_map.get((col, row), [])
+
                 # Draw base hex with transparent overlay
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),
-                                      terrain_type=t_type, coastal_directions=coastal_dirs,
+                                       terrain_type=t_type, coastal_directions=coastal_dirs,
                                        pass_directions=mountain_passes
                                        )
                 self.scene.addItem(hex_item)
 
         # Overlay country territories
         for cid, spec in self.country_specs.items():
+            if not self.should_draw_country(cid):
+                continue
+
             color = QColor(spec.color)
             rgba = QColor(color.red(), color.green(), color.blue(), 100)
             for col, row in spec.territories:
@@ -292,23 +299,25 @@ class AnsalonMapView(QGraphicsView):
                 is_coastal = raw_terrain.startswith("c_")
                 t_type = raw_terrain[2:] if is_coastal else raw_terrain
                 coastal_dirs = coastal_info.get((col, row))
-                
+                mountain_passes = mountain_passes_map.get((col, row), [])
+
                 country_hex = HexagonItem(center, HEX_RADIUS, rgba,
-                                         terrain_type=t_type, coastal_directions=coastal_dirs,
-                                          pass_directions=mountain_passes
+                                          terrain_type=t_type, coastal_directions=coastal_dirs,
+                                          pass_directions=mountain_passes,
+                                          country_id=cid
                                           )
                 self.scene.addItem(country_hex)
 
         # Draw Hexsides (Rivers, Mountains, etc)
         hexsides = self.map_cfg.hexsides
         for side_type, entries in hexsides.items():
-            if side_type in ["sea", "pass"]:  # Skip sea hexsides and mountain passes (already drawn as wedges or vectors)
+            if side_type in ["sea", "pass"]:  # Skip sea hexsides and mountain passes
                 continue
             for col, row, direction in entries:
                 center = self.get_hex_center(col, row)
                 dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
                 idx = dir_map.get(direction)
-                
+
                 if idx is not None:
                     p1 = self.get_vertex(center, idx)
                     p2 = self.get_vertex(center, (idx + 1) % 6)
@@ -317,28 +326,25 @@ class AnsalonMapView(QGraphicsView):
         # Draw locations
         self.draw_locations()
 
+    def sync_with_model(self):
+        """Redraws the map based on the current GameState model."""
+        if not self.map_rendered:
+            self.scene.clear()
+            self.draw_static_map()
+            self.map_rendered = True
+
+        # Clean up old unit items
+        for item in self.unit_items:
+            if item.scene() == self.scene:
+                self.scene.removeItem(item)
+        self.unit_items.clear()
+
         # Draw units if map is initialized
         if self.game_state.map:
             for unit in self.game_state.units:
                 if hasattr(unit, 'position') and unit.is_on_map:
                     col, row = unit.position
                     self.draw_unit(unit, col, row)
-
-        if DEBUG:
-            self.draw_units()
-
-
-    def draw_units(self):
-        """Draw units on the map for debugging purposes."""
-        col = 25
-        row = 25
-        max_col = 31
-        for unit in self.game_state.units:
-            self.draw_unit(unit, col, row)
-            col += 1
-            if col >= max_col:
-                col = 25
-                row += 1
 
     def create_location_map(self):
         """Create location map, handling conflicts by preferring special locations."""
@@ -388,6 +394,7 @@ class AnsalonMapView(QGraphicsView):
         unit_item.setPos(center)
         unit_item.setZValue(10)  # Ensure units stay above hexes
         self.scene.addItem(unit_item)
+        self.unit_items.append(unit_item)
 
     def highlight_movement_range(self, reachable_coords):
         """
