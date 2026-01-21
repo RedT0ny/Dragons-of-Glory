@@ -7,12 +7,13 @@ from ..content.specs import (
 )
 
 class Event:
-    def __init__(self, event_id: str, description: str, trigger: Callable[[Any], bool], effect: Any) -> None:
-        self.id = event_id
-        self.description = description
-        self.trigger = trigger
-        self.effect = effect
-        self.occurrence_count = 0  # Track how many times it has fired
+    def __init__(self, spec: 'EventSpec', trigger_func: Callable[[Any], bool], effect_func: Callable[[Any], None]) -> None:
+        self.spec = spec  # Store the whole spec
+        self.id = spec.id
+        self.description = spec.description
+        self.trigger = trigger_func
+        self.effect = effect_func
+        self.occurrence_count = 0
         self.is_active = True
 
     def check_trigger(self, game_state):

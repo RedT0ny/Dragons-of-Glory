@@ -1,3 +1,5 @@
+from src.content.specs import CountrySpec, LocationSpec
+
 class Location:
     """
     Represents a strategic point on the map.
@@ -9,62 +11,88 @@ class Location:
         - 'undercity': An underground city (typically a dwarven fortress).
 
     """
-    def __init__(self, loc_id, loc_type, coords, is_capital=False):
-        self.id = loc_id
-        self.loc_type = loc_type
-        self.coords = coords      # (col, row) offset coordinates
-        self.occupier = None      # 'highlord', 'whitestone', or None
-        self.is_capital = is_capital
+
+    def __init__(self, spec: LocationSpec):
+        self.spec = spec
+        self.id = spec.id
+
+        # Dynamic State
+        self.occupier = None  # 'highlord', 'whitestone', or None
+        self.is_capital = spec.is_capital  # Can change (Silvanesti/Qualinesti)
+
+    @property
+    def loc_type(self):
+        return self.spec.loc_type
+
+    @property
+    def coords(self):
+        return self.spec.coords
 
     def get_defense_modifier(self):
-        """
-        TODO: Returns the combat rating bonus provided by the location.
-        City or port: -2 roll modifier, defender's strength is doubled.
-        (Applies also to flying citadels)
-        fortress: -4 roll modifier, defender's strength is tripled.
-        ugndercity: -10 roll modifier, no flight or cav bonuses
-        """
-        pass
+        # Access type via spec
+        if self.loc_type == 'fortress':
+            return -4
+        if self.loc_type == 'undercity':
+            return -10
+        if self.loc_type in ('city', 'port'):
+            return -2
+        return 0
 
     def __repr__(self):
         prefix = "Capital " if self.is_capital else ""
         return f"<{prefix}{self.loc_type.title()} {self.id} at {self.coords}>"
 
+
 class Country:
-    def __init__(self, country_id, capital_id, strength, allegiance='neutral', alignment=(0, 0), color=None):
-        self.id = country_id
+    def __init__(self, spec: CountrySpec):
+        self.spec = spec
+        self.id = spec.id
+
+        # Dynamic State
         self.conquerable = False # Default for rule 9: Conquest
-        self.capital_id = capital_id  # The ID of the location currently serving as capital
-        self.strength = strength      # Base political/economic strength
-        self.allegiance = allegiance  # 'whitestone', 'highlord', or 'neutral'
-        
-        # alignment: Tuple (WS, HL) representing activation modifiers.
-        # Positive values make it easier for that side to convince the country.
-        self.alignment = alignment    
-        
-        self.color = color
-        self.units = []
-        self.territories = set()      # Collection of hex coordinates (col, row)
+        self.capital_id = spec.capital_id  # The ID of the location currently serving as capital
+        self.allegiance = spec.allegiance  # 'whitestone', 'highlord', or 'neutral'
+
+        # Collections
+        self.units = []               # List of Unit objects belonging to this country
         self.locations = {}           # Dict of {loc_id: Location object}
 
-    def get_name(self, translator):
-        return translator.get_country_name(self.id)
+        # Initialize locations from the Spec
+        for loc_spec in spec.locations:
+            self.locations[loc_spec.id] = Location(loc_spec)
 
-    def set_territories(self, coord_list):
-        """
-        Accepts a list of [col, row] lists from YAML
-        and converts them to a set of tuples for fast lookup.
-        """
-        self.territories = {tuple(c) for c in coord_list}
+    # --- Property Proxies ---
 
-    def is_hex_in_country(self, col, row):
-        """Quick check if a map hex belongs to this country's borders."""
-        return (col, row) in self.territories
+    @property
+    def strength(self):
+        return self.spec.strength
+
+    @property
+    def alignment(self):
+        return self.spec.alignment
+
+    @property
+    def color(self):
+        return self.spec.color
+
+    @property
+    def territories(self):
+        # Convert list of lists to set of tuples on the fly or cache it
+        # Since territories don't change, we rely on the spec
+        return {tuple(t) for t in self.spec.territories}
 
     @property
     def capital(self):
         """Helper to access the current capital Location object."""
         return self.locations.get(self.capital_id)
+
+    # --- Logic Methods ---
+
+    def is_hex_in_country(self, col, row):
+        return (col, row) in self.territories
+
+    def get_name(self, translator):
+        return translator.get_country_name(self.id)
 
     def get_capital_name(self, translator):
         """Returns the translated name of the current capital city."""
@@ -105,15 +133,18 @@ class Country:
         """Victory Check: Conquered if ALL locations are held by the enemy side."""
         if not self.conquerable: return False
 
+        # Determine enemy based on current allegiance
         enemy = 'highlord' if self.allegiance == 'whitestone' else 'whitestone'
         if not self.locations: 
             return False
+
+        # Check if ALL locations are occupied by the enemy
         return all(loc.occupier == enemy for loc in self.locations.values())
 
     def surrender(self):
-        """Deactivates all units upon total conquest."""
+        """Destroys all units upon total conquest, including reserves."""
         for unit in self.units:
-            unit.status = "inactive"
+            unit.destroy()
 
     def __repr__(self):
         return f"<Country {self.id} [{self.allegiance}] - Capital: {self.capital_id}>"

@@ -35,13 +35,39 @@ class CountrySpec:
     capital_id: str
     strength: int
     allegiance: str
-    alignment: Tuple[int, int]
+    alignment: Tuple[int, int]  # alignment: Tuple (WS, HL) representing activation modifiers.
     color: str
     locations: List[LocationSpec]
     territories: List[Tuple[int, int]]
 
 @dataclass
 class UnitSpec:
+    """
+    Blueprint for all units in the game.
+
+        :ivar id: The name of the unit.
+        :type id: str
+        :ivar unit_type: The type of the unit ('infantry', 'cavalry', 'general', 'admiral', 'hero', 'fleet', 'wing').
+        :type unit_type: UnitType
+        :ivar race: The race of the unit (e.g., 'draconian', 'dragon', 'goblin', 'hogboblin', 'human', 'solamnic', 'dwarf', 'elf', 'griffon', 'kender', 'minotaur', 'ogre', 'pegasus', 'thanoi', 'undead').
+        :type race: UnitRace
+        :ivar country: The country the unit belongs to.
+        :type country: str
+        :ivar dragonflight: The dragonflight the unit belongs to.
+        :type dragonflight: str
+        :ivar allegiance: The allegiance of the unit (e.g., 'Highlord', 'Neutral', 'Whitesone').
+        :type allegiance: str
+        :ivar terrain_affinity: The terrain affinity of the unit (e.g., 'mountain', 'desert', 'swamp').
+        :type terrain_affinity: str
+        :ivar combat_rating: The combat rating of the unit.
+        :type combat_rating: int
+        :ivar tactical_rating: The tactical rating of the unit.
+        :type tactical_rating: int
+        :ivar movement: The movement points available for the unit.
+        :type movement: int
+        :ivar status: The current status of the unit (e.g., 'inactive', 'active', 'depleted', 'reserve', 'destroyed').
+        :type status: UnitState
+    """
     id: str             # The only ID we need (from CSV or generated)
     unit_type: Optional[str]
     race: Optional[str]
