@@ -174,7 +174,7 @@ class MapViewer(QGraphicsView):
         self.scenario_spec = loader.load_scenario_yaml(SCENARIO)
 
         # The factory does all the heavy lifting
-        scenario_obj = factory.create_scenario(self.scenario_spec)
+        scenario_obj = factory.create_scenario_items(self.scenario_spec)
 
         self.units = scenario_obj.units
         self.countries = scenario_obj.countries

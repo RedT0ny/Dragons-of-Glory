@@ -166,6 +166,7 @@ class UnitState(Enum):
         return {cls.ACTIVE, cls.DEPLETED}
 
 class GamePhase(Enum):
+    DEPLOYMENT = auto()        # Step 0: Initial Deployment phase (only once)
     REPLACEMENTS = auto()      # Step 1: Replacements
     STRATEGIC_EVENTS = auto()  # Step 2: Strategic Events
     ACTIVATION = auto()        # Step 3: Country activation by diplomacy

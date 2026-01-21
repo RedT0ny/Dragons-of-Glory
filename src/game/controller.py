@@ -62,6 +62,18 @@ class GameController(QObject):
         active_player = self.game_state.active_player
         is_ai = self.ai_config.get(active_player, False)
 
+        if current_phase == GamePhase.DEPLOYMENT:
+            if is_ai:
+                print("AI is handling deployment...")
+                self.game_state.advance_phase()
+            else:
+                # Open Replacements Dialog adapted for Deployment
+                if not self.replacements_dialog or not self.replacements_dialog.isVisible():
+                    from src.gui.replacements_dialog import ReplacementsDialog
+                    self.replacements_dialog = ReplacementsDialog(self.game_state, self.view, self.view)
+                    self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
+                    self.replacements_dialog.show()
+
         # Handle "Automatic" or "System" phases (Dice rolls, cards)
         if current_phase == GamePhase.REPLACEMENTS:
             if is_ai:

@@ -1,6 +1,7 @@
+from typing import Set, Tuple, List, Dict
 from src.game.combat import CombatResolver
 from src.game.country import Country, Location
-from src.content.config import COUNTRIES_DATA
+from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.content import loader, factory
@@ -29,6 +30,7 @@ class GameState:
         self.units = []
         self.map = None  # Will be initialized by load_scenario
         self.turn = 0
+        self.scenario_spec = None
 
         # Battle Turn State
         self.phase = GamePhase.REPLACEMENTS
@@ -51,13 +53,6 @@ class GameState:
         unit_data = [u.to_dict() for u in self.units.values()]
         activated = [c.id for c in self.countries.values() if c.is_activated]
 
-        world_state = {
-            "turn": self.turn,
-            "completed_events": list(self.completed_event_ids),
-            "prerequisites": list(self.prerequisites),
-            "units": [u.to_dict() for u in self.units]
-        }
-
         loader.save_game_state(
             path=filename,
             scenario_id=self.current_scenario.spec.id,
@@ -75,28 +70,83 @@ class GameState:
         """
         Initializes the game state from scenario data.
         """
-        # 3. Setup scenario object
-        scenario_obj = factory.create_scenario(scenario_spec)
+        self.scenario_spec = scenario_spec
 
-        self.units = scenario_obj.units
-        self.countries = scenario_obj.countries
+        # 3. Setup live objects via Factory
+        self.units, self.countries = factory.create_scenario_items(scenario_spec)
 
         # 4. Setup the map
+        width, height = self.get_map_dimensions()
+
         # Create a simple map object that holds width/height
         class SimpleMap:
             def __init__(self, width, height):
                 self.width = width
                 self.height = height
 
-        self.map = SimpleMap(
-            width=getattr(scenario_obj, 'map_width', 65),
-            height=getattr(scenario_obj, 'map_height', 53)
-        )
+        self.map = SimpleMap(width, height)
 
         # 5. Default to turn 1 if start_turn is missing from the scenario object
-        self.turn = getattr(scenario_obj, 'start_turn', 1)
-        self.phase = GamePhase.REPLACEMENTS
-        self.active_player = HL
+        self.turn = getattr(scenario_spec, 'start_turn', 1)
+
+        # Determine initiative for Deployment
+        init_str = getattr(scenario_spec, 'initiative_start', 'highlord').lower()
+
+        # Start with Deployment Phase
+        self.phase = GamePhase.DEPLOYMENT
+
+        # The player WITHOUT initiative deploys first
+        if init_str == 'whitestone':
+            self.initiative_winner = WS
+            self.active_player = HL
+        else:
+            self.initiative_winner = HL
+            self.active_player = WS
+
+    def get_map_bounds(self) -> Dict[str, List[int]]:
+        """Returns the subset range or full map defaults."""
+        if self.scenario_spec and self.scenario_spec.map_subset:
+            return self.scenario_spec.map_subset
+
+        return {
+            "x_range": [0, MAP_WIDTH - 1],
+            "y_range": [0, MAP_HEIGHT - 1]
+        }
+
+    def get_map_dimensions(self) -> Tuple[int, int]:
+        """Returns (width, height) based on map subset or default config."""
+        bounds = self.get_map_bounds()
+        width = bounds['x_range'][1] - bounds['x_range'][0] + 1
+        height = bounds['y_range'][1] - bounds['y_range'][0] + 1
+        return width, height
+
+    def is_hex_in_bounds(self, q: int, r: int) -> bool:
+        """Helper to check if a specific offset coordinate is within this scenario's map."""
+        bounds = self.get_map_bounds()
+        return (bounds["x_range"][0] <= q <= bounds["x_range"][1] and
+                bounds["y_range"][0] <= r <= bounds["y_range"][1])
+
+    def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
+        """
+        Returns a set of (x, y) coordinates where a player can deploy.
+        """
+        if not self.scenario_spec: return set()
+
+        player_setup = self.scenario_spec.setup.get(allegiance, {})
+        area_spec = player_setup.get("deployment_area")
+
+        if area_spec is None:
+            # Simplification: Use all countries assigned to this player
+            countries_to_use = player_setup.get("countries", {}).keys()
+        else:
+            # Use specific countries defined in the deployment_area
+            countries_to_use = area_spec.get("countries", [])
+
+        hexes = set()
+        for cid in countries_to_use:
+            if cid in self.countries:
+                hexes.update(self.countries[cid].territories)
+        return hexes
 
     def set_initiative(self, winner):
         """Called by Controller after Step 4 dice roll."""
@@ -108,6 +158,18 @@ class GameState:
         The State Machine: Determines the next phase based on current state.
         This ensures the strict order of the Battle Turn.
         """
+        if self.phase == GamePhase.DEPLOYMENT:
+            # If currently the non-initiative player, switch to initiative player
+            # If currently the initiative player, deployment is done AND it counts as their Replacements.
+
+            if self.active_player != self.initiative_winner:
+                self.active_player = self.initiative_winner
+                # Phase remains DEPLOYMENT for the second player
+            else:
+                # Initiative winner finished deployment.
+                # Proceed to Strategic Events (Skipping Replacements for this first turn context)
+                self.phase = GamePhase.STRATEGIC_EVENTS
+
         if self.phase == GamePhase.REPLACEMENTS:
             self.phase = GamePhase.STRATEGIC_EVENTS
 

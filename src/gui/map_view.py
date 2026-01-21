@@ -2,7 +2,7 @@ import math
 
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QTimer
 
 from src.content.constants import WS
 from src.content.specs import UnitState, GamePhase
@@ -26,9 +26,17 @@ class AnsalonMapView(QGraphicsView):
         # Optimization: Track unit items to remove them individually
         self.unit_items = []
         self.map_rendered = False
+        self.initial_fit_done = False
 
         # Load map data
         self.load_all_data()
+
+    def showEvent(self, event):
+        """Fit the map to the view when shown for the first time."""
+        super().showEvent(event)
+        if not self.initial_fit_done and self.scene.itemsBoundingRect().width() > 0:
+            self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+            self.initial_fit_done = True
 
     def load_all_data(self):
         """Load all map configuration data."""
@@ -155,25 +163,22 @@ class AnsalonMapView(QGraphicsView):
                 target_hex = item
                 break
 
-        if target_hex:
-            # Convert scene pos back to hex coords?
-            # Or assume we stored valid coords.
-            # For now, let's assume we can map back or stored the hex item mapping.
-            # Simplified: Just place it (Logic would go to Controller ideally)
+        if target_hex and hasattr(target_hex, 'coords'):
+            # Execute Move
+            from src.game.map import Hex
+            col, row = target_hex.coords
+            hex_obj = Hex.offset_to_axial(col, row)
+
+            self.game_state.move_unit(self.deploying_unit, hex_obj)
 
             # Update Unit State
             self.deploying_unit.status = UnitState.ACTIVE
-
-            # Reverse engineer coords from center (approximate)
-            # Or better, store coords in HexagonItem
-            # For this snippet, assuming we have a way to set position:
-            # self.game_state.move_unit(self.deploying_unit, hex_coords)
 
             self.deploying_unit = None
             self.clear_highlights()
             self.sync_with_model()
 
-            # Show dialog again? Or let user maximize it.
+            # Ideally signal the dialog to refresh, but for now user can maximize it manually
 
     def handle_depleted_stack_click(self, scene_pos):
         # Find units at this location
@@ -201,8 +206,8 @@ class AnsalonMapView(QGraphicsView):
 
         for country, units in by_country.items():
             if len(units) >= 2:
-                # Trigger Merge Dialog
-                self.show_merge_dialog(units[0], units[1])
+                # Trigger Merge Dialog deferred to avoid scene clearing during event processing
+                QTimer.singleShot(0, lambda: self.show_merge_dialog(units[0], units[1]))
                 break # Handle one pair at a time
 
     def show_merge_dialog(self, unit1, unit2):
@@ -284,6 +289,7 @@ class AnsalonMapView(QGraphicsView):
                                        terrain_type=t_type, coastal_directions=coastal_dirs,
                                        pass_directions=mountain_passes
                                        )
+                hex_item.coords = (col, row)  # Store coordinates for click detection
                 self.scene.addItem(hex_item)
 
         # Overlay country territories

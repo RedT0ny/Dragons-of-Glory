@@ -1,23 +1,35 @@
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QPushButton, QFrame, QScrollArea, QGridLayout)
-from PySide6.QtCore import Qt, Signal
+import sys
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                               QLabel, QPushButton, QFrame, QScrollArea, QGridLayout, QTextEdit)
+from PySide6.QtCore import Qt, Signal, QObject, Slot
 
 from src.content.config import APP_NAME
 from src.gui.map_view import AnsalonMapView
+
+class ConsoleRedirector(QObject):
+    """Custom stream object to redirect stdout/stderr to a Qt Signal."""
+    text_written = Signal(str)
+
+    def write(self, text):
+        self.text_written.emit(str(text))
+
+    def flush(self):
+        # Flush is required for file-like objects
+        pass
 
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
     end_phase_clicked = Signal()
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setFixedWidth(250)
+        self.setFixedWidth(350)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         
         layout = QVBoxLayout(self)
         
         # Mini-map placeholder
         self.mini_map = QLabel("Mini-map Area")
-        self.mini_map.setFixedSize(230, 150)
+        self.mini_map.setFixedSize(320, 240)
         self.mini_map.setStyleSheet("background-color: #333; color: white;")
         self.mini_map.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.mini_map)
@@ -77,13 +89,27 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(content_layout)
         
         # Game Log
-        self.log_area = QLabel("Game log...")
+        self.log_area = QTextEdit()
+        self.log_area.setReadOnly(True)
         self.log_area.setFixedHeight(100)
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         main_layout.addWidget(self.log_area)
 
+        # Redirect console output to the log area
+        self.redirector = ConsoleRedirector()
+        self.redirector.text_written.connect(self.append_log)
+        sys.stdout = self.redirector
+        sys.stderr = self.redirector
+
         # Initialize visual grid from the game state
         self.map_view.sync_with_model()
+
+    @Slot(str)
+    def append_log(self, text):
+        """Appends text to the log area and auto-scrolls to the bottom."""
+        self.log_area.insertPlainText(text)
+        # Scroll to the bottom automatically
+        self.log_area.ensureCursorVisible()
 
     def set_controller(self, controller):
         """Connects UI signals to the controller."""

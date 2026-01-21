@@ -149,6 +149,14 @@ class Unit:
         if self.is_on_map and must_retreat:
             self.retreat()
 
+    def activate(self):
+        """Moves to Active status."""
+        self.status = UnitState.ACTIVE
+
+    def ready(self):
+        """Moves to Ready status."""
+        self.status = UnitState.READY
+
     def eliminate(self):
         """Moves to Reserve (can be rebuilt)."""
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:

@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, 
                                    QTableWidgetItem, QHeaderView, QLabel, QWidget, 
                                    QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene)
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import Qt, QSize, Signal, QTimer
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
 from src.content.specs import UnitState, GamePhase
@@ -39,7 +39,9 @@ class UnitLabel(QGraphicsView):
         self.setCursor(Qt.PointingHandCursor)
 
     def mousePressEvent(self, event):
-        self.clicked.emit(self.unit)
+        # Defer the signal to prevent the widget from being destroyed while handling the event
+        QTimer.singleShot(0, lambda: self.clicked.emit(self.unit))
+
         # Visual feedback for selection
         self.setStyleSheet("background-color: rgba(255, 255, 0, 50); border: 1px solid yellow; border-radius: 4px;")
         super().mousePressEvent(event)
@@ -282,23 +284,25 @@ class ReplacementsDialog(QDialog):
         """Minimize and show map targets."""
         self.showMinimized()
 
-        # Center map on country capital or units
-        country = self.game_state.countries.get(unit.land)
-        if country:
-            # Logic to find valid deployment hexes
-            valid_hexes = []
+        valid_hexes = []
 
-            if self.allow_territory_deploy:
-                # Allowed anywhere in territory (for newly activated countries)
-                # We convert set of tuples to list
-                valid_hexes = list(country.territories)
-            else:
-                # Cities or Fortresses of the country, not enemy occupied
-                for loc_id, loc in country.locations.items():
-                    # Assuming simple check for now. TODO: Check occupation
-                    valid_hexes.append(loc.coords)
+        # Check for Deployment Phase
+        if self.game_state.phase == GamePhase.DEPLOYMENT:
+            # Use scenario specific deployment areas
+            valid_hexes = list(self.game_state.get_deployment_hexes(unit.allegiance))
+        else:
+            # Standard Replacement Logic
+            country = self.game_state.countries.get(unit.land)
+            if country:
+                if self.allow_territory_deploy:
+                    # Allowed anywhere in territory (for newly activated countries)
+                    valid_hexes = list(country.territories)
+                else:
+                    # Cities or Fortresses of the country
+                    for loc_id, loc in country.locations.items():
+                        valid_hexes.append(loc.coords)
 
-            self.view.highlight_deployment_targets(valid_hexes, unit)
+        self.view.highlight_deployment_targets(valid_hexes, unit)
 
     def refresh(self):
         self.populate_table()

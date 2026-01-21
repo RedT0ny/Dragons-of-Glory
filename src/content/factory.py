@@ -1,13 +1,14 @@
 from . import loader
 from .specs import *
 from .config import UNITS_DATA, COUNTRIES_DATA
-from src.game.scenario import Scenario
+from src.content.constants import HL, WS
 from src.game.country import Country
 from src.game.unit import Unit, Leader, Wing, Hero, Fleet, Wizard, Army, FlyingCitadel
 
-def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
+def create_scenario_items(scenario_spec: ScenarioSpec) -> Tuple[List[Unit], Dict[str, Country]]:
     """
     Creates live objects from blueprints.
+    Returns the list of units and the dictionary of countries.
     """
     # 1. Get Blueprints from Loader
     unit_specs = loader.resolve_scenario_units(scenario_spec, UNITS_DATA)
@@ -52,25 +53,13 @@ def create_scenario(scenario_spec: ScenarioSpec) -> Scenario:
 
         # Factory logic: Pass the SPEC directly
         # The 's' variable IS the UnitSpec object
-        live_units.append(target_class(spec=s, ordinal=s.ordinal))
+        new_unit = target_class(spec=s, ordinal=s.ordinal)
 
-    # 3. Create the Scenario
-    scenario = Scenario(
-        scenario_id=scenario_spec.id,
-        description=scenario_spec.description,
-        units=live_units,
-        countries=country_specs, # Can also convert these to Country objects here
-        setup=scenario_spec.setup,
-        map_subset=scenario_spec.map_subset
-    )
+        # Set initial status: Units for active sides start as READY (available for placement)
+        if new_unit.allegiance in [HL, WS]:
+            new_unit.ready()
 
-    # 4. Attach map bounds to scenario for easy access
-    if scenario_spec.map_subset:
-        scenario.map_width = scenario_spec.map_subset['x_range'][1] - scenario_spec.map_subset['x_range'][0] + 1
-        scenario.map_height = scenario_spec.map_subset['y_range'][1] - scenario_spec.map_subset['y_range'][0] + 1
-    else:
-        from src.content.config import MAP_WIDTH, MAP_HEIGHT
-        scenario.map_width = MAP_WIDTH
-        scenario.map_height = MAP_HEIGHT
+        live_units.append(new_unit)
 
-    return scenario
+    # 3. Create scenario items
+    return live_units, live_countries
