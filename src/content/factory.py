@@ -12,7 +12,7 @@ def create_scenario_items(scenario_spec: ScenarioSpec) -> Tuple[List[Unit], Dict
     """
     # 1. Get Blueprints from Loader
     unit_specs = loader.resolve_scenario_units(scenario_spec, UNITS_DATA)
-    country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
+    country_specs = loader.resolve_scenario_countries(scenario_spec, COUNTRIES_DATA)
 
     # 2. Convert Specs to Live Objects
     live_countries = {

@@ -196,7 +196,7 @@ southlund:
 
 daltigoth:
   capital_id: daltigoth_city
-  color: "#556B2F"
+  color: "#BDB76B"
   allegiance: neutral
   alignment: [-2, 4]
   strength: 24
@@ -695,7 +695,7 @@ lemish:
 
 hinterlund:
   capital_id: maelgoth
-  color: "#BDB76B"
+  color: "#556B2F"
   allegiance: neutral
   alignment: [3, -2]
   strength: 18
@@ -1001,7 +1001,7 @@ sikket:
 silvanesti:
   capital_id: silvanost
   color: "#228B22"
-  allegiance: whitestone
+  allegiance: neutral
   alignment: [5, -2]
   strength: 38
   locations:
@@ -1127,7 +1127,7 @@ silvanesti:
 
 solanthus:
   capital_id: solanthus_city
-  color: "#87CEEB"
+  color: "#37ABC8"
   allegiance: neutral
   alignment: [3, -2]
   strength: 30
@@ -1177,7 +1177,7 @@ solanthus:
 taman:
   capital_id: neraka
   color: "#8B0000"
-  allegiance: highlord
+  allegiance: neutral
   alignment: [0, 0]
   strength: 20
   locations:
@@ -1297,8 +1297,8 @@ thorbardin:
 
 tower:
   capital_id: high_clerist_tower
-  color: "#F5F5F5"
-  allegiance: whitestone
+  color: "#94B1B7"
+  allegiance: neutral
   alignment: [0, 0]
   strength: 0
   locations:

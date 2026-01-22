@@ -60,7 +60,7 @@ class UnitSelectionDialog(QDialog):
         self.discarded_unit = None
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Choose which unit to return to service.\nThe other will be permanently eliminated."))
+        layout.addWidget(QLabel("Choose which unit will return to service.\nThe other will be permanently eliminated."))
 
         h_layout = QHBoxLayout()
 

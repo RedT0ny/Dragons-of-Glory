@@ -2,7 +2,7 @@ import csv, yaml, json
 import os, re
 from dataclasses import asdict
 from collections import defaultdict
-from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP
+from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP, HL, WS, NEUTRAL
 from src.content.specs import *
 
 
@@ -384,6 +384,45 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
                 selected_specs.append(u)
 
     return selected_specs
+
+def resolve_scenario_countries(spec: ScenarioSpec, countries_yaml_path: str) -> Dict[str, CountrySpec]:
+    """
+    Loads country specs and filters/configures them based on the ScenarioSpec.
+    Sets the allegiance correctly for Highlord, Whitestone, and Neutral countries.
+    """
+    if spec is None: return {}
+
+    # 1. Load all raw country specs
+    all_specs = load_countries_yaml(countries_yaml_path)
+    resolved_specs = {}
+
+    def _process_group(group_data, allegiance):
+        """Helper to extract country IDs and set allegiance."""
+        if not group_data: return
+
+        # Handle list (names only) or dict (names with config)
+        c_ids = group_data.keys() if isinstance(group_data, dict) else group_data
+
+        for cid in c_ids:
+            if cid in all_specs:
+                c_spec = all_specs[cid]
+                c_spec.allegiance = allegiance
+                resolved_specs[cid] = c_spec
+
+    # 2. Process Highlord
+    hl_setup = spec.setup.get("highlord", {})
+    _process_group(hl_setup.get("countries", {}), HL)
+
+    # 3. Process Whitestone
+    ws_setup = spec.setup.get("whitestone", {})
+    _process_group(ws_setup.get("countries", {}), WS)
+
+    # 4. Process Neutrals
+    # Note: load_scenario_yaml maps the neutral section to "neutral_countries"
+    neutral_data = spec.setup.get("neutral_countries", [])
+    _process_group(neutral_data, NEUTRAL)
+
+    return resolved_specs
 
 def load_artifacts_yaml(path: str) -> Dict[str, ArtifactSpec]:
     with open(path, "r", encoding="utf-8") as f:
