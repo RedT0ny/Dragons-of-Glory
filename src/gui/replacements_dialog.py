@@ -217,10 +217,12 @@ class ReplacementsDialog(QDialog):
         layout.setContentsMargins(2, 2, 2, 2)
         layout.setAlignment(Qt.AlignLeft)
 
-        # Get country color from map_view lookup if possible
+        # Get country color from game_state lookup
         country_color = QColor(200, 200, 200)
         if units:
-            country_color = self.view.country_colors.get(units[0].land, country_color)
+            country_id = units[0].land
+            if country_id in self.game_state.countries:
+                country_color = QColor(self.game_state.countries[country_id].color)
 
         for unit in units:
             lbl = UnitLabel(unit)
@@ -282,7 +284,7 @@ class ReplacementsDialog(QDialog):
 
     def on_ready_unit_clicked(self, unit):
         """Minimize and show map targets."""
-        self.showMinimized()
+        #self.showMinimized()
 
         valid_hexes = []
 

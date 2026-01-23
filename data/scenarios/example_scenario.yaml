@@ -1,6 +1,7 @@
 # Example scenario YAML
 scenario:
   id: "unique_scenario_id"
+  picture: "scenario.jpg"
   description: >
     Folded block scalar for historical flavor.
 
@@ -35,7 +36,7 @@ scenario:
         red:
           # Explicit partial setup
           units_by_type:
-            dragon: { quantity: 1 }
+            dragon: 1
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: ["verminaard", "kitiara", "ladonna"]

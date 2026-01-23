@@ -69,6 +69,7 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         active_events=data.get("active_events", []),
         setup=setup,
         victory_conditions=v_conds,
+        picture=data.get("picture", "scenario.jpg"),
         notes=data.get("notes", "")
     )
 
@@ -221,7 +222,7 @@ def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
             strength=info.get("strength", 0),
             allegiance=info.get("allegiance", "neutral"),
             alignment=tuple(info.get("alignment", [0, 0])),
-            color=info.get("color"),
+            color=info.get("color", "#00000000"),
             locations=locations,
             territories=[tuple(t) for t in info.get("territories", [])]
         )
@@ -352,8 +353,11 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
                 units_by_type = config["units_by_type"]
 
                 for type_or_race, type_config in units_by_type.items():
-                    requested_qty = type_config.get("quantity", 1) if isinstance(type_config, dict) else 1
-                    type_or_race_lower = type_or_race.lower()
+                    # Support for simplified format: "inf: 4" instead of "inf: { quantity: 4 }"
+                    if isinstance(type_config, int):
+                        requested_qty = type_config
+                    else:
+                        requested_qty = 1
 
                     # Try to find units matching this type or race from this country/dragonflight
                     matching_units = []

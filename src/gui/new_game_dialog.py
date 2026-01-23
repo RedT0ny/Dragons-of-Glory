@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
                                QLineEdit, QListView, QPushButton, QSizePolicy,
                                QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
-from src.content.config import SCENARIOS_DIR
+from src.content.config import SCENARIOS_DIR, IMAGES_DIR
 from src.content.loader import load_scenario_yaml
 from src.gui.notes_dialog import NotesDialog
 import os
@@ -30,7 +30,7 @@ class Ui_newGameDialog(object):
         if not Dialog.objectName():
             Dialog.setObjectName(u"Dialog")
         Dialog.setWindowModality(Qt.WindowModality.NonModal)
-        Dialog.resize(1280, 720)
+        Dialog.resize(1024, 768)
         Dialog.setWindowOpacity(0.7)
         Dialog.setModal(True)
         self.horizontalLayout = QHBoxLayout(Dialog)
@@ -85,7 +85,7 @@ class Ui_newGameDialog(object):
         sizePolicy2.setHeightForWidth(self.scPicture.sizePolicy().hasHeightForWidth())
         self.scPicture.setSizePolicy(sizePolicy2)
         self.scPicture.setMaximumSize(QSize(426, 240))
-        self.scPicture.setPixmap(QPixmap(u"I:/Wargames/Dragons of Glory/images/tales_cover.jpg"))
+        self.scPicture.setPixmap(QPixmap(IMAGES_DIR+'\\scenario.jpg'))
         self.scPicture.setScaledContents(True)
 
         self.horizontalLayout_2.addWidget(self.scPicture)
@@ -275,7 +275,23 @@ class NewGameDialog(QDialog):
         """Display scenario details in the UI from the ScenarioSpec."""
         # Description
         self.ui.scDescription.setPlainText(spec.description)
-        
+
+        # Picture
+        pic_filename = spec.picture if spec.picture else "scenario.jpg"
+        pic_path = os.path.join(IMAGES_DIR, pic_filename)
+
+        # Check if file exists, else use fallback or blank
+        if os.path.exists(pic_path):
+            self.ui.scPicture.setPixmap(QPixmap(pic_path))
+        else:
+            # Optional: Set a specific "missing image" placeholder if desired
+            # For now, we can try loading the COVER_PICTURE from config as fallback
+            from src.content.config import COVER_PICTURE
+            if os.path.exists(COVER_PICTURE):
+                self.ui.scPicture.setPixmap(QPixmap(COVER_PICTURE))
+            else:
+                self.ui.scPicture.clear()
+
         # Turn information
         self.ui.startTurn.setText(str(spec.start_turn))
         self.ui.endTurn.setText(str(spec.end_turn))

@@ -1,0 +1,102 @@
+# language: yaml
+scenario:
+  id: "campaign_1_dragonlance_chronicles"
+  picture: "scenario.jpg"
+  description: >
+    This is the complete game, covering the whole of the War of the Lance. 
+    It starts with the events on Ansalon before the Dragon Highlords moved 
+    toward conquest and allows both players to influence the full course of the war.
+
+  # Map Configuration: None as it covers entire Ansalon.
+
+  # Timeline and Turn Logic
+  start_turn: 1
+  end_turn: 30
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Active Global Events
+  active_events: null
+
+  # Allegiance-based Setup
+  initial_setup:
+
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: [
+        "abanasinia",
+        "balifor",
+        "blode",
+        "blodehelm",
+        "southlund",
+        "daltigoth",
+        "dargaard",
+        "goodlund",
+        "sancrist",
+        "haltigoth",
+        "coastlund",
+        "hylo",
+        "icereach",
+        "nightlund",
+        "kaolyn",
+        "kern",
+        "kharolis",
+        "khur",
+        "kothas",
+        "lemish",
+        "hinterlund",
+        "saifhum",
+        "mithas",
+        "nergoth",
+        "nordmaar",
+        "palanthas",
+        "qualinesti",
+        "sanction",
+        "sikket",
+        "silvanesti",
+        "solanthus",
+        "tarsis",
+        "thorbardin",
+        "tower",
+        "thank",
+        "throt",
+        "vingaard",
+        "zhakar"
+        ]
+
+    highlord:
+      # Specific deployment region (subset of countries)
+      deployment_area:
+        countries: [ "taman" ]
+
+      countries:
+        taman:
+          units: all
+        green:
+          units: all
+        blue:
+          units: all
+        red:
+          units: all
+
+      explicit_units: [ "ariakas" ]
+
+      artifacts: null
+
+      victory_conditions:
+        major: "Control more than 30 countries"
+        marginal: "Countrol more than 20 countries"
+
+    whitestone:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
+
+      artifacts: null
+
+      victory_conditions:
+        major: "Control more than 30 countries"
+        marginal: "Countrol more than 20 countries"
+
+  notes: >
+    Whitestone starts without countries, they will join by diplomacy or as a result of the highlord's invasion.' 
+    The player with the most countries held consults the victory table.
+    Dragonflights do not count towards the number of countries controlled.

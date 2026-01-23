@@ -6,9 +6,9 @@ from PySide6.QtCore import Qt, QPointF, QTimer
 
 from src.content.constants import WS
 from src.content.specs import UnitState, GamePhase
-from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH, COUNTRIES_DATA, MAP_CONFIG_DATA, MAP_TERRAIN_DATA,
+from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET)
-from src.content import loader
+from src.game.map import Hex
 from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter
 
 class AnsalonMapView(QGraphicsView):
@@ -28,28 +28,12 @@ class AnsalonMapView(QGraphicsView):
         self.map_rendered = False
         self.initial_fit_done = False
 
-        # Load map data
-        self.load_all_data()
-
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
         super().showEvent(event)
         if not self.initial_fit_done and self.scene.itemsBoundingRect().width() > 0:
             self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
             self.initial_fit_done = True
-
-    def load_all_data(self):
-        """Load all map configuration data."""
-        self.country_specs = loader.load_countries_yaml(COUNTRIES_DATA)
-        self.map_cfg = loader.load_map_config(MAP_CONFIG_DATA)
-        self.location_map = self.create_location_map()
-        self.terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
-
-        # Create country color lookup: {"country_id": QColor}
-        self.country_colors = {
-            spec.id: QColor(spec.color)
-            for spec in self.country_specs.values()
-        }
 
     def get_hex_center(self, col, row):
         """Calculates pixel center for a pointy-top hex using odd-r offset coordinates."""
@@ -66,65 +50,6 @@ class AnsalonMapView(QGraphicsView):
     def should_draw_country(self, country_id):
         """Hook to filter which countries are drawn. By default, draw all."""
         return True
-
-    def get_neighbor_offset(self, col, row, direction_idx):
-        """Calculate the neighbor hex coordinates based on direction."""
-        parity = row & 1
-        offsets = {
-            0: [(1, 0), (1, 0)],
-            1: [(0, 1), (1, 1)],
-            2: [(-1, 1), (0, 1)],
-            3: [(-1, 0), (-1, 0)],
-            4: [(-1, -1), (0, -1)],
-            5: [(0, -1), (1, -1)]
-        }
-        offset = offsets[direction_idx][parity]
-        return col + offset[0], row + offset[1]
-
-
-    def get_coastal_hexside_directions(self):
-        """
-        Returns a dict mapping (col, row) -> list of direction_indices for coastal hexes.
-        For each sea hexside, colors wedges on BOTH the land hex and the adjacent ocean hex.
-        """
-        from collections import defaultdict
-        coastal_dirs = defaultdict(list)
-
-        sea_hexsides = self.map_cfg.hexsides.get("sea", [])
-        dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
-        opposite_dir = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
-
-        for col, row, direction in sea_hexsides:
-            direction_idx = dir_map.get(direction)
-            if direction_idx is not None:
-                coastal_dirs[(col, row)].append(direction_idx)
-                neighbor_col, neighbor_row = self.get_neighbor_offset(col, row, direction_idx)
-                opposite_idx = opposite_dir[direction_idx]
-                coastal_dirs[(neighbor_col, neighbor_row)].append(opposite_idx)
-
-        return coastal_dirs
-
-    def get_mountain_pass_directions(self):
-        """
-        Returns a dict mapping (col, row) -> list of direction_indices for mountain passes.
-        Paints a line joining the centers of the adjacent hexes.
-        """
-        from collections import defaultdict
-        pass_dirs = defaultdict(list)
-
-        pass_hexsides = self.map_cfg.hexsides.get("pass", [])
-        dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
-        opposite_dir = {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2}
-
-        for col, row, direction in pass_hexsides:
-            direction_idx = dir_map.get(direction)
-            if direction_idx is not None:
-                pass_dirs[(col, row)].append(direction_idx)
-                neighbor_col, neighbor_row = self.get_neighbor_offset(col, row, direction_idx)
-                opposite_idx = opposite_dir[direction_idx]
-                pass_dirs[(neighbor_col, neighbor_row)].append(opposite_idx)
-
-        return pass_dirs
 
     def wheelEvent(self, event):
         """Zoom with Ctrl+Wheel."""
@@ -229,6 +154,9 @@ class AnsalonMapView(QGraphicsView):
         self.clear_highlights()
         self.deploying_unit = unit
 
+        # Change cursor to indicate placement mode (overrides ScrollHandDrag)
+        self.setCursor(Qt.PointingHandCursor)
+
         # This requires HexagonItem to store its coords or a lookup
         # For this implementation, we iterate scene items (inefficient but works for small map)
         # or use get_hex_center if we have coords.
@@ -244,93 +172,106 @@ class AnsalonMapView(QGraphicsView):
 
     def clear_highlights(self):
         self.deploying_unit = None
+
+        # Restore default cursor (returns to ScrollHandDrag "open hand")
+        self.unsetCursor()
+
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
                 item.set_highlight(False)
 
     def draw_static_map(self):
-        """Draws the static elements of the map (terrain, borders, locations)."""
+        """Draws the static elements of the map based on GameState model."""
         self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
 
-        # Get map bounds from scenario (if available)
-        if self.game_state.map and hasattr(self.game_state.map, 'width'):
-            map_width = self.game_state.map.width
-            map_height = self.game_state.map.height
-        else:
-            # Default to full Ansalon map
-            map_width = MAP_WIDTH
-            map_height = MAP_HEIGHT
+        board = self.game_state.map
+        if not board:
+            return # Should not happen if initialized correctly
 
-        # Build coastal information
-        coastal_info = self.get_coastal_hexside_directions()
+        map_width = board.width
+        map_height = board.height
 
-        # Build mountain pass information
-        mountain_passes_map = self.get_mountain_pass_directions()
-
-        # Draw all hexes with terrain
+        # Draw all hexes
         for row in range(map_height):
             for col in range(map_width):
+                hex_obj = Hex.offset_to_axial(col, row)
                 center = self.get_hex_center(col, row)
-                raw_terrain = self.terrain_data.get(f"{col},{row}", "ocean")
 
-                # Extract coastal flag and terrain type
-                is_coastal = raw_terrain.startswith("c_")
-                t_type = raw_terrain[2:] if is_coastal else raw_terrain
+                # 1. Terrain info from Board
+                t_type = board.get_terrain(hex_obj)
+                is_coastal = board.is_coastal(hex_obj)
 
-                # Get coastal directions
-                coastal_dirs = coastal_info.get((col, row))
+                # 2. Coastal Directions (Dynamic check)
+                coastal_dirs = []
+                # 3. Mountain Passes (Dynamic check)
+                pass_directions = []
 
-                # Get mountain pass directions
-                mountain_passes = mountain_passes_map.get((col, row), [])
+                neighbors = hex_obj.neighbors() # Returns [E, SE, SW, W, NW, NE] -> indices 0..5
 
-                # Draw base hex with transparent overlay
+                for idx, neighbor in enumerate(neighbors):
+                    hexside = board.get_hexside(hex_obj, neighbor)
+
+                    if hexside == "sea":
+                        coastal_dirs.append(idx)
+                    elif hexside == "pass":
+                        pass_directions.append(idx)
+
+                    # 4. Draw Hexside Items (Rivers, etc)
+                    # To avoid duplicates, we only draw for specific directions (e.g. E, SE, SW)
+                    if idx in [0, 1, 2] and hexside and hexside not in ["sea", "pass"]:
+                        # Calculate vertices for this edge
+                        # Edge i connects vertex i and (i+1)%6
+                        p1 = self.get_vertex(center, idx)
+                        p2 = self.get_vertex(center, (idx + 1) % 6)
+                        self.scene.addItem(HexsideItem(p1, p2, hexside))
+
+                # Draw Base Hex
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),
                                        terrain_type=t_type, coastal_directions=coastal_dirs,
-                                       pass_directions=mountain_passes
-                                       )
-                hex_item.coords = (col, row)  # Store coordinates for click detection
+                                       pass_directions=pass_directions)
+                hex_item.coords = (col, row)
                 self.scene.addItem(hex_item)
 
-        # Overlay country territories
-        for cid, spec in self.country_specs.items():
-            if not self.should_draw_country(cid):
+                # 5. Draw Location if present
+                loc_data = board.get_location(hex_obj)
+                if loc_data:
+                    loc_item = LocationItem(center, loc_data['location_id'],
+                                            loc_data['type'], loc_data['is_capital'])
+                    self.scene.addItem(loc_item)
+
+        # Overlay Country territories
+        # Iterate GameState countries directly
+        for country in self.game_state.countries.values():
+            if not self.should_draw_country(country.id):
                 continue
 
-            color = QColor(spec.color)
-            rgba = QColor(color.red(), color.green(), color.blue(), 100)
-            for col, row in spec.territories:
+            # Use country.color from Spec/YAML
+            c_color = QColor(country.color)
+            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), 100)
+
+            for col, row in country.territories:
+                hex_obj = Hex.offset_to_axial(col, row)
                 center = self.get_hex_center(col, row)
-                raw_terrain = self.terrain_data.get(f"{col},{row}", "grassland")
-                is_coastal = raw_terrain.startswith("c_")
-                t_type = raw_terrain[2:] if is_coastal else raw_terrain
-                coastal_dirs = coastal_info.get((col, row))
-                mountain_passes = mountain_passes_map.get((col, row), [])
+
+                # Re-query terrain for overlay
+                t_type = board.get_terrain(hex_obj)
+
+                # Re-calc coastal/pass for overlay
+                c_dirs = []
+                p_dirs = []
+                neighbors = hex_obj.neighbors()
+                for idx, neighbor in enumerate(neighbors):
+                    hexside = board.get_hexside(hex_obj, neighbor)
+                    if hexside == "sea": c_dirs.append(idx)
+                    if hexside == "pass": p_dirs.append(idx)
 
                 country_hex = HexagonItem(center, HEX_RADIUS, rgba,
-                                          terrain_type=t_type, coastal_directions=coastal_dirs,
-                                          pass_directions=mountain_passes,
-                                          country_id=cid
-                                          )
+                                          terrain_type=t_type, coastal_directions=c_dirs,
+                                          pass_directions=p_dirs,
+                                          country_id=country.id)
+                country_hex.coords = (col, row)  # Fix: Ensure overlay hexes also have coords
                 self.scene.addItem(country_hex)
-
-        # Draw Hexsides (Rivers, Mountains, etc)
-        hexsides = self.map_cfg.hexsides
-        for side_type, entries in hexsides.items():
-            if side_type in ["sea", "pass"]:  # Skip sea hexsides and mountain passes
-                continue
-            for col, row, direction in entries:
-                center = self.get_hex_center(col, row)
-                dir_map = {"E": 0, "NE": 5, "NW": 4, "W": 3, "SW": 2, "SE": 1}
-                idx = dir_map.get(direction)
-
-                if idx is not None:
-                    p1 = self.get_vertex(center, idx)
-                    p2 = self.get_vertex(center, (idx + 1) % 6)
-                    self.scene.addItem(HexsideItem(p1, p2, side_type))
-
-        # Draw locations
-        self.draw_locations()
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
@@ -352,49 +293,16 @@ class AnsalonMapView(QGraphicsView):
                     col, row = unit.position
                     self.draw_unit(unit, col, row)
 
-    def create_location_map(self):
-        """Create location map, handling conflicts by preferring special locations."""
-        location_map = {}
-
-        # Add country locations first
-        for country_spec in self.country_specs.values():
-            for loc_spec in country_spec.locations:
-                coords = loc_spec.coords
-                if coords:
-                    location_map[coords] = {
-                        'type': loc_spec.loc_type,
-                        'is_capital': loc_spec.is_capital,
-                        'country_id': country_spec.id,
-                        'location_id': loc_spec.id,
-                    }
-
-        # Add special locations
-        for loc_spec in self.map_cfg.special_locations:
-            coords = loc_spec.coords
-            if coords:
-                location_map[coords] = {
-                    'type': loc_spec.loc_type,
-                    'is_capital': False,
-                    'country_id': None,
-                    'location_id': loc_spec.id,
-                }
-
-        return location_map
-
-    def draw_locations(self):
-        """Draw location symbols."""
-        for coords, loc in self.location_map.items():
-            center = self.get_hex_center(coords[0], coords[1])
-            loc_item = LocationItem(center, loc['location_id'], loc['type'], loc['is_capital'])
-            self.scene.addItem(loc_item)
-
     def draw_unit(self, unit, col, row):
         """Helper to place a Unit graphics item on the map."""
         center = self.get_hex_center(col, row)
 
-        # Get the color for this unit's country (fallback to allegiance colors if no country)
-        color = self.country_colors.get(unit.land,
-                                        QColor("blue") if unit.allegiance == WS else QColor("red"))
+        # Get color logic - simplified
+        if unit.land and unit.land in self.game_state.countries:
+            c_spec = self.game_state.countries[unit.land]
+            color = QColor(c_spec.color)
+        else:
+            color = QColor("blue") if unit.allegiance == WS else QColor("red")
 
         unit_item = UnitCounter(unit, color)
         unit_item.setPos(center)
@@ -409,7 +317,5 @@ class AnsalonMapView(QGraphicsView):
         """
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
-                # Extract col, row from center position
-                # This is a reverse calculation - you may need to adjust
-                is_reachable = False  # Implement coordinate matching
-                item.set_highlight(is_reachable)
+                item.set_highlight(False) # Reset first
+                # TODO: Implement actual reachability highlight

@@ -1,6 +1,7 @@
 # Example scenario YAML
 scenario:
   id: "scenario_2_solamnic_plain"
+  picture: "scenario_2.jpg"
   description: >
     *** The Solamnic Plain ***
     
@@ -37,8 +38,8 @@ scenario:
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
   map_subset:
-    x_range: [35, 52]
-    y_range: [32, 47]
+    x_range: [0, 40]
+    y_range: [3, 31]
 
   # Timeline and Turn Logic
   start_turn: 10
@@ -61,12 +62,9 @@ scenario:
       countries:
         mithas:
           units_by_type:
-            inf:
-              quantity: 3
-            fleet:
-              quantity: 3
-            admiral:
-              quantity: 1
+            inf: 3
+            fleet: 3
+            admiral: 1
         taman:
           units: all
         sanction:

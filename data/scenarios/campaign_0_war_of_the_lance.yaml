@@ -1,10 +1,37 @@
 # language: yaml
 scenario:
   id: "campaign_0_war_of_the_lance"
+  picture: "cover.png"
   description: >
-    This is the complete game, covering the whole of the War of the Lance. 
-    It starts with the events on Ansalon before the Dragon Highlords moved 
-    toward conquest and allows both players to influence the full course of the war.
+    After her defeat in the Age of Dreams, Takhisis swore that she and her children, the chromatic dragons, would leave 
+    the world of mortals. The dragons knew this as the Oath of Finality. Thus the chromatic dragons slumbered for over 
+    a thousand years in hidden places throughout Ansalon - from the red dragon lairs in the Khalkist Mountains, to the 
+    glacial hibernation caves of the white dragons in Icereach. Even the Cataclysm did not stir the chromatic dragons, 
+    though the land buckled and shifted in the wake of the fiery mountain’s fall.
+    
+    As the metallic dragons slept, Takhisis launched an insidious plot. The crafty red dragon Harkiel the Bender and 
+    other dragons of evil stole the eggs of the metallic dragons from their caches in the Dragon Isles, and transported 
+    them to a secret location beneath the volcanic mountain range known as the Lords of Doom.
+    
+    Takhisis appeared as a bodiless spirit before the good dragons, waking them from their long hibernation, to tell 
+    them that she would crush the eggs unless the metallic dragons agreed to stay out of the upcoming war, promising 
+    to return the dragons’ eggs once the war had concluded. The metallic dragons, counseled by their gold and silver 
+    leaders, reluctantly assured the Dark Queen that they would not intervene in the war. Even Paladine, who understood 
+    that his children had been forced into this agreement, sadly recognized the power of their Oath.
+    
+    The period from 332 AC to 340 AC saw the birth of the dragonarmies. Guided by their Dark Queen, the evil dragons 
+    form an unholy alliance with a handful of ruthless individuals, who had been drawn together by Takhisis with 
+    promises of wealth and dominion. Chief among these was a human, Duulket Ariakas, a bloodthirsty warlord and 
+    former Black Robe wizard, whose brilliant strategic mind and personal strength greatly appealed to Takhisis. She 
+    charged Ariakas with the selection and training of her new army, accomplished under the guise of a mercenary lord 
+    consolidating his own power. In truth, Ariakas was to be her Dragon Emperor, and the first of the dragon highlords.
+
+    The chromatic dragons were the cornerstone of Ariakas’ efforts. Their sheer power meant that no ordinary force 
+    could stand up to them. This, along with their hereditary thirst for revenge against Huma’s heirs, meant that the 
+    chromatic dragons would be a formidable foe. Meanwhile, Ariakas and his highlords assembled mercenaries and recruits
+    from the Khalkists and neighboring Estwilde to further augment the army of the Dark Queen.
+    
+    With the Taman Busuk and Estwilde already under the control of the dragonarmies by 337 AC, Ariakas looked east...
 
   # Map Configuration: None as it covers entire Ansalon.
 

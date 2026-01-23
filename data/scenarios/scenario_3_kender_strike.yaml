@@ -1,0 +1,95 @@
+# Scenario 3: Kender Strike
+scenario:
+  id: "scenario_3_kender_strike"
+  picture: "scenario_3.jpg"
+  description: >
+    *** The Kender Strike ***
+    
+    The most humorous defeat of the Dragon-army occurred at the hands of the kender of Hylo. 
+    That unpredictable race (whose members are best avoided by all sensible folk) proved to be 
+    as tenacious as it was resilient.
+    
+    Because of damage sustained in battle, my ship, the Regent’s Crown, required immediate 
+    repairs. We therefore made a brief stop in the kender port of Hylo. It was here that we 
+    were treated to a most entertaining display of the ingenuity of that diminutive race. 
+    The Dragon Highlords had managed to land an army on Northern Ergoth, under the command of a 
+    brutal hobgoblin — Toede by name. It was a weak force by Dragonarmy standards, primarily
+    goblins and hobgoblins, but nevertheless posed a grave threat to the kender on the island. 
+    This evil force would have conquered were not the kender suddenly united under the command 
+    of one Kronin Thistleknott. Kronin was undoubtedly strange for a kender. While personable 
+    and mischievous, he also had a sense of purpose, destiny, and leadership, qualities unusual 
+    in a kender.
+    
+    Kronin managed to unite the different family clans of the kender in Hylo under his guidance. 
+    The clans went along since it sounded like something far less boring than their lives had 
+    been thus far. (Although several kender clans thought it would be great fun to become subjects 
+    of the Highlords and send all their old, boring objects as tribute.)
+    
+    Toede’s force attacked the port the day after we called there, and we witnessed an unusual 
+    battle. The kender forces trooped through the city in chaotic fashion. I had the impression 
+    they thought they were attending a carnival. They drew up into a thin line north of the city 
+    as the evil army came into view.
+    
+    And then the kender began to taunt! My ears have never been treated to such a variety of 
+    insults and verbal abuse. Of course, the hobgoblins and goblins went berserk, attacking 
+    wildly with no sense of order.
+    
+    This was all part of the plan, as the kender fell back in the center and drew the monsters 
+    into a narrow corridor of death. The kender attack was speedy and merciless and the surrounded
+    monsters were massacred. The forces of evil were dealt a stunning defeat at the hands of the 
+    kender that day.
+
+  # Map Configuration
+  # Northern Ergoth
+  map_subset:
+    x_range: [10, 18]
+    y_range: [11, 24]
+
+  # Timeline and Turn Logic
+  start_turn: 1
+  end_turn: 5
+  initiative_start: "whitestone"
+
+  # Global Events
+  possible_events: null
+
+  # Allegiance-based Setup
+  initial_setup:
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: null
+
+    highlord:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area:
+        - [12, 13]
+        - [12, 14]
+        - [12, 15]
+        - [13, 14]
+
+      countries:
+        throt:
+          units_by_type:
+            inf: 4
+
+      units_by_race: { draconian: 2 }
+      explicit_units: ["toede"]
+
+      artifacts: null
+
+      victory_conditions:
+        major: "Capture Hylo by turn 5"
+
+    whitestone:
+      deployment_area: ["hylo"]
+
+      countries:
+        hylo:
+          units: all
+
+      victory_conditions:
+        major: "Destroy more than 50% of the highlord army"
+
+  notes: >
+    No Strategic Event counters or Activations are used in this scenario. 
+    No new draconian armies enter during this scenario.

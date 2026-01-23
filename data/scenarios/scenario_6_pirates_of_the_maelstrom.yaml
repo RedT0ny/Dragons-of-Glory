@@ -1,0 +1,67 @@
+# Example scenario YAML
+scenario:
+  id: "unique_scenario_id"
+  picture: "scenario.jpg"
+  description: >
+    Folded block scalar for historical flavor.
+
+  # Map Configuration
+  # If null or omitted, assume full map [0,0] to [64,52]
+  map_subset:
+    x_range: [35, 52]
+    y_range: [32, 47]
+
+  # Timeline and Turn Logic
+  start_turn: 1
+  end_turn: 30
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Global Events
+  possible_events: ["E1", "E10", "E20"]
+
+  # Allegiance-based Setup
+  initial_setup:
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: ["abanasinia", "khur", "solanthus"]
+
+    highlord:
+      # Deployment area: If null, defaults to the union of all country territories below
+      deployment_area: null
+
+      countries:
+        taman:
+          # "all" is a keyword to pull every unit matching this country in units.csv
+          units: all
+        red:
+          # Explicit partial setup
+          units_by_type:
+            dragon: 1
+
+      # Specific units (Leaders/Wizards) not tied to a country's regular army
+      explicit_units: ["verminaard", "kitiara", "ladonna"]
+      artifacts: ["staff_of_magius"]
+
+      victory_conditions:
+        major: "Description of victory"
+        marginal: "Description of victory"
+
+    whitestone:
+      # Example of specific deployment region (subset of countries)
+      deployment_area:
+        countries: ["qualinesti", "abanasinia"]
+
+      countries:
+        qualinesti:
+          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
+        abanasinia:
+          units: all
+
+      explicit_units: ["fizban", "laurana"]
+      artifacts: ["blue_crystal_staff"]
+
+      victory_conditions:
+        major: "Protect the capital"
+
+  notes: >
+    Any additional special rules or setup instructions.

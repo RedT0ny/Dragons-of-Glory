@@ -1,0 +1,105 @@
+# Scenario 4: The Siege of Kalaman
+scenario:
+  id: "scenario_4_siege_of_kalaman"
+  picture: "scenario_4.jpg"
+  description: >
+    *** The Siege of Kalaman ***
+    
+    Kalaman was a port of supreme importance to the Dragon Highlords. It was a port on 
+    the northern shores of Ansalon and thus a necessary link between the pirate bases of 
+    the Maelstrom and the central government of Sanction. It also represented an opportunity 
+    to throw back the Whitestone forces and turn the tide of the war. Moreover, the Dark 
+    Lady had her own personal score to settle with the commander of the Kalaman Forces. For 
+    it was Laurana who had defeated her at the High Clerist Tower and that same Golden 
+    General now watched over Kalaman.
+    
+    The defenses of Kalaman and its environs were as good as any in Ansalon. The port itself 
+    was flanked to the north by a wide bay that emptied into the sea. The rushing waters of 
+    the Vingaard River to the west restricted massive troop movements. The city walls held 
+    well to the south and were arranged to great advantage of the defender against ground 
+    troops.
+    
+    Yet no roof covered Kalaman’s head. The Dragon Highlords had something new in the offing, 
+    a threat that would change the tide of the war yet again. From the south came massive
+    fortresses built atop rock ripped from the living stone. They floated through the sky 
+    with no more effort than a breeze. Within their bowels dwelt armies of draconians and 
+    dragons. The great craft maneuvered toward Kalaman and prepared to disgorge their 
+    troops like hail from the sky.
+    
+    Though the good dragons fought with the troops of Kalaman, as the battle raged back and 
+    forth, Kalaman slowly diminished in strength.
+
+  # Map Configuration
+  # If null or omitted, assume full map [0,0] to [64,52]
+  map_subset:
+    x_range: [27, 39]
+    y_range: [4, 29]
+
+  # Timeline and Turn Logic
+  start_turn: 20
+  end_turn: 30
+  initiative_start: "highlord"  # highlord | whitestone | neutral
+
+  # Global Events
+  active_events: ["golden_general"]
+  possible_events: ["E10", "E20"]
+
+  # Allegiance-based Setup
+  initial_setup:
+    # Countries that are on the map but not yet controlled by either main player
+    neutral:
+      countries: null
+
+    highlord:
+      deployment_area: ["dargaard", "estwilde", "taman"]
+
+      countries:
+        kern:
+          units: all
+        taman:
+          units_by_type:
+            inf: 4
+            cav: 1
+        red:
+          units_by_type:
+            dragon: 2
+            highlord: 1
+        blue:
+          units_by_type:
+            dragon: 2
+            highlord: 2
+
+      # Specific units (Leaders/Wizards) not tied to a country's regular army
+      units_by_race:
+        draconian: 10
+        magic: 1  # Flying Citadel. Might be too much.
+      explicit_units: ["ariakas", "dracart"]
+
+      victory_conditions:
+        major: "Capture Kalaman by turn 30"
+
+    whitestone:
+      deployment_area:
+        countries: ["nightlund"]
+
+      countries:
+        caergoth:
+          units: all
+        nightlund:
+          units: all
+        palanthas:
+          units_by_type:
+            inf: 1
+            fleet: 1
+        sancrist:
+          units: all
+        solanthus:
+          units: all
+
+      explicit_units: ["fizban", "laurana"]
+
+      victory_conditions:
+        major: "Defend Kalaman until the end of turn 30"
+
+  notes: >
+    Any additional special rules or setup instructions.

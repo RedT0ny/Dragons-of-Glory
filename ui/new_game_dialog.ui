@@ -9,8 +9,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1280</width>
-    <height>720</height>
+    <width>1024</width>
+    <height>768</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -98,7 +98,7 @@
            <string/>
           </property>
           <property name="pixmap">
-           <pixmap>I:/Wargames/Dragons of Glory/images/tales_cover.jpg</pixmap>
+           <pixmap>IMAGES_DIR+&quot;scenario.jpg&quot;</pixmap>
           </property>
           <property name="scaledContents">
            <bool>true</bool>

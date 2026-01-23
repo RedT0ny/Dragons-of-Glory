@@ -1,10 +1,12 @@
 from typing import Set, Tuple, List, Dict
 from src.game.combat import CombatResolver
 from src.game.country import Country, Location
-from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT
+from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.content import loader, factory
+from src.game.map import Board, Hex
+
 
 class GameState:
     """
@@ -78,13 +80,24 @@ class GameState:
         # 4. Setup the map
         width, height = self.get_map_dimensions()
 
-        # Create a simple map object that holds width/height
-        class SimpleMap:
-            def __init__(self, width, height):
-                self.width = width
-                self.height = height
+        # Initialize the actual HexGrid model
+        self.map = Board(width, height)
 
-        self.map = SimpleMap(width, height)
+        # Populate Terrain
+        terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
+        self.map.populate_terrain(terrain_data)
+
+        # Populate Hexsides (Rivers, Mountains)
+        map_config = loader.load_map_config(MAP_CONFIG_DATA)
+        self.map.populate_hexsides(map_config.hexsides)
+
+        # Populate Locations (Special + Country)
+        self.map.populate_locations(map_config.special_locations, self.countries)
+
+        # Register existing units on the map if they have positions
+        for unit in self.units:
+            if unit.position and unit.is_on_map:
+                self.map.add_unit_to_spatial_map(unit)
 
         # 5. Default to turn 1 if start_turn is missing from the scenario object
         self.turn = getattr(scenario_spec, 'start_turn', 1)
@@ -135,17 +148,31 @@ class GameState:
         player_setup = self.scenario_spec.setup.get(allegiance, {})
         area_spec = player_setup.get("deployment_area")
 
-        if area_spec is None:
-            # Simplification: Use all countries assigned to this player
-            countries_to_use = player_setup.get("countries", {}).keys()
-        else:
-            # Use specific countries defined in the deployment_area
-            countries_to_use = area_spec.get("countries", [])
-
         hexes = set()
-        for cid in countries_to_use:
-            if cid in self.countries:
-                hexes.update(self.countries[cid].territories)
+
+        # Case 1: deployment_area is None -> Use all countries assigned to this player
+        if area_spec is None:
+            countries_to_use = player_setup.get("countries", {}).keys()
+            for cid in countries_to_use:
+                if cid in self.countries:
+                    hexes.update(self.countries[cid].territories)
+
+        # Case 2: deployment_area is a Dictionary (standard format with "countries" key)
+        elif isinstance(area_spec, dict):
+            countries_to_use = area_spec.get("countries", [])
+            for cid in countries_to_use:
+                if cid in self.countries:
+                    hexes.update(self.countries[cid].territories)
+
+        # Case 3: deployment_area is a List (mixed coords and country IDs)
+        elif isinstance(area_spec, list):
+            for item in area_spec:
+                if isinstance(item, str): # It's a country ID (real or virtual)
+                    if item in self.countries:
+                        hexes.update(self.countries[item].territories)
+                elif isinstance(item, (list, tuple)) and len(item) == 2: # It's a coordinate [col, row]
+                    hexes.add(tuple(item))
+
         return hexes
 
     def set_initiative(self, winner):
@@ -241,9 +268,16 @@ class GameState:
     def move_unit(self, unit, target_hex):
         """
         Centralizes the move: updates unit.position AND the spatial map.
+        target_hex: Hex object (axial)
         """
+        # Remove from old position in spatial map
         self.map.remove_unit_from_spatial_map(unit)
-        unit.position = (target_hex.q, target_hex.r)
+
+        # Update Unit's internal state (store as offset col, row for persistence/view)
+        offset_coords = target_hex.axial_to_offset()
+        unit.position = offset_coords
+
+        # Add to new position in spatial map
         self.map.add_unit_to_spatial_map(unit)
 
     def resolve_event(self, event):

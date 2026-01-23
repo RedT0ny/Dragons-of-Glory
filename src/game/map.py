@@ -1,4 +1,5 @@
 import heapq
+from collections import defaultdict
 from src.content.specs import HexDirection
 
 class Hex:
@@ -37,17 +38,19 @@ class Hex:
         """
         Returns the 6 neighboring hexagons using axial (q, r) offsets
         for a pointy-top grid.
+        Ordered: [E, SE, SW, W, NW, NE] to match View indices 0..5
         """
         # Mapping our Enum to logical coordinate offsets
-        lookup = {
-            HexDirection.EAST:       Hex(1, 0),
-            HexDirection.NORTH_EAST: Hex(1, -1),
-            HexDirection.NORTH_WEST: Hex(0, -1),
-            HexDirection.WEST:       Hex(-1, 0),
-            HexDirection.SOUTH_WEST: Hex(-1, 1),
-            HexDirection.SOUTH_EAST: Hex(0, 1)
-        }
-        return [self + offset for offset in lookup.values()]
+        # Order matters for the View loop!
+        ordered_offsets = [
+            Hex(1, 0),   # 0: E
+            Hex(0, 1),   # 1: SE
+            Hex(-1, 1),  # 2: SW
+            Hex(-1, 0),  # 3: W
+            Hex(0, -1),  # 4: NW
+            Hex(1, -1)   # 5: NE
+        ]
+        return [self + offset for offset in ordered_offsets]
 
     def distance_to(self, other):
         """Cálculo de distancia Manhattan para hexágonos."""
@@ -66,9 +69,10 @@ class Hex:
         return hash((self.q, self.r))
 
 
-class HexGrid:
+class Board:
     """
-    Manage the collection of hexagons and the relationship with the units.
+    The Game Board model (Single Source of Truth).
+    Manages the grid of hexes, terrain, boundaries, and unit spatial tracking.
     """
     def __init__(self, width, height, offset_q=0, offset_r=0):
         self.width = width
@@ -77,24 +81,79 @@ class HexGrid:
         # on the master Ansalon map.
         self.offset_q = offset_q
         self.offset_r = offset_r
-        
+
         self.grid = {}  # (q, r) -> terrain_type
         self.hexside_data = {}  # ((q1,r1), (q2,r2)) -> border_type
         # Add a way to quickly find which hexsides are rivers
         self.navigable_edges = set()
-        self.unit_map = {}
-        self.special_hexes = {} # (q, r) -> "fortified_city", etc.
+        self.unit_map = defaultdict(list)
+        self.locations = {} # (q, r) -> dict (location data)
 
-    def load_from_csv(self, terrain_csv_path):
-        """Loads terrain data from a CSV grid."""
-        import csv
-        with open(terrain_csv_path, mode='r') as f:
-            reader = csv.reader(f)
-            header = next(reader) # Skip column headers
-            for row_idx, row in enumerate(reader):
-                for col_idx, terrain in enumerate(row[1:]): # skip row header
-                    hex_obj = Hex.offset_to_axial(col_idx, row_idx)
-                    self.grid[(hex_obj.q, hex_obj.r)] = terrain
+    def populate_terrain(self, terrain_data: dict):
+        """
+        Populates the grid from a dict of 'col,row' -> 'terrain_type'.
+        Designed to work with loader.load_terrain_csv output.
+        """
+        for key, terrain in terrain_data.items():
+            try:
+                col_str, row_str = key.split(',')
+                col, row = int(col_str), int(row_str)
+
+                # Convert offset (col, row) to axial (q, r)
+                hex_obj = Hex.offset_to_axial(col, row)
+                self.grid[(hex_obj.q, hex_obj.r)] = terrain
+            except ValueError:
+                continue
+
+    def populate_locations(self, special_locs: list, countries: dict):
+        """
+        Populates locations from config and country capitals.
+        """
+        # 1. Add special locations (Ruins, etc)
+        for loc_spec in special_locs:
+            if loc_spec.coords:
+                col, row = loc_spec.coords
+                hex_obj = Hex.offset_to_axial(col, row)
+                self.locations[(hex_obj.q, hex_obj.r)] = {
+                    'type': loc_spec.loc_type,
+                    'is_capital': False,
+                    'country_id': None,
+                    'location_id': loc_spec.id,
+                }
+
+        # 2. Add country locations (Cities, Capitals) - Override if conflict?
+        for country in countries.values():
+            # Handle cases where locations is a dict (runtime object) vs list (spec)
+            country_locations = country.locations.values() if isinstance(country.locations, dict) else country.locations
+
+            for loc_spec in country_locations:
+                if loc_spec.coords:
+                    col, row = loc_spec.coords
+                    hex_obj = Hex.offset_to_axial(col, row)
+                    # Merge or overwrite
+                self.locations[(hex_obj.q, hex_obj.r)] = {
+                    'type': loc_spec.loc_type,
+                    'is_capital': loc_spec.is_capital,
+                    'country_id': country.id,
+                    'location_id': loc_spec.id,
+                }
+
+    def populate_hexsides(self, hexsides_data: dict):
+        """
+        Populates hexsides from the config dictionary (loader.load_map_config).
+        Format: {'river': [[col, row, dir_str], ...], ...}
+        """
+        # Map string directions to indices for Hex.neighbors() [E, SE, SW, W, NW, NE]
+        dir_str_map = {
+            "E": 0, "SE": 1,
+            "SW": 2, "W": 3, "NW": 4, "NE": 5
+        }
+
+        for side_type, entries in hexsides_data.items():
+            for col, row, direction_str in entries:
+                dir_idx = dir_str_map.get(direction_str)
+                if dir_idx is not None:
+                    self.add_hexside_by_offset(col, row, dir_idx, side_type)
 
     def add_hexside(self, q1, r1, q2, r2, side_type):
         """Registers a special border between two hexes (River/Mountain)."""
@@ -105,6 +164,44 @@ class HexGrid:
         # Fords and Bridges are for ground units and usually block large ships.
         if side_type == "deep_river":
             self.navigable_edges.add(key)
+
+    def add_unit_to_spatial_map(self, unit):
+        """Registers a unit at its current position in the spatial lookup."""
+        if not hasattr(unit, 'position') or not unit.position:
+            return
+
+        # unit.position is (col, row). We store by axial (q, r) internally or offset?
+        # get_units_in_hex uses (q, r) inputs, but let's check what game_state passes.
+        # game_state.move_unit passes target_hex which is Hex(axial).
+        # But unit.position stores offset (col, row) usually for serialization.
+
+        # Let's standardize: unit.position is (col, row) offset.
+        # Spatial map keys will be (q, r) axial for math efficiency.
+
+        col, row = unit.position
+        hex_obj = Hex.offset_to_axial(col, row)
+        key = (hex_obj.q, hex_obj.r)
+
+        if unit not in self.unit_map[key]:
+            self.unit_map[key].append(unit)
+
+    def remove_unit_from_spatial_map(self, unit):
+        """Removes a unit from the spatial lookup."""
+        if not hasattr(unit, 'position') or not unit.position:
+            return
+
+        col, row = unit.position
+
+        # Fix: Ensure position coordinates are valid integers before converting
+        if col is None or row is None:
+            return
+
+        hex_obj = Hex.offset_to_axial(col, row)
+        key = (hex_obj.q, hex_obj.r)
+
+        if key in self.unit_map:
+            if unit in self.unit_map[key]:
+                self.unit_map[key].remove(unit)
 
     def is_ship_bridge(self, from_hex, to_hex, alliance):
         """
@@ -142,9 +239,10 @@ class HexGrid:
         return q + self.offset_q, r + self.offset_r
 
     def get_terrain(self, hex_coord):
+        """Returns the logical terrain type (stripped of visual prefixes)."""
         master_q, master_r = self.to_master_coords(hex_coord.q, hex_coord.r)
         raw_terrain = self.grid.get((master_q, master_r), "plain")
-        
+
         # If it starts with 'c_', it's coastal. Return the part after 'c_'.
         if raw_terrain.startswith("c_"):
             return raw_terrain[2:]
@@ -161,6 +259,10 @@ class HexGrid:
         m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
         key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
         return self.hexside_data.get(key)
+
+    def get_location(self, hex_coord):
+        """Returns location dict if one exists at this hex."""
+        return self.locations.get((hex_coord.q, hex_coord.r))
 
     def get_units_in_hex(self, q, r):
         return self.unit_map.get((q, r), [])

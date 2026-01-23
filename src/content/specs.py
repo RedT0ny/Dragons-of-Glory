@@ -84,6 +84,21 @@ class UnitSpec:
 
 @dataclass
 class ScenarioSpec:
+    """
+    Blueprint for game scenarios and campaigns.
+
+        :ivar id: The name of the scenario.
+        :ivar description: A brief description of the scenario.
+        :ivar map_subset: A dictionary mapping map names to lists of hex indices.
+        :ivar start_turn: The turn number when the scenario starts.
+        :ivar end_turn: The turn number when the scenario ends.
+        :ivar initiative_start: The unit ID that starts the initiative phase.
+        :ivar active_events: A list of event IDs that are active during the scenario.
+        :ivar setup: A dictionary containing setup configurations for the scenario.
+        :ivar victory_conditions: A dictionary defining victory conditions for the scenario.
+        :ivar picture: A filename for a picture associated with the scenario (default: "scenario.jpg").
+        :ivar notes: Additional notes about the scenario (default: "").
+    """
     id: str
     description: str
     map_subset: Optional[Dict[str, List[int]]]
@@ -93,6 +108,7 @@ class ScenarioSpec:
     active_events: List[str]
     setup: Dict[str, Any]
     victory_conditions: Dict[str, Any]
+    picture: str = "scenario.jpg"  # Added field with a default fallback
     notes: str = "" # Added a default value to prevent errors if notes are missing
 
 @dataclass

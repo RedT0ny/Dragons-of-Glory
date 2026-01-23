@@ -1,21 +1,27 @@
 # language: yaml
 scenario:
   id: "scenario_1_fall_of_silvanesti"
+  picture: "scenario_1.jpg"
   description: >
+    *** The Fall of Silvanesti ***
+    
     No continuous civilized government lasted longer than the Silvanesti kingdom of the High Elves. Established in the 
     distant past by Silvanos, the great father of elven civilization, Silvanesti was rooted in the Age of Twilight. 
     From that time on, no force has been able to bring about the ruin of this nation. It survived two previous dragon 
     wars despite its major participation in both. It even survived the Cataclysm intact.
+    
     But in the summer of 349 AC, events quickly conspired to bring an end to its glorious reign. Large elements of the 
     1st, 2d, and 3d Blue Flight Dragonarmies and the 3d through 7th Red Flights surged south over the Khur border into 
     the Silvanesti forests. These armies were supported by the newly organized Khuri-tarak Empire forces from Khur under 
-    command of the Dragon Highlords. 
+    command of the Dragon Highlords.
+    
     Despite the early use of dragons from the air to soften the entrenched elves and the widespread use of magic by the 
     Highlords, the offensive quickly became mired in the dense forests of Silvanesti. The elves, using the terrain to 
     maximum advantage and practicing a flexible and responsive defense, constantly held the great armies at bay.
     This was accomplished at great cost. The policy of feigned retreat and surround, while working to their great 
     defensive advantage against the over-zealous dragon troops, gradually decimated the elves. Heavy losses quickly 
     taxed the resources of both sides.
+    
     After several months of inconclusive yet deadly combat, the supply lines from Silvanost, capital of Silvanesti, 
     suddenly failed. The reasons for this are still not clear and the elves do not speak on the subject to those not of 
     their race. For whatever reason, it is clear that the government in Silvanesti failed and its citizens fled west by 
@@ -53,28 +59,21 @@ scenario:
       countries:
         taman:
           units_by_type:
-            inf:
-              quantity: 4
-            cav:
-              quantity: 1
+            inf: 4
+            cav: 1
         khur:
           units_by_type:
-            inf:
-              quantity: 4
-            cav:
-              quantity: 1
+            inf: 4
+            cav: 1
         green:
           units_by_type:
-            dragon:
-              quantity: 2
+            dragon: 2
         blue:
           units_by_type:
-            dragon:
-              quantity: 1
+            dragon: 1
         red:
           units_by_type:
-            dragon:
-              quantity: 1
+            dragon: 1
 
       explicit_units: [ "ariakas","phair","topus","salahkhan"]
 
