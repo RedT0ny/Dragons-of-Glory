@@ -31,7 +31,7 @@ class Ui_newGameDialog(object):
             Dialog.setObjectName(u"Dialog")
         Dialog.setWindowModality(Qt.WindowModality.NonModal)
         Dialog.resize(1024, 768)
-        Dialog.setWindowOpacity(0.7)
+        Dialog.setWindowOpacity(0.8)
         Dialog.setModal(True)
         self.horizontalLayout = QHBoxLayout(Dialog)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
@@ -84,7 +84,7 @@ class Ui_newGameDialog(object):
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.scPicture.sizePolicy().hasHeightForWidth())
         self.scPicture.setSizePolicy(sizePolicy2)
-        self.scPicture.setMaximumSize(QSize(426, 240))
+        self.scPicture.setMaximumSize(QSize(592, 333))
         self.scPicture.setPixmap(QPixmap(IMAGES_DIR+'\\scenario.jpg'))
         self.scPicture.setScaledContents(True)
 

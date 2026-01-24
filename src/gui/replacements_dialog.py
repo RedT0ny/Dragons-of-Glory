@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
                                QTableWidgetItem, QHeaderView, QLabel, QWidget,
-                               QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene, QGridLayout)
+                               QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene, QGridLayout,
+                               QAbstractItemView)
 from PySide6.QtCore import Qt, QSize, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
@@ -140,6 +141,8 @@ class ReplacementsDialog(QDialog):
         layout = QVBoxLayout(self)
 
         self.table = QTableWidget()
+        self.table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self.table.verticalScrollBar().setSingleStep(15)
         self.table.setColumnCount(4) # Country Name, Reserve, Ready, Destroyed
         self.table.setHorizontalHeaderLabels(["Country", "Reserve (Pool)", "Ready (Deploy)", "Destroyed"])
 

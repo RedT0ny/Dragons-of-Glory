@@ -3,14 +3,24 @@ scenario:
   id: "campaign_1_dragonlance_chronicles"
   picture: "scenario.jpg"
   description: >
-    This is the complete game, covering the whole of the War of the Lance. 
-    It starts with the events on Ansalon before the Dragon Highlords moved 
-    toward conquest and allows both players to influence the full course of the war.
+    *** Dragonlance Chronicles ***
+    
+    Five years ago, a band of good friends frequented the Inn of the Last Home, the most popular tavern and inn in the 
+    treetop town of Solace. They made a pact to go off on their own in search of some sign of the true gods, agreeing 
+    to meet back at the Inn of the Last Home on that day five years later. Each taking a different path, they set out 
+    for the far corners of Ansalon. Now the heroes, known as the Innfellows, return to their hometown after finding 
+    only futility—the true gods seem to be well and truly gone. However, at the very least, they can look forward to a 
+    warm fire, a good meal, and the companionship of their dearest friends upon their return. 
+    
+    Unfortunately, they find that Solace has changed in their absence. The Seekers, a misguided religious sect of 
+    questionable sincerity, have become the temporal rulers of Solace, governing the region from the nearby Lordcity 
+    of Haven. Rumors of war and whispers of monsters and death circulate among the farmers and townsfolk in hushed 
+    voices. Solace has changed, and that change promises to become even more drastic.
 
   # Map Configuration: None as it covers entire Ansalon.
 
   # Timeline and Turn Logic
-  start_turn: 1
+  start_turn: 20
   end_turn: 30
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
@@ -23,59 +33,58 @@ scenario:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
       countries: [
-        "abanasinia",
-        "balifor",
-        "blode",
-        "blodehelm",
-        "southlund",
         "daltigoth",
         "dargaard",
-        "goodlund",
-        "sancrist",
         "haltigoth",
-        "coastlund",
-        "hylo",
         "icereach",
-        "nightlund",
         "kaolyn",
-        "kern",
         "kharolis",
-        "khur",
-        "kothas",
-        "lemish",
-        "hinterlund",
         "saifhum",
         "mithas",
-        "nergoth",
-        "nordmaar",
         "palanthas",
-        "qualinesti",
-        "sanction",
         "sikket",
-        "silvanesti",
-        "solanthus",
         "tarsis",
         "thorbardin",
-        "tower",
         "thank",
-        "throt",
-        "vingaard",
         "zhakar"
         ]
 
     highlord:
       # Specific deployment region (subset of countries)
-      deployment_area:
-        countries: [ "taman" ]
 
       countries:
+        abanasinia: null
+        balifor: null
+        blode:
+          units: all
+        blodehelm:
+          units: all
+        estwilde: null
+        kern:
+          units: all
+        khur:
+          units: all
+        lemish:
+          units: all
+        kothas: null
+        nightlund: null
+        nordmaar: null
+        sanction:
+          units: all
         taman:
           units: all
-        green:
+        throt:
+          units: all
+        vingaard: null
+        black:
           units: all
         blue:
           units: all
+        green:
+          units: all
         red:
+          units: all
+        white:
           units: all
 
       explicit_units: [ "ariakas" ]
@@ -88,7 +97,76 @@ scenario:
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
-      deployment_area: null
+      deployment_area:
+        - "caergoth"
+        - "coastlund"
+        - "goodlund"
+        - "hinterlund"
+        - "hylo"
+        - "nergoth"
+        - "qualinesti"
+        - "sancrist"
+        - "solanthus"
+        - "tower"
+        - [8, 31]
+        - [9, 31]
+        - [10, 31]
+        - [8, 32]
+        - [9, 32]
+        - [10, 32]
+        - [7, 33]
+        - [8, 33]
+        - [9, 33]
+        - [10, 33]
+        - [11, 33]
+        - [8, 34]
+        - [9, 34]
+        - [10, 34]
+        - [11, 34]
+        - [12, 34]
+        - [8, 35]
+        - [9, 35]
+        - [10, 35]
+        - [11, 35]
+        - [12, 35]
+        - [9, 36]
+        - [10, 36]
+        - [11, 36]
+        - [12, 36]
+        - [13, 36]
+        - [11, 37]
+        - [12, 37]
+        - [13, 37]
+        - [12, 38]
+        - [13, 38]
+
+      countries:
+        caergoth:
+          units: all
+        coastlund:
+          units: all
+        goodlund:
+          units: all
+        hinterlund:
+          units: all
+        hylo:
+          units: all
+        nergoth:
+          units: all
+        qualinesti:
+          units: all
+        sancrist:
+          units: all
+        silvanesti:
+          units_by_type:
+            inf: 3
+            fleet: 2
+            general: 1
+          #territories: {[9, 33], [10, 34]}
+        solanthus:
+          units: all
+        tower:
+          units: all
 
       artifacts: null
 
