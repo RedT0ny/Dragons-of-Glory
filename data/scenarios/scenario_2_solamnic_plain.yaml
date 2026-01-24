@@ -77,7 +77,7 @@ scenario:
           units: all
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
-      explicit_units: [ "ariakas", "chot", "dracart" ]
+      explicit_units: [ "ariakas", "dracart" ]
       artifacts: null
 
       victory_conditions:

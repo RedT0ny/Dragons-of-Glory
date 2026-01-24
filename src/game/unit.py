@@ -128,6 +128,9 @@ class Unit:
     def is_leader(self) -> bool:
         return False # Base unit is not a leader
 
+    def is_army(self) -> bool:
+        return False # Base unit is not an army either
+
     # --- State Logic ---
 
     def apply_combat_loss(self, dmg_type: str, must_retreat: bool = False):
@@ -214,7 +217,7 @@ class Leader(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
 
-    def is_leader(self):
+    def is_leader(self) -> bool:
         return True
 
 class Wizard(Leader):
@@ -337,3 +340,6 @@ class Army(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
         self.terrain_affinity = spec.terrain_affinity
+
+    def is_army(self) -> bool:
+        return True

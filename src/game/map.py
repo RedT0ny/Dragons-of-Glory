@@ -1,6 +1,7 @@
 import heapq
 from collections import defaultdict
-from src.content.specs import HexDirection
+from src.content.specs import HexDirection, UnitType, UnitRace
+
 
 class Hex:
     """
@@ -266,6 +267,65 @@ class Board:
 
     def get_units_in_hex(self, q, r):
         return self.unit_map.get((q, r), [])
+
+    def can_unit_move_to(self, unit, target_hex):
+        """
+        Checks if a unit can legally enter and stay in the target hex based on stacking rules.
+        Does NOT check for movement range or pathfinding costs (handled elsewhere).
+        """
+        # 1. Enemy Check
+        if self.has_enemy_army(target_hex, unit.allegiance):
+            return False
+
+        # Get current units in the target hex
+        current_units = self.get_units_in_hex(target_hex.q, target_hex.r)
+
+        # If the unit is already there (e.g. re-evaluating), don't count itself
+        other_units = [u for u in current_units if u != unit]
+
+        # 2. Kender Rule: Cannot stack with any other type of ARMY
+        # (Assuming Kender are defined by race='kender' and type='inf')
+        is_kender_army = unit.race == UnitRace.KENDER and unit.unit_type == UnitType.INFANTRY
+
+        if is_kender_army:
+            # If I am kender, I cannot enter if there are non-kender ARMIES
+            for u in other_units:
+                if u.is_army() and u.race != UnitRace.KENDER:
+                    return False
+        elif unit.is_army():
+            # If I am a normal army, I cannot enter if there are Kender armies
+            for u in other_units:
+                if u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY:
+                    return False
+
+        # 3. Counting Limits
+        # We need to count specific categories
+        army_count = 0
+        wing_count = 0
+
+        for u in other_units:
+            if u.is_army():
+                army_count += 1
+            elif u.unit_type == UnitType.WING:
+                wing_count += 1
+
+        # Check Limits based on the incoming unit type
+        if unit.is_army():
+            # Check City/Fortress bonus
+            loc_data = self.get_location(target_hex)
+            is_fortified = loc_data and loc_data.get('type') in ['city', 'fortress', 'capital']
+
+            limit = 3 if is_fortified else 2
+            if army_count >= limit:
+                return False
+
+        elif unit.unit_type == UnitType.WING:
+            if wing_count >= 2:
+                return False
+
+        # Leaders and Fleets have unlimited stacking, so no check needed for them.
+
+        return True
 
     def has_enemy_army(self, hex_coord, alliance):
         """Rule 5: Check if hex contains any army from a different alliance."""

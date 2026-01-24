@@ -28,6 +28,7 @@ class HexagonItem(QGraphicsItem):
     
         # Create pointy-top hexagon path
         self.path = QPainterPath()
+        # Creates hexagon vertices using polar coordinates
         for i in range(6):
             angle_rad = math.radians(60 * i - 30)
             x = self.center.x() + self.radius * math.cos(angle_rad)

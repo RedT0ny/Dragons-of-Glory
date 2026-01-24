@@ -162,13 +162,18 @@ class AnsalonMapView(QGraphicsView):
         # or use get_hex_center if we have coords.
 
         for col, row in valid_coords_list:
-            center = self.get_hex_center(col, row)
-            # Find item at center
-            items = self.scene.items(center)
-            for item in items:
-                if isinstance(item, HexagonItem):
-                    item.set_highlight(True)
-                    break
+            # NEW: Check stacking limits before highlighting!
+            from src.game.map import Hex
+            hex_obj = Hex.offset_to_axial(col, row)
+
+            # Highlights valid hexes where unit can move
+            if self.game_state.map.can_unit_move_to(unit, hex_obj):
+                center = self.get_hex_center(col, row)
+                items = self.scene.items(center)
+                for item in items:
+                    if isinstance(item, HexagonItem):
+                        item.set_highlight(True)
+                        break
 
     def clear_highlights(self):
         self.deploying_unit = None
@@ -288,15 +293,66 @@ class AnsalonMapView(QGraphicsView):
 
         # Draw units if map is initialized
         if self.game_state.map:
+            # Group units by position to handle stacking
+            units_by_hex = {} # (col, row) -> [unit, unit...]
+
             for unit in self.game_state.units:
                 if hasattr(unit, 'position') and unit.is_on_map:
-                    col, row = unit.position
-                    self.draw_unit(unit, col, row)
+                    pos = unit.position # (col, row)
+                    if pos not in units_by_hex:
+                        units_by_hex[pos] = []
+                    units_by_hex[pos].append(unit)
 
-    def draw_unit(self, unit, col, row):
-        """Helper to place a Unit graphics item on the map."""
-        center = self.get_hex_center(col, row)
+            # Draw each stack
+            for pos, stack in units_by_hex.items():
+                self.draw_stack(stack, pos[0], pos[1])
 
+    def draw_stack(self, stack, col, row):
+        """Draws a list of units at a specific hex with visual stacking offset."""
+        base_center = self.get_hex_center(col, row)
+
+        # Sort stack for consistent rendering (e.g., Army bottom, Leader top)
+        # Order: Fleet -> Wing -> Army -> Leader/Hero/Wizard
+        def sort_key(u):
+            order = {'fleet': 0, 'wing': 1, 'inf': 2, 'cav': 2, 'dragon': 1}
+            return order.get(u.unit_type, 3) # Default to 3 (top)
+
+        stack.sort(key=sort_key)
+
+        # Stacking visual parameters
+        max_offset_items = 5 # Stop offsetting after the 5th unit to prevent spillover
+        offset_x = -5 # Shift slightly left
+        offset_y = -5 # Shift slightly up (to look like a pile)
+
+        for i, unit in enumerate(stack):
+            # Calculate offset
+            # If we exceed the limit, we just pile them on top of the last offset position
+            # so the user sees "there are more" but it stays in hex.
+            idx = min(i, max_offset_items - 1)
+
+            # We start from bottom-right and move to top-left to simulate 3D piling
+            # Or simply offset center.
+            # Let's do a simple diagonal shift.
+
+            # To center the *pile*, we might want the first unit to be slightly bottom-right
+            # relative to the hex center.
+
+            dx = idx * offset_x
+            dy = idx * offset_y
+
+            # Center the whole stack visually?
+            # Let's anchor the bottom unit at (center + slight positive offset)
+            # so the top unit ends up near (center + slight negative offset)
+            start_x = base_center.x() - (dx / 2) # Crude centering adjustment
+            start_y = base_center.y() - (dy / 2)
+
+            pos = QPointF(start_x + dx, start_y + dy)
+
+            # Draw the unit
+            self.draw_unit_at_pos(unit, pos)
+
+    def draw_unit_at_pos(self, unit, pos):
+        """Helper to place a Unit graphics item at a specific pixel position."""
         # Get color logic - simplified
         if unit.land and unit.land in self.game_state.countries:
             c_spec = self.game_state.countries[unit.land]
@@ -305,10 +361,12 @@ class AnsalonMapView(QGraphicsView):
             color = QColor("blue") if unit.allegiance == WS else QColor("red")
 
         unit_item = UnitCounter(unit, color)
-        unit_item.setPos(center)
-        unit_item.setZValue(10)  # Ensure units stay above hexes
+        unit_item.setPos(pos)
+        unit_item.setZValue(10 + self.unit_items.count(unit_item)) # Ensure correct Z-order in stack
         self.scene.addItem(unit_item)
         self.unit_items.append(unit_item)
+
+    # Removed the old draw_unit method as it is replaced by draw_stack logic
 
     def highlight_movement_range(self, reachable_coords):
         """

@@ -9,7 +9,7 @@ class Location:
         - 'port': A port city.
         - 'fortress': A fortress.
         - 'undercity': An underground city (typically a dwarven fortress).
-
+        - 'temple': The Dark Temple of Takhisis, where draconians are created
     """
 
     def __init__(self, spec: LocationSpec):

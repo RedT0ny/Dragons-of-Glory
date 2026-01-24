@@ -359,6 +359,8 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
                     else:
                         requested_qty = 1
 
+                    type_or_race_lower = type_or_race.lower()
+
                     # Try to find units matching this type or race from this country/dragonflight
                     matching_units = []
 

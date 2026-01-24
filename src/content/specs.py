@@ -204,6 +204,13 @@ class UnitType(Enum):
     WING = "wing"
     HIGHLORD = "highlord"
 
+class LocType(Enum):
+    CITY = "city"
+    PORT = "port"
+    FORTRESS = "fortress"
+    UNDERCITY = "undercity"
+    TEMPLE = "temple"
+
 class HexDirection(Enum):
     NORTH_EAST = 0
     EAST = 1

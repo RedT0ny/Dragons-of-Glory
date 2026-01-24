@@ -3,7 +3,7 @@ from src.game.combat import CombatResolver
 from src.game.country import Country, Location
 from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
-from src.content.specs import GamePhase, UnitState
+from src.content.specs import GamePhase, UnitState, UnitRace
 from src.content import loader, factory
 from src.game.map import Board, Hex
 
@@ -109,7 +109,7 @@ class GameState:
         self.phase = GamePhase.DEPLOYMENT
 
         # The player WITHOUT initiative deploys first
-        if init_str == 'whitestone':
+        if init_str == WS:
             self.initiative_winner = WS
             self.active_player = HL
         else:
@@ -180,6 +180,54 @@ class GameState:
         self.initiative_winner = winner
         self.active_player = winner # Winner goes first
 
+    def process_draconian_production(self):
+        """
+        Rule: At replacement step, HL manufactures 1 Draconian at the Dark Temple
+        if the hex is not enemy controlled.
+        """
+        # 1. Check if Dark Temple country exists in this scenario
+        # Since it's in countries.yaml, it will be loaded if the scenario references it
+        # or if it's a campaign.
+        dt_country = self.countries.get("dtemple")
+
+        # If not explicitly in scenario, maybe we need to find it?
+        # Actually, if it's not in self.countries, it means it's not part of the play area
+        # or active setup, so no production.
+        if not dt_country:
+            return
+
+        if not dt_country.territories:
+            return
+
+        temple_coords = dt_country.territories[0]  # (col, row)
+        from src.game.map import Hex
+        temple_axial = Hex.offset_to_axial(*temple_coords)
+
+        # 2. Check Ownership/Occupation (Rule: If captured by WS, no production)
+        # "Captured" in this game usually means occupying the hex.
+        if self.map.has_enemy_army(temple_axial, HL):
+            # Temple is besieged or captured
+            return
+
+        # 3. Find one INACTIVE or RESERVE Draconian linked to Dark Temple
+        # Since units.csv likely assigns them to 'dark_temple', we look for that.
+        candidate = next((u for u in self.units
+                          if u.land == "dtemple" and u.status in [UnitState.INACTIVE, UnitState.RESERVE]), None)
+
+        # Fallback: If units are generic 'highlord' but we know they are Draconians
+        if not candidate:
+            candidate = next((u for u in self.units
+                              if u.race == UnitRace.DRACONIAN and u.status in [UnitState.INACTIVE, UnitState.RESERVE]),
+                             None)
+
+        if candidate:
+            # Ensure it is assigned to dark_temple for deployment logic
+            if candidate.land != "dtemple":
+                candidate.land = "dtemple"
+
+            candidate.ready()  # Move to READY so it appears in the dialog
+            print(f"Dark Temple produced: {candidate.id}")
+
     def advance_phase(self):
         """
         The State Machine: Determines the next phase based on current state.
@@ -197,8 +245,16 @@ class GameState:
                 # Proceed to Strategic Events (Skipping Replacements for this first turn context)
                 self.phase = GamePhase.STRATEGIC_EVENTS
 
-        if self.phase == GamePhase.REPLACEMENTS:
-            self.phase = GamePhase.STRATEGIC_EVENTS
+        elif self.phase == GamePhase.REPLACEMENTS:
+            # Logic: HL goes first (set in next_turn), then WS.
+            if self.active_player == HL:
+                # Highlord starts replacements phase logic
+                self.process_draconian_production()
+                self.active_player = WS
+                # Phase remains REPLACEMENTS for the second player
+            else:
+                self.phase = GamePhase.STRATEGIC_EVENTS
+                self.active_player = HL  # Reset to default for the new phase
 
         elif self.phase == GamePhase.STRATEGIC_EVENTS:
             self.phase = GamePhase.ACTIVATION

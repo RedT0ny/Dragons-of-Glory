@@ -71,8 +71,10 @@ scenario:
         throt:
           units_by_type:
             inf: 4
+        dtemple:
+          units_by_type:
+            inf: 2
 
-      units_by_race: { draconian: 2 }
       explicit_units: ["toede"]
 
       artifacts: null

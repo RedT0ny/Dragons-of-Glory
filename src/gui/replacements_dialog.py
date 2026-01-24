@@ -1,42 +1,54 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, 
-                                   QTableWidgetItem, QHeaderView, QLabel, QWidget, 
-                                   QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene)
-from PySide6.QtCore import Qt, QSize, Signal, QTimer
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
+                               QTableWidgetItem, QHeaderView, QLabel, QWidget,
+                               QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene, QGridLayout)
+from PySide6.QtCore import Qt, QSize, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
 from src.content.specs import UnitState, GamePhase
 from src.content.constants import WS, HL, NEUTRAL, UI_COLORS
 from src.gui.map_items import UnitCounter
 
-class UnitLabel(QGraphicsView):
-    """A clickable preview representing a unit using the UnitCounter class."""
+class UnitLabel(QLabel):
+    """A clickable preview representing a unit. Uses a static Pixmap instead of a heavy QGraphicsView."""
     clicked = Signal(object) # Emits the Unit object
 
-    def __init__(self, unit, parent=None):
+    def __init__(self, unit, color, parent=None):
         super().__init__(parent)
         self.unit = unit
-        
-        # Setup Scene
-        self.scene = QGraphicsScene(self)
-        self.setScene(self.scene)
-        
+        self.color = color
+
         # UI settings for a "label-like" appearance
         self.setFixedSize(70, 70)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setFrameShape(QFrame.NoFrame)
+        self.setAlignment(Qt.AlignCenter)
         self.setStyleSheet("background: transparent;")
-        self.setRenderHint(QPainter.Antialiasing)
-        
-        # Add the actual UnitCounter
-        # Try to find country color, default to neutral grey
-        color = QColor(200, 200, 200) 
-        self.counter = UnitCounter(self.unit, color)
-        self.scene.addItem(self.counter)
-        
-        # Center the counter in the view
-        self.setSceneRect(-35, -35, 70, 70)
+
+        # Generate and set pixmap
+        self.setPixmap(self._render_unit_pixmap())
         self.setCursor(Qt.PointingHandCursor)
+
+    def _render_unit_pixmap(self):
+        """Renders the UnitCounter QGraphicsItem into a QPixmap."""
+        # Create a temporary scene to hold the item for rendering
+        scene = QGraphicsScene()
+        counter = UnitCounter(self.unit, self.color)
+        scene.addItem(counter)
+
+        # Define the target pixmap
+        pixmap = QPixmap(70, 70)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Render the scene into the pixmap
+        # UnitCounter is usually centered at 0,0. We need to map it to the pixmap center.
+        # target rect on pixmap, source rect in scene
+        target_rect = QRectF(0, 0, 70, 70)
+        source_rect = QRectF(-35, -35, 70, 70)
+        scene.render(painter, target_rect, source_rect)
+
+        painter.end()
+        return pixmap
 
     def mousePressEvent(self, event):
         # Defer the signal to prevent the widget from being destroyed while handling the event
@@ -64,9 +76,14 @@ class UnitSelectionDialog(QDialog):
 
         h_layout = QHBoxLayout()
 
+        # Helper to get color (simplified, grey default)
+        c1 = QColor("lightgrey")
+        c2 = QColor("lightgrey")
+
         # Unit 1 Option
         u1_layout = QVBoxLayout()
-        lbl1 = UnitLabel(unit1)
+        # Note: We need to pass a color now.
+        lbl1 = UnitLabel(unit1, c1)
         lbl1.setCursor(Qt.ArrowCursor) # Disable click handling of the label itself here
         btn1 = QPushButton(f"Restore {unit1.id}")
         btn1.clicked.connect(lambda: self.select_unit(unit1, unit2))
@@ -76,7 +93,7 @@ class UnitSelectionDialog(QDialog):
 
         # Unit 2 Option
         u2_layout = QVBoxLayout()
-        lbl2 = UnitLabel(unit2)
+        lbl2 = UnitLabel(unit2, c2)
         lbl2.setCursor(Qt.ArrowCursor)
         btn2 = QPushButton(f"Restore {unit2.id}")
         btn2.clicked.connect(lambda: self.select_unit(unit2, unit1))
@@ -97,6 +114,11 @@ class UnitSelectionDialog(QDialog):
 
 
 class ReplacementsDialog(QDialog):
+    """
+    Dialog for selecting replacements in the game.
+    Allows users to choose between two units for replacement.
+    The chosen unit will be ready to deploy. The other one will be destroyed.
+    """
     def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False):
         super().__init__(parent)
         self.game_state = game_state
@@ -105,7 +127,7 @@ class ReplacementsDialog(QDialog):
         self.allow_territory_deploy = allow_territory_deploy
 
         self.setWindowTitle("Replacements Pool")
-        self.resize(1000, 600)        # Modeless so user can interact with map
+        self.resize(640, 480)        # Modeless so user can interact with map
         self.setModal(False)
 
         self.selected_reserve_unit = None
@@ -147,11 +169,16 @@ class ReplacementsDialog(QDialog):
         player_side = self.game_state.active_player
         enemy_side = WS if player_side == HL else HL
 
+        # Helper set for checking valid countries
+        valid_country_ids = set(self.game_state.countries.keys())
+
         if self.filter_country_id:
             # If filtered, we only care about this specific country
             target_c = self.game_state.countries.get(self.filter_country_id)
             if target_c:
-                all_groups = [("New Ally", [target_c], True)]
+                # Format: (Header Name, Allegiance-key-for-stateless, Country List, Is Interactive)
+                # We pass None as allegiance to skip looking for stateless units in specific country view
+                all_groups = [("New Ally", None, [target_c], True)]
             else:
                 all_groups = []
         else:
@@ -163,15 +190,24 @@ class ReplacementsDialog(QDialog):
             neutral_countries = [c for c in countries if c.allegiance == NEUTRAL]
 
             all_groups = [
-                ("Your Allies", player_countries, True),
-                ("Enemy Forces", enemy_countries, False),
-                ("Neutrals", neutral_countries, False) # Can't replace neutrals typically until active
+                ("Your Allies", player_side, player_countries, True),
+                ("Enemy Forces", enemy_side, enemy_countries, False),
+                ("Neutrals", NEUTRAL, neutral_countries, False)
             ]
 
         row_idx = 0
-        # Populates table with country groups and unit counts
-        for group_name, group_countries, is_interactive in all_groups:
-            if not group_countries: continue
+
+        for group_name, side, group_countries, is_interactive in all_groups:
+            # 1. Identify "Others" (stateless units) for this side if applicable
+            stateless_units = []
+            if side:
+                stateless_units = [
+                    u for u in self.game_state.units
+                    if u.allegiance == side and (not u.land or u.land not in valid_country_ids)
+                ]
+
+            if not group_countries and not stateless_units:
+                continue
 
             # Group Header
             self.table.insertRow(row_idx)
@@ -183,6 +219,7 @@ class ReplacementsDialog(QDialog):
             self.table.setSpan(row_idx, 0, 1, 4)
             row_idx += 1
 
+            # Render Countries
             for country in group_countries:
                 self.table.insertRow(row_idx)
 
@@ -193,19 +230,36 @@ class ReplacementsDialog(QDialog):
                 # Retrieve units from the global state instead of the country object
                 country_units = [u for u in self.game_state.units if u.land == country.id]
 
-                # Column 1: Reserve
-                reserve_units = [u for u in country_units if u.status == UnitState.RESERVE]
-                self.set_cell_units(row_idx, 1, reserve_units, is_interactive, "reserve")
-
-                # Column 2: Ready
-                ready_units = [u for u in country_units if u.status == UnitState.READY]
-                self.set_cell_units(row_idx, 2, ready_units, is_interactive, "ready")
-
-                # Column 3: Destroyed
-                destroyed_units = [u for u in country_units if u.status == UnitState.DESTROYED]
-                self.set_cell_units(row_idx, 3, destroyed_units, False, "destroyed")
-
+                self._fill_row_units(row_idx, country_units, is_interactive)
                 row_idx += 1
+
+            # Render "Others" / Stateless units
+            if stateless_units:
+                self.table.insertRow(row_idx)
+
+                name_item = QTableWidgetItem("Others / Independent")
+                font = name_item.font()
+                font.setItalic(True)
+                name_item.setFont(font)
+                self.table.setItem(row_idx, 0, name_item)
+
+                self._fill_row_units(row_idx, stateless_units, is_interactive)
+                row_idx += 1
+
+    def _fill_row_units(self, row_idx, units, is_interactive):
+        """Helper to fill columns 1, 2, 3 for a given list of units."""
+        # Column 1: Reserve
+        reserve_units = [u for u in units if u.status == UnitState.RESERVE]
+        self.set_cell_units(row_idx, 1, reserve_units, is_interactive, "reserve")
+
+        # Column 2: Ready
+        ready_units = [u for u in units if u.status == UnitState.READY]
+        self.set_cell_units(row_idx, 2, ready_units, is_interactive, "ready")
+
+        # Column 3: Destroyed
+        destroyed_units = [u for u in units if u.status == UnitState.DESTROYED]
+        self.set_cell_units(row_idx, 3, destroyed_units, False, "destroyed")
+
 
     def set_cell_units(self, row, col, units, interactive, category):
         """Creates a widget containing UnitLabels for the cell."""
@@ -213,9 +267,11 @@ class ReplacementsDialog(QDialog):
             return
 
         container = QWidget()
-        layout = QHBoxLayout(container)
+        # Use QGridLayout for wrapping instead of QHBoxLayout
+        layout = QGridLayout(container)
         layout.setContentsMargins(2, 2, 2, 2)
-        layout.setAlignment(Qt.AlignLeft)
+        layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        layout.setSpacing(4)
 
         # Get country color from game_state lookup
         country_color = QColor(200, 200, 200)
@@ -224,10 +280,12 @@ class ReplacementsDialog(QDialog):
             if country_id in self.game_state.countries:
                 country_color = QColor(self.game_state.countries[country_id].color)
 
-        for unit in units:
-            lbl = UnitLabel(unit)
-            # Update the counter color inside the label
-            lbl.counter.color = country_color
+        # Define wrapping parameters
+        cols_per_row = 4 # Number of units before wrapping to next line
+
+        for i, unit in enumerate(units):
+            # Pass color to UnitLabel constructor
+            lbl = UnitLabel(unit, country_color)
 
             self.current_unit_labels[unit.id] = lbl
             if interactive:
@@ -238,11 +296,23 @@ class ReplacementsDialog(QDialog):
             else:
                 lbl.setCursor(Qt.ForbiddenCursor)
 
-            layout.addWidget(lbl)
+            # Add to grid: calculate row and column index
+            grid_row = i // cols_per_row
+            grid_col = i % cols_per_row
+            layout.addWidget(lbl, grid_row, grid_col)
 
         self.table.setCellWidget(row, col, container)
-        # Adjust row height if needed
-        self.table.setRowHeight(row, 70)
+
+        # Dynamic Row Height Calculation
+        num_visual_rows = (len(units) + cols_per_row - 1) // cols_per_row
+        required_height = (num_visual_rows * 76) + 4 # 76px per row + margin
+
+        current_height = self.table.rowHeight(row)
+        if required_height > current_height:
+            self.table.setRowHeight(row, required_height)
+        elif current_height == 0:
+            self.table.setRowHeight(row, max(76, required_height))
+
 
     def on_reserve_unit_clicked(self, unit):
         """Handle logic for pairing units in reserve."""

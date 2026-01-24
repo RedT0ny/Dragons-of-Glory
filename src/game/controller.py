@@ -73,6 +73,7 @@ class GameController(QObject):
                     self.replacements_dialog = ReplacementsDialog(self.game_state, self.view, self.view)
                     self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
                     self.replacements_dialog.show()
+            print(f"Step 0: Deployment Phase - {active_player}")
 
         # Handle "Automatic" or "System" phases (Dice rolls, cards)
         if current_phase == GamePhase.REPLACEMENTS:
@@ -89,6 +90,7 @@ class GameController(QObject):
                     self.replacements_dialog.show()
                 # We do NOT advance phase automatically.
                 # User must click "End Phase" in main window (which calls on_end_phase_clicked)
+            print(f"Step 1: Replacements Phase - {active_player}")
 
         elif current_phase == GamePhase.STRATEGIC_EVENTS:
             # TODO: Draw random event
@@ -136,7 +138,7 @@ class GameController(QObject):
                     return
 
                     # If AI, or human failed/cancelled activation, move on
-            print("Step 3: Activation")
+            print(f"Step 3: Activation - {active_player}")
             self.game_state.advance_phase()
 
 
@@ -186,8 +188,11 @@ class GameController(QObject):
         self.game_state.advance_phase()
         self.view.sync_with_model()
 
-        # Check if we should auto-proceed to the next phase (e.g. Strategic Events)
-        self.check_active_player()
+        # Trigger the loop again to handle the next state immediately.
+        # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
+        # the UI (Dialogs) for that player will be initialized.
+        self.process_game_turn()
+
 
     def execute_simple_ai_logic(self, side):
         # ... logic to call self.game_state relevant methods (move, attack...)
