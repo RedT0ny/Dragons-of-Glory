@@ -60,12 +60,18 @@ scenario:
       deployment_area: null
 
       countries:
+        dtemple:
+          units: all
+          ready: 8
+        estwilde: null
         mithas:
           units_by_type:
             inf: 3
             fleet: 3
             admiral: 1
         taman:
+          units: all
+        throt:
           units: all
         sanction:
           units: all

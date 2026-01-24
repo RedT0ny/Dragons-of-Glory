@@ -57,11 +57,6 @@ def create_scenario_items(scenario_spec: ScenarioSpec) -> Tuple[List[Unit], Dict
 
         # Set initial status: Units for active sides start as READY (available for placement)
         if new_unit.allegiance in [HL, WS]:
-            if new_unit.race == UnitRace.DRACONIAN:
-                # Special Rule: Draconians start INACTIVE (in the pool) by default.
-                # The GameState logic will activate specific numbers based on scenario rules.
-                new_unit.status = UnitState.INACTIVE
-            else:
                 new_unit.ready()
 
         live_units.append(new_unit)

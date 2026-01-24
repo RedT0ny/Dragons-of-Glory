@@ -74,6 +74,7 @@ scenario:
         dtemple:
           units_by_type:
             inf: 2
+          ready: 2
 
       explicit_units: ["toede"]
 

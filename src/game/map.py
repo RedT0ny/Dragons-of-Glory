@@ -75,13 +75,13 @@ class Board:
     The Game Board model (Single Source of Truth).
     Manages the grid of hexes, terrain, boundaries, and unit spatial tracking.
     """
-    def __init__(self, width, height, offset_q=0, offset_r=0):
+    def __init__(self, width, height, offset_col=0, offset_row=0):
         self.width = width
         self.height = height
-        # offset_q and offset_r represent the 'origin' of this scenario 
-        # on the master Ansalon map.
-        self.offset_q = offset_q
-        self.offset_r = offset_r
+        # offset_col and offset_row represent the local (0,0) origin on the master map.
+        # These offsets are in offset (col, row) coordinates.
+        self.offset_col = offset_col
+        self.offset_row = offset_row
 
         self.grid = {}  # (q, r) -> terrain_type
         self.hexside_data = {}  # ((q1,r1), (q2,r2)) -> border_type
@@ -236,8 +236,12 @@ class Board:
         self.add_hexside(origin.q, origin.r, neighbor.q, neighbor.r, side_type)
 
     def to_master_coords(self, q, r):
-        """Converts local scenario coordinates to master map coordinates."""
-        return q + self.offset_q, r + self.offset_r
+        """Converts local scenario coordinates (axial) to master map coordinates (axial)."""
+        col, row = Hex(q, r).axial_to_offset()
+        master_col = col + self.offset_col
+        master_row = row + self.offset_row
+        master_hex = Hex.offset_to_axial(master_col, master_row)
+        return master_hex.q, master_hex.r
 
     def get_terrain(self, hex_coord):
         """Returns the logical terrain type (stripped of visual prefixes)."""

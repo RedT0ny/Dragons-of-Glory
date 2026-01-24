@@ -1,9 +1,8 @@
 from typing import Set, Tuple, List, Dict
 from src.game.combat import CombatResolver
-from src.game.country import Country, Location
 from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
-from src.content.specs import GamePhase, UnitState, UnitRace
+from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec
 from src.content import loader, factory
 from src.game.map import Board, Hex
 
@@ -47,6 +46,9 @@ class GameState:
         self.prerequisites = set() # Track pre-requirements for events, like artifacts
         self.artifact_pool = {} # ID -> ArtifactSpec blueprint
 
+        # Draconian rules
+        self.draconian_ready_at_start = 0
+
     def end_game(self):
         pass
 
@@ -74,14 +76,23 @@ class GameState:
         """
         self.scenario_spec = scenario_spec
 
-        # 3. Setup live objects via Factory
+        # Setup live objects via Factory
         self.units, self.countries = factory.create_scenario_items(scenario_spec)
 
-        # 4. Setup the map
+        # Apply Draconian scenario rules (ready count, production flag)
+        self._apply_draconian_setup()
+
+        # Setup the map
+        bounds = self.get_map_bounds()
         width, height = self.get_map_dimensions()
+        offset_col = bounds["x_range"][0]
+        offset_row = bounds["y_range"][0]
+
+        if self.scenario_spec and self.scenario_spec.map_subset:
+            self._apply_map_subset_offsets(offset_col, offset_row, width, height)
 
         # Initialize the actual HexGrid model
-        self.map = Board(width, height)
+        self.map = Board(width, height, offset_col=offset_col, offset_row=offset_row)
 
         # Populate Terrain
         terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
@@ -92,7 +103,12 @@ class GameState:
         self.map.populate_hexsides(map_config.hexsides)
 
         # Populate Locations (Special + Country)
-        self.map.populate_locations(map_config.special_locations, self.countries)
+        special_locations = map_config.special_locations
+        if self.scenario_spec and self.scenario_spec.map_subset:
+            special_locations = self._adjust_special_locations(
+                special_locations, offset_col, offset_row
+            )
+        self.map.populate_locations(special_locations, self.countries)
 
         # Register existing units on the map if they have positions
         for unit in self.units:
@@ -171,20 +187,100 @@ class GameState:
                     if item in self.countries:
                         hexes.update(self.countries[item].territories)
                 elif isinstance(item, (list, tuple)) and len(item) == 2: # It's a coordinate [col, row]
-                    hexes.add(tuple(item))
+                    coord = tuple(item)
+                    if self.is_hex_in_bounds(coord[0], coord[1]):
+                        hexes.add(coord)
 
         return hexes
+
+    def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
+        """Normalize scenario and country coordinates to local (subset) space."""
+        # Convert country territories and locations to local coords
+        for country in self.countries.values():
+            country.spec.territories = [
+                (col - offset_col, row - offset_row)
+                for col, row in country.spec.territories
+            ]
+            for loc_spec in country.spec.locations:
+                if loc_spec.coords:
+                    col, row = loc_spec.coords
+                    loc_spec.coords = (col - offset_col, row - offset_row)
+
+        # Convert deployment areas that use explicit coordinates
+        for allegiance in [HL, WS]:
+            setup = self.scenario_spec.setup.get(allegiance, {})
+            area_spec = setup.get("deployment_area")
+
+            if isinstance(area_spec, list):
+                new_area = []
+                for item in area_spec:
+                    if isinstance(item, (list, tuple)) and len(item) == 2:
+                        new_area.append((item[0] - offset_col, item[1] - offset_row))
+                    else:
+                        new_area.append(item)
+                setup["deployment_area"] = new_area
+            elif isinstance(area_spec, dict):
+                for key in ["coords", "hexes"]:
+                    coords_list = area_spec.get(key)
+                    if isinstance(coords_list, list):
+                        new_coords = []
+                        for item in coords_list:
+                            if isinstance(item, (list, tuple)) and len(item) == 2:
+                                new_coords.append((item[0] - offset_col, item[1] - offset_row))
+                            else:
+                                new_coords.append(item)
+                        area_spec[key] = new_coords
+
+        # Normalize bounds to local coordinate space
+        self.scenario_spec.map_subset = {
+            "x_range": [0, width - 1],
+            "y_range": [0, height - 1]
+        }
+
+    def _adjust_special_locations(self, special_locations, offset_col: int, offset_row: int):
+        """Shift master-map special locations into local subset coordinates."""
+        adjusted = []
+        for loc in special_locations:
+            if not loc.coords:
+                continue
+            col, row = loc.coords
+            adjusted.append(LocationSpec(
+                id=loc.id,
+                loc_type=loc.loc_type,
+                coords=(col - offset_col, row - offset_row),
+                is_capital=loc.is_capital
+            ))
+        return adjusted
 
     def set_initiative(self, winner):
         """Called by Controller after Step 4 dice roll."""
         self.initiative_winner = winner
         self.active_player = winner # Winner goes first
 
+    def _apply_draconian_setup(self):
+        """Reads dtemple config from scenario YAML and applies READY / production flags."""
+        hl_setup = self.scenario_spec.setup.get("highlord", {})
+        dtemple_cfg = hl_setup.get("countries", {}).get("dtemple")
+
+        if not isinstance(dtemple_cfg, dict):
+            return
+
+        # Ready count (defaults to 0)
+        self.draconian_ready_at_start = int(dtemple_cfg.get("ready", 0))
+
+        # Apply READY to first N draconians
+        draconians = [u for u in self.units if u.land == "dtemple" and u.race == UnitRace.DRACONIAN]
+        # Only touch the units that actually need to change
+        for unit in draconians[:self.draconian_ready_at_start]:
+            unit.ready()
+
     def process_draconian_production(self):
         """
         Rule: At replacement step, HL manufactures 1 Draconian at the Dark Temple
         if the hex is not enemy controlled.
         """
+        if not self.draconian_production_enabled:
+            return
         # 1. Check if Dark Temple country exists in this scenario
         # Since it's in countries.yaml, it will be loaded if the scenario references it
         # or if it's a campaign.
@@ -193,10 +289,7 @@ class GameState:
         # If not explicitly in scenario, maybe we need to find it?
         # Actually, if it's not in self.countries, it means it's not part of the play area
         # or active setup, so no production.
-        if not dt_country:
-            return
-
-        if not dt_country.territories:
+        if not dt_country or not dt_country.territories:
             return
 
         temple_coords = dt_country.territories[0]  # (col, row)
@@ -210,21 +303,11 @@ class GameState:
             return
 
         # 3. Find one INACTIVE or RESERVE Draconian linked to Dark Temple
-        # Since units.csv likely assigns them to 'dark_temple', we look for that.
+        # Since units.csv likely assigns them to 'dtemple', we look for that.
         candidate = next((u for u in self.units
                           if u.land == "dtemple" and u.status in [UnitState.INACTIVE, UnitState.RESERVE]), None)
 
-        # Fallback: If units are generic 'highlord' but we know they are Draconians
-        if not candidate:
-            candidate = next((u for u in self.units
-                              if u.race == UnitRace.DRACONIAN and u.status in [UnitState.INACTIVE, UnitState.RESERVE]),
-                             None)
-
         if candidate:
-            # Ensure it is assigned to dark_temple for deployment logic
-            if candidate.land != "dtemple":
-                candidate.land = "dtemple"
-
             candidate.ready()  # Move to READY so it appears in the dialog
             print(f"Dark Temple produced: {candidate.id}")
 

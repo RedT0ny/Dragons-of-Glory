@@ -90,11 +90,11 @@ scenario:
         ]
 
     highlord:
-      # Specific deployment region (subset of countries)
-      deployment_area:
-        countries: [ "taman" ]
+      # Deployment in Taman Busuk and Dark Temple
 
       countries:
+        dtemple:
+          units: all
         taman:
           units: all
         green:

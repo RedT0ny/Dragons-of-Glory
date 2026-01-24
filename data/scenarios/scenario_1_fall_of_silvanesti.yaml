@@ -57,6 +57,7 @@ scenario:
         countries: [ "khur" ]
 
       countries:
+        dtemple: null
         taman:
           units_by_type:
             inf: 4

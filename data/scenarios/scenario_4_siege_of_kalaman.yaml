@@ -54,6 +54,9 @@ scenario:
       deployment_area: ["dargaard", "estwilde", "taman"]
 
       countries:
+        dtemple:
+          units: all
+          ready: 10
         kern:
           units: all
         taman:

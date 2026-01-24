@@ -37,8 +37,13 @@ class AnsalonMapView(QGraphicsView):
 
     def get_hex_center(self, col, row):
         """Calculates pixel center for a pointy-top hex using odd-r offset coordinates."""
-        x = HEX_RADIUS * math.sqrt(3) * (col + 0.5 * (row & 1))
-        y = HEX_RADIUS * 3/2 * row
+        offset_col = getattr(self.game_state.map, "offset_col", 0) if self.game_state.map else 0
+        offset_row = getattr(self.game_state.map, "offset_row", 0) if self.game_state.map else 0
+        draw_col = col + offset_col
+        draw_row = row + offset_row
+
+        x = HEX_RADIUS * math.sqrt(3) * (draw_col + 0.5 * (draw_row & 1))
+        y = HEX_RADIUS * 3/2 * draw_row
         return QPointF(x + X_OFFSET, y + Y_OFFSET)
 
     def get_vertex(self, center, i):
