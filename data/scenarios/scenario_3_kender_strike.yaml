@@ -41,9 +41,9 @@ scenario:
 
   # Map Configuration
   # Northern Ergoth
-  map_subset:
-    x_range: [10, 18]
-    y_range: [11, 24]
+  #map_subset:
+  #  x_range: [10, 18]
+  #  y_range: [11, 24]
 
   # Timeline and Turn Logic
   start_turn: 1

@@ -1,7 +1,11 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QPushButton, QMessageBox)
-from PySide6.QtCore import Qt, Signal, QTimer
+import os
 
+from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                               QPushButton, QMessageBox)
+from PySide6.QtCore import Qt, Signal, QTimer, QUrl
+
+from src.content.config import AUDIO_DIR, MAX_TICKS
 from src.gui.map_view import AnsalonMapView
 from src.content.constants import WS, HL
 import random
@@ -32,6 +36,7 @@ class DiplomacyMapView(AnsalonMapView):
 
 class DiplomacyDialog(QDialog):
     def __init__(self, game_state, parent=None):
+        """Sets up diplomacy dialog with map and buttons"""
         super().__init__(parent)
         self.game_state = game_state
         self.setWindowTitle("Diplomacy Phase")
@@ -119,41 +124,93 @@ class DiplomacyDialog(QDialog):
         btn_box.addWidget(btn_ok)
         btn_box.addWidget(btn_cancel)
         dlg_layout.addLayout(btn_box)
-        
+
         def on_roll():
-            roll = random.randint(1, 10)
-            success = roll <= target_rating
-            
-            res_text = f"Rolled: {roll}..."
-            if success:
-                res_lbl.setText(res_text + " Success!")
-                res_lbl.setStyleSheet("color: green; font-size: 16px; font-weight: bold;")
+            """
+            Handles the diplomacy roll action with animation.
+            On success: Closes automatically to proceed to deployment.
+            On failure: Stays open so the player can see the result and click 'Close'.
+            """
+            # 1. Immediate UI Feedback & Blocking
+            btn_ok.setDisabled(True)
+            btn_cancel.setDisabled(True)  # Disable while rolling
+            self.map_view.setEnabled(False)  # Lock the background map only
 
-                # Update Game State
-                country.allegiance = active_side
-                self.activated_country_id = country.id
+            # 2. Sound Effect Setup
+            dice_sound = QSoundEffect(dlg)
+            dice_sound.setVolume(1)
+            try:
+                dice_sound.setSource(QUrl.fromLocalFile(os.path.join(AUDIO_DIR, "roll_1d10.wav")))
+            except Exception as e:
+                print(f"Error loading dice sound: {e}")
+            dice_sound.setLoopCount(1)
+            dice_sound.play()
 
-                # Make units ready and update their allegiance
-                from src.content.specs import UnitState
-                for u in self.game_state.units:
-                    if u.land == country.id:
-                        u.status = UnitState.READY
-                        u.allegiance = active_side
+            # 3. Animation Configuration
+            self.roll_ticks = 0
+            actual_roll = random.randint(1, 10)
+            success = actual_roll <= target_rating
 
-                # Close this popup after a short delay, then accept main dialog
-                QTimer.singleShot(1000, dlg.accept)
-                dlg.result_success = True
-            else:
-                res_lbl.setText(res_text + " Failure...")
-                res_lbl.setStyleSheet("color: red; font-size: 16px; font-weight: bold;")
-                btn_ok.setDisabled(True)
-                btn_cancel.setText("Close")
-                dlg.result_success = False
+            animation_timer = QTimer(dlg)
+
+            def update_roll_visual():
+                self.roll_ticks += 1
+
+                if self.roll_ticks < MAX_TICKS:
+                    fake_val = random.randint(1, 10)
+                    res_lbl.setText(f"🎲 Rolling... {fake_val}")
+                else:
+                    # --- ANIMATION ENDS ---
+                    animation_timer.stop()
+                    animation_timer.deleteLater()
+                    dice_sound.stop()
+
+                    final_text = f"Rolled: {actual_roll}..."
+
+                    if success:
+                        res_lbl.setText(f"🎲 {final_text} SUCCESS!")
+                        res_lbl.setStyleSheet(
+                            "color: #27ae60; font-size: 18px; font-weight: bold; border: 2px solid #27ae60; padding: 5px;")
+
+                        # Set result flag for the parent logic
+                        dlg.result_success = True
+
+                        # Update Game State Logic
+                        country.allegiance = active_side
+                        self.activated_country_id = country.id
+                        from src.content.specs import UnitState
+                        for u in self.game_state.units:
+                            if u.land == country.id:
+                                u.status = UnitState.READY
+                                u.allegiance = active_side
+
+                        # Success is usually followed by deployment, so auto-close is fine here
+                        QTimer.singleShot(1500, lambda: (dlg.accept(), self.accept()))
+
+                    else:
+                        # --- FAILURE LOGIC ---
+                        res_lbl.setText(f"🎲 {final_text} FAILURE")
+                        res_lbl.setStyleSheet(
+                            "color: #c0392b; font-size: 18px; font-weight: bold; border: 2px solid #c0392b; padding: 5px;")
+
+                        # IMPORTANT: Re-enable the button and change text to "Close"
+                        # We do NOT use a timer here so the user must click manually.
+                        btn_cancel.setText("Close")
+                        btn_cancel.setDisabled(False)
+
+                        # Ensure clicking "Close" also closes the underlying Diplomacy Map
+                        btn_cancel.clicked.disconnect()  # Remove old connection
+                        btn_cancel.clicked.connect(lambda: (dlg.reject(), self.reject()))
+
+            animation_timer.timeout.connect(update_roll_visual)
+            animation_timer.start(70)
 
         btn_ok.clicked.connect(on_roll)
         btn_cancel.clicked.connect(dlg.reject)
-        
+        # 1. This pauses the code and actually shows the popup window to the user.
         dlg.exec()
-        
+
+        # 2. This runs ONLY after the popup (dlg) is closed.
+        # If the roll was successful, we tell the MAIN diplomacy map to close too.
         if getattr(dlg, 'result_success', False):
             self.accept()

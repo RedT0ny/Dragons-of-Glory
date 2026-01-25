@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QPointF, QTimer
 from src.content.constants import WS
 from src.content.specs import UnitState, GamePhase
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
-                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET)
+                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
 from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter
 
@@ -27,12 +27,15 @@ class AnsalonMapView(QGraphicsView):
         self.unit_items = []
         self.map_rendered = False
         self.initial_fit_done = False
+        self.zoom_on_show = 1.0
 
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
         super().showEvent(event)
         if not self.initial_fit_done and self.scene.itemsBoundingRect().width() > 0:
             self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
+            if self.zoom_on_show != 1.0:
+                self.scale(self.zoom_on_show, self.zoom_on_show)
             self.initial_fit_done = True
 
     def get_hex_center(self, col, row):
@@ -204,6 +207,7 @@ class AnsalonMapView(QGraphicsView):
 
         # Draw all hexes
         for row in range(map_height):
+            # Iterates hex grid; draws terrain, hexsides, and locations
             for col in range(map_width):
                 hex_obj = Hex.offset_to_axial(col, row)
                 center = self.get_hex_center(col, row)
@@ -258,7 +262,7 @@ class AnsalonMapView(QGraphicsView):
 
             # Use country.color from Spec/YAML
             c_color = QColor(country.color)
-            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), 100)
+            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), OVERLAY_ALPHA)
 
             for col, row in country.territories:
                 hex_obj = Hex.offset_to_axial(col, row)

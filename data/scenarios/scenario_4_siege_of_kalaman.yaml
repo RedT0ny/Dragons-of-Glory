@@ -31,9 +31,9 @@ scenario:
 
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
-  map_subset:
-    x_range: [27, 39]
-    y_range: [4, 29]
+  #map_subset:
+  #  x_range: [27, 39]
+  #  y_range: [4, 29]
 
   # Timeline and Turn Logic
   start_turn: 20
@@ -48,15 +48,17 @@ scenario:
   initial_setup:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: null
+      countries:
+        dargaard: all
 
     highlord:
-      deployment_area: ["dargaard", "estwilde", "taman"]
+      deployment_area: ["dargaard", "estwilde", "taman", "dtemple"]
 
       countries:
         dtemple:
           units: all
           ready: 10
+        estwilde: null
         kern:
           units: all
         taman:

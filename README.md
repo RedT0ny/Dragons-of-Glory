@@ -2,7 +2,26 @@
 A python implementation of Dragonlance classic "Dragons of Glory", with Dragon #170's Advanced Rules and other updates.
 
 
+TODO:
 
+- Add Maelstrom overlay (either on the background image map or rendered)
+- Add Dragon #170's Advanced Rules in "settings"
+- Add minimap
+- Add list of units in the right panel
+- Add unit pictures for the info panel
+- Add menu bar to main_window
+- Add hover tooltips to the map
+- Implement the "move units" and "combat" features
+- Implement save and load game
+- Check victory conditions
+- Implement dashboards
+- Implement AI player
+- Change replacements dialog to window
+- I18n
+
+TODO BUGFIX:
+
+- Fix map subset not working correctly (use full map for now)
 
 Notes:
 
@@ -10,7 +29,6 @@ constants.py        ← Pure strings/numbers, NO imports (Not required?)
 specs.py           ← Imports constants, defines domain
 config.py          ← Imports specs, defines runtime
 main.py            ← Imports everything
-
 
 Every country has a color for their units. The country can be neutral, aligned with Whitestone or aligned with Highlord.
 How to show the unit allegiance without changing the original color?

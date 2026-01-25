@@ -317,7 +317,7 @@ class Board:
         if unit.is_army():
             # Check City/Fortress bonus
             loc_data = self.get_location(target_hex)
-            is_fortified = loc_data and loc_data.get('type') in ['city', 'fortress', 'capital']
+            is_fortified = loc_data and (loc_data.get('type') in ['city', 'port'] or loc_data.get('is_capital'))
 
             limit = 3 if is_fortified else 2
             if army_count >= limit:

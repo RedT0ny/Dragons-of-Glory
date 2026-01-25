@@ -32,22 +32,21 @@ scenario:
 
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: [
-        "daltigoth",
-        "dargaard",
-        "haltigoth",
-        "icereach",
-        "kaolyn",
-        "kharolis",
-        "saifhum",
-        "mithas",
-        "palanthas",
-        "sikket",
-        "tarsis",
-        "thorbardin",
-        "thank",
-        "zhakar"
-        ]
+      countries:
+        daltigoth: all
+        dargaard: all
+        haltigoth: all
+        icereach: all
+        kaolyn: all
+        kharolis: all
+        saifhum: all
+        mithas: all
+        palanthas: all
+        sikket: all
+        tarsis: all
+        thorbardin: all
+        thank: all
+        zhakar: all
 
     highlord:
       # Specific deployment region (subset of countries)

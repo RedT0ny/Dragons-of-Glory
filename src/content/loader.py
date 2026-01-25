@@ -45,7 +45,7 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
     
     # We maintain the structure for players and neutral countries
     setup = {
-        "neutral_countries": setup_raw.get("neutral", {}).get("countries", []),
+        "neutral": setup_raw.get("neutral", {}),
         "highlord": setup_raw.get("highlord", {}),
         "whitestone": setup_raw.get("whitestone", {})
     }
@@ -328,14 +328,13 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
 
     # 3. Filter based on ScenarioSpec
     selected_specs = []
-    for allegiance in [HL, WS]:
-        p_cfg = spec.setup.get(allegiance, {})
-
-        # Process countries
-        for cname, config in p_cfg.get("countries", {}).items():
+    # Iterate through every allegiance defined in the YAML (highlord, whitestone, neutral, etc.)
+    for allegiance, p_cfg in spec.setup.items():
+        # Process countries under this allegiance
+        for cname, config in (p_cfg.get("countries") or {}).items():
             lc = cname.lower()
 
-            # Case 1: "units: all" - Get all units from this country
+            # Case 1: Direct "all" or nested "units: all"
             if config == "all" or (isinstance(config, dict) and config.get("units") == "all"):
                 # Try country first
                 matching_units = idx["country"].get(lc, [])
@@ -345,8 +344,9 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
                     matching_units = idx["df"].get(lc, [])
 
                 for unit_spec in matching_units:
-                    unit_spec.allegiance = allegiance  # Modify in-place
+                    unit_spec.allegiance = allegiance
                     selected_specs.append(unit_spec)
+
 
             # Case 2: "units_by_type" - Get specific types/races with quantities
             elif isinstance(config, dict) and "units_by_type" in config:
@@ -424,9 +424,9 @@ def resolve_scenario_countries(spec: ScenarioSpec, countries_yaml_path: str) -> 
     _process_group(ws_setup.get("countries", {}), WS)
 
     # 4. Process Neutrals
-    # Note: load_scenario_yaml maps the neutral section to "neutral_countries"
-    neutral_data = spec.setup.get("neutral_countries", [])
-    _process_group(neutral_data, NEUTRAL)
+    # Note: load_scenario_yaml maps the neutral section to "neutral"
+    neutral_data = spec.setup.get("neutral", [])
+    _process_group(neutral_data.get("countries", {}), NEUTRAL)
 
     return resolved_specs
 

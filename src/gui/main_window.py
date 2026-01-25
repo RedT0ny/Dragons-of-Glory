@@ -7,15 +7,22 @@ from src.content.config import APP_NAME
 from src.gui.map_view import AnsalonMapView
 
 class ConsoleRedirector(QObject):
-    """Custom stream object to redirect stdout/stderr to a Qt Signal."""
+    """Custom stream object to redirect stdout/stderr to a Qt Signal while keeping original output."""
     text_written = Signal(str)
 
+    def __init__(self, original_stream):
+        super().__init__()
+        self.original_stream = original_stream
+
     def write(self, text):
+        # 1. Emit signal for the GUI log area
         self.text_written.emit(str(text))
+        # 2. Write to the original python console stream
+        self.original_stream.write(text)
 
     def flush(self):
-        # Flush is required for file-like objects
-        pass
+        # Pass flush to original stream (required for file-like objects)
+        self.original_stream.flush()
 
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
@@ -80,6 +87,7 @@ class MainWindow(QMainWindow):
         
         # Hex Map
         self.map_view = AnsalonMapView(self.game_state)
+        self.map_view.zoom_on_show = 2
         content_layout.addWidget(self.map_view, stretch=4)
     
         # Sidebar
@@ -95,11 +103,14 @@ class MainWindow(QMainWindow):
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
         main_layout.addWidget(self.log_area)
 
-        # Redirect console output to the log area
-        self.redirector = ConsoleRedirector()
-        self.redirector.text_written.connect(self.append_log)
-        sys.stdout = self.redirector
-        sys.stderr = self.redirector
+        # Redirect console output to the log area while keeping original console
+        self.stdout_redirector = ConsoleRedirector(sys.stdout)
+        self.stdout_redirector.text_written.connect(self.append_log)
+        sys.stdout = self.stdout_redirector
+
+        self.stderr_redirector = ConsoleRedirector(sys.stderr)
+        self.stderr_redirector.text_written.connect(self.append_log)
+        sys.stderr = self.stderr_redirector
 
         # Initialize visual grid from the game state
         self.map_view.sync_with_model()

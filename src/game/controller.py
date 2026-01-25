@@ -1,5 +1,7 @@
 # Conceptual example for game flow
 from PySide6.QtCore import QObject, QTimer
+
+from src.content.constants import HL, WS
 from src.content.specs import GamePhase
 
 class GameController(QObject):
@@ -94,10 +96,11 @@ class GameController(QObject):
 
         elif current_phase == GamePhase.STRATEGIC_EVENTS:
             # TODO: Draw random event
-            print("Step 2: Strategic Events")
+            print(f"Step 2: Strategic Events - {active_player}")
             self.game_state.advance_phase()
 
         elif current_phase == GamePhase.ACTIVATION:
+            print(f"Step 3: Activation - {active_player}")
             if not is_ai:
                 from src.gui.diplomacy_dialog import DiplomacyDialog
                 from PySide6.QtWidgets import QDialog, QMessageBox
@@ -138,9 +141,8 @@ class GameController(QObject):
                     return
 
                     # If AI, or human failed/cancelled activation, move on
-            print(f"Step 3: Activation - {active_player}")
+            print("Activation attempt finished or skipped.")
             self.game_state.advance_phase()
-
 
         elif current_phase == GamePhase.INITIATIVE:
             # Logic: Roll Dice, determine winner
@@ -148,7 +150,13 @@ class GameController(QObject):
             hl_roll = random.randint(1, 4)
             ws_roll = random.randint(1, 4)
             # Simple tie-break logic needed (omitted for brevity)
-            winner = "Highlord" if hl_roll >= ws_roll else "Whitestone"
+            if hl_roll == ws_roll:
+                # Ties go to the player who had initiative on the previous Turn
+                winner = self.game_state.initiative_winner
+            elif hl_roll > ws_roll:
+                winner = HL
+            else:
+                winner = WS
 
             print(f"Step 4: Initiative. Winner: {winner}")
             self.game_state.set_initiative(winner)
@@ -156,6 +164,7 @@ class GameController(QObject):
 
         # Handle "Action" phases (Movement/Combat)
         elif current_phase == GamePhase.MOVEMENT:
+            print(f"Step 5: Movement phase - {active_player}")
             if is_ai:
                 moved = self.execute_simple_ai_logic(active_player)
                 if not moved: # AI is done moving
@@ -166,6 +175,7 @@ class GameController(QObject):
                 pass
 
         elif current_phase == GamePhase.COMBAT:
+            print(f"Step 6: Combat phase - {active_player}")
             if is_ai:
                 # AI performs attacks
                 self.game_state.advance_phase()

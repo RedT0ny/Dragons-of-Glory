@@ -55,7 +55,8 @@ class Unit:
 
     @property
     def allegiance(self) -> str:
-        return self.spec.allegiance or NEUTRAL
+        # FIX: Check if an override exists before falling back to the spec
+        return getattr(self, '_allegiance_override', self.spec.allegiance or NEUTRAL)
 
     @allegiance.setter
     def allegiance(self, value):

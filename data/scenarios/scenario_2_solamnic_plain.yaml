@@ -37,9 +37,9 @@ scenario:
 
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
-  map_subset:
-    x_range: [0, 40]
-    y_range: [3, 31]
+  #map_subset:
+  #  x_range: [0, 40]
+  #  y_range: [3, 31]
 
   # Timeline and Turn Logic
   start_turn: 10
@@ -53,7 +53,12 @@ scenario:
   initial_setup:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: ["kaolyn", "lemish", "palanthas", "vingaard"]
+      countries:
+        kaolyn:
+          units: all
+        lemish: all
+        palanthas: all
+        vingaard: all
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below

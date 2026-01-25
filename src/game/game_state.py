@@ -268,11 +268,15 @@ class GameState:
         # Ready count (defaults to 0)
         self.draconian_ready_at_start = int(dtemple_cfg.get("ready", 0))
 
-        # Apply READY to first N draconians
+        # Normalize all draconians first
         draconians = [u for u in self.units if u.land == "dtemple" and u.race == UnitRace.DRACONIAN]
-        # Only touch the units that actually need to change
-        for unit in draconians[:self.draconian_ready_at_start]:
-            unit.ready()
+        for unit in draconians:
+            unit.status = UnitState.INACTIVE
+
+        # Then mark first N as READY
+        for i, unit in enumerate(draconians):
+            if i < self.draconian_ready_at_start:
+                unit.ready()
 
     def process_draconian_production(self):
         """
@@ -325,25 +329,39 @@ class GameState:
                 # Phase remains DEPLOYMENT for the second player
             else:
                 # Initiative winner finished deployment.
-                # Proceed to Strategic Events (Skipping Replacements for this first turn context)
+                # Proceed directly to movement (Skipping activation, events and initiative phases for this first turn)
                 self.phase = GamePhase.STRATEGIC_EVENTS
 
         elif self.phase == GamePhase.REPLACEMENTS:
-            # Logic: HL goes first (set in next_turn), then WS.
+            # Logic: The player that lost initiative roll goes first in replacements (Handled in nex_turn).
+            # First check if active_player is HL, to process draconian production
             if self.active_player == HL:
-                # Highlord starts replacements phase logic
                 self.process_draconian_production()
-                self.active_player = WS
+            # Now check if we are in the first or second player replacement round
+            if self.active_player != self.initiative_winner:
+                # That means it's the first player replacing
+                self.active_player = self.initiative_winner
                 # Phase remains REPLACEMENTS for the second player
             else:
                 self.phase = GamePhase.STRATEGIC_EVENTS
-                self.active_player = HL  # Reset to default for the new phase
 
         elif self.phase == GamePhase.STRATEGIC_EVENTS:
-            self.phase = GamePhase.ACTIVATION
+            if self.active_player == self.initiative_winner:
+                # That means it's the event for the first player
+                self.active_player = WS if self.initiative_winner == HL else HL
+                # Phase remains STRATEGIC_EVENTS for the second player
+                # Note: since this phase is fully automatic, maybe this is not required
+                # and can be handled directly in the controller.
+            else:
+                self.phase = GamePhase.ACTIVATION
 
         elif self.phase == GamePhase.ACTIVATION:
-            self.phase = GamePhase.INITIATIVE
+            if self.active_player != self.initiative_winner:
+                # That means it's the event for the first player
+                self.active_player = self.initiative_winner
+                # Phase remains ACTIVATION for the second player
+            else:
+                self.phase = GamePhase.INITIATIVE
 
         elif self.phase == GamePhase.INITIATIVE:
             # Controller must have set_initiative() before calling this
@@ -368,8 +386,8 @@ class GameState:
         """Advances the game to the next turn (Step 8)."""
         self.turn += 1
         self.phase = GamePhase.REPLACEMENTS
-        self.active_player = HL # Reset to default for start of turn
-        self.initiative_winner = None
+        # Change active_player to the one that lost initiative roll, so they go first in replacements
+        self.active_player = WS if self.initiative_winner == HL  else HL
 
         # Reset unit flags
         for unit in self.units:
