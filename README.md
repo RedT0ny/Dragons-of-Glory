@@ -17,6 +17,7 @@ TODO:
 - Implement dashboards
 - Implement AI player
 - Change replacements dialog to window
+- Darken the overlay_alpha of the diplomacy map so countries are visible
 - I18n
 
 TODO BUGFIX:

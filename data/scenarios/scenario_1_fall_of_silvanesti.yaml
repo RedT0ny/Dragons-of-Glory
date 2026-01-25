@@ -66,6 +66,7 @@ scenario:
           units_by_type:
             inf: 4
             cav: 1
+            general: 1
         green:
           units_by_type:
             dragon: 2

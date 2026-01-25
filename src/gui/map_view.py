@@ -18,7 +18,7 @@ class AnsalonMapView(QGraphicsView):
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
-        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        #self.setDragMode(QGraphicsView.ScrollHandDrag)
 
         # Deployment state
         self.deploying_unit = None

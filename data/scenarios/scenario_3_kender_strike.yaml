@@ -88,7 +88,10 @@ scenario:
 
       countries:
         hylo:
-          units: all
+          units_by_type:
+            inf: 6
+
+      explicit_units: ["kronin"]
 
       victory_conditions:
         major: "Destroy more than 50% of the highlord army"

@@ -283,8 +283,6 @@ class GameState:
         Rule: At replacement step, HL manufactures 1 Draconian at the Dark Temple
         if the hex is not enemy controlled.
         """
-        if not self.draconian_production_enabled:
-            return
         # 1. Check if Dark Temple country exists in this scenario
         # Since it's in countries.yaml, it will be loaded if the scenario references it
         # or if it's a campaign.
@@ -293,10 +291,10 @@ class GameState:
         # If not explicitly in scenario, maybe we need to find it?
         # Actually, if it's not in self.countries, it means it's not part of the play area
         # or active setup, so no production.
-        if not dt_country or not dt_country.territories:
+        if not dt_country:
             return
 
-        temple_coords = dt_country.territories[0]  # (col, row)
+        temple_coords = dt_country.capital.coords  # (col, row)
         from src.game.map import Hex
         temple_axial = Hex.offset_to_axial(*temple_coords)
 
@@ -330,7 +328,7 @@ class GameState:
             else:
                 # Initiative winner finished deployment.
                 # Proceed directly to movement (Skipping activation, events and initiative phases for this first turn)
-                self.phase = GamePhase.STRATEGIC_EVENTS
+                self.phase = GamePhase.MOVEMENT
 
         elif self.phase == GamePhase.REPLACEMENTS:
             # Logic: The player that lost initiative roll goes first in replacements (Handled in nex_turn).

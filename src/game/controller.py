@@ -161,6 +161,7 @@ class GameController(QObject):
             print(f"Step 4: Initiative. Winner: {winner}")
             self.game_state.set_initiative(winner)
             self.game_state.advance_phase()
+            self.process_game_turn()
 
         # Handle "Action" phases (Movement/Combat)
         elif current_phase == GamePhase.MOVEMENT:

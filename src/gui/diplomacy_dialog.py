@@ -40,7 +40,7 @@ class DiplomacyDialog(QDialog):
         super().__init__(parent)
         self.game_state = game_state
         self.setWindowTitle("Diplomacy Phase")
-        self.resize(1000, 800)
+        self.resize(1200, 960)
         self.setModal(True)
         
         self.activated_country_id = None
