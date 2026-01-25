@@ -2,7 +2,7 @@ import math
 
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
-from PySide6.QtCore import Qt, QPointF, QTimer
+from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 
 from src.content.constants import WS
 from src.content.specs import UnitState, GamePhase
@@ -12,6 +12,9 @@ from src.game.map import Hex
 from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter
 
 class AnsalonMapView(QGraphicsView):
+    # Added Signal to notify main window
+    units_clicked = Signal(list)
+
     def __init__(self, game_state, parent=None):
         super().__init__(parent)
         self.game_state = game_state
@@ -76,6 +79,20 @@ class AnsalonMapView(QGraphicsView):
             return
 
         scene_pos = self.mapToScene(event.position().toPoint())
+
+        # Global Unit Selection Logic
+        # Detect clicks on units to populate Info Panel
+        items = self.scene.items(scene_pos)
+        clicked_units = []
+        for item in items:
+            if isinstance(item, UnitCounter):
+                clicked_units.append(item.unit)
+
+        if clicked_units:
+            # Sort clicked units if needed, or pass as is (stack logic usually draws top last)
+            # The top unit in visual stack is the first in hit test usually?
+            # items() returns top-most first.
+            self.units_clicked.emit(clicked_units)
 
         # 1. Handle Deployment from Replacement Dialog
         if self.deploying_unit:

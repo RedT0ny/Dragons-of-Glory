@@ -1,10 +1,14 @@
 import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                               QLabel, QPushButton, QFrame, QScrollArea, QGridLayout, QTextEdit)
-from PySide6.QtCore import Qt, Signal, QObject, Slot
+                               QFrame, QLabel, QGridLayout, QPushButton, QTextEdit,
+                               QTableWidget, QTableWidgetItem, QHeaderView,
+                               QStyleOptionButton, QStyle, QGraphicsScene)
+from PySide6.QtCore import Qt, Signal, Slot, QRect, QRectF, QObject, QSize
+from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon
 
-from src.content.config import APP_NAME
+from src.content.config import APP_NAME, UNIT_ICON_SIZE
 from src.gui.map_view import AnsalonMapView
+from src.gui.map_items import UnitCounter
 
 class ConsoleRedirector(QObject):
     """Custom stream object to redirect stdout/stderr to a Qt Signal while keeping original output."""
@@ -24,11 +28,54 @@ class ConsoleRedirector(QObject):
         # Pass flush to original stream (required for file-like objects)
         self.original_stream.flush()
 
+class CheckBoxHeader(QHeaderView):
+    """A custom header with a checkbox in the first column."""
+    toggled = Signal(bool)
+
+    def __init__(self, orientation, parent=None):
+        super().__init__(orientation, parent)
+        self.isChecked = False
+
+    def paintSection(self, painter, rect, logicalIndex):
+        painter.save()
+        super().paintSection(painter, rect, logicalIndex)
+        painter.restore()
+
+        if logicalIndex == 0:
+            option = QStyleOptionButton()
+            # Center the checkbox
+            checkbox_width = 20
+            checkbox_height = 20
+            x = rect.left() + (rect.width() - checkbox_width) // 2
+            y = rect.top() + (rect.height() - checkbox_height) // 2
+
+            option.rect = QRect(x, y, checkbox_width, checkbox_height)
+            option.state = QStyle.State_Enabled | QStyle.State_Active
+            if self.isChecked:
+                option.state |= QStyle.State_On
+            else:
+                option.state |= QStyle.State_Off
+            self.style().drawPrimitive(QStyle.PE_IndicatorCheckBox, option, painter)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            logicalIndex = self.logicalIndexAt(event.pos())
+            if logicalIndex == 0:
+                self.isChecked = not self.isChecked
+                self.toggled.emit(self.isChecked)
+                self.viewport().update()
+            else:
+                super().mousePressEvent(event)
+        else:
+            super().mousePressEvent(event)
+
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
     end_phase_clicked = Signal()
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, game_state=None):
+        """Sets up right panel with mini‑map and controls"""
         super().__init__(parent)
+        self.game_state = game_state
         self.setFixedWidth(350)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         
@@ -67,8 +114,113 @@ class InfoPanel(QFrame):
         unit_layout.addWidget(unit_img, alignment=Qt.AlignCenter)
         unit_layout.addWidget(QLabel("Rating: X\nMov: remaining (total)\ncountry_name\nunit_status"))
         layout.addWidget(unit_box)
-        
+
+        # Unit Info placeholder (Previously static unit box, replacing with Table)
+        layout.addWidget(QLabel("Selected Units Stack:"))
+
+        self.units_table = QTableWidget()
+        self.units_table.setColumnCount(5)
+
+        # Setup Custom Header for Select All
+        self.header_checkbox = CheckBoxHeader(Qt.Horizontal, self.units_table)
+        self.units_table.setHorizontalHeader(self.header_checkbox)
+        self.header_checkbox.toggled.connect(self.toggle_all_rows)
+
+        self.units_table.setHorizontalHeaderLabels(["", "Icon", "Name", "Rating", "Mov"])
+        self.units_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Checkbox
+        self.units_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Icon
+        self.units_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)  # ID
+        self.units_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.units_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.units_table.verticalHeader().setVisible(False)
+        self.units_table.setSelectionBehavior(QTableWidget.SelectRows)
+
+        # Double the icon size for the table display
+        self.units_table.setIconSize(QSize(UNIT_ICON_SIZE, UNIT_ICON_SIZE))
+
+        layout.addWidget(self.units_table)
+
         layout.addStretch()
+
+    def set_game_state(self, game_state):
+        self.game_state = game_state
+
+    @Slot(bool)
+    def toggle_all_rows(self, checked):
+        for row in range(self.units_table.rowCount()):
+            item = self.units_table.item(row, 0)
+            if item:
+                item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+
+    @Slot(list)
+    def update_unit_table(self, units):
+        """Populates the table with the provided list of units."""
+        self.units_table.setRowCount(0)
+
+        # Reset header checkbox
+        self.header_checkbox.isChecked = False
+        self.header_checkbox.viewport().update()
+
+        for row, unit in enumerate(units):
+            self.units_table.insertRow(row)
+
+            # 1. Checkbox
+            chk_item = QTableWidgetItem()
+            chk_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+            chk_item.setCheckState(Qt.Unchecked)
+            self.units_table.setItem(row, 0, chk_item)
+
+            # 2. Icon
+            icon_pixmap = self._render_unit_icon(unit)
+            icon_item = QTableWidgetItem()
+            icon_item.setIcon(QIcon(icon_pixmap))
+            # Center icon? QTableWidgetItem doesn't center icon easily, typically handled by delegate or simple alignment
+            self.units_table.setItem(row, 1, icon_item)
+
+            # 3. ID
+            self.units_table.setItem(row, 2, QTableWidgetItem(str(unit.id)))
+
+            # 4. Rating (Combat/Tactical)
+            rating = unit.combat_rating if unit.combat_rating != 0 else unit.tactical_rating
+            rating_str = f"{rating}"
+            if unit.tactical_rating and unit.combat_rating:
+                rating_str = f"{unit.combat_rating}/{unit.tactical_rating}" # Show both if applicable
+
+            self.units_table.setItem(row, 3, QTableWidgetItem(rating_str))
+
+            # 5. Movement
+            mov_str = f"{unit.movement}"
+            self.units_table.setItem(row, 4, QTableWidgetItem(mov_str))
+
+        # Adjust row heights to fit icons
+        self.units_table.resizeRowsToContents()
+        #self.units_table.resizeColumnsToContents()
+
+    def _render_unit_icon(self, unit):
+        """Helper to render a UnitCounter to a QPixmap."""
+        # Determine color
+        color = QColor("gray")
+        if self.game_state and unit.land in self.game_state.countries:
+            color = QColor(self.game_state.countries[unit.land].color)
+
+        scene = QGraphicsScene()
+        counter = UnitCounter(unit, color)
+        scene.addItem(counter)
+
+        pixmap = QPixmap(UNIT_ICON_SIZE, UNIT_ICON_SIZE)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # UnitCounter is typically centered at 0,0 with size ~ UNIT_SIZE (e.g. 50 or 60)
+        # We map the scene rect to the pixmap
+        target_rect = QRectF(0, 0, UNIT_ICON_SIZE, UNIT_ICON_SIZE)
+        source_rect = counter.boundingRect()
+
+        scene.render(painter, target_rect, source_rect)
+        painter.end()
+        return pixmap
 
 class MainWindow(QMainWindow):
     def __init__(self, game_state):
@@ -90,10 +242,10 @@ class MainWindow(QMainWindow):
         self.map_view.zoom_on_show = 2
         content_layout.addWidget(self.map_view, stretch=4)
     
-        # Sidebar
-        self.info_panel = InfoPanel()
+        # Sidebar - Pass game_state for color lookups
+        self.info_panel = InfoPanel(game_state=self.game_state)
         content_layout.addWidget(self.info_panel, stretch=1)
-        
+
         main_layout.addLayout(content_layout)
         
         # Game Log
@@ -114,6 +266,9 @@ class MainWindow(QMainWindow):
 
         # Initialize visual grid from the game state
         self.map_view.sync_with_model()
+
+        # Connect Map Selection to Info Panel
+        self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
 
     @Slot(str)
     def append_log(self, text):
