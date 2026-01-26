@@ -1,7 +1,7 @@
 # language: yaml
 scenario:
   id: "campaign_0_war_of_the_lance"
-  picture: "cover.png"
+  picture: "campaign_0.jpg"
   description: >
     *** War of the Lance ***
     

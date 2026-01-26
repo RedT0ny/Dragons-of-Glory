@@ -14,10 +14,12 @@ from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounte
 class AnsalonMapView(QGraphicsView):
     # Added Signal to notify main window
     units_clicked = Signal(list)
+    hex_clicked = Signal(object)
 
-    def __init__(self, game_state, parent=None):
+    def __init__(self, game_state, parent=None, overlay_alpha=100):
         super().__init__(parent)
         self.game_state = game_state
+        self.overlay_alpha = overlay_alpha
         self.scene = QGraphicsScene(self)
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
@@ -35,6 +37,7 @@ class AnsalonMapView(QGraphicsView):
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
         super().showEvent(event)
+        # Fits map to view on first show event
         if not self.initial_fit_done and self.scene.itemsBoundingRect().width() > 0:
             self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
             if self.zoom_on_show != 1.0:
@@ -99,9 +102,25 @@ class AnsalonMapView(QGraphicsView):
             self.handle_deployment_click(scene_pos)
             return
 
-        # 2. Handle Depleted Unit Stacking (only in Replacements Phase)
+        # 2. Handle Movement Phase Clicks
+        if self.game_state.phase == GamePhase.MOVEMENT:
+            if self.handle_movement_click(scene_pos):
+                return
+
+        # 3. Handle Depleted Unit Stacking (only in Replacements Phase)
         if self.game_state.phase == GamePhase.REPLACEMENTS:
             self.handle_depleted_stack_click(scene_pos)
+
+    def handle_movement_click(self, scene_pos):
+        items = self.scene.items(scene_pos)
+        for item in items:
+            if isinstance(item, HexagonItem) and item.is_highlighted:
+                from src.game.map import Hex
+                col, row = item.coords
+                hex_obj = Hex.offset_to_axial(col, row)
+                self.hex_clicked.emit(hex_obj)
+                return True
+        return False
 
     def handle_deployment_click(self, scene_pos):
         # Find hex at this position
@@ -279,7 +298,7 @@ class AnsalonMapView(QGraphicsView):
 
             # Use country.color from Spec/YAML
             c_color = QColor(country.color)
-            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), OVERLAY_ALPHA)
+            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), self.overlay_alpha)
 
             for col, row in country.territories:
                 hex_obj = Hex.offset_to_axial(col, row)
@@ -398,8 +417,11 @@ class AnsalonMapView(QGraphicsView):
         """
         Loops through all HexagonItems in the scene and highlights them
         if their coordinates are in the reachable_coords list.
+        reachable_coords: List of (col, row) tuples.
         """
+        reachable_set = set(reachable_coords)
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
-                item.set_highlight(False) # Reset first
-                # TODO: Implement actual reachability highlight
+                should_highlight = item.coords in reachable_set
+                if item.is_highlighted != should_highlight:
+                    item.set_highlight(should_highlight)

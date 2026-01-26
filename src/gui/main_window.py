@@ -72,6 +72,8 @@ class CheckBoxHeader(QHeaderView):
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
     end_phase_clicked = Signal()
+    selection_changed = Signal(list)
+
     def __init__(self, parent=None, game_state=None):
         """Sets up right panel with mini‑map and controls"""
         super().__init__(parent)
@@ -142,32 +144,41 @@ class InfoPanel(QFrame):
 
         layout.addStretch()
 
+        self.units_table.itemChanged.connect(self.on_item_changed)
+        self.current_units = []
+
     def set_game_state(self, game_state):
         self.game_state = game_state
 
     @Slot(bool)
     def toggle_all_rows(self, checked):
+        self.units_table.blockSignals(True)
         for row in range(self.units_table.rowCount()):
             item = self.units_table.item(row, 0)
             if item:
                 item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        self.units_table.blockSignals(False)
+        self.notify_selection()
 
     @Slot(list)
     def update_unit_table(self, units):
         """Populates the table with the provided list of units."""
+        self.current_units = units
+        self.units_table.blockSignals(True)
         self.units_table.setRowCount(0)
 
         # Reset header checkbox
         self.header_checkbox.isChecked = False
         self.header_checkbox.viewport().update()
 
+        # Populates table rows with unit properties and selection checkboxes
         for row, unit in enumerate(units):
             self.units_table.insertRow(row)
 
             # 1. Checkbox
             chk_item = QTableWidgetItem()
             chk_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            chk_item.setCheckState(Qt.Unchecked)
+            chk_item.setCheckState(Qt.Checked)
             self.units_table.setItem(row, 0, chk_item)
 
             # 2. Icon
@@ -194,7 +205,20 @@ class InfoPanel(QFrame):
 
         # Adjust row heights to fit icons
         self.units_table.resizeRowsToContents()
+        self.units_table.blockSignals(False)
         #self.units_table.resizeColumnsToContents()
+
+    def on_item_changed(self, item):
+        if item.column() == 0:
+            self.notify_selection()
+
+    def notify_selection(self):
+        selected = []
+        for row in range(self.units_table.rowCount()):
+            item = self.units_table.item(row, 0)
+            if item.checkState() == Qt.Checked and row < len(self.current_units):
+                selected.append(self.current_units[row])
+        self.selection_changed.emit(selected)
 
     def _render_unit_icon(self, unit):
         """Helper to render a UnitCounter to a QPixmap."""
@@ -280,3 +304,5 @@ class MainWindow(QMainWindow):
     def set_controller(self, controller):
         """Connects UI signals to the controller."""
         self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)
+        self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
+        self.map_view.hex_clicked.connect(controller.on_hex_clicked)

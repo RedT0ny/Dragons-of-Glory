@@ -13,12 +13,16 @@ import random
 class DiplomacyMapView(AnsalonMapView):
     country_clicked = Signal(str)
 
+    def __init__(self, game_state, parent=None, overlay_alpha=200):
+        super().__init__(game_state, parent, overlay_alpha)
+
     def should_draw_country(self, country_id):
-        # Only draw neutral countries
+        """Returns neutral countries to be drawn"""
         country = self.game_state.countries.get(country_id)
         return country and country.allegiance == 'neutral'
 
     def mousePressEvent(self, event):
+        """Emits country ID on click if neutral"""
         if event.button() == Qt.LeftButton:
             scene_pos = self.mapToScene(event.position().toPoint())
             items = self.scene.items(scene_pos)

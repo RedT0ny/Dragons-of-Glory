@@ -22,6 +22,8 @@ class GameController(QObject):
         self.ai_timer.timeout.connect(self.process_game_turn)
         self.ai_timer.setInterval(1000) # 1 second between AI moves
 
+        self.selected_units_for_movement = []
+
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
         self.process_game_turn()
@@ -196,8 +198,13 @@ class GameController(QObject):
             self.replacements_dialog.close()
             self.replacements_dialog = None
 
+        # Clear movement highlights/selection
+        self.selected_units_for_movement = []
+        self.view.highlight_movement_range([])
+
         self.game_state.advance_phase()
         self.view.sync_with_model()
+
 
         # Trigger the loop again to handle the next state immediately.
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
@@ -208,3 +215,47 @@ class GameController(QObject):
     def execute_simple_ai_logic(self, side):
         # ... logic to call self.game_state relevant methods (move, attack...)
         return False # Return True if more moves are possible
+
+    def on_unit_selection_changed(self, selected_units):
+        """Called when user changes selection in the Unit Table."""
+        self.selected_units_for_movement = selected_units
+
+        # Clear highlights if no units selected
+        if not selected_units:
+            self.view.highlight_movement_range([])
+            return
+
+        if self.game_state.phase == GamePhase.MOVEMENT:
+             # Only highlight if it's the active player's turn
+             if any(u.allegiance != self.game_state.active_player for u in selected_units):
+                 self.view.highlight_movement_range([])
+                 return
+
+             reachable = self.calculate_reachable_hexes(selected_units)
+             self.view.highlight_movement_range(reachable)
+
+    def on_hex_clicked(self, hex_obj):
+        """Called when user clicks a hex in Movement phase."""
+        if self.game_state.phase != GamePhase.MOVEMENT:
+            return
+
+        if not self.selected_units_for_movement:
+            return
+
+        # Move all selected units
+        # Simplified: Move them to target.
+        for unit in self.selected_units_for_movement:
+            self.game_state.move_unit(unit, hex_obj)
+
+        # Clear selection/highlights
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
+        self.selected_units_for_movement = []
+
+    def calculate_reachable_hexes(self, units):
+        """
+        Delegates calculation of reachable hexes to the map model.
+        Returns a list of (col, row) tuples.
+        """
+        reachable_hexes = self.game_state.map.get_reachable_hexes(units)
+        return [h.axial_to_offset() for h in reachable_hexes]

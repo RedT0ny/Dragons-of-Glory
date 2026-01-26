@@ -66,6 +66,9 @@ class Hex:
     def __eq__(self, other):
         return self.q == other.q and self.r == other.r
 
+    def __lt__(self, other):
+        return (self.q, self.r) < (other.q, other.r)
+
     def __hash__(self):
         return hash((self.q, self.r))
 
@@ -405,7 +408,7 @@ class Board:
 
         # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
         if terrain == "forest":
-            if unit.terrain_affinity == "forest":
+            if getattr(unit, 'terrain_affinity', None) == "forest":
                 pass
             else:
                 cost += 1
@@ -416,7 +419,7 @@ class Board:
 
         if hexside_type == "mountain":
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
-            if unit.terrain_affinity in ["mountain","all"]:
+            if getattr(unit, 'terrain_affinity', None)  in ["mountain","all"]:
                 cost += 1
             else:
                 return float('inf')
@@ -429,7 +432,7 @@ class Board:
         """
         neighbors = []
         currently_in_zoc = self.is_adjacent_to_enemy(hex_coord, unit)
-        is_exempt = unit.unit_type in ['cavalry', 'wing'] or unit.is_leader()
+        is_exempt = unit.unit_type in [UnitType.CAVALRY, UnitType.WING] or unit.is_leader()
 
         for neighbor in hex_coord.neighbors():
             # 1. Basic Bounds Check
@@ -439,7 +442,7 @@ class Board:
 
             # 2. Check for Sea Barriers (Rule 5)
             # If ground unit, check if the hexside between current and neighbor is 'sea'
-            if unit.unit_type != 'wing':
+            if unit.unit_type != UnitType.WING:
                 hexside = self.get_hexside(hex_coord, neighbor)
                 if hexside == "sea":  # Explicitly mark water-only boundaries in config
                     continue
@@ -496,3 +499,106 @@ class Board:
             current = came_from[current]
         path.reverse()
         return path
+
+    def get_reachable_hexes(self, units):
+        """
+        Calculates all reachable hexes for a stack of units.
+        Returns a list of Hex objects.
+        """
+        if not units:
+            return []
+
+        # 1. Determine Stack Constraints
+        start_hex = None
+        min_mp = 999
+
+        for unit in units:
+            if not getattr(unit, 'is_on_map', True):
+                continue
+            if hasattr(unit, 'position') and unit.position:
+                col, row = unit.position
+                # Assuming unit.position is (col, row)
+                h = Hex.offset_to_axial(col, row)
+                if start_hex is None:
+                    start_hex = h
+                elif start_hex != h:
+                    # Units in different locations cannot move as a stack
+                    return []
+
+            m = unit.movement
+            min_mp = min(min_mp, m)
+
+        if not start_hex or min_mp <= 0:
+            return []
+
+        frontier = []
+        heapq.heappush(frontier, (0, start_hex))
+        cost_so_far = {start_hex: 0}
+
+        reachable_hexes = []
+
+        while frontier:
+            current_cost, current_hex = heapq.heappop(frontier)
+
+            if current_cost > min_mp:
+                continue
+
+            # Optimization check
+            if current_cost > cost_so_far.get(current_hex, float('inf')):
+                continue
+
+            if current_hex != start_hex:
+                reachable_hexes.append(current_hex)
+
+            # Explore neighbors using stack movement rules
+            for next_hex in current_hex.neighbors():
+                # 1. Bounds check
+                c, r = next_hex.axial_to_offset()
+                if not (0 <= c < self.width and 0 <= r < self.height):
+                    continue
+
+                stack_cost = 0
+                possible = True
+
+                for unit in units:
+                    # Check 1: Is hex occupied by enemy?
+                    if self.has_enemy_army(next_hex, unit.allegiance):
+                        possible = False
+                        break
+
+                    # Check 2: Sea Barrier (if not handled by cost)
+                    # Note: get_movement_cost usually returns inf for ground vs sea,
+                    # but explicit hexside check mimics get_neighbors behavior.
+                    if unit.unit_type != 'wing':
+                        hexside = self.get_hexside(current_hex, next_hex)
+                        if hexside == "sea":
+                            possible = False
+                            break
+
+                    # Check 3: ZOC (Rule 5)
+                    # If currently in ZOC, cannot move to another ZOC hex.
+                    # Exemptions: Cavalry, Wing, Leader (UnitType check or method)
+                    is_exempt = unit.unit_type in ['cavalry', 'wing'] or (hasattr(unit, 'is_leader') and unit.is_leader())
+                    if not is_exempt:
+                        if self.is_adjacent_to_enemy(current_hex, unit) and self.is_adjacent_to_enemy(next_hex, unit):
+                            possible = False
+                            break
+
+                    # Check 4: Movement Cost
+                    cost = self.get_movement_cost(unit, current_hex, next_hex)
+                    if cost == float('inf') or cost is None:
+                        possible = False
+                        break
+
+                    stack_cost = max(stack_cost, cost)
+
+                if not possible:
+                    continue
+
+                new_cost = current_cost + stack_cost
+                if new_cost <= min_mp:
+                    if next_hex not in cost_so_far or new_cost < cost_so_far[next_hex]:
+                        cost_so_far[next_hex] = new_cost
+                        heapq.heappush(frontier, (new_cost, next_hex))
+
+        return reachable_hexes
