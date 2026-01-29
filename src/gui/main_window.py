@@ -170,9 +170,10 @@ class InfoPanel(QFrame):
         # Check for Movement Phase to auto-select
         from src.content.specs import GamePhase
         is_movement_phase = self.game_state and self.game_state.phase == GamePhase.MOVEMENT
+        is_combat_phase = self.game_state and self.game_state.phase == GamePhase.COMBAT
 
         # Reset header checkbox
-        self.header_checkbox.isChecked = is_movement_phase
+        self.header_checkbox.isChecked = is_movement_phase or is_combat_phase
         self.header_checkbox.viewport().update()
 
         # Populates table rows with unit properties and selection checkboxes
@@ -182,7 +183,7 @@ class InfoPanel(QFrame):
             # 1. Checkbox
             chk_item = QTableWidgetItem()
             chk_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            chk_item.setCheckState(Qt.Checked if is_movement_phase else Qt.Unchecked)
+            chk_item.setCheckState(Qt.Checked if is_movement_phase or is_combat_phase else Qt.Unchecked)
             self.units_table.setItem(row, 0, chk_item)
 
             # 2. Icon
@@ -314,3 +315,4 @@ class MainWindow(QMainWindow):
         self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)
         self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
+        self.map_view.right_clicked.connect(controller.reset_combat_selection)

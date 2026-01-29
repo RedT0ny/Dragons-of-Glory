@@ -1,5 +1,4 @@
-import sys
-import locale
+import sys, locale
 from PySide6.QtWidgets import QApplication
 
 from src.gui.main_window import MainWindow

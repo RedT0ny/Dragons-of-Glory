@@ -414,11 +414,11 @@ class GameState:
     def get_units_by_country(self, country):
         pass
 
-    def get_units_at(self, position):
+    def get_units_at(self, hex_coord):
         """
         GameState asks the map's unit_map for the units at this coordinate.
         """
-        return self.map.get_units_in_hex(position.q, position.r)
+        return self.map.get_units_in_hex(hex_coord.q, hex_coord.r)
 
     def move_unit(self, unit, target_hex):
         """

@@ -12,9 +12,10 @@ from src.game.map import Hex
 from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter
 
 class AnsalonMapView(QGraphicsView):
-    # Added Signal to notify main window
+    # Added Signals to notify main window
     units_clicked = Signal(list)
     hex_clicked = Signal(object)
+    right_clicked = Signal()
 
     def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
@@ -78,6 +79,11 @@ class AnsalonMapView(QGraphicsView):
         """Handle clicks for deployment or depleted unit interaction."""
         super().mousePressEvent(event)
 
+        # Scenario 1: Right-click Deselect
+        if event.button() == Qt.RightButton:
+            self.right_clicked.emit()
+            return
+
         if event.button() != Qt.LeftButton:
             return
 
@@ -109,9 +115,9 @@ class AnsalonMapView(QGraphicsView):
 
         # 3. Handle Combat Phase Clicks
         if self.game_state.phase == GamePhase.COMBAT:
-            # Reuse movement click logic to identify the clicked hex
-            # The controller will decide if it's a valid target
-            if self.handle_movement_click(scene_pos):
+            # Combat clicks need to detect hexes even if NOT highlighted (to select stacks)
+            # handle_movement_click only works on highlighted items.
+            if self.handle_combat_click_view(scene_pos):
                 return
 
         # 4. Handle Depleted Unit Stacking (only in Replacements Phase)
@@ -128,6 +134,21 @@ class AnsalonMapView(QGraphicsView):
                 self.hex_clicked.emit(hex_obj)
                 return True
         return False
+
+    def handle_combat_click_view(self, scene_pos):
+        """Detects click on ANY hex during combat to allow stack selection."""
+        items = self.scene.items(scene_pos)
+        for item in items:
+            if isinstance(item, HexagonItem):
+                # We accept any hex click here, the Controller decides if it's valid
+                # (Friend to select, Enemy to target, Empty to deselect)
+                from src.game.map import Hex
+                col, row = item.coords
+                hex_obj = Hex.offset_to_axial(col, row)
+                self.hex_clicked.emit(hex_obj)
+                return True
+        return False
+
 
     def handle_deployment_click(self, scene_pos):
         # Find hex at this position

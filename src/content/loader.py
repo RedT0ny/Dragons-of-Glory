@@ -153,9 +153,19 @@ def load_data(file_path):
             with open(file_path, 'r') as f:
                 return yaml.safe_load(f)
         elif ext == '.csv':
+            data = {}
             with open(file_path, 'r') as f:
-                reader = csv.DictReader(f)
-                return [row for row in reader]
+                reader = csv.reader(f, delimiter=';')
+                headers = next(reader)
+
+                for row in reader:
+                    roll = int(row[0])
+                    data[roll] = {}
+
+                    for i in range(1, len(headers)):
+                        data[roll][headers[i]] = row[i]
+
+            return data
     except Exception as e:
         print(f"Error loading {file_path}: {e}")
         return {}

@@ -24,15 +24,16 @@ class CombatResolver:
         """
         if defender_cs <= 0: return "6:1"
         ratio = attacker_cs / defender_cs
-        # ... logic to map ratio to CRT columns ...
+
+        # Logic to map ratio to CRT columns (rounding in favor of defender)
         if ratio >= 6: return "6:1"
         if ratio >= 5: return "5:1"
         if ratio >= 4: return "4:1"
-        if ratio >= 3.33: return "3:2"
         if ratio >= 3: return "3:1"
         if ratio >= 2: return "2:1"
-        if ratio >= 1.5: return "2:3"
+        if ratio >= 1.5: return "3:2"
         if ratio >= 1: return "1:1"
+        if ratio >= 0.66: return "2:3"
         if ratio >= 0.5: return "1:2"
 
         return "1:3"
