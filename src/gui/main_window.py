@@ -167,8 +167,12 @@ class InfoPanel(QFrame):
         self.units_table.blockSignals(True)
         self.units_table.setRowCount(0)
 
+        # Check for Movement Phase to auto-select
+        from src.content.specs import GamePhase
+        is_movement_phase = self.game_state and self.game_state.phase == GamePhase.MOVEMENT
+
         # Reset header checkbox
-        self.header_checkbox.isChecked = False
+        self.header_checkbox.isChecked = is_movement_phase
         self.header_checkbox.viewport().update()
 
         # Populates table rows with unit properties and selection checkboxes
@@ -178,7 +182,7 @@ class InfoPanel(QFrame):
             # 1. Checkbox
             chk_item = QTableWidgetItem()
             chk_item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
-            chk_item.setCheckState(Qt.Checked)
+            chk_item.setCheckState(Qt.Checked if is_movement_phase else Qt.Unchecked)
             self.units_table.setItem(row, 0, chk_item)
 
             # 2. Icon
@@ -207,6 +211,10 @@ class InfoPanel(QFrame):
         self.units_table.resizeRowsToContents()
         self.units_table.blockSignals(False)
         #self.units_table.resizeColumnsToContents()
+
+        # Immediately notify selection if we auto-selected units
+        if is_movement_phase:
+            self.notify_selection()
 
     def on_item_changed(self, item):
         if item.column() == 0:

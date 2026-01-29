@@ -64,6 +64,8 @@ class Hex:
         return f"Hex(Axial:{self.q},{self.r} | Offset:{col:02d}{row:02d})"
 
     def __eq__(self, other):
+        if not isinstance(other, Hex):
+            return False
         return self.q == other.q and self.r == other.r
 
     def __lt__(self, other):

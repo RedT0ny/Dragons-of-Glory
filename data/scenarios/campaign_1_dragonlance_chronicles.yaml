@@ -54,37 +54,27 @@ scenario:
       countries:
         abanasinia: null
         balifor: null
-        blode:
+        blode: all
+        blodehelm: all
+        dtemple:
           units: all
-        blodehelm:
-          units: all
+          ready: 12
         estwilde: null
-        kern:
-          units: all
-        khur:
-          units: all
-        lemish:
-          units: all
+        kern: all
+        khur: all
+        lemish: all
         kothas: null
         nightlund: null
         nordmaar: null
-        sanction:
-          units: all
-        taman:
-          units: all
-        throt:
-          units: all
+        sanction: all
+        taman: all
+        throt: all
         vingaard: null
-        black:
-          units: all
-        blue:
-          units: all
-        green:
-          units: all
-        red:
-          units: all
-        white:
-          units: all
+        black: all
+        blue: all
+        green: all
+        red: all
+        white: all
 
       explicit_units: [ "ariakas" ]
 

@@ -414,11 +414,11 @@ class GameState:
     def get_units_by_country(self, country):
         pass
 
-    def get_units_at(self, hex_coord):
+    def get_units_at(self, position):
         """
         GameState asks the map's unit_map for the units at this coordinate.
         """
-        return self.map.get_units_in_hex(hex_coord.q, hex_coord.r)
+        return self.map.get_units_in_hex(position.q, position.r)
 
     def move_unit(self, unit, target_hex):
         """
@@ -446,12 +446,11 @@ class GameState:
         Initiates combat resolution for a specific hex.
         """
         defenders = self.get_units_at(hex_position)
+        # Need to convert hex_position (axial) to offset for get_terrain if it expects offset?
+        # Looking at game_state code, map.get_terrain usually takes axial object or handles conversion.
+        # Assuming hex_position is the Axial Hex object passed from controller.
+
         terrain = self.map.get_terrain(hex_position)
-        
+
         resolver = CombatResolver(attackers, defenders, terrain)
         result = resolver.resolve()
-        
-        self.apply_combat_result(result)
-
-    def get_units_at(self, position):
-        return [u for u in self.units if u.position == position]

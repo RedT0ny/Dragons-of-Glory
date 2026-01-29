@@ -16,7 +16,7 @@ class AnsalonMapView(QGraphicsView):
     units_clicked = Signal(list)
     hex_clicked = Signal(object)
 
-    def __init__(self, game_state, parent=None, overlay_alpha=100):
+    def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
         self.game_state = game_state
         self.overlay_alpha = overlay_alpha
@@ -107,7 +107,14 @@ class AnsalonMapView(QGraphicsView):
             if self.handle_movement_click(scene_pos):
                 return
 
-        # 3. Handle Depleted Unit Stacking (only in Replacements Phase)
+        # 3. Handle Combat Phase Clicks
+        if self.game_state.phase == GamePhase.COMBAT:
+            # Reuse movement click logic to identify the clicked hex
+            # The controller will decide if it's a valid target
+            if self.handle_movement_click(scene_pos):
+                return
+
+        # 4. Handle Depleted Unit Stacking (only in Replacements Phase)
         if self.game_state.phase == GamePhase.REPLACEMENTS:
             self.handle_depleted_stack_click(scene_pos)
 
@@ -269,7 +276,7 @@ class AnsalonMapView(QGraphicsView):
 
                     # 4. Draw Hexside Items (Rivers, etc)
                     # To avoid duplicates, we only draw for specific directions (e.g. E, SE, SW)
-                    if idx in [0, 1, 2] and hexside and hexside not in ["sea", "pass"]:
+                    if idx in [0, 1, 2] and hexside and hexside in ["river", "deep_river", "mountain"]:
                         # Calculate vertices for this edge
                         # Edge i connects vertex i and (i+1)%6
                         p1 = self.get_vertex(center, idx)
@@ -284,11 +291,11 @@ class AnsalonMapView(QGraphicsView):
                 self.scene.addItem(hex_item)
 
                 # 5. Draw Location if present
-                loc_data = board.get_location(hex_obj)
-                if loc_data:
-                    loc_item = LocationItem(center, loc_data['location_id'],
-                                             loc_data['type'], loc_data['is_capital'])
-                    self.scene.addItem(loc_item)
+                # loc_data = board.get_location(hex_obj)
+                # if loc_data:
+                #     loc_item = LocationItem(center, loc_data['location_id'],
+                #                              loc_data['type'], loc_data['is_capital'])
+                #     self.scene.addItem(loc_item)
 
         # Overlay Country territories
         # Iterate GameState countries directly
@@ -420,6 +427,7 @@ class AnsalonMapView(QGraphicsView):
         reachable_coords: List of (col, row) tuples.
         """
         reachable_set = set(reachable_coords)
+        # Highlights reachable hexagons by comparing item coordinates
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
                 should_highlight = item.coords in reachable_set
