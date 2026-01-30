@@ -1,13 +1,153 @@
-# Catalog of all possible items
-staff_of_magius:
-  description: "A powerful staff for a wizard."
-  bonus: { tactical_rating: 1, fear_immunity: true }
+# Artifact catalog
+
+# If a leader equipped with the Blue Crystal Staff dies in battle, they are revived and the staff destroyed
+blue_crystal_staff:
+  description: >
+    A powerful artifact in the service of good that comes into the world only during times of great need. 
+    The wielder of the staff is guided and protected by the goddess, Mishakal, ensuring the forces of evil 
+    cannot benefit from it.
+  picture: "bluestaff.jpg"
   requirements:
-    - { type: "trait", value: "is_magical" }
-  is_consumable: false
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "leader" }
+  bonus:
+    tactical_rating: 1
+    other: "revive"
+    is_consumable: true
+
+# The Crown of Power allows a Highlord to control dragons from any dragonflight
+crown_of_power:
+  description: >
+    This relic is a powerful artifact of evil, designed to represent absolute and total control of one person over
+    another (or many others). It is said that whoever wears the crown will rule Krynn in the name of the Dark
+    Queen, Takhisis.
+  picture: "crown.jpg"
+  requirements:
+    - { type: "unit_type", value: "highlord" }
+  bonus:
+    tactical_rating: 1
+    other: "emperor"
+
+disks_of_mishakal:
+  description: >
+    Crafted during the Age of Might, each of the 160 disks are made of hammered platinum. A rod of steel pierces one 
+    edge of each disk, binding the disks together. Arcane glyphs engraved on both sides of the disk provide a treatise 
+    on the rituals and worship of the true gods of Krynn.
+  picture: "disks_of_mishakal.jpg"
+  requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "army" }
+  bonus:
+    combat_rating: 1
+    other: "healing"
+
+# Note: Implement armor/defense bonus in Leader class. It shall affect DRM.
+dragonarmor:
+  description: >
+    A specially crafted suit of armor, designed and worn by the forces of the Dark Queen’s Dragonarmies. 
+    Each suit of dragonarmor is specifically crafted to fit a specific individual, and is presented as a 
+    token of prestige to officers.
+  picture: "dragonarmor.jpg"
+  requirements:
+    - { type: "allegiance", value: "highlord" }
+    - { type: "unit_type", value: "leader" }
+  bonus:
+    tactical_rating: 1
+    other: "armor"
 
 dragonlance:
-  description: "A legendary weapon against dragons."
-  bonus: { combat_rating: 5 } # Handled in Unit.combat_rating property
+  description: > 
+    First created during the Third Dragon War, dragonlances are weapons created for the express purpose of killing 
+    dragons. The lances are as effective as a normal lance against most opponents. Against dragons, they are devastating.
+  picture: "dragonlance.svg"
   requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "army" }
+  bonus:
+    combat_rating: 1
+    other: "dragon_slayer"
+
+dragon_orb:
+  description: >
+    A powerful artifact created by the alliance of wizards during the final desperate hours of the Third Dragon War. 
+    It contains the spirit of a mighty wyrm of evil, luring other dragons to their doom.
+  picture: "orb.svg"
+  requirements:
+    - { type: "unit_type", value: "leader" }
+  bonus: { other: "dragon_orb" }
+
+gnome_tech:
+  description: >
+    A wondrous device created by the ingenious gnomes of Mount Nevermind. This compact apparatus hums with 
+    barely contained energy, capable of enhancing the technological capabilities of those who wield it.
+  picture: "gnome_tech.jpg"
+  requirements:
+    - { type: "unit_type", value: "army" }
+  bonus:
+    other: "gnome_tech"
+
+hammer_of_kharas:
+  description: >
+    The Hammer of Kharas was named for the dwarven hero, Kharas, who wielded the hammer during the Dwarfgate 
+    Wars, although the hammer was forged more than two thousand years prior to that great battle. History prior to 
+    Kharas records it as being called the Hammer of Honor. 
+    Forged in 2,072 PC by the dwarves of Thorbardin as a replica of the hammer of Reorx, the dwarves presented it to 
+    Ergoth as an offering of peace. 
+    The hammer would remain with Ergoth for centuries, until it would appear once again during the Third Dragon War, 
+    when Huma Dragonbane sought out a dwarven smith in Ergoth, bearing the blessed Silver Arm of Ergoth and the Hammer 
+    of Honor. This dwarven smith, with the divine power of the Hammer of Kharas and the Silver Arm was able to forge
+    the first dragonlances.
+  picture: "hammer_of_kharas.jpg"
+  requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "leader" }
+  bonus:
+    tactical_rating: 1
+    diplomacy: ["kaolyn", "thorbardin", "zhakar"]
+
+# Eliminate to allow a depleted unit to heal completely
+medallion_of_faith:
+  description: > 
+    A silver medallion bearing the sign of {random:Paladine|Mishakal|Habbakuk|Kiri-Jolith}.
+  picture: "medallion.jpg"
+  requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "army" }
+  bonus: { other: "healing" }
+  is_consumable: true
+
+plate_of_solamnus:
+  description: >
+    A suit of full plate mail beautifully crafted, polished to a silvery sheen and engraved with the markings 
+    of one of the orders of the Knights of Solamnia. The Plate of Solamnus was forged when the knighthood and the 
+    Orders were first formed and no one knows how many of these suits of armor were forged. No such armor has been 
+    forged since that time, at least according to the records of the Knights of Solamnia, who have tried to keep 
+    track of every suit they have discovered.
+  picture: "solamnus_plate.svg"
+  requirements:
+    - { type: "unit_type", value: "army" }
     - { type: "race", value: "solamnic" }
+  bonus:
+    tactical_rating: 1
+    other: "armor"
+
+staff_of_magius:
+  description: >
+    This staff is said to have been created and wielded by the great war-wizard Magius, whose magic was instrumental 
+    in aiding Huma in defeating the Queen of Darkness.
+  requirements:
+    - { type: "unit_type", value: "wizard" }
+  bonus: { tactical_rating: 2 }
+
+wyrmslayer:
+  description: >
+    A longsword of elven design, with elegant elven script etched into the blade. The crosspiece of the blade bears 
+    the distinctive likeness of an eagle’s beak.
+    Forged by the Silvanesti during the Age of Dreams for use in the early Dragon Wars. It was famously wielded by 
+    the elven hero Kith-Kanan during the Kinslayer War and later buried with him in Pax Tharkas.
+  picture: "wyrmslayer.jpg"
+  requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "leader" }
+    - { type: "race", value: "elf" }
+  bonus: { tactical_rating: 2 }

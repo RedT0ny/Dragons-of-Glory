@@ -1,23 +1,24 @@
 # Dragons-of-Glory
-A python implementation of Dragonlance classic "Dragons of Glory", with Dragon #170's Advanced Rules and other updates.
+A python implementation of Dragonlance classic "Dragons of Glory".
 
+Design overview:
+![game_layout.svg](assets/img/game_layout.svg)
 
 TODO:
 
-- Add Maelstrom overlay (either on the background image map or rendered)
 - Add Dragon #170's Advanced Rules in "settings"
 - Add minimap
-- Add list of units in the right panel
 - Add unit pictures for the info panel
 - Add menu bar to main_window
 - Add hover tooltips to the map
-- Implement the "move units" and "combat" features
+- Finalize movement and combat phases.
 - Implement save and load game
 - Check victory conditions
+- Implement events and artifacts.
+- Implement status tab.
 - Implement dashboards
 - Implement AI player
 - Change replacements dialog to window
-- Darken the overlay_alpha of the diplomacy map so countries are visible
 - I18n
 
 TODO BUGFIX:

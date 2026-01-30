@@ -1,54 +1,274 @@
 # Scripted events that can happen
+E1_WS_DIPLOMACY:
+  type: "diplomacy"
+  description: > 
+    When shadows lengthened and hope seemed a memory, the scattered peoples of Ansalon remembered a greater 
+    truth: that ancient rivalries were the luxury of peaceful times. From the plains of Abanasinia to the halls of 
+    Thorbardin, envoys moved swiftly. Old grievances were set aside, not forgotten, but deferred to a common cause. 
+    In this darkest hour, the free peoples began to unite, forging a fragile but shining alliance against the
+    overwhelming tide of evil.
+    
+    This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
+  picture: "ws_diplomacy.jpg"
+  trigger: { turn: 1 }
+  allegiance: "whitestone"
+  effects: { activation_bonus: 2 }
+  max_occurrences: 2
+
+E1_WS_MINOR_DIPLOMACY:
+  type: "diplomacy"
+  description: > 
+    A week of parleying, bargaining, and negotiation has borne fruit. Old enmities are set aside as leaders from 
+    various factions agree to a non-aggression pact, allowing for greater focus on the common enemy.
+    
+    This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
+  picture: "ws_minor_diplomacy.jpg"
+  trigger: { turn: 1 }
+  allegiance: "whitestone"
+  effects: { gain_alliance: "neutral" }
+  max_occurrences: 3
+
+E1_HL_MINOR_DIPLOMACY:
+  type: "diplomacy"
+  description: > 
+    Through a combination of fear and persuasion, the Dark Queen's agents have convinced a minor faction to join 
+    her cause. This new alliance strengthens her position in the ongoing conflict.
+    
+    This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
+  picture: "hl_minor_diplomacy.jpg"
+  trigger: { turn: 5 }
+  allegiance: "highlord"
+  effects: { activation_bonus: 1 }
+  max_occurrences: 3
+
+E1_BLUE_CRYSTAL_STAFF:
+  type: "artifact"
+  description: "In the course of his Courting Quest, Riverwind recovers a Blue Crystal Staff from the depths of Xak Tsaroth."
+  picture: "bluestaff.jpg"
+  allegiance: "whitestone"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "blue_crystal_staff" }
+
+E1_CROWN_OF_POWER:
+  type: "artifact"
+  description: "Takhisis offers an artifact of eldritch power to her favourite Dragon Highlord."
+  picture: "crown.jpg"
+  allegiance: "highlord"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "crown_of_power" }
+
+E1_DRAGONARMOR:
+  type: "artifact"
+  description: "The Dark Queen's vile magesmiths craft a dragonarmor."
+  picture: "dragonarmor.jpg"
+  allegiance: "highlord"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "dragonarmor" }
+  max_occurrences: 4
+
 E1_FIND_METAL:
   type: "pre_req"
   description: "Pure Dragon Metal found in the mountains."
+  picture: "dragonmetal.jpg"
   trigger: { turn: 5 }
-  effects: { grant_prerequisite: "pure_metal" }
+  effects: { grant_prerequisite: "dragonmetal" }
 
-E10_CREATE_LANCE:
+E1_HAMMER_OF_KHARAS:
   type: "artifact"
-  description: "The first Dragonlances are forged!"
-  trigger:
-    turn: 10
-    requires: ["pure_metal", "hammer_of_kharas"]
+  description: "The Hammer of Kharas has been recovered."
+  picture: "hammer_of_kharas.jpg"
+  trigger: { turn: 5 }
   effects:
-    grant_artifact: "dragonlance"
-    allegiance: "whitestone"
+    grant_prerequisite: "hammer_of_kharas"
+    grant_artifact: "hammer_of_kharas"
+
+E1_HIGHLORD_BLITZRIEG:
+  type: "bonus"
+  description: >
+    The Dragon Highlords launch a swift and devastating blitzkrieg against the Whitestone forces, catching them 
+    off guard and disrupting their plans.
+    
+    This turn all Highlord armies receive a +1 bonus to their combat rolls.
+  picture: "highlord_attack.jpg"
+  allegiance: "highlord"
+  trigger: { turn: 5 }
+  effects: { combat_bonus: 1 }
+  max_occurrences: 3
+
+E1_MEDALLION_OF_FAITH:
+  type: "artifact"
+  description: "A medallion of faith from the true gods is discovered in an abandoned shrine."
+  picture: "medallion.jpg"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "medallion_of_faith" }
+  max_occurrences: 4
+
+E1_PLATE_OF_SOLAMNUS:
+  type: "artifact"
+  description: "A full suit of plate mail with the markings of the Solamnic Order."
+  picture: "solamnus_plate.svg"
+  requires: "knights_at_war"
+  allegiance: "whitestone"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "plate_of_solamnus" }
+  max_occurrences: 4
+
+E1_WILDRUNNER_TACTICS:
+  type: "bonus"
+  description: >
+    The Wildrunners of Silvanesti share their guerrilla warfare tactics with the Whitestone armies, improving 
+    their effectiveness in combat.
+    
+    This turn all Whitestone armies receive a +1 bonus to their combat rolls.
+  picture: "wildrunner_tactics.jpg"
+  allegiance: "whitestone"
+  trigger: { turn: 5 }
+  effects: { combat_bonus: 1 }
+  max_occurrences: 3
 
 E1_WIZARD_WS:
   type: "unit"
-  description: "From the Tower of High Sorcery of Wayreth, a wizard arrives to aid the forces of good."
+  description: >
+    The wizard council at the Tower of High Sorcery in Wayreth sends reinforcements to aid the Whitestone forces.
+    
+    A powerful wizard arrives to join your ranks.
+  picture: "ws_wizard.jpg"
   trigger: { turn: 5 }
-  effects: { add_units: "wizard", allegiance: "whitestone" }
+  allegiance: "whitestone"
+  effects: { add_units: "wizard",  }
   max_occurrences: 3
 
 E1_WIZARD_HL:
   type: "unit"
-  description: "A black robed wizard arrives to serve the Dark Queen."
+  description: >
+    Tempted by promises of power and dark knowledge, a Black Robe wizard joins the Dragonarmies to serve their 
+    Dark Queen.
+    
+    A powerful evil wizard arrives to join your ranks.
+  picture: "hl_wizard.jpg"
   trigger: { turn: 5 }
-  effects: { add_units: "wizard", allegiance: "highlord" }
+  allegiance: "highlord"
+  effects: { add_units: "wizard" }
   max_occurrences: 3
+
+E10_CREATE_LANCE:
+  type: "artifact"
+  description: >
+    Using the Silver Arm of Ergoth and the Hammer of Kharas, Theros Ironfield forges the legendary Dragonlance, 
+    a weapon capable of slaying even the mightiest of dragons.
+    
+    A Dragonlance has been created!
+  picture: "dragonlance.svg"
+  allegiance: "whitestone"
+  trigger:
+    turn: 10
+    requires: ["pure_metal", "hammer_of_kharas"]
+  effects: { grant_artifact: "dragonlance" }
+
+E10_DRAGON_ORB:
+  type: "artifact"
+  description: >
+    One of the believed lost Dragon Orbs, created by the alliance of mages during the Third Dragon War, has been 
+    found in a distant ruins. This potent artifact contains the spirit of a mighty wyrm, capable of luring other 
+    dragons to their doom.
+    
+    You have obtained a Dragon Orb!
+  picture: "orb.svg"
+  trigger: { turn: 10 }
+  effects: { grant_artifact: "dragon_orb" }
+
+E20_DISKS_OF_MISHAKAL:
+  type: "artifact"
+  description: > 
+    After a desperate battle against Khisanth in the ruins of Xak Tsaroth, Goldmoon finds a set of Platinum Disks. 
+    These ancient artifacts, inscribed with the teachings of the true gods, radiate a soothing light that heals and 
+    inspires those who follow the path of righteousness.
+    
+    You have recovered the Disks of Mishakal!
+  picture: "disks_of_mishakal.jpg"
+  allegiance: "whitestone"
+  trigger: { turn: 5 }
+  effects: { grant_artifact: "disks_of_mishakal" }
+
+E10_HL_DIPLOMACY:
+  type: "diplomacy"
+  description: > 
+    The Dark Queen's influence spreads like a shadow across the land. Through cunning diplomacy and ruthless 
+    intimidation, she secures the allegiance of various factions, bolstering her forces for the battles to come.
+    
+    This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
+  picture: "hl_diplomacy.jpg"
+  trigger: { turn: 10 }
+  allegiance: "highlord"
+  effects: { activation_bonus: 2 }
+  max_occurrences: 2
+
+E10_WHITESTONE_COUNCIL:
+  type: "diplomacy"
+  description: > 
+    In a grand council held in the Whitestone Glade of Sancrist, leaders from all corners of Ansalon convene to 
+    discuss the dire situation. Through impassioned speeches and heartfelt pleas, a powerful alliance is forged, 
+    uniting the forces of good against the encroaching darkness.
+    
+    This turn, your efforts to secure a vital ally are successful. You receive a +3 bonus in your activation roll.
+  picture: "whitestone_council.jpg"
+  trigger: { turn: 15 }
+  allegiance: "whitestone"
+  effects: { activation_bonus: 3 }
+
+E20_FLYING_CITADEL:
+  type: "units"
+  description: >
+    From the desolate, broken lands where even the sun fears to linger, a terrible groaning shakes the very bones 
+    of the world. The earth heaves, then sunders with a sound of shattering stone. Soil, rock, and the forgotten tombs
+    of ages crumble away as a jagged mass of obsidian and iron tears itself free from the ground. A dreadful silence 
+    falls, broken only by the low, sorcerous hum of ancient hatred given wings. The air itself curdles around its form 
+    as the titanic, shadow-wreathed citadel ascends, blotting out the sky. Where its fell silhouette passes, daylight 
+    withers, hope chills, and the land beneath lies cursed in a premature and ominous dusk.
+    
+    An ominous Flying Citadel joins the Dragon Highlord's forces.
+  picture: "citadel.jpg"
+  trigger: { turn: 20 }
+  effects: { add_units: "citadel" }
+
+E20_GNOME_TECH:
+  type: "artifact"
+  description: > 
+    The ingenious gnomes of Mount Nevermind have perfected a wondrous device that hums with barely contained energy. 
+    This compact apparatus is capable of enhancing the technological capabilities of those who wield it, providing 
+    a significant advantage in battle.
+    
+    Mount Nevermind has joined the war. A Gnome Tech artifact has been acquired!
+  picture: "gnome_tech.jpg"
+  trigger: { turn: 20 }
+  effects:
+    grant_artifact: "gnome_tech"
+    add_units: "nevermind"
+
+E20_GOLDEN_GENERAL:
+  type: "units"
+  description: "Laurana, the Golden General, has been appointed commander-in-chief of the Whitestone forces"
+  picture: "golden_general.jpg"
+  trigger: { turn: 20 }
+  effects: { add_units: "golden_general" }
 
 E20_GOOD_DRAGONS:
   type: "units"
   description: "The Good Dragons emerge to aid the forces of good."
+  picture: "good_dragons.jpg"
   trigger: { turn: 20 }
   effects: { add_units: "good_dragons" }
 
 E20_SOTHS_LEGIONS:
   type: "units"
   description: "Lord Soth, Knight of the Black Rose, offers his allegiance to Takhisis."
+  picture: "soths_charge.jpg"
   trigger: { turn: 20 }
   effects: { add_units: "soths_legions" }
 
-E20_FLYING_CITADEL:
-  type: "units"
-  description: "Using a dark ritual, a flying citadel is summoned."
+E20_WYRMSLAYER:
+  type: "artifact"
+  description: "The skeletal hand of Kith-Kanan hands the Wyrmslayer to a Whitestone Hero!"
+  picture: "wyrmslayer_hand.jpg"
   trigger: { turn: 20 }
-  effects: { add_units: "citadel" }
-
-E20_GOLDEN_GENERAL:
-  type: "units"
-  description: "Laurana, the Golden General, has been appointed commander-in-chief of the Whitestone forces"
-  trigger: { turn: 20 }
-  effects: { add_units: "golden_general" }
+  effects: { grant_artifact: "wyrmslayer" }
