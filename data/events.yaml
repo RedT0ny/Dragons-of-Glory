@@ -1,5 +1,5 @@
 # Scripted events that can happen
-E1_WS_DIPLOMACY:
+ws_diplomacy:
   type: "diplomacy"
   description: > 
     When shadows lengthened and hope seemed a memory, the scattered peoples of Ansalon remembered a greater 
@@ -10,12 +10,12 @@ E1_WS_DIPLOMACY:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
   picture: "ws_diplomacy.jpg"
-  trigger: { turn: 1 }
+  trigger: { turn: 3 }
   allegiance: "whitestone"
   effects: { activation_bonus: 2 }
   max_occurrences: 2
 
-E1_WS_MINOR_DIPLOMACY:
+ws_minor_diplomacy:
   type: "diplomacy"
   description: > 
     A week of parleying, bargaining, and negotiation has borne fruit. Old enmities are set aside as leaders from 
@@ -23,12 +23,12 @@ E1_WS_MINOR_DIPLOMACY:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "ws_minor_diplomacy.jpg"
-  trigger: { turn: 1 }
+  trigger: { turn: 2 }
   allegiance: "whitestone"
   effects: { gain_alliance: "neutral" }
   max_occurrences: 3
 
-E1_HL_MINOR_DIPLOMACY:
+hl_minor_diplomacy:
   type: "diplomacy"
   description: > 
     Through a combination of fear and persuasion, the Dark Queen's agents have convinced a minor faction to join 
@@ -41,48 +41,71 @@ E1_HL_MINOR_DIPLOMACY:
   effects: { activation_bonus: 1 }
   max_occurrences: 3
 
-E1_BLUE_CRYSTAL_STAFF:
+blue_crystal_staff:
   type: "artifact"
-  description: "In the course of his Courting Quest, Riverwind recovers a Blue Crystal Staff from the depths of Xak Tsaroth."
-  picture: "bluestaff.jpg"
+  description: >
+    During his courting quest, Riverwind arrives to the ancient ruins of Xak Tsaroth. There, he discovers an ancient 
+    temple, in which the statue of a beautiful woman holds a staff in outstretched hands. 
+    The goddess Mishakal appears to Riverwind in a vision, offering him the staff, which will allow for the return of 
+    good clerics. 
+    
+    You have recovered the Blue Crystal Staff!
+  picture: "riverwind_quest.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 5 }
+  trigger: { turn: 11 }
   effects: { grant_artifact: "blue_crystal_staff" }
 
-E1_CROWN_OF_POWER:
+crown_of_power:
   type: "artifact"
-  description: "Takhisis offers an artifact of eldritch power to her favourite Dragon Highlord."
-  picture: "crown.jpg"
+  description: >
+    From the Abyss, Takhisis poduces a Crown of solid gold, carved with twisting designs, and inset with flawless blood 
+    rubies. When it is worn, the rubies glow with an unholy light. The Dark Queen offers it to her most faithful 
+    lieutenant.
+    
+    The Crown of Power has been granted to the Highlord.
+  picture: "takhisis_crown.jpg"
   allegiance: "highlord"
   trigger: { turn: 5 }
   effects: { grant_artifact: "crown_of_power" }
 
-E1_DRAGONARMOR:
+dragonarmor:
   type: "artifact"
-  description: "The Dark Queen's vile magesmiths craft a dragonarmor."
-  picture: "dragonarmor.jpg"
+  description: >
+    The forges of Neraka finalize the production of the latest design from the Dark Queen's vile magesmiths.
+    
+    A suit of Dragonarmor is presented as a token of prestige to one of the highlords.
+  picture: "dark_forge.jpg"
   allegiance: "highlord"
   trigger: { turn: 5 }
   effects: { grant_artifact: "dragonarmor" }
   max_occurrences: 4
 
-E1_FIND_METAL:
+dragonmetal:
   type: "pre_req"
-  description: "Pure Dragon Metal found in the mountains."
-  picture: "dragonmetal.jpg"
-  trigger: { turn: 5 }
+  description: >
+    A Whitestone heroine ventured beneath the Stone Dragon in Foghaven Vale. There, welling up from the earth, she 
+    found a pool of cool liquid metal. This gift from the gods of Light is one of the essential ingredients that can 
+    be used to forge dragonlances.
+    
+    A pool of pure dragonmetal has been found in Foghaven Vale.
+  picture: "foghaven_vale.jpg"
+  trigger: { turn: 20 }
   effects: { grant_prerequisite: "dragonmetal" }
 
-E1_HAMMER_OF_KHARAS:
+hammer_of_kharas:
   type: "artifact"
-  description: "The Hammer of Kharas has been recovered."
+  description: >
+    Arman Kharas, Flint and Tas return to the Temple of Stars after entering the Sacred Valley of the Thanes. They
+    bring with them an artifact that can change the course of the war.
+    
+    Whitestone finds the Hammer of Kharas!
   picture: "hammer_of_kharas.jpg"
-  trigger: { turn: 5 }
+  trigger: { turn: 20 }
   effects:
     grant_prerequisite: "hammer_of_kharas"
     grant_artifact: "hammer_of_kharas"
 
-E1_HIGHLORD_BLITZRIEG:
+highlord_blitzkrieg:
   type: "bonus"
   description: >
     The Dragon Highlords launch a swift and devastating blitzkrieg against the Whitestone forces, catching them 
@@ -91,29 +114,35 @@ E1_HIGHLORD_BLITZRIEG:
     This turn all Highlord armies receive a +1 bonus to their combat rolls.
   picture: "highlord_attack.jpg"
   allegiance: "highlord"
-  trigger: { turn: 5 }
+  trigger: { turn: 1 }
   effects: { combat_bonus: 1 }
   max_occurrences: 3
 
-E1_MEDALLION_OF_FAITH:
+medallion_of_faith:
   type: "artifact"
   description: "A medallion of faith from the true gods is discovered in an abandoned shrine."
   picture: "medallion.jpg"
-  trigger: { turn: 5 }
+  trigger: { turn: 19 }
   effects: { grant_artifact: "medallion_of_faith" }
   max_occurrences: 4
 
-E1_PLATE_OF_SOLAMNUS:
+plate_of_solamnus:
   type: "artifact"
-  description: "A full suit of plate mail with the markings of the Solamnic Order."
+  description: > 
+    As the storm rages over Ansalon and the Dragonarmies cast their shadow over Solamnia, the Knights 
+    undust their weapons and relics. Beautifully crafted suits of plate armor, polished to a silvery sheen and 
+    engraved with the markings of all three orders of the Knights of Solamnia, are unveiled to the face of Krynn
+    once again.
+    
+    A Plate of Solamnus is recovered from the catacombs of the Solamnic Keeps and presented to the Whitestone.
   picture: "solamnus_plate.svg"
   requires: "knights_at_war"
   allegiance: "whitestone"
-  trigger: { turn: 5 }
+  trigger: { turn: 1 }
   effects: { grant_artifact: "plate_of_solamnus" }
   max_occurrences: 4
 
-E1_WILDRUNNER_TACTICS:
+wildrunner_tactics:
   type: "bonus"
   description: >
     The Wildrunners of Silvanesti share their guerrilla warfare tactics with the Whitestone armies, improving 
@@ -122,23 +151,23 @@ E1_WILDRUNNER_TACTICS:
     This turn all Whitestone armies receive a +1 bonus to their combat rolls.
   picture: "wildrunner_tactics.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 5 }
+  trigger: { turn: 6 }
   effects: { combat_bonus: 1 }
   max_occurrences: 3
 
-E1_WIZARD_WS:
+ws_wizard:
   type: "unit"
   description: >
     The wizard council at the Tower of High Sorcery in Wayreth sends reinforcements to aid the Whitestone forces.
     
     A powerful wizard arrives to join your ranks.
   picture: "ws_wizard.jpg"
-  trigger: { turn: 5 }
+  trigger: { turn: 2 }
   allegiance: "whitestone"
   effects: { add_units: "wizard",  }
   max_occurrences: 3
 
-E1_WIZARD_HL:
+hl_wizard:
   type: "unit"
   description: >
     Tempted by promises of power and dark knowledge, a Black Robe wizard joins the Dragonarmies to serve their 
@@ -146,12 +175,12 @@ E1_WIZARD_HL:
     
     A powerful evil wizard arrives to join your ranks.
   picture: "hl_wizard.jpg"
-  trigger: { turn: 5 }
+  trigger: { turn: 1 }
   allegiance: "highlord"
   effects: { add_units: "wizard" }
   max_occurrences: 3
 
-E10_CREATE_LANCE:
+dragonlance_forged:
   type: "artifact"
   description: >
     Using the Silver Arm of Ergoth and the Hammer of Kharas, Theros Ironfield forges the legendary Dragonlance, 
@@ -160,12 +189,12 @@ E10_CREATE_LANCE:
     A Dragonlance has been created!
   picture: "dragonlance.svg"
   allegiance: "whitestone"
-  trigger:
-    turn: 10
-    requires: ["pure_metal", "hammer_of_kharas"]
+  trigger: { turn: 20 }
+  requires: ["dragonmetal", "hammer_of_kharas"]
   effects: { grant_artifact: "dragonlance" }
+  max_ocurrences: 5
 
-E10_DRAGON_ORB:
+dragon_orb:
   type: "artifact"
   description: >
     One of the believed lost Dragon Orbs, created by the alliance of mages during the Third Dragon War, has been 
@@ -174,10 +203,10 @@ E10_DRAGON_ORB:
     
     You have obtained a Dragon Orb!
   picture: "orb.svg"
-  trigger: { turn: 10 }
+  trigger: { turn: 4 }
   effects: { grant_artifact: "dragon_orb" }
 
-E20_DISKS_OF_MISHAKAL:
+disks_of_mishakal:
   type: "artifact"
   description: > 
     After a desperate battle against Khisanth in the ruins of Xak Tsaroth, Goldmoon finds a set of Platinum Disks. 
@@ -187,10 +216,10 @@ E20_DISKS_OF_MISHAKAL:
     You have recovered the Disks of Mishakal!
   picture: "disks_of_mishakal.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 5 }
+  trigger: { turn: 19 }
   effects: { grant_artifact: "disks_of_mishakal" }
 
-E10_HL_DIPLOMACY:
+hl_diplomacy:
   type: "diplomacy"
   description: > 
     The Dark Queen's influence spreads like a shadow across the land. Through cunning diplomacy and ruthless 
@@ -203,7 +232,7 @@ E10_HL_DIPLOMACY:
   effects: { activation_bonus: 2 }
   max_occurrences: 2
 
-E10_WHITESTONE_COUNCIL:
+whitestone_council:
   type: "diplomacy"
   description: > 
     In a grand council held in the Whitestone Glade of Sancrist, leaders from all corners of Ansalon convene to 
@@ -212,11 +241,11 @@ E10_WHITESTONE_COUNCIL:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +3 bonus in your activation roll.
   picture: "whitestone_council.jpg"
-  trigger: { turn: 15 }
+  trigger: { turn: 21 }
   allegiance: "whitestone"
   effects: { activation_bonus: 3 }
 
-E20_FLYING_CITADEL:
+flying_citadel:
   type: "units"
   description: >
     From the desolate, broken lands where even the sun fears to linger, a terrible groaning shakes the very bones 
@@ -228,10 +257,10 @@ E20_FLYING_CITADEL:
     
     An ominous Flying Citadel joins the Dragon Highlord's forces.
   picture: "citadel.jpg"
-  trigger: { turn: 20 }
+  trigger: { turn: 22 }
   effects: { add_units: "citadel" }
 
-E20_GNOME_TECH:
+gnome_tech:
   type: "artifact"
   description: > 
     The ingenious gnomes of Mount Nevermind have perfected a wondrous device that hums with barely contained energy. 
@@ -240,35 +269,71 @@ E20_GNOME_TECH:
     
     Mount Nevermind has joined the war. A Gnome Tech artifact has been acquired!
   picture: "gnome_tech.jpg"
-  trigger: { turn: 20 }
+  trigger: { turn: 10 }
   effects:
     grant_artifact: "gnome_tech"
     add_units: "nevermind"
 
-E20_GOLDEN_GENERAL:
+golden_general:
   type: "units"
-  description: "Laurana, the Golden General, has been appointed commander-in-chief of the Whitestone forces"
+  description: >
+    Turning around to face the Lord of Palanthas and his generals, Laurana threw back her head, her golden hair 
+    glinting in the light of the candles. 'I will take the leadership of the armies,' she said in a voice nearly 
+    as cold as the void in her soul.
+    
+    Lauranthalasa Kanan becomes the Golden General of the Whitestone forces.
   picture: "golden_general.jpg"
-  trigger: { turn: 20 }
+  trigger: { turn: 21 }
   effects: { add_units: "golden_general" }
 
-E20_GOOD_DRAGONS:
+good_dragons:
   type: "units"
-  description: "The Good Dragons emerge to aid the forces of good."
+  description: >
+    The air around you is filled with glistening metallic colors as hundreds of dragons launch into flight. Mighty 
+    wings flap thunderously as the dragons strain upward. Swiftly the ground falls away. The saddles seem secure, but 
+    the effect is still dizzying. The army of dragons moves out over the wave-tossed ocean, soaring steadily to the 
+    southeast. Necks and tails extended to streamline their flight, the good dragons are eager to exact their vengeance.
+    
+    The Good Dragons are back in the skies of Ansalon!
   picture: "good_dragons.jpg"
   trigger: { turn: 20 }
   effects: { add_units: "good_dragons" }
 
-E20_SOTHS_LEGIONS:
-  type: "units"
-  description: "Lord Soth, Knight of the Black Rose, offers his allegiance to Takhisis."
-  picture: "soths_charge.jpg"
+silver_arm:
+  type: "artifact"
+  description: > 
+    Imbued by the faith in the true gods, Theros Ironfeld fights the Gray Wraith in a temple near Qualinost. 
+    After the foul ghost abandons the face of Krynn, a glimse of argent catches the eye of the hero.
+    
+    Theros discovers the Silver Arm of Ergoth!
+  picture: "silver_arm.jpg"
+  allegiance: "whitestone"
   trigger: { turn: 20 }
+  effects: { grant_artifact: "silver_arm" }
+
+
+soths_legions:
+  type: "units"
+  description: >
+    Lord Soth shifted the blade in his gloved hands. He held it out to her, hilt-first, and knelt down on one knee 
+    before her.
+    'My lady,' he said. 'Accept my service.'
+    
+    Lord Soth swears allegiance to the highlord of the Blue Dragonflight.
+  picture: "soths_charge.jpg"
+  trigger: { turn: 16 }
   effects: { add_units: "soths_legions" }
 
-E20_WYRMSLAYER:
+wyrmslayer:
   type: "artifact"
-  description: "The skeletal hand of Kith-Kanan hands the Wyrmslayer to a Whitestone Hero!"
-  picture: "wyrmslayer_hand.jpg"
-  trigger: { turn: 20 }
+  description: >
+    The half-elf dropped the useless bow and staggered backward, nearly stumbling over the steps leading to the 
+    throne of Kith-Kanan. His hand reached out, grabbing for anything to hurl at the creature... when his 
+    fingers closed over the metal hilt of a sword.
+    Tanis nearly dropped the weapon in amazement. The metal was so cold it burned his hand. The blade gleamed brightly 
+    in the wavering light.
+    
+    The Whitesone heroes have found Wyrmslayer, the magical sword of the elven hero, Kith-Kanan!
+  picture: "kith-kanan_tomb.jpg"
+  trigger: { turn: 19 }
   effects: { grant_artifact: "wyrmslayer" }

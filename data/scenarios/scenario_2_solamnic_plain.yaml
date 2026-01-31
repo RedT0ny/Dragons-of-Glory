@@ -54,8 +54,11 @@ scenario:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
       countries:
-        kaolyn:
-          units: all
+        coastlund: all
+        hinterlund: all
+        nightlund: all
+        haltigoth: all
+        kaolyn: all
         lemish: all
         palanthas: all
         vingaard: all

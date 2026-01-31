@@ -6,6 +6,7 @@ blue_crystal_staff:
     A powerful artifact in the service of good that comes into the world only during times of great need. 
     The wielder of the staff is guided and protected by the goddess, Mishakal, ensuring the forces of evil 
     cannot benefit from it.
+  effect: "+1 Tactical Rating. Revives a dead leader, self-destructing in the process."
   picture: "bluestaff.jpg"
   requirements:
     - { type: "allegiance", value: "whitestone" }
@@ -21,6 +22,7 @@ crown_of_power:
     This relic is a powerful artifact of evil, designed to represent absolute and total control of one person over
     another (or many others). It is said that whoever wears the crown will rule Krynn in the name of the Dark
     Queen, Takhisis.
+  effect: "Allows a Highlord to command all chromatic dragonflights."
   picture: "crown.jpg"
   requirements:
     - { type: "unit_type", value: "highlord" }
@@ -34,6 +36,7 @@ disks_of_mishakal:
     edge of each disk, binding the disks together. Arcane glyphs engraved on both sides of the disk provide a treatise 
     on the rituals and worship of the true gods of Krynn.
   picture: "disks_of_mishakal.jpg"
+  effect: "The unit equipped with this artifact gains +1 Combat Rating and can heal itself from depleted to active, once per battle."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
@@ -48,6 +51,7 @@ dragonarmor:
     Each suit of dragonarmor is specifically crafted to fit a specific individual, and is presented as a 
     token of prestige to officers.
   picture: "dragonarmor.jpg"
+  effect: "+1 Tactical Rating. Armor bonus."
   requirements:
     - { type: "allegiance", value: "highlord" }
     - { type: "unit_type", value: "leader" }
@@ -60,6 +64,7 @@ dragonlance:
     First created during the Third Dragon War, dragonlances are weapons created for the express purpose of killing 
     dragons. The lances are as effective as a normal lance against most opponents. Against dragons, they are devastating.
   picture: "dragonlance.svg"
+  effect: "+1 Combat Rating. Dragon slayer (doubles Combat Rating vs dragons)."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
@@ -72,15 +77,25 @@ dragon_orb:
     A powerful artifact created by the alliance of wizards during the final desperate hours of the Third Dragon War. 
     It contains the spirit of a mighty wyrm of evil, luring other dragons to their doom.
   picture: "orb.svg"
+  effect: >
+    Can be used only vs dragons. Roll 1d6. If it's higher than the leader’s Tactical Rating, both the leader 
+    and the Orb are permanently removed from the game. If the roll is equal to or less, all dragons and draconians 
+    opposing that leader in the battle are eliminated. The Orb is also permanently eliminated.
   requirements:
     - { type: "unit_type", value: "leader" }
   bonus: { other: "dragon_orb" }
+  is_consumable: true
 
 gnome_tech:
   description: >
     A wondrous device created by the ingenious gnomes of Mount Nevermind. This compact apparatus hums with 
     barely contained energy, capable of enhancing the technological capabilities of those who wield it.
   picture: "gnome_tech.jpg"
+  effect: >
+    Gnomish technology may be used whenever the army equipped with it involved in combat. If the player decides 
+    to use it, they roll two dice before combat takes place. On any result but doubles, the player receives a combat 
+    die roll modifier equal to the highest of his two dice. 
+    If the roll is doubles, the player receives a combat die penalty of 6, and the gnome technology is destroyed.
   requirements:
     - { type: "unit_type", value: "army" }
   bonus:
@@ -98,6 +113,7 @@ hammer_of_kharas:
     of Honor. This dwarven smith, with the divine power of the Hammer of Kharas and the Silver Arm was able to forge
     the first dragonlances.
   picture: "hammer_of_kharas.jpg"
+  effect: "+1 Tactical Rating. +1 diplomacy with Kaolyn, Thorbardin and Zhakar."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "leader" }
@@ -110,6 +126,7 @@ medallion_of_faith:
   description: > 
     A silver medallion bearing the sign of {random:Paladine|Mishakal|Habbakuk|Kiri-Jolith}.
   picture: "medallion.jpg"
+  effect: "Heals a depleted unit, destroyed in the process."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
@@ -124,6 +141,7 @@ plate_of_solamnus:
     forged since that time, at least according to the records of the Knights of Solamnia, who have tried to keep 
     track of every suit they have discovered.
   picture: "solamnus_plate.svg"
+  effect: "+1 Tactical Rating. Armor bonus."
   requirements:
     - { type: "unit_type", value: "army" }
     - { type: "race", value: "solamnic" }
@@ -131,10 +149,24 @@ plate_of_solamnus:
     tactical_rating: 1
     other: "armor"
 
+silver_arm:
+  description: >
+    The Silver Arm of Ergoth resembles the arm of a human, from the shoulder-blade to hand. It can be the right arm 
+    or the left, shifting magically to adjust to the wearer. It is powerfully muscled, and crafted of solid silver. 
+    It is inflexible and no known force can mar its mirror-sheen surface
+  picture: "silver_arm.jpg"
+  effect: "+2 combat rating."
+  requirements:
+    - { type: "allegiance", value: "whitestone" }
+    - { type: "unit_type", value: "army" }
+  bonus: { combat_rating: 2 }
+
 staff_of_magius:
   description: >
     This staff is said to have been created and wielded by the great war-wizard Magius, whose magic was instrumental 
     in aiding Huma in defeating the Queen of Darkness.
+  picture: "staff_of_magius.jpg"
+  effect: "+2 Tactical Rating. Wizards only."
   requirements:
     - { type: "unit_type", value: "wizard" }
   bonus: { tactical_rating: 2 }
@@ -146,6 +178,7 @@ wyrmslayer:
     Forged by the Silvanesti during the Age of Dreams for use in the early Dragon Wars. It was famously wielded by 
     the elven hero Kith-Kanan during the Kinslayer War and later buried with him in Pax Tharkas.
   picture: "wyrmslayer.jpg"
+  effect: "+2 Tactical Rating. Elven leaders only."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "leader" }
