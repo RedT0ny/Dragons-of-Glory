@@ -2,9 +2,9 @@ import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QLabel, QGridLayout, QPushButton, QTextEdit,
                                QTableWidget, QTableWidgetItem, QHeaderView,
-                               QStyleOptionButton, QStyle, QGraphicsScene)
+                               QStyleOptionButton, QStyle, QGraphicsScene, QTabWidget)
 from PySide6.QtCore import Qt, Signal, Slot, QRect, QRectF, QObject, QSize
-from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon
+from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon, QAction
 
 from src.content.config import APP_NAME, UNIT_ICON_SIZE
 from src.gui.map_view import AnsalonMapView
@@ -261,26 +261,43 @@ class MainWindow(QMainWindow):
         self.game_state = game_state
         self.setWindowTitle(APP_NAME)
         self.resize(1920, 1080)
-        
+
+        self.setup_menu_bar()
+
         # Main Layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        
-        # Content Layout (Map + Sidebar)
-        content_layout = QHBoxLayout()
-        
+
+        # Initialize Tab Widget
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
+
+        # --- Tab 1: Map Tab ---
+        self.map_tab = QWidget()
+        map_layout = QHBoxLayout(self.map_tab)
+
         # Hex Map
         self.map_view = AnsalonMapView(self.game_state)
         self.map_view.zoom_on_show = 2
-        content_layout.addWidget(self.map_view, stretch=4)
-    
-        # Sidebar - Pass game_state for color lookups
-        self.info_panel = InfoPanel(game_state=self.game_state)
-        content_layout.addWidget(self.info_panel, stretch=1)
+        map_layout.addWidget(self.map_view, stretch=4)
 
-        main_layout.addLayout(content_layout)
-        
+        # Sidebar
+        self.info_panel = InfoPanel(game_state=self.game_state)
+        map_layout.addWidget(self.info_panel, stretch=1)
+
+        self.tabs.addTab(self.map_tab, "Map")
+
+        # --- Placeholder Tabs ---
+        self.status_tab = QLabel("Status Information")
+        self.tabs.addTab(self.status_tab, "Status")
+
+        self.artifacts_tab = QLabel("Artifacts Collection")
+        self.tabs.addTab(self.artifacts_tab, "Artifacts")
+
+        self.heroes_tab = QLabel("Heroes Registry")
+        self.tabs.addTab(self.heroes_tab, "Heroes")
+
         # Game Log
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
@@ -302,6 +319,47 @@ class MainWindow(QMainWindow):
 
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
+
+    def setup_menu_bar(self):
+        """Initializes the top menu bar."""
+        menubar = self.menuBar()
+
+        # --- Game Menu ---
+        game_menu = menubar.addMenu("&Game")
+
+        save_action = QAction("&Save Game", self)
+        save_action.setShortcut("Ctrl+S")
+        # save_action.triggered.connect(self.on_save_clicked)
+        game_menu.addAction(save_action)
+
+        load_action = QAction("&Load Game", self)
+        load_action.setShortcut("Ctrl+L")
+        game_menu.addAction(load_action)
+
+        game_menu.addSeparator()
+
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut("Alt+F4")
+        exit_action.triggered.connect(self.close)
+        game_menu.addAction(exit_action)
+
+        # --- View Menu ---
+        view_menu = menubar.addMenu("&View")
+
+        zoom_in_action = QAction("Zoom &In", self)
+        zoom_in_action.setShortcut("Ctrl++")
+        zoom_in_action.triggered.connect(lambda: self.map_view.scale(1.25, 1.25))
+        view_menu.addAction(zoom_in_action)
+
+        zoom_out_action = QAction("Zoom &Out", self)
+        zoom_out_action.setShortcut("Ctrl+-")
+        zoom_out_action.triggered.connect(lambda: self.map_view.scale(0.8, 0.8))
+        view_menu.addAction(zoom_out_action)
+
+        # --- Help Menu ---
+        help_menu = menubar.addMenu("&Help")
+        about_action = QAction("&About", self)
+        help_menu.addAction(about_action)
 
     @Slot(str)
     def append_log(self, text):

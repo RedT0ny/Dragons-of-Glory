@@ -1,5 +1,4 @@
-import math
-import os
+import math, os
 
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtSvgWidgets import QGraphicsSvgItem
@@ -9,6 +8,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 
 from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, HL
 from src.content.specs import UnitType, UnitRace
+from src.content.utils import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 
@@ -252,11 +252,11 @@ class UnitCounter(QGraphicsItem):
         # Draw unit ID at top
         painter.setPen(Qt.white if self.unit.allegiance == WS else Qt.black)
         font = painter.font()
-        font.setPointSize(9)
+        font.setPointSize(8)
         font.setBold(True)
         painter.setFont(font)
 
-        id_text = f"{self.unit.id}"
+        id_text = caption_id(self.unit.id)
         painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, id_text)
 
         # Draw stats at bottom

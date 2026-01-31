@@ -38,7 +38,12 @@ class AnsalonMapView(QGraphicsView):
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
         super().showEvent(event)
-        # Fits map to view on first show event
+        if not self.initial_fit_done:
+            # Use a single shot timer to let the layout settle before fitting
+            QTimer.singleShot(0, self._perform_initial_zoom)
+
+    def _perform_initial_zoom(self):
+        """ Fits map to view on first show event."""
         if not self.initial_fit_done and self.scene.itemsBoundingRect().width() > 0:
             self.fitInView(self.scene.itemsBoundingRect(), Qt.KeepAspectRatio)
             if self.zoom_on_show != 1.0:
