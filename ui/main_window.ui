@@ -6,27 +6,27 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1200</width>
-    <height>820</height>
+    <width>1920</width>
+    <height>1080</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Dragons of Glory</string>
+   <string>Ansalon Game</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="mainVerticalLayout">
+   <layout class="QVBoxLayout" name="mainLayout">
     <item>
-     <widget class="QTabWidget" name="tabWidget">
+     <widget class="QTabWidget" name="tabs">
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
-      <widget class="QWidget" name="mapTab">
+      <widget class="QWidget" name="map_tab">
        <attribute name="title">
         <string>Map</string>
        </attribute>
-       <layout class="QHBoxLayout" name="contentHorizontalLayout" stretch="4,1">
+       <layout class="QHBoxLayout" name="mapTabLayout" stretch="4,1">
         <item>
-         <widget class="QWidget" name="map_view" native="true">
+         <widget class="QGraphicsView" name="map_view">
           <property name="styleSheet">
            <string notr="true">background-color: #222;</string>
           </property>
@@ -36,14 +36,8 @@
          <widget class="QFrame" name="info_panel">
           <property name="minimumSize">
            <size>
-            <width>250</width>
+            <width>350</width>
             <height>0</height>
-           </size>
-          </property>
-          <property name="maximumSize">
-           <size>
-            <width>250</width>
-            <height>16777215</height>
            </size>
           </property>
           <property name="frameShape">
@@ -52,13 +46,13 @@
           <property name="frameShadow">
            <enum>QFrame::Shadow::Sunken</enum>
           </property>
-          <layout class="QVBoxLayout" name="infoPanelLayout">
+          <layout class="QVBoxLayout" name="infoLayout">
            <item>
             <widget class="QLabel" name="mini_map">
              <property name="minimumSize">
               <size>
-               <width>230</width>
-               <height>150</height>
+               <width>320</width>
+               <height>240</height>
               </size>
              </property>
              <property name="styleSheet">
@@ -131,9 +125,9 @@
               </widget>
              </item>
              <item row="2" column="2">
-              <widget class="QPushButton" name="btnEndTurn">
+              <widget class="QPushButton" name="btnEndPhase">
                <property name="text">
-                <string>End Turn</string>
+                <string>End Phase</string>
                </property>
               </widget>
              </item>
@@ -155,9 +149,9 @@ Location (if any)</string>
              <property name="frameShape">
               <enum>QFrame::Shape::Box</enum>
              </property>
-             <layout class="QVBoxLayout" name="unitLayout">
+             <layout class="QVBoxLayout" name="unitBoxLayout">
               <item>
-               <widget class="QLabel" name="unit_name_label">
+               <widget class="QLabel" name="lblUnitName">
                 <property name="text">
                  <string>Unit Name</string>
                 </property>
@@ -186,7 +180,7 @@ Location (if any)</string>
                </widget>
               </item>
               <item>
-               <widget class="QLabel" name="unit_stats_label">
+               <widget class="QLabel" name="lblUnitStats">
                 <property name="text">
                  <string>Rating: X
 Mov: remaining (total)
@@ -199,7 +193,43 @@ unit_status</string>
             </widget>
            </item>
            <item>
-            <spacer name="verticalSpacer">
+            <widget class="QLabel" name="lblStack">
+             <property name="text">
+              <string>Selected Units Stack:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableWidget" name="units_table">
+             <column>
+              <property name="text">
+               <string/>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Icon</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Name</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Rating</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>Mov</string>
+              </property>
+             </column>
+            </widget>
+           </item>
+           <item>
+            <spacer name="infoSpacer">
              <property name="orientation">
               <enum>Qt::Orientation::Vertical</enum>
              </property>
@@ -211,15 +241,12 @@ unit_status</string>
              </property>
             </spacer>
            </item>
-           <item>
-            <widget class="QTableView" name="tableView"/>
-           </item>
           </layout>
          </widget>
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="statusTab">
+      <widget class="QWidget" name="status_tab">
        <attribute name="title">
         <string>Status</string>
        </attribute>
@@ -227,24 +254,24 @@ unit_status</string>
         <property name="geometry">
          <rect>
           <x>0</x>
-          <y>0</y>
-          <width>1171</width>
-          <height>661</height>
+          <y>10</y>
+          <width>1891</width>
+          <height>891</height>
          </rect>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
-          <widget class="QFrame" name="frame">
+          <widget class="QFrame" name="ws_status_panel">
            <property name="frameShape">
             <enum>QFrame::Shape::StyledPanel</enum>
            </property>
            <property name="frameShadow">
             <enum>QFrame::Shadow::Raised</enum>
            </property>
-           <widget class="QLabel" name="label">
+           <widget class="QLabel" name="ws_status_lbl">
             <property name="geometry">
              <rect>
-              <x>130</x>
+              <x>260</x>
               <y>10</y>
               <width>121</width>
               <height>31</height>
@@ -259,21 +286,34 @@ unit_status</string>
             <property name="text">
              <string>Whitestone</string>
             </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignHCenter|Qt::AlignmentFlag::AlignTop</set>
+            </property>
+           </widget>
+           <widget class="QTableWidget" name="table_status_ws">
+            <property name="geometry">
+             <rect>
+              <x>15</x>
+              <y>61</y>
+              <width>591</width>
+              <height>291</height>
+             </rect>
+            </property>
            </widget>
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frame_3">
+          <widget class="QFrame" name="hl_status_panel">
            <property name="frameShape">
             <enum>QFrame::Shape::StyledPanel</enum>
            </property>
            <property name="frameShadow">
             <enum>QFrame::Shadow::Raised</enum>
            </property>
-           <widget class="QLabel" name="label_2">
+           <widget class="QLabel" name="hl_status_lbl">
             <property name="geometry">
              <rect>
-              <x>130</x>
+              <x>230</x>
               <y>10</y>
               <width>121</width>
               <height>31</height>
@@ -288,21 +328,24 @@ unit_status</string>
             <property name="text">
              <string>Highlord</string>
             </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignHCenter|Qt::AlignmentFlag::AlignTop</set>
+            </property>
            </widget>
           </widget>
          </item>
          <item>
-          <widget class="QFrame" name="frame_2">
+          <widget class="QFrame" name="neutral_status_panel">
            <property name="frameShape">
             <enum>QFrame::Shape::StyledPanel</enum>
            </property>
            <property name="frameShadow">
             <enum>QFrame::Shadow::Raised</enum>
            </property>
-           <widget class="QLabel" name="label_3">
+           <widget class="QLabel" name="neutral_status_lbl">
             <property name="geometry">
              <rect>
-              <x>120</x>
+              <x>240</x>
               <y>10</y>
               <width>121</width>
               <height>31</height>
@@ -317,13 +360,16 @@ unit_status</string>
             <property name="text">
              <string>Neutral</string>
             </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignHCenter|Qt::AlignmentFlag::AlignTop</set>
+            </property>
            </widget>
           </widget>
          </item>
         </layout>
        </widget>
       </widget>
-      <widget class="QWidget" name="artifactsTab">
+      <widget class="QWidget" name="artifacts_tab">
        <attribute name="title">
         <string>Artifacts</string>
        </attribute>
@@ -332,8 +378,8 @@ unit_status</string>
          <rect>
           <x>0</x>
           <y>0</y>
-          <width>1171</width>
-          <height>661</height>
+          <width>1891</width>
+          <height>901</height>
          </rect>
         </property>
         <layout class="QVBoxLayout" name="verticalLayout">
@@ -357,7 +403,7 @@ unit_status</string>
              <property name="frameShadow">
               <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <widget class="QPushButton" name="pushButton_2">
+             <widget class="QPushButton" name="pushButton_3">
               <property name="geometry">
                <rect>
                 <x>224</x>
@@ -370,7 +416,7 @@ unit_status</string>
                <string>Assign/Remove</string>
               </property>
              </widget>
-             <widget class="QLabel" name="label_7">
+             <widget class="QLabel" name="label_8">
               <property name="geometry">
                <rect>
                 <x>40</x>
@@ -395,7 +441,7 @@ unit_status</string>
                <bool>false</bool>
               </property>
              </widget>
-             <widget class="QLabel" name="label_6">
+             <widget class="QLabel" name="label_9">
               <property name="geometry">
                <rect>
                 <x>72</x>
@@ -416,6 +462,12 @@ unit_status</string>
           <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
             <widget class="QFrame" name="frame_5">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+               <horstretch>1</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="frameShape">
               <enum>QFrame::Shape::StyledPanel</enum>
              </property>
@@ -425,24 +477,36 @@ unit_status</string>
              <widget class="QListView" name="listView">
               <property name="geometry">
                <rect>
-                <x>5</x>
-                <y>0</y>
-                <width>571</width>
+                <x>40</x>
+                <y>90</y>
+                <width>521</width>
                 <height>321</height>
                </rect>
+              </property>
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
               </property>
              </widget>
             </widget>
            </item>
            <item>
             <widget class="QFrame" name="frame_7">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+               <horstretch>2</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="frameShape">
               <enum>QFrame::Shape::StyledPanel</enum>
              </property>
              <property name="frameShadow">
               <enum>QFrame::Shadow::Raised</enum>
              </property>
-             <widget class="QPushButton" name="pushButton">
+             <widget class="QPushButton" name="pushButton_4">
               <property name="geometry">
                <rect>
                 <x>224</x>
@@ -455,7 +519,7 @@ unit_status</string>
                <string>Assign/Remove</string>
               </property>
              </widget>
-             <widget class="QLabel" name="label_4">
+             <widget class="QLabel" name="label_10">
               <property name="geometry">
                <rect>
                 <x>70</x>
@@ -468,7 +532,7 @@ unit_status</string>
                <string>Artifact Name</string>
               </property>
              </widget>
-             <widget class="QLabel" name="label_5">
+             <widget class="QLabel" name="label_11">
               <property name="geometry">
                <rect>
                 <x>38</x>
@@ -500,35 +564,32 @@ unit_status</string>
         </layout>
        </widget>
       </widget>
-      <widget class="QWidget" name="heroesTab">
+      <widget class="QWidget" name="heroes_tab">
        <attribute name="title">
         <string>Heroes</string>
        </attribute>
+       <layout class="QVBoxLayout">
+        <item>
+         <widget class="QLabel" name="lblHeroes">
+          <property name="text">
+           <string>Heroes Registry</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </widget>
      </widget>
     </item>
     <item>
-     <widget class="QLabel" name="log_area">
-      <property name="minimumSize">
-       <size>
-        <width>0</width>
-        <height>50</height>
-       </size>
-      </property>
+     <widget class="QTextEdit" name="log_area">
       <property name="maximumSize">
        <size>
         <width>16777215</width>
         <height>100</height>
        </size>
       </property>
-      <property name="frameShape">
-       <enum>QFrame::Shape::Panel</enum>
-      </property>
-      <property name="frameShadow">
-       <enum>QFrame::Shadow::Sunken</enum>
-      </property>
-      <property name="text">
-       <string>Game log...</string>
+      <property name="readOnly">
+       <bool>true</bool>
       </property>
      </widget>
     </item>
@@ -539,64 +600,79 @@ unit_status</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1200</width>
+     <width>1920</width>
      <height>33</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menuFile">
+   <widget class="QMenu" name="menuGame">
     <property name="title">
-     <string>File</string>
+     <string>&amp;Game</string>
     </property>
-    <addaction name="actionNew_Game"/>
-    <addaction name="actionLoad_Game"/>
-    <addaction name="actionSave_Game"/>
-   </widget>
-   <widget class="QMenu" name="menuEdit">
-    <property name="title">
-     <string>Edit</string>
-    </property>
+    <addaction name="actionSave"/>
+    <addaction name="actionLoad"/>
+    <addaction name="separator"/>
+    <addaction name="actionExit"/>
    </widget>
    <widget class="QMenu" name="menuView">
     <property name="title">
-     <string>View</string>
+     <string>&amp;View</string>
     </property>
-   </widget>
-   <widget class="QMenu" name="menuSettings">
-    <property name="title">
-     <string>Settings</string>
-    </property>
-   </widget>
-   <widget class="QMenu" name="menuWindow">
-    <property name="title">
-     <string>Window</string>
-    </property>
+    <addaction name="actionZoomIn"/>
+    <addaction name="actionZoomOut"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
-     <string>Help</string>
+     <string>&amp;Help</string>
     </property>
+    <addaction name="actionAbout"/>
    </widget>
-   <addaction name="menuFile"/>
-   <addaction name="menuEdit"/>
+   <addaction name="menuGame"/>
    <addaction name="menuView"/>
-   <addaction name="menuSettings"/>
-   <addaction name="menuWindow"/>
    <addaction name="menuHelp"/>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
-  <action name="actionNew_Game">
+  <action name="actionSave">
    <property name="text">
-    <string>New Game</string>
+    <string>&amp;Save Game</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
    </property>
   </action>
-  <action name="actionLoad_Game">
+  <action name="actionLoad">
    <property name="text">
-    <string>Load Game</string>
+    <string>&amp;Load Game</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
    </property>
   </action>
-  <action name="actionSave_Game">
+  <action name="actionExit">
    <property name="text">
-    <string>Save Game</string>
+    <string>E&amp;xit</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+F4</string>
+   </property>
+  </action>
+  <action name="actionZoomIn">
+   <property name="text">
+    <string>Zoom &amp;In</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl++</string>
+   </property>
+  </action>
+  <action name="actionZoomOut">
+   <property name="text">
+    <string>Zoom &amp;Out</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+-</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>&amp;About</string>
    </property>
   </action>
  </widget>

@@ -2,11 +2,13 @@ import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QLabel, QGridLayout, QPushButton, QTextEdit,
                                QTableWidget, QTableWidgetItem, QHeaderView,
-                               QStyleOptionButton, QStyle, QGraphicsScene, QTabWidget)
+                               QStyleOptionButton, QStyle, QGraphicsScene, QTabWidget,
+                               QScrollArea)
 from PySide6.QtCore import Qt, Signal, Slot, QRect, QRectF, QObject, QSize
-from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon, QAction
+from PySide6.QtGui import QColor, QPainter, QPixmap, QIcon, QAction, QFontDatabase, QFont
 
 from src.content.config import APP_NAME, UNIT_ICON_SIZE
+from src.content.constants import WS, HL, NEUTRAL
 from src.gui.map_view import AnsalonMapView
 from src.gui.map_items import UnitCounter
 
@@ -205,7 +207,9 @@ class InfoPanel(QFrame):
             self.units_table.setItem(row, 3, QTableWidgetItem(rating_str))
 
             # 5. Movement
-            mov_str = f"{unit.movement}"
+            total_mov = unit.movement
+            remaining_mov = getattr(unit, 'movement_points', total_mov)
+            mov_str = f"{remaining_mov} ({total_mov})"
             self.units_table.setItem(row, 4, QTableWidgetItem(mov_str))
 
         # Adjust row heights to fit icons
@@ -255,6 +259,159 @@ class InfoPanel(QFrame):
         painter.end()
         return pixmap
 
+class StatusTab(QWidget):
+    def __init__(self, game_state):
+        super().__init__()
+        self.game_state = game_state
+        self.init_ui()
+
+    def init_ui(self):
+        self.main_layout = QHBoxLayout(self)
+        self.refresh()
+
+    def refresh(self):
+        # Clear existing layout
+        while self.main_layout.count():
+            item = self.main_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Create 3 panels
+        self.main_layout.addWidget(self.create_panel("Whitestone", WS))
+        self.main_layout.addWidget(self.create_panel("Highlord", HL))
+        self.main_layout.addWidget(self.create_panel("Neutral", NEUTRAL))
+
+    def create_panel(self, title, alliance):
+        panel = QWidget()
+        v_layout = QVBoxLayout(panel)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+
+        # 1. Label
+        lbl = QLabel(title)
+        lbl.setAlignment(Qt.AlignCenter)
+
+        font_db = QFontDatabase()
+        font_id = font_db.addApplicationFont("assets/font/Libra Regular.otf")
+        if font_id != -1:
+            families = font_db.applicationFontFamilies(font_id)
+            if families:
+                font = QFont(families[0], 18)
+                lbl.setFont(font)
+        else:
+            f = lbl.font()
+            f.setPointSize(18)
+            lbl.setFont(f)
+
+        v_layout.addWidget(lbl)
+
+        # 2. Scroll Area containing list of Country Tables
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setAlignment(Qt.AlignTop)
+
+        # Filter countries
+        countries = [c for c in self.game_state.countries.values() if c.allegiance == alliance]
+        countries.sort(key=lambda x: x.id)
+
+        for country in countries:
+            # Country Header
+            c_lbl = QLabel(country.id.title())
+            c_lbl.setStyleSheet("font-weight: bold; background-color: #EEE; border: 1px solid #CCC;")
+            c_lbl.setAlignment(Qt.AlignCenter)
+            container_layout.addWidget(c_lbl)
+
+            # Table
+            table = QTableWidget()
+            table.setColumnCount(6)
+            table.setHorizontalHeaderLabels(["Icon", "Name", "Status", "Rating", "Move", "Pos"])
+            table.verticalHeader().setVisible(False)
+
+            # Column sizing
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Icon
+            header.setSectionResizeMode(1, QHeaderView.Stretch)  # Name
+            header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Status
+            header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Rating
+            header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Move
+            header.setSectionResizeMode(5, QHeaderView.ResizeToContents)  # Pos
+
+            # Get units
+            units = [u for u in self.game_state.units if u.land == country.id]
+            table.setRowCount(len(units))
+            table.setIconSize(QSize(UNIT_ICON_SIZE, UNIT_ICON_SIZE))
+
+            for row, unit in enumerate(units):
+                # Icon
+                icon_pixmap = self._render_unit_icon(unit)
+                table.setItem(row, 0, QTableWidgetItem(QIcon(icon_pixmap), ""))
+
+                # Name
+                table.setItem(row, 1, QTableWidgetItem(str(unit.id)))
+
+                # Status
+                s_str = unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status)
+                table.setItem(row, 2, QTableWidgetItem(s_str))
+
+                # Rating
+                rating_str = f"{unit.combat_rating}"
+                if unit.tactical_rating and unit.combat_rating != 0:
+                    rating_str = f"{unit.combat_rating}/{unit.tactical_rating}"
+                elif unit.combat_rating == 0 and unit.tactical_rating:
+                    rating_str = f"{unit.tactical_rating}"
+                table.setItem(row, 3, QTableWidgetItem(rating_str))
+
+                # Move
+                total = unit.movement
+                rem = getattr(unit, 'movement_points', total)
+                table.setItem(row, 4, QTableWidgetItem(f"{rem} ({total})"))
+
+                # Pos
+                if unit.is_on_map and unit.position and unit.position != (None, None):
+                    table.setItem(row, 5, QTableWidgetItem(f"{unit.position}"))
+                else:
+                    table.setItem(row, 5, QTableWidgetItem("-"))
+
+            table.resizeRowsToContents()
+            # Set height
+            h = table.horizontalHeader().height()
+            for r in range(table.rowCount()):
+                h += table.rowHeight(r)
+            table.setFixedHeight(h + 2)  # small buffer
+
+            container_layout.addWidget(table)
+
+        scroll.setWidget(container)
+        v_layout.addWidget(scroll)
+
+        return panel
+
+    def _render_unit_icon(self, unit):
+        color = QColor("gray")
+        if self.game_state and unit.land in self.game_state.countries:
+            color = QColor(self.game_state.countries[unit.land].color)
+
+        scene = QGraphicsScene()
+        counter = UnitCounter(unit, color)
+        scene.addItem(counter)
+
+        pixmap = QPixmap(UNIT_ICON_SIZE, UNIT_ICON_SIZE)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        target_rect = QRectF(0, 0, UNIT_ICON_SIZE, UNIT_ICON_SIZE)
+        source_rect = counter.boundingRect()
+
+        scene.render(painter, target_rect, source_rect)
+        painter.end()
+        return pixmap
+
+
 class MainWindow(QMainWindow):
     def __init__(self, game_state):
         super().__init__()
@@ -289,7 +446,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.map_tab, "Map")
 
         # --- Placeholder Tabs ---
-        self.status_tab = QLabel("Status Information")
+        self.status_tab = StatusTab(self.game_state)
         self.tabs.addTab(self.status_tab, "Status")
 
         self.artifacts_tab = QLabel("Artifacts Collection")
@@ -297,6 +454,9 @@ class MainWindow(QMainWindow):
 
         self.heroes_tab = QLabel("Heroes Registry")
         self.tabs.addTab(self.heroes_tab, "Heroes")
+
+        # Connect signals after all UI elements are initialized
+        self.tabs.currentChanged.connect(self.on_tab_changed)
 
         # Game Log
         self.log_area = QTextEdit()
@@ -319,6 +479,10 @@ class MainWindow(QMainWindow):
 
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
+
+    def on_tab_changed(self, index):
+        if self.tabs.widget(index) == self.status_tab:
+            self.status_tab.refresh()
 
     def setup_menu_bar(self):
         """Initializes the top menu bar."""
