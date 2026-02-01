@@ -41,8 +41,10 @@ scenario:
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  active_events: ["golden_general"]
-  possible_events: ["E10", "E20"]
+  active_events:
+    golden_general: all
+
+  #possible_events: ["E10", "E20"]
 
   # Allegiance-based Setup
   initial_setup:

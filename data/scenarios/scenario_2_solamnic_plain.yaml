@@ -47,7 +47,9 @@ scenario:
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  active_events: [ "highlord wizard", "whitestone wizard" ]
+  active_events:
+    hl_wizard: 1
+    ws_wizard: 1
 
   # Allegiance-based Setup
   initial_setup:

@@ -58,8 +58,8 @@ blue_crystal_staff:
 crown_of_power:
   type: "artifact"
   description: >
-    From the Abyss, Takhisis poduces a Crown of solid gold, carved with twisting designs, and inset with flawless blood 
-    rubies. When it is worn, the rubies glow with an unholy light. The Dark Queen offers it to her most faithful 
+    From the Abyss, Takhisis produces a Crown of solid gold, carved with twisting designs, and inset with flawless 
+    blood rubies. When it is worn, the rubies glow with an unholy light. The Dark Queen offers it to her most faithful 
     lieutenant.
     
     The Crown of Power has been granted to the Highlord.
@@ -89,18 +89,18 @@ dragonmetal:
     
     A pool of pure dragonmetal has been found in Foghaven Vale.
   picture: "foghaven_vale.jpg"
-  trigger: { turn: 20 }
+  trigger: { turn: 7 }
   effects: { grant_prerequisite: "dragonmetal" }
 
 hammer_of_kharas:
   type: "artifact"
   description: >
-    Arman Kharas, Flint and Tas return to the Temple of Stars after entering the Sacred Valley of the Thanes. They
-    bring with them an artifact that can change the course of the war.
+    Arman Kharas returns to the Temple of Stars after entering the Sacred Valley of the Thanes. He brings
+    with him an artifact that can change the course of the war.
     
     Whitestone finds the Hammer of Kharas!
   picture: "hammer_of_kharas.jpg"
-  trigger: { turn: 20 }
+  trigger: { turn: 8 }
   effects:
     grant_prerequisite: "hammer_of_kharas"
     grant_artifact: "hammer_of_kharas"
@@ -189,7 +189,7 @@ dragonlance_forged:
     A Dragonlance has been created!
   picture: "dragonlance.svg"
   allegiance: "whitestone"
-  trigger: { turn: 20 }
+  trigger: { turn: 10 }
   requires: ["dragonmetal", "hammer_of_kharas"]
   effects: { grant_artifact: "dragonlance" }
   max_ocurrences: 5

@@ -25,7 +25,10 @@ scenario:
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Active Global Events
-  active_events: null
+  active_events:
+    blue_crystal_staff: all
+    dragonmetal: all
+    dragon_orb: 1
 
   # Allegiance-based Setup
   initial_setup:

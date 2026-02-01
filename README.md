@@ -6,8 +6,10 @@ Design overview:
 
 TODO:
 
+- Create a Player class.
 - Add Dragon #170's Advanced Rules in "settings"
 - Add minimap
+- Add attribute and diplomacy logic for Knight's countries
 - Add unit pictures for the info panel
 - Add menu bar to main_window
 - Add hover tooltips to the map
@@ -15,7 +17,8 @@ TODO:
 - Implement save and load game
 - Check victory conditions
 - Implement events and artifacts.
-- Implement status tab.
+- Clicking on a unit in the status tab should highlight it on the mini-map.
+- double click on a unit in the status tab should show the map tab and zoom on the unit.
 - Implement dashboards
 - Implement AI player
 - Change replacements dialog to window
@@ -52,3 +55,33 @@ Moving units:
 5. At the bottom of the right panel, a list will show the units stacked in the selected Hex.
 6. Once the unit or stack is selected, it can be dragged to a new Hex.
 7. The unit or stack will be moved to the new Hex.
+
+Events and artifacts:
+
+events in the scenario yaml:
+
+if active_events [{ event_id : int(times) }] remove them from the game_state list of active events or reduce the number of possible occurrences by times.
+if active_events: [{ event_id : all }] remove all possible occurrences of event_id from the game_state list.
+if possible_events [{ event_id : int(times)}] add to the game_state event list only the ones in this list.
+if possible_events: null remove all possible events from the game_state list.
+if possible_events not defined, add all events to the game_state list.
+
+events in the event.yaml:
+
+if max_occurrences not indicated or = 1, the event can only be triggered once.
+if max_occurrences is 0, the event can never be triggered.
+if max_occurrences is > 0, the event can be triggered up to max_occurrences times.
+if max_occurrences is < 0, the event can be triggered an infinite number of times.
+Add a new field 'probability' to increase chances of an event being triggered? Use 
+Pseudo-Random Distribution (PRD) and Bad Luck Protection (BLP)
+add a new field 'triggered' to the event dataclass?
+
+events in the game_state list:
+
+if game_state events list is empty, skip event phase and show a placeholder.
+
+How to deal with pre-requisites? List of pre_req_ids in the player dataclass.
+Or simplify them as not-assignable artifacts (dragonmetal, Knight countries at war...)
+
+
+

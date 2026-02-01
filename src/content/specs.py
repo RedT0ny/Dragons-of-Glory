@@ -17,7 +17,7 @@ Classes:
 - MapConfigSpec: Represents the configuration for a map layout, including
   terrain, dimensions, and special locations.
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 from enum import Enum, auto
 from src.content.constants import WS, HL, NEUTRAL
@@ -39,6 +39,13 @@ class CountrySpec:
     color: str
     locations: List[LocationSpec]
     territories: List[Tuple[int, int]]
+
+@dataclass
+class PlayerSpec:
+    allegiance: str  # "whitestone" or "highlord"
+    resources: int = 0 # For future implementation
+    pre_req: List[str] = field(default_factory=list)
+    is_ai: bool = False
 
 @dataclass
 class UnitSpec:
