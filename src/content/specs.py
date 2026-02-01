@@ -9,6 +9,7 @@ Shall only be used by Loader.py to read data from CSV/JSON/YAML files into these
 Classes:
 - LocationSpec: Represents the details of a specific location on the map.
 - CountrySpec: Represents a country and its associated properties.
+- PlayerSpec: Represents a player and their associated attributes.
 - UnitSpec: Represents a unit and its various attributes.
 - ScenarioSpec: Represents the structure of a game scenario, including map
   subset, events, setup, and victory conditions.
@@ -18,7 +19,7 @@ Classes:
   terrain, dimensions, and special locations.
 """
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 from enum import Enum, auto
 from src.content.constants import WS, HL, NEUTRAL
 
@@ -40,11 +41,20 @@ class CountrySpec:
     locations: List[LocationSpec]
     territories: List[Tuple[int, int]]
 
+
 @dataclass
 class PlayerSpec:
     allegiance: str  # "whitestone" or "highlord"
-    resources: int = 0 # For future implementation
+    # Scenario Setup data
+    deployment_area: Optional[Union[List[Any], Dict[str, Any]]] = None
+    setup_countries: Dict[str, Any] = field(default_factory=dict)
+    explicit_units: List[str] = field(default_factory=list)
+    victory_conditions: Dict[str, Any] = field(default_factory=dict)
+
+    # Configuration & Future
+    resources: int = 0
     pre_req: List[str] = field(default_factory=list)
+    artifacts: List[str] = field(default_factory=list)
     is_ai: bool = False
 
 @dataclass

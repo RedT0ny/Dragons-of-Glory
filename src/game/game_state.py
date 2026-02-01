@@ -6,7 +6,6 @@ from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec
 from src.content import loader, factory
 from src.game.map import Board, Hex
 
-
 class GameState:
     """
     Represents the state of the game.
@@ -43,11 +42,19 @@ class GameState:
         self.countries = {}
         self.events = [] # Live Event objects
         self.completed_event_ids = set() # Track for serialization
-        self.prerequisites = set() # Track pre-requirements for events, like artifacts
-        self.artifact_pool = {} # ID -> ArtifactSpec blueprint
+        self.artifact_pool = {} # ID -> ArtifactSpec blueprint (Catalog)
+        self.players = {} # Dict[str, Player]
 
         # Draconian rules
         self.draconian_ready_at_start = 0
+
+    @property
+    def current_player(self):
+        """Returns the Player object for the active_player allegiance."""
+        return self.players.get(self.active_player)
+
+    def get_player(self, allegiance: str):
+        return self.players.get(allegiance)
 
     def end_game(self):
         pass
@@ -110,6 +117,14 @@ class GameState:
             )
         self.map.populate_locations(special_locations, self.countries)
 
+        # Initialize Players (after map offsets are applied to the spec)
+        self._initialize_players()
+
+        # Register existing units on the map if they have positions
+        for unit in self.units:
+            if unit.position and unit.is_on_map:
+                self.map.add_unit_to_spatial_map(unit)
+
         # Register existing units on the map if they have positions
         for unit in self.units:
             if unit.position and unit.is_on_map:
@@ -155,43 +170,46 @@ class GameState:
         return (bounds["x_range"][0] <= q <= bounds["x_range"][1] and
                 bounds["y_range"][0] <= r <= bounds["y_range"][1])
 
+    def _initialize_players(self):
+        """Creates Player objects based on scenario setup."""
+        from src.game.player import Player
+        from src.content.specs import PlayerSpec
+
+        self.players = {}
+        for allegiance in [HL, WS]:
+            setup_data = self.scenario_spec.setup.get(allegiance, {})
+
+            # Create spec from dictionary (handling potential missing keys)
+            spec = PlayerSpec(
+                allegiance=allegiance,
+                deployment_area=setup_data.get("deployment_area"),
+                setup_countries=setup_data.get("countries", {}),
+                explicit_units=setup_data.get("explicit_units", []),
+                victory_conditions=setup_data.get("victory_conditions", {}) or self.scenario_spec.victory_conditions.get(allegiance, {}),
+                pre_req=setup_data.get("pre_req", []),
+                artifacts=setup_data.get("artifacts", []),
+                is_ai=False # Default to False, Controller will override
+            )
+
+            player = Player(spec)
+            self.players[allegiance] = player
+
+            # Assign controlled countries based on 'countries' key in setup
+            # If not specified, maybe fall back? Scenario usually specifies active countries.
+            country_ids = spec.setup_countries.keys()
+            for cid in country_ids:
+                if cid in self.countries:
+                    player.add_country(self.countries[cid])
+
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
         """
         Returns a set of (x, y) coordinates where a player can deploy.
+        Delegates to the Player object.
         """
-        if not self.scenario_spec: return set()
+        if allegiance not in self.players:
+            return set()
 
-        player_setup = self.scenario_spec.setup.get(allegiance, {})
-        area_spec = player_setup.get("deployment_area")
-
-        hexes = set()
-
-        # Case 1: deployment_area is None -> Use all countries assigned to this player
-        if area_spec is None:
-            countries_to_use = player_setup.get("countries", {}).keys()
-            for cid in countries_to_use:
-                if cid in self.countries:
-                    hexes.update(self.countries[cid].territories)
-
-        # Case 2: deployment_area is a Dictionary (standard format with "countries" key)
-        elif isinstance(area_spec, dict):
-            countries_to_use = area_spec.get("countries", [])
-            for cid in countries_to_use:
-                if cid in self.countries:
-                    hexes.update(self.countries[cid].territories)
-
-        # Case 3: deployment_area is a List (mixed coords and country IDs)
-        elif isinstance(area_spec, list):
-            for item in area_spec:
-                if isinstance(item, str): # It's a country ID (real or virtual)
-                    if item in self.countries:
-                        hexes.update(self.countries[item].territories)
-                elif isinstance(item, (list, tuple)) and len(item) == 2: # It's a coordinate [col, row]
-                    coord = tuple(item)
-                    if self.is_hex_in_bounds(coord[0], coord[1]):
-                        hexes.add(coord)
-
-        return hexes
+        return self.players[allegiance].get_deployment_hexes(self.countries, self.is_hex_in_bounds)
 
     def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
         """Normalize scenario and country coordinates to local (subset) space."""

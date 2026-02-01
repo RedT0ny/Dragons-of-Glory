@@ -11,11 +11,11 @@ class GameController(QObject):
         self.view = view
         self.replacements_dialog = None
 
-        # Configuration: True if Computer, False if Human
-        self.ai_config = {
-            "Highlord": highlord_ai,
-            "Whitestone": whitestone_ai
-        }
+        # Apply AI configuration to Players directly
+        if HL in self.game_state.players:
+            self.game_state.players[HL].set_ai(highlord_ai)
+        if WS in self.game_state.players:
+            self.game_state.players[WS].set_ai(whitestone_ai)
 
         # Timer to drive AI actions periodically
         self.ai_timer = QTimer()
@@ -32,7 +32,12 @@ class GameController(QObject):
     def check_active_player(self):
         """Checks if the loop should continue running automatically."""
         current_phase = self.game_state.phase
-        current_side = self.game_state.active_player
+
+        # Use Player object to check AI status
+        is_ai = False
+        if self.game_state.current_player:
+            is_ai = self.game_state.current_player.is_ai
+
 
         # Fix 2: Identify "System" phases that run automatically regardless of Human/AI
         # REPLACEMENTS, MOVEMENT, and COMBAT are 'Interactive', others are 'Automatic'
@@ -42,7 +47,6 @@ class GameController(QObject):
             GamePhase.INITIATIVE
         ]
 
-        is_ai = self.ai_config.get(current_side, False)
         is_auto_phase = current_phase in system_phases
 
         # Start timer if it's an AI turn OR if the game needs to auto-resolve a phase
@@ -65,7 +69,10 @@ class GameController(QObject):
         # 4. GUI updates automatically via sync_with_model()
         current_phase = self.game_state.phase
         active_player = self.game_state.active_player
-        is_ai = self.ai_config.get(active_player, False)
+
+        is_ai = False
+        if self.game_state.current_player:
+            is_ai = self.game_state.current_player.is_ai
 
         if current_phase == GamePhase.DEPLOYMENT:
             if is_ai:

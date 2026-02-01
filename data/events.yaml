@@ -299,6 +299,18 @@ good_dragons:
   trigger: { turn: 20 }
   effects: { add_units: "good_dragons" }
 
+ogres_of_daltigoth:
+  type: "units"
+  description: >
+    Stormogre unites the tribes of ogres at Daltigoth to fight the Whitestone.
+    
+    Daltigoth enters the war on the Highlord side.
+  picture: "ogres_of_daltigoth.jpg"
+  trigger:
+    turn: 20
+    other: "elven_exiles"
+  effects: { add_units: "daltigoth" }
+
 silver_arm:
   type: "artifact"
   description: > 
@@ -310,7 +322,6 @@ silver_arm:
   allegiance: "whitestone"
   trigger: { turn: 20 }
   effects: { grant_artifact: "silver_arm" }
-
 
 soths_legions:
   type: "units"
