@@ -105,8 +105,30 @@ class GameController(QObject):
             print(f"Step 1: Replacements Phase - {active_player}")
 
         elif current_phase == GamePhase.STRATEGIC_EVENTS:
-            # TODO: Draw random event
             print(f"Step 2: Strategic Events - {active_player}")
+
+            # Draw Event
+            event = self.game_state.draw_strategic_event(active_player)
+
+            if event:
+                # Activate (update counts) and Apply Effects
+                event.activate(self.game_state)
+
+                if not is_ai:
+                    # 1. Show Event Dialog
+                    from src.gui.event_dialog import EventDialog
+                    dlg = EventDialog(event)
+                    dlg.exec()
+
+                    # 2. Check for Artifact/Assets
+                    # "If the event is of the type artifact... open the assets_tab"
+                    # Check "artifact" or specific event type enum if available
+                    if event.spec.event_type == "artifact" or "grant_asset" in event.spec.effects:
+                        asset_id = event.spec.effects.get("grant_asset")
+                        self.open_assets_tab_for_assignment(asset_id)
+                        return # Stop loop, wait for user interaction (End Turn)
+
+            # If no event or event handled (and not requiring UI pause)
             self.game_state.advance_phase()
 
         elif current_phase == GamePhase.ACTIVATION:
@@ -198,6 +220,34 @@ class GameController(QObject):
 
         # If the new phase is AI controlled or automatic, keep the timer running/trigger next step
         self.check_active_player()
+
+    def open_assets_tab_for_assignment(self, asset_id=None):
+        """
+        Switches to Assets tab and prompts user.
+        """
+        main_window = self.view.window()
+
+        # 1. Switch Tab
+        if hasattr(main_window, 'tabs') and hasattr(main_window, 'assets_tab'):
+            main_window.tabs.setCurrentWidget(main_window.assets_tab)
+            # Refresh assets tab to show new item
+            main_window.assets_tab.refresh()
+
+            # Pre-select the new asset if ID provided
+            if asset_id:
+                main_window.assets_tab.select_asset_by_id(asset_id)
+
+        # 2. Show Popup
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(main_window, "New Artifact",
+                                "You have received an artifact!\n\n"
+                                "Assign it to an unequipped unit using the panel.\n"
+                                "You may also manage other assets.\n"
+                                "Click 'End Turn' (End Phase) when ready.")
+
+        # 3. Stop Timer (if it was running)
+        self.ai_timer.stop()
+        # The game flow is now paused until on_end_phase_clicked is called.
 
     def on_end_phase_clicked(self):
         """Call this when Human clicks 'End Phase' button."""

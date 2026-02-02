@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel)
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtCore import Qt, Slot, QObject, Signal
 
 from src.content.config import APP_NAME
@@ -100,7 +100,19 @@ class MainWindow(QMainWindow):
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
 
+    def closeEvent(self, event: QCloseEvent):
+        """Restores original console streams on exit to prevent segfaults."""
+        # Restore original streams to avoid crash on shutdown (Access Violation 0xC0000005)
+        # because Python might try to flush stdout/stderr to a destroyed QObject.
+        if hasattr(self, 'stdout_redirector'):
+            sys.stdout = self.stdout_redirector.original_stream
+        if hasattr(self, 'stderr_redirector'):
+            sys.stderr = self.stderr_redirector.original_stream
+
+        super().closeEvent(event)
+
     def on_tab_changed(self, index):
+        """Refreshes tab content when tab changes"""
         if self.tabs.widget(index) == self.status_tab:
             self.status_tab.refresh()
         elif self.tabs.widget(index) == self.assets_tab:

@@ -111,7 +111,7 @@ highlord_blitzkrieg:
     off guard and disrupting their plans.
     
     This turn all Highlord armies receive a +1 bonus to their combat rolls.
-  picture: "highlord_attack.jpg"
+  picture: "hl_blitzkrieg.jpg"
   allegiance: "highlord"
   turn: 1
   effects: { combat_bonus: 1 }
@@ -156,7 +156,7 @@ wildrunner_tactics:
   max_occurrences: 3
 
 ws_wizard:
-  type: "unit"
+  type: "units"
   description: >
     The wizard council at the Tower of High Sorcery in Wayreth sends reinforcements to aid the Whitestone forces.
     
@@ -168,7 +168,7 @@ ws_wizard:
   max_occurrences: 3
 
 hl_wizard:
-  type: "unit"
+  type: "units"
   description: >
     Tempted by promises of power and dark knowledge, a Black Robe wizard joins the Dragonarmies to serve their 
     Dark Queen.

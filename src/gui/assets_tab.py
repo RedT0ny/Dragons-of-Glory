@@ -1,11 +1,12 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QTreeWidget, QTreeWidgetItem, QFrame, QPushButton, QLineEdit, QTextEdit)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                               QTreeWidget, QTreeWidgetItem, QFrame, QPushButton, QLineEdit, QTextEdit,
+                               QTreeWidgetItemIterator)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
-from src.content.constants import WS
+from src.content.constants import WS, HL
 from src.content.config import FONTS_DIR, LIBRA_FONT
 
 
@@ -170,7 +171,7 @@ class AssetsTab(QWidget):
         self.details_panel = AssetDetails()
         self.details_panel.btn_assign.clicked.connect(self.on_assign_clicked)
         self.details_panel.btn_remove.clicked.connect(self.on_remove_clicked)
-        main_layout.addWidget(self.details_panel, stretch=0)
+        main_layout.addWidget(self.details_panel, stretch=1)
 
         # Signals
         self.asset_tree.itemSelectionChanged.connect(self.on_tree_asset_selected)
@@ -226,6 +227,21 @@ class AssetsTab(QWidget):
 
         self.asset_tree.expandAll()
         self.asset_tree.blockSignals(False)
+
+    def select_asset_by_id(self, asset_id):
+        """Selects an asset in the tree by its ID."""
+        if not asset_id:
+            return
+
+        iterator = QTreeWidgetItemIterator(self.asset_tree)
+        while iterator.value():
+            item = iterator.value()
+            asset = item.data(0, Qt.UserRole)
+            if asset and asset.id == asset_id:
+                self.asset_tree.setCurrentItem(item)
+                self.on_tree_asset_selected() # Manually trigger update
+                break
+            iterator += 1
 
     def on_unit_selected(self, unit):
         self.current_selected_unit = unit

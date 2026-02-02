@@ -1,10 +1,13 @@
-from typing import Set, Tuple, List, Dict
+import random
+from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver
-from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA
+from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, ARTIFACTS_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
-from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec
+from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType
 from src.content import loader, factory
 from src.game.map import Board, Hex
+from src.game.event import Event, Asset, check_requirements
+
 
 class GameState:
     """
@@ -44,6 +47,7 @@ class GameState:
         self.completed_event_ids = set() # Track for serialization
         self.artifact_pool = {} # ID -> ArtifactSpec blueprint (Catalog)
         self.players = {} # Dict[str, Player]
+        self.strategic_event_pool = [] # Pool of available strategic events
 
         # Draconian rules
         self.draconian_ready_at_start = 0
@@ -89,6 +93,9 @@ class GameState:
         # Apply Draconian scenario rules (ready count, production flag)
         self._apply_draconian_setup()
 
+        # Load Artifacts Catalog
+        self.artifact_pool = loader.load_artifacts_yaml(ARTIFACTS_DATA)
+
         # Setup the map
         bounds = self.get_map_bounds()
         width, height = self.get_map_dimensions()
@@ -119,6 +126,16 @@ class GameState:
 
         # Initialize Players (after map offsets are applied to the spec)
         self._initialize_players()
+
+        # Load Strategic Events
+        event_specs = loader.resolve_scenario_events(self.scenario_spec, EVENTS_DATA)
+        self.strategic_event_pool = []
+        for s in event_specs:
+            # We pass generic lambdas that delegate back to GameState logic
+            evt = Event(s,
+                        trigger_func=lambda gs, s=s: gs.check_event_trigger_conditions(s.trigger_conditions),
+                        effect_func=lambda gs, s=s: gs.apply_event_effect(s))
+            self.strategic_event_pool.append(evt)
 
         # Register existing units on the map if they have positions
         for unit in self.units:
@@ -452,6 +469,120 @@ class GameState:
 
         # Add to new position in spatial map
         self.map.add_unit_to_spatial_map(unit)
+
+    def check_event_trigger_conditions(self, conditions) -> bool:
+        """Checks if a list of trigger conditions is met."""
+        if not conditions:
+            return False
+
+        # Example condition format: "turn: 5" or "always_true" or dict
+        for cond in conditions:
+            if isinstance(cond, str):
+                if cond == "always_true":
+                    return True
+                # Parse simple strings if needed
+            elif isinstance(cond, dict):
+                if "turn" in cond and self.turn == cond["turn"]:
+                    return True
+                # Add more conditions as needed (e.g. "unit_at")
+
+        return False
+
+    def check_event_requirements_met(self, requirements) -> bool:
+        """Checks if event prerequisites are met."""
+        if not requirements:
+            return True
+
+        current_player_obj = self.current_player
+        for req in requirements:
+            # Reusing the shared check_requirements from event.py
+            if not check_requirements(req, current_player_obj, self):
+                return False
+        return True
+
+    def apply_event_effect(self, spec):
+        """Applies the effects of an event."""
+        if not spec.effects:
+            return
+
+        player = self.current_player
+
+        # Grant Asset
+        if "grant_asset" in spec.effects:
+            asset_id = spec.effects["grant_asset"]
+            if asset_id in self.artifact_pool:
+                asset_spec = self.artifact_pool[asset_id]
+                new_asset = Asset(asset_spec)
+                new_asset.owner = player.allegiance
+                player.assets[asset_id] = new_asset
+                print(f"Granted asset {asset_id} to {player.allegiance}")
+
+        # Add Units (Reinforcements)
+        if "add_units" in spec.effects:
+            # Logic to add units to reserve or specific location
+            pass
+
+        # Other effects...
+
+    def draw_strategic_event(self, allegiance):
+        """
+        Draws an event for the given allegiance based on triggers and probability.
+        """
+        # 1. Check for Auto-Triggers (Highest priority)
+        candidates = []
+        for event in self.strategic_event_pool:
+            if event.id in self.completed_event_ids: continue
+            if event.occurrence_count >= event.spec.max_occurrences: continue
+
+            # Allegiance check: Must match player OR be neutral (None)
+            # "Each player can only draw either an event of their allegiance or an event without allegiance"
+            if event.spec.allegiance and event.spec.allegiance != allegiance: continue
+
+            candidates.append(event)
+
+        # Check triggers
+        for event in candidates:
+            if event.spec.trigger_conditions:
+                if self.check_event_trigger_conditions(event.spec.trigger_conditions):
+                    return event
+
+        # 2. Check "Possible" Events (Random Draw)
+        possible_events = []
+        weights = []
+
+        for event in candidates:
+            # Skip if it has triggers (handled above, don't draw randomly if trigger didn't fire)
+            if event.spec.trigger_conditions:
+                continue
+
+            # Pre-requirements
+            if not self.check_event_requirements_met(event.spec.requirements):
+                continue
+
+            # Turn check and Probability Weight Calculation
+            if event.spec.turn is None:
+                diff = 0
+            else:
+                if self.turn < event.spec.turn:
+                    continue
+                diff = self.turn - event.spec.turn
+
+            # Formula: chance reduces as diff increases
+            # Base prob * (1 / (1 + 0.5 * diff)) - tunable decay
+            decay = 1.0 / (1.0 + 0.5 * diff)
+
+            # Use spec.probability (default 1.0)
+            weight = getattr(event.spec, 'probability', 1.0) * decay
+
+            possible_events.append(event)
+            weights.append(weight)
+
+        if not possible_events:
+            return None
+
+        # Draw one
+        chosen = random.choices(possible_events, weights=weights, k=1)[0]
+        return chosen
 
     def resolve_event(self, event):
         pass

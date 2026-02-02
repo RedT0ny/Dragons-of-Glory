@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 
 ################################################################################
 ## Form generated from reading UI file 'event_dialog.ui'
@@ -18,6 +19,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QDialogButtonBox,
     QGridLayout, QLabel, QSizePolicy, QTextEdit,
     QWidget)
+
+from src.content.config import IMAGES_DIR
+
 
 class Ui_event_dialog(object):
     def setupUi(self, event_dialog):
@@ -76,3 +80,29 @@ class Ui_event_dialog(object):
         self.event_description.setPlaceholderText(QCoreApplication.translate("event_dialog", u"event_description", None))
     # retranslateUi
 
+class EventDialog(QDialog, Ui_event_dialog):
+    def __init__(self, event, parent=None):
+        super().__init__(parent)
+        self.setupUi(self)
+        self.event = event
+        self.populate()
+
+    def populate(self):
+        if not self.event:
+            return
+
+        # Title
+        title = self.event.spec.id.replace("_", " ").title()
+        self.setWindowTitle(f"Strategic Event: {title}")
+
+        # Description
+        self.event_description.setText(self.event.description)
+
+        # Picture
+        if self.event.spec.picture:
+            image_path = os.path.join(IMAGES_DIR, self.event.spec.picture)
+            if os.path.exists(image_path):
+                pix = QPixmap(image_path)
+                # Keep aspect ratio
+                self.event_picture.setPixmap(pix.scaled(self.event_picture.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                self.event_picture.setText("")

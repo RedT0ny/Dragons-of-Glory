@@ -163,7 +163,7 @@ class EventSpec:
     event_type: str # Uses EventType enum values
     description: str
     turn: int
-    effects: Dict[str, Any] # e.g., {"add_units": ["silver_dragon"], "grant_artifact": "dragonlance"}
+    effects: Dict[str, Any] # e.g., {"add_units": ["silver_dragon"], "grant_asset": "dragonlance"}
     picture: str = "event.jpg"
     trigger_conditions: list = None
     requirements: list = None
@@ -180,7 +180,7 @@ class AssetType(Enum):
 class EventType(Enum):
     PLAYER_BONUS = "bonus"
     REINFORCEMENTS = "units"
-    PREREQUISITE = "pre_req"
+    BANNER = "banner"
     ARTIFACT = "artifact"
 
 class UnitColumn(Enum):
