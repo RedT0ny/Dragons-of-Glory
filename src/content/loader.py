@@ -39,10 +39,10 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         raw_data = yaml.safe_load(f)
 
     data = raw_data.get("scenario", {})
-    
+
     # Extract setup data
     setup_raw = data.get("initial_setup", {})
-    
+
     # We maintain the structure for players and neutral countries
     setup = {
         "neutral": setup_raw.get("neutral", {}),
@@ -59,6 +59,15 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
             "whitestone": setup["whitestone"].get("victory_conditions", {})
         }
 
+    # Handling possible_events logic:
+    # If key is missing -> Defaults to "ALL" (handled in spec default)
+    # If key is present but null -> None
+    # If key is present and list/dict -> List/Dict
+    if "possible_events" in data:
+        possible_events = data["possible_events"] # Could be None (yaml null) or data
+    else:
+        possible_events = "ALL"
+
     return ScenarioSpec(
         id=data.get("id", "unknown"),
         description=data.get("description", ""),
@@ -66,12 +75,110 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         start_turn=data.get("start_turn", 1),
         end_turn=data.get("end_turn", 30),
         initiative_start=data.get("initiative_start", "highlord"),
-        active_events=data.get("active_events", []),
+        active_events=data.get("active_events", {}), # Default to empty dict if missing
+        possible_events=possible_events,
         setup=setup,
         victory_conditions=v_conds,
         picture=data.get("picture", "scenario.jpg"),
         notes=data.get("notes", "")
     )
+
+def resolve_scenario_events(spec: ScenarioSpec, events_yaml_path: str) -> List[EventSpec]:
+    """
+    Parses events based on scenario rules:
+    1. Filters based on 'possible_events' (The Deck).
+    2. Adjusts occurrences based on 'active_events' (The History/Modifiers).
+    """
+    if spec is None: return []
+
+    # 1. Load the Master Catalog (events.yaml)
+    all_event_specs = load_events_yaml(events_yaml_path) # Dict[id, EventSpec]
+    final_pool: Dict[str, EventSpec] = {}
+
+    # 2. Determine the Initial Pool (possible_events)
+    # "if possible_events not defined, add all events to the game_state list."
+    if spec.possible_events == "ALL":
+        final_pool = {k: v for k, v in all_event_specs.items()}
+
+    # "if possible_events: null remove all possible events from the game_state list."
+    elif spec.possible_events is None:
+        final_pool = {}
+
+    # "if possible_events [{ event_id : int(times)}] add ... only the ones in this list."
+    elif isinstance(spec.possible_events, (list, dict)):
+        # Normalize to dict for easier processing
+        inclusion_map = {}
+
+        if isinstance(spec.possible_events, list):
+            for item in spec.possible_events:
+                if isinstance(item, str):
+                    inclusion_map[item] = None # No count override
+                elif isinstance(item, dict):
+                    for k, v in item.items():
+                        inclusion_map[k] = v
+        elif isinstance(spec.possible_events, dict):
+            inclusion_map = spec.possible_events
+
+        # Build pool
+        for eid, override_val in inclusion_map.items():
+            if eid in all_event_specs:
+                # Create a copy to avoid mutating the cached master list
+                # We can use factory/dataclass replace, or just new instance
+                # Since EventSpec is simple, we assume copy is handled by caller or we make fresh object
+                # For now, simplistic assignment, but in a real app use copy.deepcopy or replace()
+                import copy
+                event_copy = copy.replace(all_event_specs[eid])
+
+                # Apply override if 'times' provided in possible_events
+                if isinstance(override_val, int):
+                    event_copy.max_occurrences = override_val
+
+                final_pool[eid] = event_copy
+
+    # 3. Apply Modifiers (active_events)
+    # "active_events" here acts as a record of what has been consumed or needs removal
+    modifiers = spec.active_events
+
+    # Normalize modifiers to a dictionary {id: val}
+    mod_map = {}
+    if isinstance(modifiers, list):
+        # If list of strings: treat as "remove 1 occurrence"? Or "remove completely"?
+        # Prompt says: "if active_events [{ event_id : int(times) }]"
+        # If it's just a list of strings, we assume it's just keys, but usually YAML dicts load as dicts.
+        for item in modifiers:
+            if isinstance(item, dict):
+                mod_map.update(item)
+            elif isinstance(item, str):
+                # Ambiguous case: just ID listed. Assume 1 occurrence consumed?
+                # Or assume it acts like 'all'? Let's assume 1 for safety unless specified.
+                mod_map[item] = 1
+    elif isinstance(modifiers, dict):
+        mod_map = modifiers
+
+    for eid, mod_val in mod_map.items():
+        if eid not in final_pool:
+            continue
+
+        target_event = final_pool[eid]
+
+        # "if active_events: [{ event_id : all }] remove all possible occurrences"
+        if str(mod_val).lower() == "all":
+            del final_pool[eid]
+            continue
+
+        # "remove them ... or reduce the number of possible occurrences by times."
+        if isinstance(mod_val, int):
+            # If infinite event (<0), reducing it doesn't stop it, unless logic changes.
+            # Assuming standard decrement for positive max_occurrences.
+            if target_event.max_occurrences > 0:
+                target_event.max_occurrences -= mod_val
+
+                # If reduced to 0 or less, remove it
+                if target_event.max_occurrences <= 0:
+                    del final_pool[eid]
+
+    return list(final_pool.values())
+
 
 def save_game_state(path: str, scenario_id: str, turn: int, phase: str, active_player: str, units: List[Dict[str, Any]], activated_countries: List[str]):
     """
@@ -440,33 +547,53 @@ def resolve_scenario_countries(spec: ScenarioSpec, countries_yaml_path: str) -> 
 
     return resolved_specs
 
-def load_artifacts_yaml(path: str) -> Dict[str, ArtifactSpec]:
+
+def load_artifacts_yaml(path: str) -> Dict[str, AssetSpec]:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    
+
     specs = {}
     for aid, info in data.items():
-        specs[aid] = ArtifactSpec(
+        # Determine asset type (default to artifact)
+        a_type = info.get("type", "artifact")
+
+        # Smart default for equippable:
+        # Artifacts are usually equippable; pre_reqs/banners never are.
+        default_equippable = True if a_type == "artifact" else False
+
+        specs[aid] = AssetSpec(
             id=aid,
+            asset_type=a_type,
             description=info.get("description", ""),
+            effect=info.get("effect", ""),  # Added this
             bonus=info.get("bonus", {}),
             requirements=info.get("requirements", []),
-            is_consumable=info.get("is_consumable", False)
+            is_consumable=info.get("is_consumable", False),
+            is_equippable=info.get("is_equippable", default_equippable),
+            picture=info.get("picture", "artifact.jpg")
         )
     return specs
 
 def load_events_yaml(path: str) -> Dict[str, EventSpec]:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    
+
     specs = {}
     for eid, info in data.items():
+        # 1. Normalize trigger: if it's not a list, make it a list for easier iteration later
+        raw_trigger = info.get("trigger", [])
+        trigger_list = raw_trigger if isinstance(raw_trigger, list) else [raw_trigger]
+
         specs[eid] = EventSpec(
             id=eid,
             event_type=info.get("type", "bonus"),
             description=info.get("description", ""),
-            trigger_conditions=info.get("trigger", {}),
+            turn=info.get("turn"),
+            requirements=info.get("requirements", []),      # New Requirements List
+            trigger_conditions=trigger_list,                # Normalized to List
             effects=info.get("effects", {}),
-            allegiance=info.get("allegiance")
+            allegiance=info.get("allegiance"),
+            max_occurrences=info.get("max_occurrences", 1),
+            picture=info.get("picture", "event.jpg")
         )
     return specs

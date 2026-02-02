@@ -33,7 +33,7 @@ class Unit:
             self.status = raw_status
 
         self.position: Tuple[Optional[int], Optional[int]] = (None, None)
-        self.equipment: List[Any] = [] # List of Artifact objects
+        self.equipment: List[Any] = [] # List of Asset objects
 
         # Turn-based flags
         self.is_transported = False

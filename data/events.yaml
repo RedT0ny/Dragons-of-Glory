@@ -10,7 +10,7 @@ ws_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
   picture: "ws_diplomacy.jpg"
-  trigger: { turn: 3 }
+  turn: 3
   allegiance: "whitestone"
   effects: { activation_bonus: 2 }
   max_occurrences: 2
@@ -23,7 +23,7 @@ ws_minor_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "ws_minor_diplomacy.jpg"
-  trigger: { turn: 2 }
+  turn: 2
   allegiance: "whitestone"
   effects: { gain_alliance: "neutral" }
   max_occurrences: 3
@@ -36,7 +36,7 @@ hl_minor_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "hl_minor_diplomacy.jpg"
-  trigger: { turn: 5 }
+  turn: 5
   allegiance: "highlord"
   effects: { activation_bonus: 1 }
   max_occurrences: 3
@@ -52,8 +52,8 @@ blue_crystal_staff:
     You have recovered the Blue Crystal Staff!
   picture: "riverwind_quest.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 11 }
-  effects: { grant_artifact: "blue_crystal_staff" }
+  turn: 11
+  effects: { grant_asset: "blue_crystal_staff" }
 
 crown_of_power:
   type: "artifact"
@@ -65,8 +65,8 @@ crown_of_power:
     The Crown of Power has been granted to the Highlord.
   picture: "takhisis_crown.jpg"
   allegiance: "highlord"
-  trigger: { turn: 5 }
-  effects: { grant_artifact: "crown_of_power" }
+  turn: 5
+  effects: { grant_asset: "crown_of_power" }
 
 dragonarmor:
   type: "artifact"
@@ -76,8 +76,8 @@ dragonarmor:
     A suit of Dragonarmor is presented as a token of prestige to one of the highlords.
   picture: "dark_forge.jpg"
   allegiance: "highlord"
-  trigger: { turn: 5 }
-  effects: { grant_artifact: "dragonarmor" }
+  turn: 5
+  effects: { grant_asset: "dragonarmor" }
   max_occurrences: 4
 
 dragonmetal:
@@ -89,8 +89,8 @@ dragonmetal:
     
     A pool of pure dragonmetal has been found in Foghaven Vale.
   picture: "foghaven_vale.jpg"
-  trigger: { turn: 7 }
-  effects: { grant_prerequisite: "dragonmetal" }
+  turn: 7
+  effects: { grant_asset: "dragonmetal" }
 
 hammer_of_kharas:
   type: "artifact"
@@ -100,10 +100,9 @@ hammer_of_kharas:
     
     Whitestone finds the Hammer of Kharas!
   picture: "hammer_of_kharas.jpg"
-  trigger: { turn: 8 }
+  turn: 8
   effects:
-    grant_prerequisite: "hammer_of_kharas"
-    grant_artifact: "hammer_of_kharas"
+    grant_asset: "hammer_of_kharas"
 
 highlord_blitzkrieg:
   type: "bonus"
@@ -114,7 +113,7 @@ highlord_blitzkrieg:
     This turn all Highlord armies receive a +1 bonus to their combat rolls.
   picture: "highlord_attack.jpg"
   allegiance: "highlord"
-  trigger: { turn: 1 }
+  turn: 1
   effects: { combat_bonus: 1 }
   max_occurrences: 3
 
@@ -122,8 +121,8 @@ medallion_of_faith:
   type: "artifact"
   description: "A medallion of faith from the true gods is discovered in an abandoned shrine."
   picture: "medallion.jpg"
-  trigger: { turn: 19 }
-  effects: { grant_artifact: "medallion_of_faith" }
+  turn: 19
+  effects: { grant_asset: "medallion_of_faith" }
   max_occurrences: 4
 
 plate_of_solamnus:
@@ -136,10 +135,11 @@ plate_of_solamnus:
     
     A Plate of Solamnus is recovered from the catacombs of the Solamnic Keeps and presented to the Whitestone.
   picture: "solamnus_plate.svg"
-  requires: "knights_at_war"
   allegiance: "whitestone"
-  trigger: { turn: 1 }
-  effects: { grant_artifact: "plate_of_solamnus" }
+  trigger:
+    turn: 1
+    other: "knights_at_war"
+  effects: { grant_asset: "plate_of_solamnus" }
   max_occurrences: 4
 
 wildrunner_tactics:
@@ -151,7 +151,7 @@ wildrunner_tactics:
     This turn all Whitestone armies receive a +1 bonus to their combat rolls.
   picture: "wildrunner_tactics.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 6 }
+  turn: 6
   effects: { combat_bonus: 1 }
   max_occurrences: 3
 
@@ -162,7 +162,7 @@ ws_wizard:
     
     A powerful wizard arrives to join your ranks.
   picture: "ws_wizard.jpg"
-  trigger: { turn: 2 }
+  turn: 2
   allegiance: "whitestone"
   effects: { add_units: "wizard",  }
   max_occurrences: 3
@@ -175,7 +175,7 @@ hl_wizard:
     
     A powerful evil wizard arrives to join your ranks.
   picture: "hl_wizard.jpg"
-  trigger: { turn: 1 }
+  turn: 1
   allegiance: "highlord"
   effects: { add_units: "wizard" }
   max_occurrences: 3
@@ -189,9 +189,10 @@ dragonlance_forged:
     A Dragonlance has been created!
   picture: "dragonlance.svg"
   allegiance: "whitestone"
-  trigger: { turn: 10 }
-  requires: ["dragonmetal", "hammer_of_kharas"]
-  effects: { grant_artifact: "dragonlance" }
+  turn: 10
+  requirements:
+    - { type: "asset", id: "dragonmetal" }       # Check Player.assets
+  effects: { grant_asset: "dragonlance" }
   max_ocurrences: 5
 
 dragon_orb:
@@ -203,8 +204,8 @@ dragon_orb:
     
     You have obtained a Dragon Orb!
   picture: "orb.svg"
-  trigger: { turn: 4 }
-  effects: { grant_artifact: "dragon_orb" }
+  turn: 4
+  effects: { grant_asset: "dragon_orb" }
 
 disks_of_mishakal:
   type: "artifact"
@@ -216,8 +217,8 @@ disks_of_mishakal:
     You have recovered the Disks of Mishakal!
   picture: "disks_of_mishakal.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 19 }
-  effects: { grant_artifact: "disks_of_mishakal" }
+  turn: 19
+  effects: { grant_asset: "disks_of_mishakal" }
 
 hl_diplomacy:
   type: "diplomacy"
@@ -227,7 +228,7 @@ hl_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
   picture: "hl_diplomacy.jpg"
-  trigger: { turn: 10 }
+  turn: 10
   allegiance: "highlord"
   effects: { activation_bonus: 2 }
   max_occurrences: 2
@@ -241,7 +242,7 @@ whitestone_council:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +3 bonus in your activation roll.
   picture: "whitestone_council.jpg"
-  trigger: { turn: 21 }
+  turn: 21
   allegiance: "whitestone"
   effects: { activation_bonus: 3 }
 
@@ -257,7 +258,7 @@ flying_citadel:
     
     An ominous Flying Citadel joins the Dragon Highlord's forces.
   picture: "citadel.jpg"
-  trigger: { turn: 22 }
+  turn: 22
   effects: { add_units: "citadel" }
 
 gnome_tech:
@@ -269,9 +270,9 @@ gnome_tech:
     
     Mount Nevermind has joined the war. A Gnome Tech artifact has been acquired!
   picture: "gnome_tech.jpg"
-  trigger: { turn: 10 }
+  turn: 10
   effects:
-    grant_artifact: "gnome_tech"
+    grant_asset: "gnome_tech"
     add_units: "nevermind"
 
 golden_general:
@@ -283,7 +284,7 @@ golden_general:
     
     Lauranthalasa Kanan becomes the Golden General of the Whitestone forces.
   picture: "golden_general.jpg"
-  trigger: { turn: 21 }
+  turn: 21
   effects: { add_units: "golden_general" }
 
 good_dragons:
@@ -296,20 +297,8 @@ good_dragons:
     
     The Good Dragons are back in the skies of Ansalon!
   picture: "good_dragons.jpg"
-  trigger: { turn: 20 }
+  turn: 20
   effects: { add_units: "good_dragons" }
-
-ogres_of_daltigoth:
-  type: "units"
-  description: >
-    Stormogre unites the tribes of ogres at Daltigoth to fight the Whitestone.
-    
-    Daltigoth enters the war on the Highlord side.
-  picture: "ogres_of_daltigoth.jpg"
-  trigger:
-    turn: 20
-    other: "elven_exiles"
-  effects: { add_units: "daltigoth" }
 
 silver_arm:
   type: "artifact"
@@ -320,8 +309,8 @@ silver_arm:
     Theros discovers the Silver Arm of Ergoth!
   picture: "silver_arm.jpg"
   allegiance: "whitestone"
-  trigger: { turn: 20 }
-  effects: { grant_artifact: "silver_arm" }
+  turn: 20
+  effects: { grant_asset: "silver_arm" }
 
 soths_legions:
   type: "units"
@@ -332,7 +321,7 @@ soths_legions:
     
     Lord Soth swears allegiance to the highlord of the Blue Dragonflight.
   picture: "soths_charge.jpg"
-  trigger: { turn: 16 }
+  turn: 16
   effects: { add_units: "soths_legions" }
 
 wyrmslayer:
@@ -346,5 +335,5 @@ wyrmslayer:
     
     The Whitesone heroes have found Wyrmslayer, the magical sword of the elven hero, Kith-Kanan!
   picture: "kith-kanan_tomb.jpg"
-  trigger: { turn: 19 }
-  effects: { grant_artifact: "wyrmslayer" }
+  turn: 19
+  effects: { grant_asset: "wyrmslayer" }

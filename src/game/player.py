@@ -10,8 +10,12 @@ class Player:
         self.is_ai = spec.is_ai
 
         # Runtime Sets
-        self.artifacts: Set[str] = set(spec.artifacts or [])
+        self.assets: Dict[str, Any] = {} # ID -> Asset Instance
         self.prerequisites: Set[str] = set(spec.pre_req or []) # Track pre-requirements for events, like artifacts
+
+        # Legacy/Transition: Init assets from spec artifacts if present
+        # Note: This requires game_state to resolve specs, usually done in initialization phase
+        # For now we initialize empty and let GameState populate it
 
     def add_country(self, country: Country):
         self.controlled_countries[country.spec.id] = country
@@ -20,15 +24,29 @@ class Player:
         """Runtime toggle for AI control."""
         self.is_ai = enabled
 
-    def add_artifact(self, artifact_id: str):
-        self.artifacts.add(artifact_id)
+    def grant_asset(self, asset_id: str, game_state):
+        """
+        Unified method to grant artifacts, resources, or banners.
+        """
+        if asset_id in self.assets:
+            return # Already owned
 
-    def remove_artifact(self, artifact_id: str):
-        if artifact_id in self.artifacts:
-            self.artifacts.remove(artifact_id)
+        # Look up the blueprint
+        spec = game_state.artifact_pool.get(asset_id)
+        if not spec:
+            print(f"Warning: Asset ID {asset_id} not found in catalog.")
+            return
 
-    def has_artifact(self, artifact_id: str) -> bool:
-        return artifact_id in self.artifacts
+        # Create the live Asset instance
+        from src.game.event import Asset
+        new_asset = Asset(spec)
+        new_asset.owner = self
+
+        self.assets[asset_id] = new_asset
+        print(f"Player {self.allegiance} received asset: {spec.id} ({spec.asset_type})")
+
+    def has_asset(self, asset_id: str) -> bool:
+        return asset_id in self.assets
 
     def get_deployment_hexes(self, all_countries: Dict[str, Country], is_hex_in_bounds: Callable[[int, int], bool]) -> Set[tuple]:
         """

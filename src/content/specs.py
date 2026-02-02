@@ -7,6 +7,7 @@ locations, countries, units, scenarios, saved game states, and map configuration
 Shall only be used by Loader.py to read data from CSV/JSON/YAML files into these structures.
 
 Classes:
+- AssetSpec: Represents the details of a specific asset in the game.
 - LocationSpec: Represents the details of a specific location on the map.
 - CountrySpec: Represents a country and its associated properties.
 - PlayerSpec: Represents a player and their associated attributes.
@@ -110,7 +111,8 @@ class ScenarioSpec:
         :ivar start_turn: The turn number when the scenario starts.
         :ivar end_turn: The turn number when the scenario ends.
         :ivar initiative_start: The unit ID that starts the initiative phase.
-        :ivar active_events: A list of event IDs that are active during the scenario.
+        :ivar active_events: Events that have already occurred or modify the pool (History).
+        :ivar possible_events: Whitelist of events allowed in this scenario. Sentinel "ALL" used if missing.
         :ivar setup: A dictionary containing setup configurations for the scenario.
         :ivar victory_conditions: A dictionary defining victory conditions for the scenario.
         :ivar picture: A filename for a picture associated with the scenario (default: "scenario.jpg").
@@ -122,9 +124,10 @@ class ScenarioSpec:
     start_turn: int
     end_turn: int
     initiative_start: str
-    active_events: List[str]
+    active_events: Union[List[str], Dict[str, Any]] # Changed to support {id: times}
     setup: Dict[str, Any]
     victory_conditions: Dict[str, Any]
+    possible_events: Union[str, List[str], Dict[str, Any], None] = "ALL" # New field, default "ALL" implies undefined in YAML
     picture: str = "scenario.jpg"  # Added field with a default fallback
     notes: str = "" # Added a default value to prevent errors if notes are missing
 
@@ -144,11 +147,15 @@ class MapConfigSpec:
     special_locations: List[LocationSpec]
 
 @dataclass
-class ArtifactSpec:
+class AssetSpec:
     id: str
+    asset_type: str  # "artifact", "pre_req", "banner"
     description: str
-    bonus: Dict[str, Any]
-    requirements: List[Dict[str, Any]]
+    effect: str = "" # The flavor text of what it does
+    bonus: Dict[str, Any] = field(default_factory=dict)
+    requirements: List[Dict[str, Any]] = field(default_factory=list)
+    picture: str = "artifact.jpg"
+    is_equippable: bool = False
     is_consumable: bool = False
 
 @dataclass
@@ -156,12 +163,22 @@ class EventSpec:
     id: str
     event_type: str # Uses EventType enum values
     description: str
-    trigger_conditions: Dict[str, Any] # e.g., {"turn": 10, "requires": ["metal"]}
+    turn: int
     effects: Dict[str, Any] # e.g., {"add_units": ["silver_dragon"], "grant_artifact": "dragonlance"}
+    picture: str = "event.jpg"
+    trigger_conditions: list = None
+    requirements: list = None
     allegiance: Optional[str] = None # Who benefits?
     max_occurrences: int = 1  # Default to 1 (one-time event)
+    probability: float = 1.0  # New field for Pseudo-Random Distribution
 
 # --- ENUMS ---
+class AssetType(Enum):
+    ARTIFACT = "artifact"
+    RESOURCE = "bonus"
+    BANNER = "banner"
+    PRE_REQ = "pre_req"
+
 class EventType(Enum):
     PLAYER_BONUS = "bonus"
     REINFORCEMENTS = "units"
@@ -244,8 +261,8 @@ class RequirementType(Enum):
     UNIT_TYPE = "unit_type"
     CUSTOM = "custom"
 
-# --- ARTIFACT CONFIG ---
-ARTIFACT_REQUIREMENTS = {
+# --- ASSET CONFIG ---
+ASSET_REQUIREMENTS = {
     "race_requirements": {
         "solamnic": UnitRace.SOLAMNIC,
         "draconian": UnitRace.DRACONIAN,
@@ -257,7 +274,6 @@ ARTIFACT_REQUIREMENTS = {
         "ogre": UnitRace.OGRE,
     },
     "trait_requirements": {
-        "has_silver_arm": lambda unit: hasattr(unit, 'traits') and 'silver_arm' in unit.traits,
         "is_leader": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type in [UnitType.GENERAL, UnitType.ADMIRAL, UnitType.EMPEROR],
         "is_magical": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type == UnitType.WIZARD,
     },
