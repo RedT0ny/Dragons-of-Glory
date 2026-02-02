@@ -26,6 +26,7 @@ MAP_TERRAIN_DATA = os.path.join(DATA_DIR, "ansalon_map.csv")
 UNITS_DATA = os.path.join(DATA_DIR, "units.csv")
 EVENTS_DATA = os.path.join(DATA_DIR, "events.yaml")
 ARTIFACTS_DATA = os.path.join(DATA_DIR, "artifacts.yaml")
+LIBRA_FONT = os.path.join(FONTS_DIR, "Libra Regular.otf")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77

@@ -15,7 +15,7 @@ blue_crystal_staff:
   bonus:
     tactical_rating: 1
     other: "revive"
-    is_consumable: true
+  is_consumable: true
 
 # The Crown of Power allows a Highlord to control dragons from any dragonflight
 crown_of_power:

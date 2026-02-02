@@ -557,10 +557,6 @@ def load_artifacts_yaml(path: str) -> Dict[str, AssetSpec]:
         # Determine asset type (default to artifact)
         a_type = info.get("type", "artifact")
 
-        # Smart default for equippable:
-        # Artifacts are usually equippable; pre_reqs/banners never are.
-        default_equippable = True if a_type == "artifact" else False
-
         specs[aid] = AssetSpec(
             id=aid,
             asset_type=a_type,
@@ -569,7 +565,6 @@ def load_artifacts_yaml(path: str) -> Dict[str, AssetSpec]:
             bonus=info.get("bonus", {}),
             requirements=info.get("requirements", []),
             is_consumable=info.get("is_consumable", False),
-            is_equippable=info.get("is_equippable", default_equippable),
             picture=info.get("picture", "artifact.jpg")
         )
     return specs
@@ -586,7 +581,7 @@ def load_events_yaml(path: str) -> Dict[str, EventSpec]:
 
         specs[eid] = EventSpec(
             id=eid,
-            event_type=info.get("type", "bonus"),
+            event_type=info.get("type", "resource"),
             description=info.get("description", ""),
             turn=info.get("turn"),
             requirements=info.get("requirements", []),      # New Requirements List

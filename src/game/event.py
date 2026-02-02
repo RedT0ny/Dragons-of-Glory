@@ -43,11 +43,14 @@ class Asset:
         self.bonus = spec.bonus
         self.requirements = spec.requirements
         self.is_consumable = spec.is_consumable
-        self.is_equippable = spec.is_equippable
         self.asset_type = AssetType(spec.asset_type)
 
         self.owner = None
         self.assigned_to = None  # Reference to a Unit object
+
+    @property
+    def is_equippable(self):
+        return self.asset_type == AssetType.ARTIFACT
 
     def can_equip(self, unit):
         """

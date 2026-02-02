@@ -3,6 +3,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QSize
 from PySide6.QtGui import QIcon
 
 from src.content.config import UNIT_ICON_SIZE
+from src.content.specs import UnitColumn
 from src.gui.unit_panel import UnitTable
 
 class InfoPanel(QFrame):
@@ -41,7 +42,7 @@ class InfoPanel(QFrame):
         self.selection_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         layout.addWidget(self.selection_label)
         
-        # Unit Info placeholder
+        # Unit Info Frame
         unit_box = QFrame()
         unit_box.setFrameStyle(QFrame.Box)
         unit_layout = QVBoxLayout(unit_box)
@@ -53,13 +54,19 @@ class InfoPanel(QFrame):
         unit_layout.addWidget(QLabel("Rating: X\nMov: remaining (total)\ncountry_name\nunit_status"))
         layout.addWidget(unit_box)
 
-        # Unit Info placeholder
+        # Unit Info table
         layout.addWidget(QLabel("Selected Units Stack:"))
 
         # Use reusable UnitTable
-        self.units_table = UnitTable(["checkbox", "icon", "name", "rating", "move"])
+        self.units_table = UnitTable([
+            UnitColumn.CHECKBOX,
+            UnitColumn.ICON,
+            UnitColumn.NAME,
+            UnitColumn.RATING,
+            UnitColumn.MOVE
+        ])
         self.units_table.itemChanged.connect(self.on_item_changed)
-        
+
         layout.addWidget(self.units_table)
         layout.addStretch()
 

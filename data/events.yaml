@@ -81,7 +81,7 @@ dragonarmor:
   max_occurrences: 4
 
 dragonmetal:
-  type: "pre_req"
+  type: "resource"
   description: >
     A Whitestone heroine ventured beneath the Stone Dragon in Foghaven Vale. There, welling up from the earth, she 
     found a pool of cool liquid metal. This gift from the gods of Light is one of the essential ingredients that can 

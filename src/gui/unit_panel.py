@@ -4,7 +4,8 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTable
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
-from src.content.config import UNIT_ICON_SIZE
+from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT
+from src.content.specs import UnitColumn
 from src.gui.map_items import UnitCounter
 
 class CheckBoxHeader(QHeaderView):
@@ -51,8 +52,7 @@ class CheckBoxHeader(QHeaderView):
 class UnitTable(QTableWidget):
     """
     A reusable table widget for displaying units.
-    columns: list of strings identifier. Supported:
-    'checkbox', 'icon', 'name', 'status', 'rating', 'move', 'pos', 'type', 'equipment'
+    columns: list of UnitColumn enums.
     """
     
     def __init__(self, columns, parent=None):
@@ -64,19 +64,8 @@ class UnitTable(QTableWidget):
     def _init_ui(self):
         self.setColumnCount(len(self.columns_config))
         
-        headers = []
-        for col in self.columns_config:
-            if col == 'checkbox': headers.append("")
-            elif col == 'icon': headers.append("Icon")
-            elif col == 'name': headers.append("Name")
-            elif col == 'status': headers.append("Status")
-            elif col == 'rating': headers.append("Rating")
-            elif col == 'move': headers.append("Move")
-            elif col == 'pos': headers.append("Pos")
-            elif col == 'type': headers.append("Type")
-            elif col == 'equipment': headers.append("Equipment")
-            else: headers.append(col.title())
-            
+        # Use Enum values as header labels
+        headers = [col.value for col in self.columns_config]
         self.setHorizontalHeaderLabels(headers)
         self.verticalHeader().setVisible(False)
         self.setIconSize(QSize(UNIT_ICON_SIZE, UNIT_ICON_SIZE))
@@ -84,22 +73,22 @@ class UnitTable(QTableWidget):
         # Default behavior
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setSelectionMode(QTableWidget.SingleSelection)
-        
-        # If 'checkbox' is present, assume special header
-        if 'checkbox' in self.columns_config:
+
+        # Checkbox special handling
+        if UnitColumn.CHECKBOX in self.columns_config:
             self.header_checkbox = CheckBoxHeader(Qt.Horizontal, self)
             self.setHorizontalHeader(self.header_checkbox)
             self.header_checkbox.toggled.connect(self.toggle_all_rows)
             # Adjust first col
             self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        
+
         # Adjust other columns
         for i, col in enumerate(self.columns_config):
-            if col == 'name':
+            if col == UnitColumn.NAME:
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
-            elif col != 'checkbox':
+            elif col != UnitColumn.CHECKBOX:
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
-                
+
     def set_units(self, units, game_state=None):
         self.current_units = units
         self.game_state = game_state # Needed for colors/rendering
@@ -119,54 +108,54 @@ class UnitTable(QTableWidget):
                 
         self.blockSignals(False)
         self.resizeRowsToContents()
-        
-    def _create_item(self, col_type, unit):
+
+    def _create_item(self, col_type: UnitColumn, unit):
         item = QTableWidgetItem()
         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-        
-        if col_type == 'checkbox':
+
+        if col_type == UnitColumn.CHECKBOX:
             item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
             item.setCheckState(Qt.Unchecked)
-            
-        elif col_type == 'icon':
+
+        elif col_type == UnitColumn.ICON:
             pixmap = self._render_unit_icon(unit)
             item.setIcon(QIcon(pixmap))
-            
-        elif col_type == 'name':
+
+        elif col_type == UnitColumn.NAME:
             item.setText(str(unit.id))
-            
-        elif col_type == 'status':
+
+        elif col_type == UnitColumn.STATUS:
             s_str = unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status)
             item.setText(s_str)
-            
-        elif col_type == 'rating':
+
+        elif col_type == UnitColumn.RATING:
             rating_str = f"{unit.combat_rating}"
             if unit.tactical_rating and unit.combat_rating != 0:
                 rating_str = f"{unit.combat_rating}/{unit.tactical_rating}"
             elif unit.combat_rating == 0 and unit.tactical_rating:
                 rating_str = f"{unit.tactical_rating}"
             item.setText(rating_str)
-            
-        elif col_type == 'move':
+
+        elif col_type == UnitColumn.MOVE:
             total = unit.movement
             rem = getattr(unit, 'movement_points', total)
             item.setText(f"{rem} ({total})")
-            
-        elif col_type == 'pos':
+
+        elif col_type == UnitColumn.POS:
             if unit.is_on_map and unit.position and unit.position != (None, None):
                 item.setText(f"{unit.position}")
             else:
                 item.setText("-")
-                
-        elif col_type == 'type':
+
+        elif col_type == UnitColumn.TYPE:
             item.setText(str(unit.unit_type))
-            
-        elif col_type == 'equipment':
+
+        elif col_type == UnitColumn.EQUIPMENT:
             equip_str = "-"
             if hasattr(unit, 'equipment') and unit.equipment:
                 equip_str = ", ".join([a.spec.id for a in unit.equipment])
             item.setText(equip_str)
-            
+
         return item
         
     def _render_unit_icon(self, unit):
@@ -224,7 +213,7 @@ class AllegiancePanel(QWidget):
             lbl.setAlignment(Qt.AlignCenter)
             
             font_db = QFontDatabase()
-            font_id = font_db.addApplicationFont("assets/font/Libra Regular.otf")
+            font_id = font_db.addApplicationFont(LIBRA_FONT)
             if font_id != -1:
                 families = font_db.applicationFontFamilies(font_id)
                 if families:

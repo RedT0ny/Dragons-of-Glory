@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout
 from src.content.constants import WS, HL, NEUTRAL
 from src.gui.unit_panel import AllegiancePanel
+from src.content.specs import UnitColumn
 
 class StatusTab(QWidget):
     def __init__(self, game_state):
@@ -19,9 +20,16 @@ class StatusTab(QWidget):
             if item.widget():
                 item.widget().deleteLater()
 
-        columns = ["icon", "name", "status", "rating", "move", "pos"]
+        columns = [
+            UnitColumn.ICON,
+            UnitColumn.NAME,
+            UnitColumn.STATUS,
+            UnitColumn.RATING,
+            UnitColumn.MOVE,
+            UnitColumn.POS
+        ]
 
         # Create 3 panels
-        self.main_layout.addWidget(AllegiancePanel(self.game_state, WS, columns, title="Whitestone"))
-        self.main_layout.addWidget(AllegiancePanel(self.game_state, HL, columns, title="Highlord"))
-        self.main_layout.addWidget(AllegiancePanel(self.game_state, NEUTRAL, columns, title="Neutral"))
+        self.main_layout.addWidget(AllegiancePanel(self.game_state, WS, columns, title=WS))
+        self.main_layout.addWidget(AllegiancePanel(self.game_state, HL, columns, title=HL))
+        self.main_layout.addWidget(AllegiancePanel(self.game_state, NEUTRAL, columns, title=NEUTRAL))

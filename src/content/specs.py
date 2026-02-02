@@ -149,13 +149,12 @@ class MapConfigSpec:
 @dataclass
 class AssetSpec:
     id: str
-    asset_type: str  # "artifact", "pre_req", "banner"
+    asset_type: str  # AssetType enum
     description: str
     effect: str = "" # The flavor text of what it does
     bonus: Dict[str, Any] = field(default_factory=dict)
     requirements: List[Dict[str, Any]] = field(default_factory=list)
     picture: str = "artifact.jpg"
-    is_equippable: bool = False
     is_consumable: bool = False
 
 @dataclass
@@ -175,15 +174,25 @@ class EventSpec:
 # --- ENUMS ---
 class AssetType(Enum):
     ARTIFACT = "artifact"
-    RESOURCE = "bonus"
+    RESOURCE = "resource"
     BANNER = "banner"
-    PRE_REQ = "pre_req"
 
 class EventType(Enum):
     PLAYER_BONUS = "bonus"
     REINFORCEMENTS = "units"
     PREREQUISITE = "pre_req"
     ARTIFACT = "artifact"
+
+class UnitColumn(Enum):
+    CHECKBOX = ""
+    ICON = "Icon"
+    NAME = "Name"
+    STATUS = "Status"
+    RATING = "Rating"
+    MOVE = "Move"
+    POS = "Pos"
+    TYPE = "Type"
+    EQUIPMENT = "Equipment"
 
 class UnitRace(Enum):
     DWARF = "dwarf"

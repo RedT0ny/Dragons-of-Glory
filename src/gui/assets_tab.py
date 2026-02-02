@@ -3,8 +3,11 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
-from src.content.specs import AssetType
+from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
+from src.content.constants import WS
+from src.content.config import FONTS_DIR, LIBRA_FONT
+
 
 class AssetDetails(QFrame):
     """Lower section of the Assets Tab showing details."""
@@ -34,7 +37,7 @@ class AssetDetails(QFrame):
         self.name_label = QLabel("Select an asset")
         # Set Font to Libra
         font_db = QFontDatabase()
-        font_id = font_db.addApplicationFont("assets/font/Libra Regular.otf")
+        font_id = font_db.addApplicationFont(LIBRA_FONT)
         if font_id != -1:
             families = font_db.applicationFontFamilies(font_id)
             if families:
@@ -186,12 +189,17 @@ class AssetsTab(QWidget):
              item = self.panel_layout.takeAt(0)
              if item.widget():
                  item.widget().deleteLater()
-        
+
         # Use columns: Icon, Name, Type, Equipment
-        columns = ["icon", "name", "type", "pos", "equipment"]
+        columns = [
+            UnitColumn.ICON,
+            UnitColumn.NAME,
+            UnitColumn.TYPE,
+            UnitColumn.EQUIPMENT
+        ]
         self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")
         self.unit_panel.unit_selected.connect(self.on_unit_selected)
-        
+
         self.panel_layout.addWidget(self.unit_panel)
 
         # 2. Refresh Asset Tree
