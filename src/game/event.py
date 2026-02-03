@@ -25,12 +25,16 @@ class Event:
     def activate(self, game_state):
         # Conditionally applies effect then deactivates if triggered
         if self.check_trigger(game_state): # E.g. If effects key is "grant_artifact", look artifact up in the global pool and give it to the player.
-            self.effect(game_state)
-            self.occurrence_count += 1
+            self.force_activate(game_state)
 
-            # Auto-deactivate if we hit the limit
-            if self.occurrence_count >= self.spec.max_occurrences:
-                self.deactivate()
+    def force_activate(self, game_state):
+        """Executes the event effect immediately, bypassing trigger checks."""
+        self.effect(game_state)
+        self.occurrence_count += 1
+
+        # Auto-deactivate if we hit the limit
+        if self.occurrence_count >= self.spec.max_occurrences:
+            self.deactivate()
 
     def deactivate(self):
         self.is_active = False
@@ -52,11 +56,18 @@ class Asset:
     def is_equippable(self):
         return self.asset_type == AssetType.ARTIFACT
 
-    def can_equip(self, unit):
+    def can_equip(self, unit, log_reason=False):
         """
         Check if a unit can equip this asset based on requirements.
         """
         if not self.is_equippable:
+            if log_reason:
+                print(f"Asset '{self.id}' is not equippable.")
+            return False
+
+        if not unit.is_on_map:
+            if log_reason:
+                print(f"Cannot equip '{self.id}' to '{unit.id}': Unit is not on the map.")
             return False
 
         for requirement in self.requirements:
@@ -64,8 +75,11 @@ class Asset:
             req_value = requirement.get("value")
 
             if not self._check_requirement(unit, req_type, req_value):
+                if log_reason:
+                    print(f"Cannot equip '{self.id}' to '{unit.id}': Requirement {req_type}='{req_value}' failed.")
                 return False
         return True
+
 
     def _check_requirement(self, unit, req_type, req_value):
         """Check a single requirement against a unit."""
@@ -82,6 +96,10 @@ class Asset:
             return hasattr(unit, 'allegiance') and unit.allegiance == required_allegiance
 
         elif req_type == RequirementType.UNIT_TYPE.value:
+            if req_value == "leader":
+                return unit.is_leader()
+            if req_value == "army":
+                return unit.is_army()
             return hasattr(unit, 'unit_type') and unit.unit_type.value == req_value
 
         elif req_type == RequirementType.ITEM.value:
@@ -95,7 +113,7 @@ class Asset:
 
     def apply_to(self, unit):
         """Apply asset effects to a unit."""
-        if self.can_equip(unit):
+        if self.can_equip(unit, log_reason=True):
             if not hasattr(unit, 'equipment'):
                 unit.equipment = []
             unit.equipment.append(self)

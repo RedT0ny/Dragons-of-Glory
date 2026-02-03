@@ -112,7 +112,10 @@ class GameController(QObject):
 
             if event:
                 # Activate (update counts) and Apply Effects
-                event.activate(self.game_state)
+                # We use force_activate because draw_strategic_event has already validated
+                # that this event SHOULD happen (either via trigger or random draw).
+                # Standard .activate() would fail for random events as they have no trigger condition.
+                event.force_activate(self.game_state)
 
                 if not is_ai:
                     # 1. Show Event Dialog
@@ -229,9 +232,11 @@ class GameController(QObject):
 
         # 1. Switch Tab
         if hasattr(main_window, 'tabs') and hasattr(main_window, 'assets_tab'):
-            main_window.tabs.setCurrentWidget(main_window.assets_tab)
-            # Refresh assets tab to show new item
+            # Refresh assets tab to show new item BEFORE switching view
             main_window.assets_tab.refresh()
+
+            # Switch the view
+            main_window.tabs.setCurrentWidget(main_window.assets_tab)
 
             # Pre-select the new asset if ID provided
             if asset_id:

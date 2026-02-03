@@ -196,6 +196,7 @@ class AssetsTab(QWidget):
             UnitColumn.ICON,
             UnitColumn.NAME,
             UnitColumn.TYPE,
+            UnitColumn.POS,
             UnitColumn.EQUIPMENT
         ]
         self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")

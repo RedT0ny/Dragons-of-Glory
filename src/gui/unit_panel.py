@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT
+from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
 from src.gui.map_items import UnitCounter
 
@@ -249,6 +250,8 @@ class AllegiancePanel(QWidget):
         if not self.game_state:
             return
 
+        processed_units = set()
+
         # Filter countries
         countries = [c for c in self.game_state.countries.values() if c.allegiance == self.allegiance]
         countries.sort(key=lambda x: x.id)
@@ -256,6 +259,8 @@ class AllegiancePanel(QWidget):
         for country in countries:
              # Get units
             units = [u for u in self.game_state.units if u.land == country.id]
+            processed_units.update(units)
+
             # Show empty countries logic same as original StatusTab
             
             # Header
@@ -279,6 +284,48 @@ class AllegiancePanel(QWidget):
             
             self.container_layout.addWidget(table)
             self.tables.append(table)
+
+        # --- Handle Stateless / Independent Units ---
+        remaining_units = [u for u in self.game_state.units
+                           if u.allegiance == self.allegiance and u not in processed_units]
+
+        if remaining_units:
+            groups = {}
+            for unit in remaining_units:
+                # Determine Group
+                land_val = str(unit.land).lower() if unit.land else ""
+                if land_val in DRAGONFLIGHTS:
+                    group_name = f"{land_val.title()} Dragonflight"
+                else:
+                    group_name = "Others / Independent"
+
+                if group_name not in groups:
+                    groups[group_name] = []
+                groups[group_name].append(unit)
+
+            # Create Tables for groups
+            for name in sorted(groups.keys()):
+                units = groups[name]
+
+                # Header
+                c_lbl = QLabel(name)
+                c_lbl.setStyleSheet("font-weight: bold; background-color: #E0E0E0; border: 1px dashed #999;")
+                c_lbl.setAlignment(Qt.AlignCenter)
+                self.container_layout.addWidget(c_lbl)
+
+                # Table
+                table = UnitTable(self.columns)
+                table.itemSelectionChanged.connect(lambda t=table: self.on_table_selection(t))
+                table.set_units(units, self.game_state)
+
+                # Adjust height
+                h = table.horizontalHeader().height()
+                for r in range(table.rowCount()):
+                    h += table.rowHeight(r)
+                table.setFixedHeight(h + 2)
+
+                self.container_layout.addWidget(table)
+                self.tables.append(table)
 
     def on_table_selection(self, sender_table):
         # Enforce exclusive selection across tables

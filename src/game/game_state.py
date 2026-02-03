@@ -510,12 +510,8 @@ class GameState:
         # Grant Asset
         if "grant_asset" in spec.effects:
             asset_id = spec.effects["grant_asset"]
-            if asset_id in self.artifact_pool:
-                asset_spec = self.artifact_pool[asset_id]
-                new_asset = Asset(asset_spec)
-                new_asset.owner = player.allegiance
-                player.assets[asset_id] = new_asset
-                print(f"Granted asset {asset_id} to {player.allegiance}")
+            # Delegate to Player class to ensure consistent asset creation and storage
+            player.grant_asset(asset_id, self)
 
         # Add Units (Reinforcements)
         if "add_units" in spec.effects:

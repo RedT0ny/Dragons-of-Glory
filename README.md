@@ -26,7 +26,9 @@ TODO:
 
 TODO BUGFIX:
 
-- Fix map subset not working correctly (use full map for now)
+- Fix map subset not working correctly (use full map for now).
+- Fix deployment of land-less units (e.g. dragonflights) on the map.
+- Add position in the unit table.
 
 Notes:
 

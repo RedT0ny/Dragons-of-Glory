@@ -77,6 +77,14 @@ dragonlance:
     combat_rating: 1
     other: "dragon_slayer"
 
+dragonmetal:
+  type: "resource"
+  description: >
+    A rare and precious metal, dragonmetal is said to be created from the melted down scales of dragons. 
+    The metal is light, yet incredibly strong, and is highly sought after by armorers and smiths.
+  picture: "dragonmetal.jpg"
+  effect: "Necessary to craft dragonlances."
+
 dragon_orb:
   type: "artifact"
   description: >

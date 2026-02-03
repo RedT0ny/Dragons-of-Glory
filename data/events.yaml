@@ -99,7 +99,7 @@ hammer_of_kharas:
     with him an artifact that can change the course of the war.
     
     Whitestone finds the Hammer of Kharas!
-  picture: "hammer_of_kharas.jpg"
+  picture: "arman_kharas.jpg"
   turn: 8
   effects:
     grant_asset: "hammer_of_kharas"
@@ -269,7 +269,7 @@ gnome_tech:
     a significant advantage in battle.
     
     Mount Nevermind has joined the war. A Gnome Tech artifact has been acquired!
-  picture: "gnome_tech.jpg"
+  picture: "gnomes.jpg"
   turn: 10
   effects:
     grant_asset: "gnome_tech"
@@ -307,7 +307,7 @@ silver_arm:
     After the foul ghost abandons the face of Krynn, a glimse of argent catches the eye of the hero.
     
     Theros discovers the Silver Arm of Ergoth!
-  picture: "silver_arm.jpg"
+  picture: "theros_ironfeld.jpg"
   allegiance: "whitestone"
   turn: 20
   effects: { grant_asset: "silver_arm" }

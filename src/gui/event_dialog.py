@@ -27,35 +27,23 @@ class Ui_event_dialog(object):
     def setupUi(self, event_dialog):
         if not event_dialog.objectName():
             event_dialog.setObjectName(u"event_dialog")
-        event_dialog.resize(640, 360)
+        event_dialog.resize(768, 432)
         self.gridLayoutWidget = QWidget(event_dialog)
         self.gridLayoutWidget.setObjectName(u"gridLayoutWidget")
-        self.gridLayoutWidget.setGeometry(QRect(10, 10, 621, 344))
+        self.gridLayoutWidget.setGeometry(QRect(0, 10, 761, 421))
         self.event_layout = QGridLayout(self.gridLayoutWidget)
         self.event_layout.setObjectName(u"event_layout")
         self.event_layout.setContentsMargins(0, 0, 0, 0)
-        self.event_picture = QLabel(self.gridLayoutWidget)
-        self.event_picture.setObjectName(u"event_picture")
-        sizePolicy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.event_picture.sizePolicy().hasHeightForWidth())
-        self.event_picture.setSizePolicy(sizePolicy)
-        self.event_picture.setMinimumSize(QSize(192, 108))
-        self.event_picture.setMaximumSize(QSize(240, 135))
-        self.event_picture.setAutoFillBackground(False)
-        self.event_picture.setStyleSheet(u"background-color: #333; color: white;")
-        self.event_picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.event_layout.addWidget(self.event_picture, 2, 1, 1, 1)
-
         self.event_description = QTextEdit(self.gridLayoutWidget)
         self.event_description.setObjectName(u"event_description")
 
-        self.event_layout.addWidget(self.event_description, 3, 0, 1, 3)
+        self.event_layout.addWidget(self.event_description, 4, 0, 1, 3)
 
         self.event_buttons = QDialogButtonBox(self.gridLayoutWidget)
         self.event_buttons.setObjectName(u"event_buttons")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.event_buttons.sizePolicy().hasHeightForWidth())
         self.event_buttons.setSizePolicy(sizePolicy)
         self.event_buttons.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
@@ -63,7 +51,29 @@ class Ui_event_dialog(object):
         self.event_buttons.setOrientation(Qt.Orientation.Horizontal)
         self.event_buttons.setStandardButtons(QDialogButtonBox.StandardButton.Ok)
 
-        self.event_layout.addWidget(self.event_buttons, 4, 1, 1, 1, Qt.AlignmentFlag.AlignHCenter)
+        self.event_layout.addWidget(self.event_buttons, 5, 1, 1, 1, Qt.AlignmentFlag.AlignHCenter)
+
+        self.event_picture = QLabel(self.gridLayoutWidget)
+        self.event_picture.setObjectName(u"event_picture")
+        sizePolicy.setHeightForWidth(self.event_picture.sizePolicy().hasHeightForWidth())
+        self.event_picture.setSizePolicy(sizePolicy)
+        self.event_picture.setMinimumSize(QSize(336, 189))
+        self.event_picture.setMaximumSize(QSize(336, 189))
+        self.event_picture.setAutoFillBackground(False)
+        self.event_picture.setStyleSheet(u"background-color: #333; color: white;")
+        self.event_picture.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.event_layout.addWidget(self.event_picture, 2, 1, 1, 1)
+
+        self.event_title = QLabel(self.gridLayoutWidget)
+        self.event_title.setObjectName(u"event_title")
+        font = QFont()
+        font.setFamilies([u"Libra"])
+        font.setPointSize(36)
+        self.event_title.setFont(font)
+        self.event_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.event_layout.addWidget(self.event_title, 3, 1, 1, 1)
 
 
         self.retranslateUi(event_dialog)
@@ -75,9 +85,10 @@ class Ui_event_dialog(object):
 
     def retranslateUi(self, event_dialog):
         event_dialog.setWindowTitle(QCoreApplication.translate("event_dialog", u"Event", None))
-        self.event_picture.setText(QCoreApplication.translate("event_dialog", u"event_picture", None))
         self.event_description.setDocumentTitle("")
         self.event_description.setPlaceholderText(QCoreApplication.translate("event_dialog", u"event_description", None))
+        self.event_picture.setText(QCoreApplication.translate("event_dialog", u"event_picture", None))
+        self.event_title.setText(QCoreApplication.translate("event_dialog", u"Event Title", None))
     # retranslateUi
 
 class EventDialog(QDialog, Ui_event_dialog):
@@ -94,6 +105,7 @@ class EventDialog(QDialog, Ui_event_dialog):
         # Title
         title = self.event.spec.id.replace("_", " ").title()
         self.setWindowTitle(f"Strategic Event: {title}")
+        self.event_title.setText(title)
 
         # Description
         self.event_description.setText(self.event.description)
