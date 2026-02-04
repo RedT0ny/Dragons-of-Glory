@@ -149,7 +149,7 @@ class UnitTable(QTableWidget):
                 item.setText("-")
 
         elif col_type == UnitColumn.TYPE:
-            item.setText(str(unit.unit_type))
+            item.setText(str(unit.unit_type.value if unit.unit_type else "-"))
 
         elif col_type == UnitColumn.EQUIPMENT:
             equip_str = "-"

@@ -16,6 +16,7 @@ class AnsalonMapView(QGraphicsView):
     units_clicked = Signal(list)
     hex_clicked = Signal(object)
     right_clicked = Signal()
+    hex_hovered = Signal(str, int, int, str)
 
     def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
@@ -25,6 +26,7 @@ class AnsalonMapView(QGraphicsView):
         self.setScene(self.scene)
         self.setRenderHint(QPainter.Antialiasing)
         #self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setMouseTracking(True) # Enable hover tracking
 
         # Deployment state
         self.deploying_unit = None
@@ -79,6 +81,45 @@ class AnsalonMapView(QGraphicsView):
             event.accept()
         else:
             super().wheelEvent(event)
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        """Handle hover events to update info panel."""
+        super().mouseMoveEvent(event)
+
+        scene_pos = self.mapToScene(event.position().toPoint())
+        items = self.scene.items(scene_pos)
+
+        # Find HexagonItem under cursor
+        hex_item = None
+        for item in items:
+            if isinstance(item, HexagonItem):
+                hex_item = item
+                break
+
+        if hex_item and hasattr(hex_item, 'coords'):
+            col, row = hex_item.coords
+
+            # Fetch data from GameState
+            from src.game.map import Hex
+            hex_obj = Hex.offset_to_axial(col, row)
+
+            if self.game_state and self.game_state.map:
+                terrain = self.game_state.map.get_terrain(hex_obj)
+                loc_obj = self.game_state.map.get_location(hex_obj)
+
+                loc_name = "-"
+                if loc_obj:
+                    if isinstance(loc_obj, dict):
+                        # Map data often stores locations as dicts with 'location_id' or 'id'
+                        loc_name = loc_obj.get('location_id') or loc_obj.get('id', 'Unknown')
+                    else:
+                        # If it's a Location object
+                        loc_name = getattr(loc_obj, 'id', 'Unknown')
+
+                    loc_name = str(loc_name).replace("_", " ").title()
+
+                terrain_str = str(terrain).title() if terrain else "Unknown"
+                self.hex_hovered.emit(terrain_str, col, row, loc_name)
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""

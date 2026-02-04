@@ -100,6 +100,7 @@ class InfoPanel(QFrame):
         # Selection Info
         self.selection_label = QLabel("Terrain (col, row)\nLocation (if any)")
         self.selection_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.selection_label)
         
         # Unit Info Frame
@@ -132,9 +133,6 @@ class InfoPanel(QFrame):
 
         self.current_units = []
 
-    def set_game_state(self, game_state):
-        self.game_state = game_state
-
         # Sync minimap if game state is already populated
         if self.game_state and self.game_state.map:
             self.mini_map.sync_with_model()
@@ -144,6 +142,12 @@ class InfoPanel(QFrame):
         self.mini_map.game_state = game_state
         if self.game_state.map:
             self.mini_map.sync_with_model()
+
+    @Slot(str, int, int, str)
+    def update_hex_info(self, terrain, col, row, location):
+        """Updates the selection label with hover info."""
+        text = f"{terrain} ({col}, {row})\n{location}"
+        self.selection_label.setText(text)
 
     @Slot(bool)
     def toggle_all_rows(self, checked):

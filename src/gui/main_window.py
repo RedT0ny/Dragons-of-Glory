@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
 
+        # Connect Hex Hover to Info Panel
+        self.map_view.hex_hovered.connect(self.info_panel.update_hex_info)
+
         # Connect Mini-map click to Main Map center
         self.info_panel.minimap_clicked.connect(self.map_view.centerOn)
 
