@@ -100,6 +100,9 @@ class MainWindow(QMainWindow):
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
 
+        # Connect Mini-map click to Main Map center
+        self.info_panel.minimap_clicked.connect(self.map_view.centerOn)
+
     def closeEvent(self, event: QCloseEvent):
         """Restores original console streams on exit to prevent segfaults."""
         # Restore original streams to avoid crash on shutdown (Access Violation 0xC0000005)

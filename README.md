@@ -6,19 +6,14 @@ Design overview:
 
 TODO:
 
-- Create a Player class.
 - Add Dragon #170's Advanced Rules in "settings"
-- Add minimap
 - Add attribute and diplomacy logic for Knight's countries
 - Add unit pictures for the info panel
-- Add menu bar to main_window
 - Add hover tooltips to the map
 - Finalize movement and combat phases.
 - Implement save and load game
 - Check victory conditions
-- Implement events and artifacts.
-- Clicking on a unit in the status tab should highlight it on the mini-map.
-- double click on a unit in the status tab should show the map tab and zoom on the unit.
+- double-click on a unit in the status tab should show the map tab and zoom on the unit.
 - Implement dashboards
 - Implement AI player
 - Change replacements dialog to window

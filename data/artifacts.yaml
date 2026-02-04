@@ -25,7 +25,7 @@ crown_of_power:
     another (or many others). It is said that whoever wears the crown will rule Krynn in the name of the Dark
     Queen, Takhisis.
   effect: "Allows a Highlord to command all chromatic dragonflights."
-  picture: "crown.jpg"
+  picture: "crown_of_power.jpg"
   requirements:
     - { type: "unit_type", value: "highlord" }
   bonus:

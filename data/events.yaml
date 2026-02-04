@@ -134,7 +134,7 @@ plate_of_solamnus:
     once again.
     
     A Plate of Solamnus is recovered from the catacombs of the Solamnic Keeps and presented to the Whitestone.
-  picture: "solamnus_plate.svg"
+  picture: "solamnic_arms.jpg"
   allegiance: "whitestone"
   trigger:
     turn: 1
@@ -257,7 +257,7 @@ flying_citadel:
     withers, hope chills, and the land beneath lies cursed in a premature and ominous dusk.
     
     An ominous Flying Citadel joins the Dragon Highlord's forces.
-  picture: "citadel.jpg"
+  picture: "rising_citadel.jpg"
   turn: 22
   effects: { add_units: "citadel" }
 
