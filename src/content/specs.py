@@ -99,6 +99,7 @@ class UnitSpec:
     quantity: int = 1
     ordinal: int = 1
     status: str = "inactive"
+    picture: str = "army.jpg"
 
 @dataclass
 class ScenarioSpec:

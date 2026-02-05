@@ -1,10 +1,12 @@
+import os
+
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushButton, QHeaderView, QGraphicsView)
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QPointF
-from PySide6.QtGui import QIcon, QColor
+from PySide6.QtGui import QIcon, QColor, QPixmap, QFontDatabase, QFont
 
-from src.content.config import UNIT_ICON_SIZE
+from src.content.config import UNIT_ICON_SIZE, IMAGES_DIR, FONTS_DIR, LIBRA_FONT
 from src.content.constants import HL, WS
-from src.content.specs import UnitColumn
+from src.content.specs import UnitColumn, UnitType
 from src.gui.unit_panel import UnitTable
 from src.gui.map_view import AnsalonMapView
 from src.gui.map_items import HexagonItem
@@ -102,18 +104,60 @@ class InfoPanel(QFrame):
         self.selection_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.selection_label)
-        
+
         # Unit Info Frame
-        unit_box = QFrame()
-        unit_box.setFrameStyle(QFrame.Box)
-        unit_layout = QVBoxLayout(unit_box)
-        unit_layout.addWidget(QLabel("Unit Name"), alignment=Qt.AlignCenter)
-        unit_img = QLabel("Unit Picture")
-        unit_img.setFixedSize(150, 150)
-        unit_img.setStyleSheet("border: 1px solid black;")
-        unit_layout.addWidget(unit_img, alignment=Qt.AlignCenter)
-        unit_layout.addWidget(QLabel("Rating: X\nMov: remaining (total)\ncountry_name\nunit_status"))
-        layout.addWidget(unit_box)
+        self.unit_box = QFrame()
+        self.unit_box.setFrameStyle(QFrame.Box)
+        unit_layout = QVBoxLayout(self.unit_box)
+
+        # 1. Picture
+        self.lbl_unit_img = QLabel()
+        self.lbl_unit_img.setFixedSize(250, 250)
+        self.lbl_unit_img.setStyleSheet("border: 1px solid black; background-color: grey;")
+        self.lbl_unit_img.setScaledContents(True)
+        unit_layout.addWidget(self.lbl_unit_img, alignment=Qt.AlignCenter)
+
+        # 2. Name (Libra Font)
+        self.lbl_unit_name = QLabel("No Unit Selected")
+        self.lbl_unit_name.setAlignment(Qt.AlignCenter)
+        self._setup_libra_font()
+        unit_layout.addWidget(self.lbl_unit_name)
+
+        # 3. Stats Grid
+        stats_grid = QGridLayout()
+        # Rating
+        stats_grid.addWidget(QLabel("Rating:"), 0, 0)
+        self.lbl_rating = QLabel("-")
+        stats_grid.addWidget(self.lbl_rating, 0, 1)
+
+        # Movement
+        stats_grid.addWidget(QLabel("Movement:"), 1, 0)
+        self.lbl_movement = QLabel("-")
+        stats_grid.addWidget(self.lbl_movement, 1, 1)
+
+        # Status
+        stats_grid.addWidget(QLabel("Status:"), 2, 0)
+        self.lbl_status = QLabel("-")
+        stats_grid.addWidget(self.lbl_status, 2, 1)
+
+        # Allegiance
+        stats_grid.addWidget(QLabel("Allegiance:"), 3, 0)
+        self.lbl_allegiance = QLabel("-")
+        stats_grid.addWidget(self.lbl_allegiance, 3, 1)
+
+        # Equipment
+        stats_grid.addWidget(QLabel("Equipment:"), 4, 0)
+        self.lbl_equipment = QLabel("-")
+        stats_grid.addWidget(self.lbl_equipment, 4, 1)
+
+        # Terrain Affinity
+        stats_grid.addWidget(QLabel("Terrain:"), 5, 0)
+        self.lbl_terrain = QLabel("-")
+        stats_grid.addWidget(self.lbl_terrain, 5, 1)
+
+        unit_layout.addLayout(stats_grid)
+        layout.addWidget(self.unit_box)
+
 
         # Unit Info table
         layout.addWidget(QLabel("Selected Units Stack:"))
@@ -127,6 +171,7 @@ class InfoPanel(QFrame):
             UnitColumn.MOVE
         ])
         self.units_table.itemChanged.connect(self.on_item_changed)
+        self.selection_changed.connect(self.update_unit_box)
 
         layout.addWidget(self.units_table)
         layout.addStretch()
@@ -137,11 +182,115 @@ class InfoPanel(QFrame):
         if self.game_state and self.game_state.map:
             self.mini_map.sync_with_model()
 
+        # Initial update
+        self.update_unit_box([])
+
+    @Slot(list)
+    def update_unit_box(self, selected_units):
+        if not selected_units:
+            self.lbl_unit_name.setText("No Unit Selected")
+            self.lbl_unit_img.clear()
+            self.lbl_rating.setText("-")
+            self.lbl_movement.setText("-")
+            self.lbl_status.setText("-")
+            self.lbl_allegiance.setText("-")
+            self.lbl_equipment.setText("-")
+            self.lbl_terrain.setText("-")
+            return
+
+        # Show info for the first selected unit
+        unit = selected_units[0]
+
+        # 1. Image
+        img_name = unit.spec.picture if hasattr(unit.spec, 'picture') and unit.spec.picture else "army.jpg"
+        img_path = os.path.join(IMAGES_DIR, img_name)
+        if not os.path.exists(img_path):
+            img_path = os.path.join(IMAGES_DIR, "army.jpg")
+
+        if os.path.exists(img_path):
+            self.lbl_unit_img.setPixmap(QPixmap(img_path))
+        else:
+            self.lbl_unit_img.setText("Img Not Found")
+
+        # 2. Name
+        self.lbl_unit_name.setText(str(unit.id))
+
+        # 3. Rating
+        # Tactical Rating (if Leader subclass), Combat Rating otherwise.
+        if unit.is_leader():
+            self.lbl_rating.setText(f"{unit.tactical_rating} (Tactical)")
+        else:
+            self.lbl_rating.setText(f"{unit.combat_rating} (Combat)")
+
+        # 4. Movement: "Total (remaining)" -> Requirement: "Total (remaining)"
+        # Note: logic in prompt said "Total (remaining)".
+        # Usually it's Remaining / Total. Let's follow prompt exactly: "Total (remaining)"
+        total = unit.movement
+        remaining = getattr(unit, 'movement_points', total)
+        self.lbl_movement.setText(f"{total} ({remaining})")
+
+        # 5. Status
+        self.lbl_status.setText(unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status))
+
+        # 6. Allegiance: "Allegiance (Land)"
+        land = unit.land if unit.land else "other"
+        # unit.land is usually country ID or dragonflight name
+        self.lbl_allegiance.setText(f"{unit.allegiance.title()} ({land.title()})")
+
+        # 7. Equipment
+        if unit.equipment:
+            # Assuming equipment list contains objects with 'id' or 'name' or just strings?
+            # Loader puts Asset objects. Asset objects have 'spec.id' or similar?
+            # Looking at previous context (UnitTable), it accessed `a.spec.id`.
+            # Let's try to get a friendly name if possible, otherwise ID.
+            names = []
+            for item in unit.equipment:
+                if hasattr(item, 'spec') and hasattr(item.spec, 'id'):
+                    names.append(item.spec.id.replace('_', ' ').title())
+                elif hasattr(item, 'id'):
+                    names.append(item.id.replace('_', ' ').title())
+                else:
+                    names.append(str(item))
+            self.lbl_equipment.setText(", ".join(names))
+        else:
+            self.lbl_equipment.setText("None")
+
+        # 8. Terrain Affinity
+        # If unit can fly -> "Flying" (e.g. Wing, Citadel)
+        # If it's a fleet -> "Ocean"
+        # Otherwise -> terrain affinity if present, else "Clear"
+
+        # Check for Flying
+        # FlyingCitadel is a class, Wing is a class. Or use unit_type.
+        # Check UnitType enum if available on unit.
+        is_flying = False
+        if unit.unit_type in (UnitType.WING, UnitType.CITADEL):
+            is_flying = True
+
+        is_fleet = (unit.unit_type == UnitType.FLEET)
+
+        if is_flying:
+            self.lbl_terrain.setText("Flying")
+        elif is_fleet:
+            self.lbl_terrain.setText("Ocean")
+        elif unit.spec.terrain_affinity:
+            self.lbl_terrain.setText(unit.spec.terrain_affinity.title())
+        else:
+            self.lbl_terrain.setText("Clear")
+
     def set_game_state(self, game_state):
         self.game_state = game_state
         self.mini_map.game_state = game_state
         if self.game_state.map:
             self.mini_map.sync_with_model()
+
+    def _setup_libra_font(self):
+        font_id = QFontDatabase.addApplicationFont(LIBRA_FONT)
+        if font_id != -1:
+            families = QFontDatabase.applicationFontFamilies(font_id)
+            if families:
+                font = QFont(families[0], 16)
+                self.lbl_unit_name.setFont(font)
 
     @Slot(str, int, int, str)
     def update_hex_info(self, terrain, col, row, location):

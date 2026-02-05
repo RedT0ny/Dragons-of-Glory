@@ -119,24 +119,10 @@ class Asset:
             unit.equipment.append(self)
             self.assigned_to = unit
 
-            # Apply stat bonuses if bonus is a dict
-            if isinstance(self.bonus, dict):
-                for stat, value in self.bonus.items():
-                    if isinstance(value, (int, float)):
-                        current_value = getattr(unit, stat, 0)
-                        setattr(unit, stat, current_value + value)
-
     def remove_from(self, unit):
         """Remove asset effects from a unit."""
         if hasattr(unit, 'equipment') and self in unit.equipment:
             unit.equipment.remove(self)
-
-        # Remove stat bonuses if bonus is a dict
-        if isinstance(self.bonus, dict):
-            for stat, value in self.bonus.items():
-                if isinstance(value, (int, float)):
-                    current_value = getattr(unit, stat, 0)
-                    setattr(unit, stat, max(0, current_value - value))
 
         self.assigned_to = None
 

@@ -82,7 +82,16 @@ class Unit:
 
     @property
     def tactical_rating(self) -> int:
-        return self.spec.tactical_rating or 0
+        base = self.spec.tactical_rating or 0
+
+        # Add bonuses from equipped assets
+        bonus = 0
+        if hasattr(self, 'equipment'):
+            for item in self.equipment:
+                if hasattr(item, 'bonus') and isinstance(item.bonus, dict):
+                    bonus += item.bonus.get('tactical_rating', 0)
+
+        return base + bonus
 
     @property
     def combat_rating(self) -> int:

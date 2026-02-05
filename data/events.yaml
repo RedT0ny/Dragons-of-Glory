@@ -120,7 +120,7 @@ highlord_blitzkrieg:
 medallion_of_faith:
   type: "artifact"
   description: "A medallion of faith from the true gods is discovered in an abandoned shrine."
-  picture: "medallion.jpg"
+  picture: "medallion_found.jpg"
   turn: 19
   effects: { grant_asset: "medallion_of_faith" }
   max_occurrences: 4
@@ -203,7 +203,7 @@ dragon_orb:
     dragons to their doom.
     
     You have obtained a Dragon Orb!
-  picture: "orb.svg"
+  picture: "orb_found.jpg"
   turn: 4
   effects: { grant_asset: "dragon_orb" }
 
@@ -215,9 +215,11 @@ disks_of_mishakal:
     inspires those who follow the path of righteousness.
     
     You have recovered the Disks of Mishakal!
-  picture: "disks_of_mishakal.jpg"
+  picture: "disks_found.jpg"
   allegiance: "whitestone"
   turn: 19
+  requirements:
+    - { type: "asset", id: "blue_crystal_staff" }       # Check Player.assets
   effects: { grant_asset: "disks_of_mishakal" }
 
 hl_diplomacy:

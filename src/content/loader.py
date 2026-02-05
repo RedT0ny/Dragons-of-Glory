@@ -411,7 +411,8 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
                 combat_rating=get_int("combat_rating"),
                 tactical_rating=get_int("tactical_rating"),
                 movement=get_int("movement"),
-                quantity=get_int("quantity") or 1
+                quantity=get_int("quantity") or 1,
+                picture=get_val("picture") or "army.jpg"
             ))
     return specs
 
