@@ -8,7 +8,6 @@ TODO:
 
 - Add Dragon #170's Advanced Rules in "settings"
 - Add attribute and diplomacy logic for Knight's countries
-- Add unit pictures for the info panel
 - Finalize movement and combat phases.
 - Implement save and load game
 - Check victory conditions

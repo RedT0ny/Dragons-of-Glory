@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
 from PySide6.QtCore import Qt, QSize, Signal, QTimer, QRectF
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
-from src.content.specs import UnitState, GamePhase
+from src.content.specs import UnitState
 from src.content.constants import WS, HL, NEUTRAL, UI_COLORS
 from src.gui.map_items import UnitCounter
 
@@ -359,25 +359,11 @@ class ReplacementsDialog(QDialog):
         """Minimize and show map targets."""
         #self.showMinimized()
 
-        valid_hexes = []
-
-        # Check for Deployment Phase
-        if self.game_state.phase == GamePhase.DEPLOYMENT:
-            # Use scenario specific deployment areas
-            valid_hexes = list(self.game_state.get_deployment_hexes(unit.allegiance))
-        else:
-            # Standard Replacement Logic
-            country = self.game_state.countries.get(unit.land)
-            if country:
-                if self.allow_territory_deploy:
-                    # Allowed anywhere in territory (for newly activated countries)
-                    valid_hexes = list(country.territories)
-                else:
-                    # Cities or Fortresses of the country
-                    for loc_id, loc in country.locations.items():
-                        valid_hexes.append(loc.coords)
+        valid_hexes = self.game_state.get_valid_deployment_hexes(
+            unit,
+            allow_territory_wide=self.allow_territory_deploy
+        )
 
         self.view.highlight_deployment_targets(valid_hexes, unit)
-
     def refresh(self):
         self.populate_table()

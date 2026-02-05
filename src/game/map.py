@@ -1,6 +1,6 @@
 import heapq
 from collections import defaultdict
-from src.content.specs import HexDirection, UnitType, UnitRace
+from src.content.specs import HexDirection, UnitType, UnitRace, GamePhase, LocType
 
 
 class Hex:
@@ -358,13 +358,14 @@ class Board:
         """
         Dispatches to the correct movement logic based on unit class.
         """
-        if unit.unit_type == "wizard":
+        if unit.unit_type == UnitType.WIZARD:
             return 0  # Rule 5: Wizards ignore hex costs
 
-        if unit.unit_type == "wing":
+        if unit.unit_type == UnitType.WING:
             return self._get_wing_movement_cost(unit, from_hex, to_hex)
-        if unit.unit_type == "fleet":
-            return self._get_fleet_movement_cost(from_hex, to_hex)
+        if unit.unit_type == UnitType.FLEET:
+            # Pass unit to helper for enemy checks
+            return self._get_fleet_movement_cost(unit, from_hex, to_hex)
 
         return self._get_ground_movement_cost(unit, from_hex, to_hex)
 
@@ -379,14 +380,138 @@ class Board:
             cost += 1
         return cost
 
-    def _get_fleet_movement_cost(self, from_hex, to_hex):
-        """Rule 4: Ships count hexsides moved along (deep rivers)."""
+    def _get_fleet_movement_cost(self, unit, from_hex, to_hex):
+        """
+        Rule 4: Ships count hexsides moved along (deep rivers).
+        Also checks for enemy ships/armies (Blocking) and Stacking.
+        """
+        # 1. Check for Blocking Enemies
+        # "A ship cannot enter a hex... containing an enemy ship... or enemy army."
+        target_units = self.get_units_in_hex(to_hex.q, to_hex.r)
+        for u in target_units:
+            if self.are_enemies(unit, u):
+                if u.unit_type == UnitType.FLEET:
+                    return float('inf') # Blocked by enemy ship
+                if u.is_army():
+                    return float('inf') # Blocked by enemy army
+
+        # 2. Check River Movement & Stacking
+        # "Only two ships may be stacked in a river hexside."
         if self.get_hexside(from_hex, to_hex) == "deep_river":
+            # Count friendly fleets currently in destination that are also 'in river'
+            # Assuming 'river_hexside' property indicates if they are in a river state
+            fleets_in_river = [
+                u for u in target_units
+                if u.unit_type == UnitType.FLEET and u.river_hexside is not None
+            ]
+            if len(fleets_in_river) >= 2:
+                return float('inf') # Stacking limit reached
             return 1
-        # Ships move normally in Sea/Coastal hexes
+
+        # 3. Standard Sea/Coastal Movement
         if self.get_terrain(to_hex) == "ocean" or self.is_coastal(to_hex):
             return 1
+
         return float('inf')
+
+    def displace_enemy_fleets(self, army, target_hex):
+        """
+        Rule: Army entering hex moves enemy ships to nearest safe hex.
+        """
+        units_in_hex = self.get_units_in_hex(target_hex.q, target_hex.r)[:]
+
+        for u in units_in_hex:
+            if u.unit_type == UnitType.FLEET and self.are_enemies(army, u):
+                # Find retreat location
+                retreat_hex = self._find_nearest_safe_sea_hex(u, target_hex, army.allegiance)
+
+                if retreat_hex:
+                    self.move_unit_internal(u, retreat_hex)
+                    # Reset river status if forced out to sea
+                    if self.get_terrain(retreat_hex) == "ocean":
+                        u.river_hexside = None
+                else:
+                    u.destroy() # No escape, ship destroyed
+
+    def _find_nearest_safe_sea_hex(self, fleet, current_hex, enemy_allegiance):
+        """BFS to find nearest hex that is water/coastal and free of enemy armies."""
+        queue = [(current_hex, 0)]
+        visited = {current_hex}
+
+        while queue:
+            curr, dist = queue.pop(0)
+
+            # Check if this hex is valid destination (excluding the one we are being kicked out of)
+            if curr != current_hex:
+                # Must be water/coastal
+                is_valid_terrain = (self.get_terrain(curr) == "ocean" or
+                                    self.is_coastal(curr) or
+                                    self.get_hexside(current_hex, curr) == "deep_river") # Simplified river check
+
+                if is_valid_terrain:
+                    # Check for enemy armies
+                    units = self.get_units_in_hex(curr.q, curr.r)
+                    has_enemy_army = any(
+                        u.is_army() and u.allegiance == enemy_allegiance
+                        for u in units
+                    )
+
+                    if not has_enemy_army:
+                        return curr
+
+            # Add neighbors
+            for neighbor in curr.neighbors():
+                if neighbor not in visited and self.is_valid_hex(neighbor):
+                    visited.add(neighbor)
+                    queue.append((neighbor, dist + 1))
+
+        return None
+
+    def move_unit_internal(self, unit, new_hex):
+        """Helper to update unit position and internal unit map."""
+        # Remove from old
+        if unit.position:
+            old_q, old_r = unit.position
+            if (old_q, old_r) in self.unit_map:
+                if unit in self.unit_map[(old_q, old_r)]:
+                    self.unit_map[(old_q, old_r)].remove(unit)
+
+        # Update unit
+        unit.position = (new_hex.q, new_hex.r)
+
+        # Add to new
+        if (new_hex.q, new_hex.r) not in self.unit_map:
+            self.unit_map[(new_hex.q, new_hex.r)] = []
+        self.unit_map[(new_hex.q, new_hex.r)].append(unit)
+
+    def are_enemies(self, unit_a, unit_b):
+        """Simple allegiance check."""
+        return unit_a.allegiance != unit_b.allegiance
+
+    def is_valid_fleet_deployment(self, hex_obj: Hex, country, phase):
+        """
+        Deployment: Any coastal hex.
+        Replacements: Only ports.
+        """
+        # 1. Must be in country
+        if not country.is_hex_in_country(*hex_obj.axial_to_offset()):
+            return False
+
+        # 2. Check Phase logic
+        if phase == GamePhase.DEPLOYMENT:
+            return self.is_coastal(hex_obj)
+        elif phase == GamePhase.REPLACEMENTS:
+            # Check if hex has a port
+            # We iterate country locations to find if one is at this hex and is a PORT
+            for loc in country.locations.values():
+                loc_col, loc_row = loc.coords
+                hex_col, hex_row = hex_obj.axial_to_offset()
+                if (loc_col, loc_row) == (hex_col, hex_row):
+                    if loc.loc_type == LocType.PORT.value:
+                        return True
+            return False
+
+        return False
 
     def _get_ground_movement_cost(self, unit, from_hex, to_hex):
         """Rule 5: Moving Ground troops. Restrictions and Hexside Barriers"""
@@ -395,7 +520,7 @@ class Board:
         hexside_type = self.get_hexside(from_hex, to_hex)
 
         # Rule 5: Ground Army Restrictions
-        if terrain in ["sea", "desert", "marsh"]:
+        if terrain in ["ocean", "desert", "marsh"]:
             return float('inf')
 
         # Calculate Costs
@@ -416,6 +541,9 @@ class Board:
                 cost += 1
 
         # Rule 5: Hexside Barriers
+        if hexside_type == "sea":
+            return float('inf')
+
         if hexside_type == "river":
             cost += 2
 

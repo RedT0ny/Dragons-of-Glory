@@ -1,4 +1,6 @@
-from src.content.specs import CountrySpec, LocationSpec
+from src.content.constants import HL, WS
+from src.content.specs import CountrySpec, LocationSpec, UnitType
+
 
 class Location:
     """
@@ -30,11 +32,11 @@ class Location:
 
     def get_defense_modifier(self):
         # Access type via spec
-        if self.loc_type == 'fortress':
+        if self.loc_type == UnitType.FORTRESS:
             return -4
-        if self.loc_type == 'undercity':
+        if self.loc_type == UnitType.UNDERCITY:
             return -10
-        if self.loc_type in ('city', 'port'):
+        if self.loc_type in [UnitType.CITY, UnitType.PORT]:
             return -2
         return 0
 
@@ -134,7 +136,7 @@ class Country:
         if not self.conquerable: return False
 
         # Determine enemy based on current allegiance
-        enemy = 'highlord' if self.allegiance == 'whitestone' else 'whitestone'
+        enemy = HL if self.allegiance == WS else WS
         if not self.locations: 
             return False
 

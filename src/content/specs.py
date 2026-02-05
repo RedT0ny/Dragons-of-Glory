@@ -184,6 +184,18 @@ class EventType(Enum):
     BANNER = "banner"
     ARTIFACT = "artifact"
 
+class TerrainType(Enum):
+    MOUNTAIN = "mountain"
+    DESERT = "desert"
+    SWAMP = "swamp"
+    FOREST = "forest"
+    JUNGLE = "jungle"
+    OCEAN = "ocean"
+    GRASSLAND = "grassland"
+    STEPPE = "steppe"
+    MAELSTROM = "maelstrom"
+    GLACIER = "glacier"
+
 class UnitColumn(Enum):
     CHECKBOX = ""
     ICON = "Icon"

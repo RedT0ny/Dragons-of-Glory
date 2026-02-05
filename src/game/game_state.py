@@ -3,7 +3,7 @@ from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver
 from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, ARTIFACTS_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
-from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType
+from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
 from src.content import loader, factory
 from src.game.map import Board, Hex
 from src.game.event import Event, Asset, check_requirements
@@ -31,7 +31,7 @@ class GameState:
     """
     def __init__(self):
         self.units = []
-        self.map = None  # Will be initialized by load_scenario
+        self.map: Board = None  # Will be initialized by load_scenario
         self.turn = 0
         self.scenario_spec = None
 
@@ -227,6 +227,49 @@ class GameState:
             return set()
 
         return self.players[allegiance].get_deployment_hexes(self.countries, self.is_hex_in_bounds)
+
+    def get_valid_deployment_hexes(self, unit, allow_territory_wide=False) -> List[Tuple[int, int]]:
+        """
+        Calculates valid deployment coordinates for a specific unit,
+        applying Phase rules, Unit Type restrictions (Fleets), and Terrain checks.
+        """
+        candidates = []
+
+        # 1. Gather Candidates based on Phase
+        if self.phase == GamePhase.DEPLOYMENT:
+            # Scenario specific areas
+            candidates = list(self.get_deployment_hexes(unit.allegiance))
+        else:
+            # Replacements / Activation
+            country = self.countries.get(unit.land)
+            if country:
+                if allow_territory_wide:
+                    candidates = list(country.territories)
+                else:
+                    # Cities or Fortresses
+                    for loc in country.locations.values():
+                        if loc.coords:
+                            candidates.append(loc.coords)
+
+        # 2. Filter based on Unit Type & Terrain
+        valid_hexes = []
+        country = self.countries.get(unit.land)
+
+        for col, row in candidates:
+            hex_obj = Hex.offset_to_axial(col, row)
+
+            if unit.unit_type == UnitType.FLEET:
+                # Rule: Coastal and Port (Deployment) or Port (Replacements)
+                # Note: We pass self.phase to map validation logic
+                if country and self.map.is_valid_fleet_deployment(hex_obj, country, self.phase):
+                    valid_hexes.append((col, row))
+            else:
+                # Ground Units: Cannot deploy into Ocean
+                # (Unless specific amphibious rules exist, but generally no)
+                if self.map.get_terrain(hex_obj) != "ocean":
+                    valid_hexes.append((col, row))
+
+        return valid_hexes
 
     def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
         """Normalize scenario and country coordinates to local (subset) space."""
