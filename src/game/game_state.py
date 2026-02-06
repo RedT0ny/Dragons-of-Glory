@@ -391,6 +391,80 @@ class GameState:
             candidate.ready()  # Move to READY so it appears in the dialog
             print(f"Dark Temple produced: {candidate.id}")
 
+    def resolve_maelstrom_entry(self, unit, maelstrom_hex=None):
+        """
+        Executes the Maelstrom effect table (1d10).
+        Called when entering Maelstrom or at start of turn if trapped.
+
+        Returns a dict with result info for the UI/Controller to act on:
+        {
+            "roll": int,
+            "effect": "sink" | "stay" | "emerge",
+            "chooser": "player" | "opponent" | None,
+            "options": [Hex, ...] (for emerge)
+        }
+        """
+        roll = random.randint(1, 10)
+        result = {"roll": roll, "unit": unit}
+
+        # 1. Sink
+        if roll == 1:
+            result["effect"] = "sink"
+            unit.destroy()
+            print(f"Maelstrom Effect (Roll {roll}): Ship {unit.id} destroyed!")
+
+        # 2-5. Stay
+        elif 2 <= roll <= 5:
+            result["effect"] = "stay"
+            # End movement immediately
+            unit.movement_points = 0
+            # Ensure it is in the maelstrom hex (if passed for placement)
+            if maelstrom_hex:
+                self.move_unit(unit, maelstrom_hex)
+            print(f"Maelstrom Effect (Roll {roll}): Ship {unit.id} trapped for the turn.")
+
+        # 6-8. Opponent Chooses Exit
+        elif 6 <= roll <= 8:
+            result["effect"] = "emerge"
+            result["chooser"] = "opponent"
+
+            # Identify current location to find neighbors
+            current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
+            result["options"] = self.map.get_maelstrom_exits(current_hex)
+            print(f"Maelstrom Effect (Roll {roll}): Opponent chooses exit for {unit.id}.")
+
+        # 9-10. Player Chooses Exit
+        else: # 9, 10
+            result["effect"] = "emerge"
+            result["chooser"] = "player"
+
+            current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
+            result["options"] = self.map.get_maelstrom_exits(current_hex)
+            print(f"Maelstrom Effect (Roll {roll}): Player chooses exit for {unit.id}.")
+
+        return result
+
+    def process_maelstrom_start_turn(self):
+        """
+        Checks for ships trapped in the Maelstrom at the start of Step 5.
+        """
+        # Find all fleets currently located in Maelstrom hexes
+        trapped_ships = []
+        for unit in self.units:
+            if unit.is_on_map and unit.unit_type == UnitType.FLEET:
+                if unit.position:
+                    hex_obj = Hex.offset_to_axial(*unit.position)
+                    if self.map.is_maelstrom(hex_obj):
+                        trapped_ships.append((unit, hex_obj))
+
+        # Roll for each ship belonging to the active player
+        for unit, hex_obj in trapped_ships:
+            if unit.allegiance == self.active_player:
+                print(f"Processing Maelstrom check for trapped ship: {unit.id}")
+                self.resolve_maelstrom_entry(unit, hex_obj)
+                # Note: The 'emerge' result requires handling by the Controller/UI
+                # to prompt selection from result['options'].
+
     def advance_phase(self):
         """
         The State Machine: Determines the next phase based on current state.
@@ -503,6 +577,28 @@ class GameState:
         Centralizes the move: updates unit.position AND the spatial map.
         target_hex: Hex object (axial)
         """
+        # 1. Deduct Movement Points (Only in Movement Phase)
+        # We check if unit is already on map to avoid cost calculation for deployment/teleport
+        if self.phase == GamePhase.MOVEMENT and unit.position:
+            start_hex = Hex.offset_to_axial(*unit.position)
+
+            # Ensure attribute exists (defensive coding)
+            if not hasattr(unit, 'movement_points'):
+                unit.movement_points = unit.movement
+
+            # Calculate path cost using A* to ensure we deduct the optimal cost
+            path = self.map.find_shortest_path(unit, start_hex, target_hex)
+
+            cost = 0
+            current = start_hex
+            for next_step in path:
+                step_cost = self.map.get_movement_cost(unit, current, next_step)
+                cost += step_cost
+                current = next_step
+
+            unit.movement_points = max(0, unit.movement_points - cost)
+
+        # 2. Update Position
         # Remove from old position in spatial map
         self.map.remove_unit_from_spatial_map(unit)
 

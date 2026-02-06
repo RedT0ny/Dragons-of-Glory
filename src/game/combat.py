@@ -72,17 +72,23 @@ class CombatResolver:
         """
         must_retreat = False
 
-        # Parse combat result (e.g., "D1" or "2/E")
+        # Parse combat result (e.g., "D1", "2/E", or "-/DR")
         if is_attacker:
             result = result_code.split('/')[0]
         else:
             result = result_code.split('/')[1]
 
-        # Handle cumulative results like "DR"
+        # Handle "No Effect" result
+        if result == '-':
+            return
+
+        # Handle cumulative results like "DR" (Damage + Retreat)
         if len(result) > 1:
-            # First apply the letter result, then the number
+            # If result is "DR", first char is 'D', second is 'R' (retreat)
+            # If result is "1R", first char is '1', second is 'R'
+            if 'R' in result:
+                must_retreat = True
             result = result[0]
-            must_retreat = True
 
         # If result is "D" or "E", apply to all units
         if result in ['D', 'E']:

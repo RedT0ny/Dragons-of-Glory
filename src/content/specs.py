@@ -184,6 +184,14 @@ class EventType(Enum):
     BANNER = "banner"
     ARTIFACT = "artifact"
 
+class HexsideType(Enum):
+    RIVER = "river"
+    DEEP_RIVER = "deep_river"
+    MOUNTAIN = "mountain"
+    PASS = "pass"
+    BRIDGE = "bridge"
+    FORD = "ford"
+
 class TerrainType(Enum):
     MOUNTAIN = "mountain"
     DESERT = "desert"
@@ -214,10 +222,12 @@ class UnitRace(Enum):
     HUMAN = "human"
     DRACONIAN = "draconian"
     DRAGON = "dragon"
+    GNOME = "gnome"
     GOBLIN = "goblin"
     HOGBOBLIN = "hogboblin"
     KENDER = "kender"
     PEGASUS = "pegasus"
+    PIRATE = "pirate"
     THANOI = "thanoi"
     UNDEAD = "undead"
     GRIFFON = "griffon"

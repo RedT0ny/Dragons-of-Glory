@@ -1,0 +1,8 @@
+<!DOCTYPE RCC><RCC version="1.0">
+    <qresource>
+        <file alias="img/cover.png">img/cover.png</file>
+        <file alias="font/Libra Regular.otf">font/Libra Regular.otf</file>
+        <file alias="icon/en_flag.svg">icon/en_flag.svg</file>
+        <file alias="icon/es_flag.svg">icon/es_flag.svg</file>
+    </qresource>
+</RCC>

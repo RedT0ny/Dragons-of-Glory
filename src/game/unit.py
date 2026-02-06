@@ -1,5 +1,5 @@
 from typing import Optional, Tuple, List, Any
-from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState
+from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
 
 class Unit:
@@ -42,6 +42,9 @@ class Unit:
 
         # Temporary effects
         self._movement_override = None
+
+        # Initialize current movement points to max (for the first turn)
+        self.movement_points = self.movement
 
         # --- Property Proxies (Read from Spec unless overridden) ---
 
@@ -105,6 +108,33 @@ class Unit:
                 # Handle dict bonus e.g. {'combat': 2}
                 total += item.bonus.get('combat', 0)
         return total
+
+    @property
+    def terrain_affinity(self) -> Optional[TerrainType]:
+        """
+        Returns the terrain affinity as a TerrainType Enum.
+        Checks Spec first, then Equipment for overrides.
+        """
+        # 1. Base value from Spec
+        raw_val = self.spec.terrain_affinity
+
+        # 2. Check Equipment for overrides
+        # (e.g., Elven Cloak granting 'forest' affinity)
+        if hasattr(self, 'equipment'):
+            for item in self.equipment:
+                if hasattr(item, 'bonus') and isinstance(item.bonus, dict):
+                    if 'terrain_affinity' in item.bonus:
+                        raw_val = item.bonus['terrain_affinity']
+                        break # Assume first bonus takes precedence
+
+        if not raw_val:
+            return None
+
+        # 3. Convert to Enum
+        try:
+            return TerrainType(raw_val.lower())
+        except ValueError:
+            return None
 
     @property
     def movement(self) -> int:
@@ -349,7 +379,6 @@ class Army(Unit):
     """
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
-        self.terrain_affinity = spec.terrain_affinity
 
     def is_army(self) -> bool:
         return True

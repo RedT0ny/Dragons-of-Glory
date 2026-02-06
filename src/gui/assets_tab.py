@@ -1,3 +1,5 @@
+import os
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QTreeWidget, QTreeWidgetItem, QFrame, QPushButton, QLineEdit, QTextEdit,
                                QTreeWidgetItemIterator)
@@ -7,7 +9,7 @@ from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
 from src.content.constants import WS, HL
-from src.content.config import FONTS_DIR, LIBRA_FONT
+from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR
 
 
 class AssetDetails(QFrame):
@@ -20,22 +22,26 @@ class AssetDetails(QFrame):
         self.current_unit = None
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
+        layout = QHBoxLayout(self)
 
-        # Top: Picture + Info
-        top_row = QHBoxLayout()
+        # --- Left Column: Picture + Name ---
+        left_container = QWidget()
+        left_container.setFixedWidth(400)  # This forces the 400px width
+        left_col = QVBoxLayout(left_container)  # Set the layout to the container
+
+        left_col.addStretch()
 
         # Picture
         self.pic_label = QLabel()
-        self.pic_label.setFixedSize(150, 150)
-        self.pic_label.setAlignment(Qt.AlignCenter)
+        self.pic_label.setFixedSize(350, 350)
+        self.pic_label.setAlignment(Qt.AlignCenter)  # Changed to Center for better looks
         self.pic_label.setStyleSheet("border: 2px dashed gray;")
-        top_row.addWidget(self.pic_label)
+        left_col.addWidget(self.pic_label, 0, Qt.AlignCenter)
 
-        # Info (Name + Bonus)
-        info_col = QVBoxLayout()
-
+        # Name
         self.name_label = QLabel("Select an asset")
+        self.name_label.setAlignment(Qt.AlignCenter)
+
         # Set Font to Libra
         font_db = QFontDatabase()
         font_id = font_db.addApplicationFont(LIBRA_FONT)
@@ -44,21 +50,25 @@ class AssetDetails(QFrame):
             if families:
                 self.name_label.setFont(QFont(families[0], 24))
 
-        info_col.addWidget(self.name_label)
+        left_col.addWidget(self.name_label, 0, Qt.AlignCenter)
+        left_col.addStretch()
+
+        # Add the container widget to the main layout, not the layout itself
+        layout.addWidget(left_container)
+
+        # --- Right Column: Info + Desc + Buttons ---
+        right_col = QVBoxLayout()
 
         self.bonus_field = QLineEdit()
         self.bonus_field.setReadOnly(True)
         self.bonus_field.setPlaceholderText("Asset Bonus")
-        info_col.addWidget(self.bonus_field)
-
-        top_row.addLayout(info_col)
-        layout.addLayout(top_row)
+        right_col.addWidget(self.bonus_field)
 
         # Description
         self.desc_field = QTextEdit()
         self.desc_field.setReadOnly(True)
         self.desc_field.setMaximumHeight(80)
-        layout.addWidget(self.desc_field)
+        right_col.addWidget(self.desc_field)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -71,7 +81,9 @@ class AssetDetails(QFrame):
         btn_layout.addWidget(self.btn_assign)
         btn_layout.addWidget(self.btn_remove)
         btn_layout.addStretch()
-        layout.addLayout(btn_layout)
+        right_col.addLayout(btn_layout)
+
+        layout.addLayout(right_col, 2)
 
     def display_asset(self, asset):
         self.current_asset = asset
@@ -95,20 +107,24 @@ class AssetDetails(QFrame):
         self.bonus_field.setText(bonus_str)
 
         # Picture Border Color
-        border_color = "black" # Default Artifact
+        border_color = "gold" # Default Artifact
         if asset.asset_type == AssetType.RESOURCE:
             border_color = "silver"
         elif asset.asset_type == AssetType.BANNER:
-            border_color = "green"
+            border_color = "peru"
 
-        self.pic_label.setStyleSheet(f"border: 4px solid {border_color};")
+        self.pic_label.setStyleSheet(f"border: 10px solid {border_color};")
 
         # Load Picture
-        pix = QPixmap(f"assets/img/{asset.spec.picture}")
-        if not pix.isNull():
-            self.pic_label.setPixmap(pix.scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        img_name = asset.spec.picture if hasattr(asset.spec, 'picture') and asset.spec.picture else "artifact.jpg"
+        img_path = os.path.join(IMAGES_DIR, img_name)
+        if not os.path.exists(img_path):
+            img_path = os.path.join(IMAGES_DIR, "artifact.jpg")
+        if os.path.exists(img_path):
+            self.pic_label.setPixmap(QPixmap(img_path).scaled(350, 350, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.pic_label.setText("No Image")
+            self.pic_label.setText("Img not found")
+
 
     def update_buttons_state(self, unit):
         """Logic to enable/disable buttons based on selection."""

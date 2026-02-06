@@ -118,7 +118,7 @@ class AnsalonMapView(QGraphicsView):
 
                     loc_name = str(loc_name).replace("_", " ").title()
 
-                terrain_str = str(terrain).title() if terrain else "Unknown"
+                terrain_str = terrain.value.title() if terrain else "Unknown"
                 self.hex_hovered.emit(terrain_str, col, row, loc_name)
 
     def mousePressEvent(self, event: QMouseEvent):

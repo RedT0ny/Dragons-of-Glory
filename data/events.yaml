@@ -322,7 +322,7 @@ soths_legions:
     'My lady,' he said. 'Accept my service.'
     
     Lord Soth swears allegiance to the highlord of the Blue Dragonflight.
-  picture: "soths_charge.jpg"
+  picture: "soths_oath.jpg"
   turn: 16
   effects: { add_units: "soths_legions" }
 

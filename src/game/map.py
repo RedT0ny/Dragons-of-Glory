@@ -1,6 +1,6 @@
 import heapq
 from collections import defaultdict
-from src.content.specs import HexDirection, UnitType, UnitRace, GamePhase, LocType
+from src.content.specs import HexDirection, UnitType, UnitRace, GamePhase, LocType, TerrainType
 
 
 class Hex:
@@ -248,15 +248,21 @@ class Board:
         master_hex = Hex.offset_to_axial(master_col, master_row)
         return master_hex.q, master_hex.r
 
-    def get_terrain(self, hex_coord):
-        """Returns the logical terrain type (stripped of visual prefixes)."""
+    def get_terrain(self, hex_coord) -> TerrainType:
+        """Returns the logical terrain type as a TerrainType Enum."""
         master_q, master_r = self.to_master_coords(hex_coord.q, hex_coord.r)
         raw_terrain = self.grid.get((master_q, master_r), "plain")
 
-        # If it starts with 'c_', it's coastal. Return the part after 'c_'.
+        # Strip 'c_' prefix if it exists
         if raw_terrain.startswith("c_"):
-            return raw_terrain[2:]
-        return raw_terrain
+            raw_terrain = raw_terrain[2:]
+
+        # Convert string to Enum object
+        try:
+            return TerrainType(raw_terrain)
+        except ValueError:
+            # Fallback for unknown terrain
+            return TerrainType.GRASSLAND
 
     def is_coastal(self, hex_coord):
         """Helper to specifically check for coastal rules."""
@@ -277,64 +283,64 @@ class Board:
     def get_units_in_hex(self, q, r):
         return self.unit_map.get((q, r), [])
 
-    def can_unit_move_to(self, unit, target_hex):
+    def can_stack_move_to(self, moving_units, target_hex):
         """
-        Checks if a unit can legally enter and stay in the target hex based on stacking rules.
-        Does NOT check for movement range or pathfinding costs (handled elsewhere).
+        Checks if a stack of units can end their movement in the target hex
+        considering existing units and stacking limits.
         """
-        # 1. Enemy Check
-        if self.has_enemy_army(target_hex, unit.allegiance):
+        if not moving_units:
+            return True
+
+        # 1. Enemy Check (Assumes all moving units share allegiance)
+        # We check the first unit, as stacks are usually single-allegiance
+        if self.has_enemy_army(target_hex, moving_units[0].allegiance):
             return False
 
-        # Get current units in the target hex
-        current_units = self.get_units_in_hex(target_hex.q, target_hex.r)
+        # 2. Combine moving stack with units ALREADY at destination
+        # (Exclude any units that are part of the moving stack, just in case)
+        existing = self.get_units_in_hex(target_hex.q, target_hex.r)
+        others = [u for u in existing if u not in moving_units]
 
-        # If the unit is already there (e.g. re-evaluating), don't count itself
-        other_units = [u for u in current_units if u != unit]
+        combined_stack = others + moving_units
 
-        # 2. Kender Rule: Cannot stack with any other type of ARMY
-        # (Assuming Kender are defined by race='kender' and type='inf')
-        is_kender_army = unit.race == UnitRace.KENDER and unit.unit_type == UnitType.INFANTRY
+        # 3. Kender Rule
+        # Kender Infantry cannot stack with Non-Kender Armies
+        has_kender_army = any(u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY for u in combined_stack)
+        has_normal_army = any(u.is_army() and not (u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY) for u in combined_stack)
 
-        if is_kender_army:
-            # If I am kender, I cannot enter if there are non-kender ARMIES
-            for u in other_units:
-                if u.is_army() and u.race != UnitRace.KENDER:
-                    return False
-        elif unit.is_army():
-            # If I am a normal army, I cannot enter if there are Kender armies
-            for u in other_units:
-                if u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY:
-                    return False
+        if has_kender_army and has_normal_army:
+            return False
 
-        # 3. Counting Limits
-        # We need to count specific categories
-        army_count = 0
-        wing_count = 0
+        # 4. Count Totals
+        army_count = sum(1 for u in combined_stack if u.is_army())
+        wing_count = sum(1 for u in combined_stack if u.unit_type == UnitType.WING)
 
-        for u in other_units:
-            if u.is_army():
-                army_count += 1
-            elif u.unit_type == UnitType.WING:
-                wing_count += 1
+        # 5. Check Limits
+        # Base limits
+        army_limit = 2
+        wing_limit = 2
 
-        # Check Limits based on the incoming unit type
-        if unit.is_army():
-            # Check City/Fortress bonus
-            loc_data = self.get_location(target_hex)
-            is_fortified = loc_data and (loc_data.get('type') in ['city', 'port'] or loc_data.get('is_capital'))
+        # Fortified bonus (City, Port, Fortress, or Capital) increases army limit to 3
+        loc = self.get_location(target_hex)
+        if loc:
+            is_fortified = (loc.get('is_capital') or
+                            loc.get('type') in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value])
+            if is_fortified:
+                army_limit = 3
 
-            limit = 3 if is_fortified else 2
-            if army_count >= limit:
-                return False
+        if army_count > army_limit:
+            return False
 
-        elif unit.unit_type == UnitType.WING:
-            if wing_count >= 2:
-                return False
-
-        # Leaders and Fleets have unlimited stacking, so no check needed for them.
+        if wing_count > wing_limit:
+            return False
 
         return True
+
+    def can_unit_move_to(self, unit, target_hex):
+        """
+        Wrapper for single unit checks (used by deployment).
+        """
+        return self.can_stack_move_to([unit], target_hex)
 
     def has_enemy_army(self, hex_coord, alliance):
         """Rule 5: Check if hex contains any army from a different alliance."""
@@ -408,11 +414,17 @@ class Board:
                 return float('inf') # Stacking limit reached
             return 1
 
-        # 3. Standard Sea/Coastal Movement
-        if self.get_terrain(to_hex) == "ocean" or self.is_coastal(to_hex):
+        # 3. Standard Sea/Coastal/Maelstrom Movement
+        terrain = self.get_terrain(to_hex)
+        valid_sea_terrains = [
+            TerrainType.OCEAN,
+            TerrainType.MAELSTROM
+        ]
+        if terrain in valid_sea_terrains or self.is_coastal(to_hex):
             return 1
 
         return float('inf')
+
 
     def displace_enemy_fleets(self, army, target_hex):
         """
@@ -493,25 +505,54 @@ class Board:
         Deployment: Any coastal hex.
         Replacements: Only ports.
         """
+        hex_coords = hex_obj.axial_to_offset()
+
         # 1. Must be in country
-        if not country.is_hex_in_country(*hex_obj.axial_to_offset()):
+        if not country.is_hex_in_country(*hex_coords):
             return False
 
         # 2. Check Phase logic
         if phase == GamePhase.DEPLOYMENT:
-            return self.is_coastal(hex_obj)
+            # Ports are also valid deployment hexes
+            if self.is_coastal(hex_obj):
+                return True
+            for loc in country.locations.values():
+                if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
+                    return True
+            return False
         elif phase == GamePhase.REPLACEMENTS:
             # Check if hex has a port
             # We iterate country locations to find if one is at this hex and is a PORT
             for loc in country.locations.values():
-                loc_col, loc_row = loc.coords
-                hex_col, hex_row = hex_obj.axial_to_offset()
-                if (loc_col, loc_row) == (hex_col, hex_row):
-                    if loc.loc_type == LocType.PORT.value:
-                        return True
+                if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
+                    return True
             return False
 
         return False
+
+    def is_maelstrom(self, hex_obj):
+        """Checks if the hex is part of the Maelstrom region."""
+        # Maelstrom is a specific terrain type in the CSV (e.g. 'maelstrom')
+        return self.get_terrain(hex_obj) == TerrainType.MAELSTROM
+
+    def get_maelstrom_exits(self, hex_obj):
+        """
+        Returns a list of valid exit hexes (axial) for a ship emerging from the Maelstrom.
+        Valid exits are adjacent hexes that are NOT Maelstrom and are sea/coastal.
+        """
+        exits = []
+        for neighbor in hex_obj.neighbors():
+            # Must not be Maelstrom itself (we want to leave it)
+            if self.is_maelstrom(neighbor):
+                continue
+
+            # Must be valid water terrain (Ocean or Coastal)
+            # Checking is_coastal handles 'c_...' terrains, get_terrain returns stripped
+            t_type = self.get_terrain(neighbor)
+            if t_type == TerrainType.OCEAN or self.is_coastal(neighbor):
+                exits.append(neighbor)
+
+        return exits
 
     def _get_ground_movement_cost(self, unit, from_hex, to_hex):
         """Rule 5: Moving Ground troops. Restrictions and Hexside Barriers"""
@@ -520,28 +561,34 @@ class Board:
         hexside_type = self.get_hexside(from_hex, to_hex)
 
         # Rule 5: Ground Army Restrictions
-        if terrain in ["ocean", "desert", "marsh"]:
+        forbidden_terrain = [
+            TerrainType.OCEAN,
+            TerrainType.DESERT,
+            TerrainType.SWAMP,
+            TerrainType.MAELSTROM
+        ]
+        if terrain in forbidden_terrain:
             return float('inf')
 
         # Calculate Costs
         cost = 1
 
         # Mountains are impassable, unless there is a pass
-        if terrain == "mountain":
+        if terrain == TerrainType.MOUNTAIN:
             if hexside_type != "pass":
                 return float('inf')
             else:
                 cost += 1
 
         # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
-        if terrain == "forest":
-            if getattr(unit, 'terrain_affinity', None) == "forest":
+        if terrain == TerrainType.FOREST:
+            if unit.terrain_affinity == TerrainType.FOREST:
                 pass
             else:
                 cost += 1
 
         # Rule 5: Hexside Barriers
-        if hexside_type == "sea":
+        if hexside_type in ["sea","deep_river"]:
             return float('inf')
 
         if hexside_type == "river":
@@ -549,7 +596,7 @@ class Board:
 
         if hexside_type == "mountain":
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
-            if getattr(unit, 'terrain_affinity', None)  in ["mountain","all"]:
+            if unit.terrain_affinity == TerrainType.MOUNTAIN:
                 cost += 1
             else:
                 return float('inf')
@@ -677,8 +724,11 @@ class Board:
             if current_cost > cost_so_far.get(current_hex, float('inf')):
                 continue
 
+            # VALID DESTINATION CHECK
+            # We can only stop (highlight) this hex if stacking limits allow it.
             if current_hex != start_hex:
-                reachable_hexes.append(current_hex)
+                if self.can_stack_move_to(units, current_hex):
+                    reachable_hexes.append(current_hex)
 
             # Explore neighbors using stack movement rules
             for next_hex in current_hex.neighbors():
