@@ -179,14 +179,9 @@ class DiplomacyDialog(QDialog):
                         # Set result flag for the parent logic
                         dlg.result_success = True
 
-                        # Update Game State Logic
-                        country.allegiance = active_side
+                        # Update Game State Logic through the proper method
                         self.activated_country_id = country.id
-                        from src.content.specs import UnitState
-                        for u in self.game_state.units:
-                            if u.land == country.id:
-                                u.status = UnitState.READY
-                                u.allegiance = active_side
+                        self.game_state.activate_country(country.id, active_side)
 
                         # Success is usually followed by deployment, so auto-close is fine here
                         QTimer.singleShot(1500, lambda: (dlg.accept(), self.accept()))

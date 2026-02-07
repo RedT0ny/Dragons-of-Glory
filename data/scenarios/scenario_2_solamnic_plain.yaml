@@ -57,7 +57,9 @@ scenario:
     neutral:
       countries:
         coastlund: all
+        dargaard: all
         hinterlund: all
+        nevermind: all
         nightlund: all
         haltigoth: all
         kaolyn: all

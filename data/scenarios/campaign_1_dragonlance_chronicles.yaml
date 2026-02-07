@@ -44,6 +44,7 @@ scenario:
         kharolis: all
         saifhum: all
         mithas: all
+        nevermind: all
         palanthas: all
         sikket: all
         tarsis: all
@@ -133,8 +134,6 @@ scenario:
         - [13, 38]
 
       countries:
-        caergoth:
-          units: all
         coastlund:
           units: all
         goodlund:
@@ -157,6 +156,8 @@ scenario:
           #territories: {[9, 33], [10, 34]}
         solanthus:
           units: all
+        southlund:
+          units: all
         tower:
           units: all
 
@@ -167,6 +168,5 @@ scenario:
         marginal: "Countrol more than 20 countries"
 
   notes: >
-    Whitestone starts without countries, they will join by diplomacy or as a result of the highlord's invasion.' 
     The player with the most countries held consults the victory table.
     Dragonflights do not count towards the number of countries controlled.

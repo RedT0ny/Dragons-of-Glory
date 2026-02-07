@@ -1,9 +1,9 @@
 import os
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton, 
                              QLabel, QHBoxLayout, QFrame, QSizePolicy, QFileDialog, QDialog)
-from PySide6.QtGui import QPixmap, QFont, QAction
+from PySide6.QtGui import QPixmap, QFont, QAction, QMovie
 from PySide6.QtCore import Qt, Signal
-from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR
+from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
 from src.gui.new_game_dialog import NewGameDialog
 from src.gui.side_selection_dialog import SideSelectionDialog
 
@@ -33,8 +33,16 @@ class IntroWindow(QMainWindow):
         # Background Setup
         self.bg_label = QLabel(self.central_widget)
         self.bg_label.setGeometry(0, 0, 1920, 1080)
-        pixmap = QPixmap(COVER_PICTURE)
-        self.bg_label.setPixmap(pixmap.scaled(1920, 1080, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation))
+        self.movie = QMovie(INTRO_VIDEO)
+
+        # 3. (Optional) Scale the movie to fit the screen
+        # Note: Movies don't scale as easily as Pixmaps, so it's best if the
+        # GIF is already 1920x1080. If not, we set the scaled size:
+        self.movie.setScaledSize(self.bg_label.size())
+
+        # 4. Assign the movie to the label and start it
+        self.bg_label.setMovie(self.movie)
+        self.movie.start()
 
         # 3. UI Layout Overlay
         self.setup_ui()

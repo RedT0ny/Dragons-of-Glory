@@ -49,6 +49,7 @@ balifor:
   strength: 16
   locations:
     port_balifor: {loc_type: port, coords: [46, 31]}
+    flotsam: {loc_type: port, coords: [49, 26]}
   territories:
     - [49, 26]
     - [46, 27]
@@ -223,8 +224,8 @@ dargaard:
   capital_id: dargaard_keep
   color: "#2F4F4F"
   allegiance: neutral
-  alignment: [0, 0]
-  strength: 0
+  alignment: [-10, -10]
+  strength: 100
   locations:
     dargaard_keep: {loc_type: fortress, coords: [31, 13]}
   territories:
@@ -489,7 +490,7 @@ kern:
   strength: 30
   locations:
     kernen: {loc_type: city, coords: [43, 19]}
-    ogrebend: {loc_type: port, coords: [48, 22]}
+    ogrebond: {loc_type: port, coords: [48, 22]}
   territories:
     - [49, 9]
     - [48, 10]
@@ -838,8 +839,8 @@ nevermind:
   capital_id: mount_nevermind
   color: "#2F4F4F"
   allegiance: neutral
-  alignment: [0, 0]
-  strength: 0
+  alignment: [-10, -10]
+  strength: 100
   locations:
     mount_nevermind: {loc_type: undercity, coords: [6, 22]}
   territories:

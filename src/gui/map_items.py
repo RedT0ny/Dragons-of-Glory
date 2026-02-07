@@ -18,7 +18,13 @@ class HexagonItem(QGraphicsItem):
         self.center = center
         self.radius = radius
         # Ensure color is a QColor object even if a tuple is passed
-        self.color = QColor(*color) if isinstance(color, (tuple, list)) else color
+        # Handle None case by defaulting to transparent
+        if color is None:
+            self.color = QColor(0, 0, 0, 0)  # Transparent black
+        elif isinstance(color, (tuple, list)):
+            self.color = QColor(*color)
+        else:
+            self.color = color
         self.terrain_type = terrain_type
         self.coastal_directions = coastal_directions or []
         self.pass_directions = pass_directions or []
@@ -60,7 +66,7 @@ class HexagonItem(QGraphicsItem):
             painter.drawPath(self.path)
 
         # Layer 2: Country Overlay (if applicable)
-        if self.color.alpha() > 0:
+        if self.color and self.color.alpha() > 0:
             painter.setBrush(QBrush(self.color))
             painter.setPen(Qt.NoPen)
             painter.drawPath(self.path)

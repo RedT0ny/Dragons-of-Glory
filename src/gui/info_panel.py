@@ -50,8 +50,13 @@ class MiniMapView(AnsalonMapView):
 
     def draw_static_map(self):
         super().draw_static_map()
+        self.update_allegiance_colors()
 
-        # Post-process to apply allegiance colors
+    def update_allegiance_colors(self):
+        """Updates the colors of hexes based on current country allegiance."""
+        if not self.game_state:
+            return
+
         for item in self.scene.items():
             if isinstance(item, HexagonItem) and getattr(item, 'country_id', None):
                 country = self.game_state.countries.get(item.country_id)
@@ -66,7 +71,16 @@ class MiniMapView(AnsalonMapView):
                         # Update item color to reflect allegiance
                         rgba = QColor(new_color.red(), new_color.green(), new_color.blue(), self.overlay_alpha)
                         item.color = rgba
-                        item.update()
+                    else:
+                        item.color = None
+
+                    item.update()
+
+    def sync_with_model(self):
+        """Refreshes the view from the game state."""
+        super().sync_with_model()
+        self.update_allegiance_colors()
+
 
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
@@ -184,6 +198,11 @@ class InfoPanel(QFrame):
 
         # Initial update
         self.update_unit_box([])
+
+    def refresh(self):
+        """Manually refreshes the panel content (minimap, etc)."""
+        if self.mini_map:
+            self.mini_map.sync_with_model()
 
     @Slot(list)
     def update_unit_box(self, selected_units):

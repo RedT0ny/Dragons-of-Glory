@@ -261,6 +261,7 @@ flying_citadel:
     An ominous Flying Citadel joins the Dragon Highlord's forces.
   picture: "rising_citadel.jpg"
   turn: 22
+  allegiance: "highlord"
   effects: { add_units: "citadel" }
 
 gnome_tech:
@@ -275,7 +276,7 @@ gnome_tech:
   turn: 10
   effects:
     grant_asset: "gnome_tech"
-    add_units: "nevermind"
+    alliance: "nevermind"
 
 golden_general:
   type: "units"
@@ -287,6 +288,7 @@ golden_general:
     Lauranthalasa Kanan becomes the Golden General of the Whitestone forces.
   picture: "golden_general.jpg"
   turn: 21
+  allegiance: "whitestone"
   effects: { add_units: "golden_general" }
 
 good_dragons:
@@ -300,6 +302,7 @@ good_dragons:
     The Good Dragons are back in the skies of Ansalon!
   picture: "good_dragons.jpg"
   turn: 20
+  allegiance: "whitestone"
   effects: { add_units: "good_dragons" }
 
 silver_arm:
@@ -323,8 +326,9 @@ soths_legions:
     
     Lord Soth swears allegiance to the highlord of the Blue Dragonflight.
   picture: "soths_oath.jpg"
+  allegiance: "highlord"
   turn: 16
-  effects: { add_units: "soths_legions" }
+  effects: { alliance: "dargaard" }
 
 wyrmslayer:
   type: "artifact"
@@ -337,5 +341,6 @@ wyrmslayer:
     
     The Whitesone heroes have found Wyrmslayer, the magical sword of the elven hero, Kith-Kanan!
   picture: "kith-kanan_tomb.jpg"
+  allegiance: "whitestone"
   turn: 19
   effects: { grant_asset: "wyrmslayer" }

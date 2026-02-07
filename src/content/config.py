@@ -17,6 +17,7 @@ ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
 SCENARIOS_DIR = os.path.join(DATA_DIR, "scenarios")
 SAVEGAME_DIR = os.path.join(BASE_DIR, "saves")
+VIDEOS_DIR = os.path.join(ASSETS_DIR, "video")
 
 # --- DATA FILES ---
 COUNTRIES_DATA = os.path.join(DATA_DIR, "countries.yaml")
@@ -39,6 +40,7 @@ Y_OFFSET = 198
 UNIT_SIZE = HEX_RADIUS * 0.45
 UNIT_ICON_SIZE = 60
 COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
+INTRO_VIDEO = os.path.join(VIDEOS_DIR, "intro.gif")
 MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "map.jpg")
 LOCATION_SIZE = 60
 MAX_TICKS = 12

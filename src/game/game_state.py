@@ -639,23 +639,87 @@ class GameState:
                 return False
         return True
 
+    def activate_country(self, country_id: str, allegiance: str):
+        """Activates a country for the given allegiance and readies its units."""
+        country = self.countries.get(country_id)
+        if not country:
+            print(f"Warning: Country {country_id} not found for activation.")
+            return
+
+        country.allegiance = allegiance
+
+        # Update units status to READY
+        from src.content.specs import UnitState
+        for u in self.units:
+            if u.land == country_id:
+                u.status = UnitState.READY
+                u.allegiance = allegiance
+
+        print(f"Country {country_id} activated for {allegiance}")
+
+    def _resolve_add_units(self, unit_key: str, allegiance: str):
+        """Resolves generic add_units keys to specific units and readies them."""
+        from src.content.specs import UnitState, UnitType
+
+        candidates = []
+
+        # 1. Wizards
+        if unit_key == "wizard":
+            candidates = [u for u in self.units
+                          if u.unit_type == UnitType.WIZARD and u.allegiance == allegiance]
+
+        # 2. Flying Citadel
+        elif unit_key == "citadel":
+            # Assuming UnitType.CITADEL exists, otherwise checking string representation
+            candidates = [u for u in self.units
+                          if (u.unit_type == UnitType.CITADEL if hasattr(UnitType, 'CITADEL') else str(u.unit_type).lower() == 'citadel')
+                          and u.allegiance == allegiance]
+
+        # 3. Golden General (Laurana)
+        elif unit_key == "golden_general":
+            candidates = [u for u in self.units if u.id == "laurana"]
+
+        # 4. Good Dragons
+        elif unit_key == "good_dragons":
+            candidates = [u for u in self.units
+                          if u.unit_type == UnitType.WING and u.allegiance == "whitestone"]
+
+        # Fallback: Try to find by direct ID match
+        if not candidates:
+            candidates = [u for u in self.units if u.id == unit_key]
+
+        if not candidates:
+            print(f"Warning: No units found for add_units key '{unit_key}'")
+
+        for u in candidates:
+            # Move to READY so they appear in deployment
+            u.status = UnitState.READY
+            u.allegiance = allegiance
+            print(f"Unit {u.id} added/ready for {allegiance}")
+
     def apply_event_effect(self, spec):
         """Applies the effects of an event."""
         if not spec.effects:
             return
 
         player = self.current_player
+        effects = spec.effects
 
-        # Grant Asset
-        if "grant_asset" in spec.effects:
-            asset_id = spec.effects["grant_asset"]
+        # 1. Alliance: Activates country and readies units
+        if "alliance" in effects:
+            country_id = effects["alliance"]
+            self.activate_country(country_id, player.allegiance)
+
+        # 2. Add Units: Adds specific units to the pool (READY state)
+        if "add_units" in effects:
+            unit_key = effects["add_units"]
+            self._resolve_add_units(unit_key, player.allegiance)
+
+        # 3. Grant Asset: Processed last
+        if "grant_asset" in effects:
+            asset_id = effects["grant_asset"]
             # Delegate to Player class to ensure consistent asset creation and storage
             player.grant_asset(asset_id, self)
-
-        # Add Units (Reinforcements)
-        if "add_units" in spec.effects:
-            # Logic to add units to reserve or specific location
-            pass
 
         # Other effects...
 

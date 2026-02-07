@@ -123,7 +123,42 @@ class GameController(QObject):
                     dlg = EventDialog(event)
                     dlg.exec()
 
-                    # 2. Check for Artifact/Assets
+                    effects = event.spec.effects
+
+                    # 2. Check for Deployment Triggers (Alliance or Add Units)
+                    if "alliance" in effects or "add_units" in effects:
+                        # If only alliance is present, we could filter by that country.
+                        # But if add_units is present (or both), we must allow seeing all ready units (like Wizards).
+                        country_filter = effects.get("alliance")
+                        if "add_units" in effects:
+                            country_filter = None
+
+                        from src.gui.replacements_dialog import ReplacementsDialog
+                        from PySide6.QtWidgets import QMessageBox
+
+                        # Stop timer so loop waits for user
+                        self.ai_timer.stop()
+
+                        # Open Deployment Window
+                        self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
+                                                                      parent=self.view,
+                                                                      filter_country_id=country_filter,
+                                                                      allow_territory_deploy=True)
+                        self.replacements_dialog.show()
+
+                        # Instruction Popup
+                        msg_text = "Reinforcements have arrived!\n\nDeploy your new forces."
+                        if "alliance" in effects and "add_units" not in effects:
+                            msg_text = f"{effects['alliance'].title()} has joined the war!\n\nDeploy forces in their territory."
+
+                        QMessageBox.information(self.replacements_dialog, "Deployment",
+                                                msg_text + "\nClick 'Minimize' to interact with map.\n"
+                                                           "Click 'End Turn' (End Phase) when finished.")
+
+                        # Pause loop execution here; resumed by on_end_phase_clicked
+                        return
+
+                    # 3. Check for Artifact/Assets
                     # "If the event is of the type artifact... open the assets_tab"
                     # Check "artifact" or specific event type enum if available
                     if event.spec.event_type == "artifact" or "grant_asset" in event.spec.effects:
@@ -144,6 +179,9 @@ class GameController(QObject):
                 # If player successfully activates a country
                 if dlg.exec() == QDialog.Accepted and dlg.activated_country_id:
                     country_id = dlg.activated_country_id
+
+                    # Activate the country through the game state (this will handle unit updates)
+                    self.game_state.activate_country(country_id, active_player)
 
                     # Stop auto-timer so player can deploy
                     self.ai_timer.stop()
@@ -220,9 +258,16 @@ class GameController(QObject):
                 pass
 
         self.view.sync_with_model()
+        self._refresh_info_panel()
 
         # If the new phase is AI controlled or automatic, keep the timer running/trigger next step
         self.check_active_player()
+
+    def _refresh_info_panel(self):
+        """Helper to refresh side panel if accessible."""
+        main_window = self.view.window()
+        if hasattr(main_window, 'info_panel'):
+            main_window.info_panel.refresh()
 
     def open_assets_tab_for_assignment(self, asset_id=None):
         """
@@ -267,7 +312,7 @@ class GameController(QObject):
 
         self.game_state.advance_phase()
         self.view.sync_with_model()
-
+        self._refresh_info_panel()
 
         # Trigger the loop again to handle the next state immediately.
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
@@ -319,6 +364,7 @@ class GameController(QObject):
             # Clear selection/highlights
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
+            self._refresh_info_panel()
             self.selected_units_for_movement = []
 
         elif self.game_state.phase == GamePhase.COMBAT:
