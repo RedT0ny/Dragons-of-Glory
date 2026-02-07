@@ -39,6 +39,8 @@ class DiplomacyMapView(AnsalonMapView):
 
 
 class DiplomacyDialog(QDialog):
+    country_activated = Signal(str, str)  # country_id, allegiance
+    
     def __init__(self, game_state, parent=None):
         """Sets up diplomacy dialog with map and buttons"""
         super().__init__(parent)
@@ -179,9 +181,9 @@ class DiplomacyDialog(QDialog):
                         # Set result flag for the parent logic
                         dlg.result_success = True
 
-                        # Update Game State Logic through the proper method
+                        # Update Game State Logic through signal
                         self.activated_country_id = country.id
-                        self.game_state.activate_country(country.id, active_side)
+                        self.country_activated.emit(country.id, active_side)
 
                         # Success is usually followed by deployment, so auto-close is fine here
                         QTimer.singleShot(1500, lambda: (dlg.accept(), self.accept()))

@@ -2,7 +2,8 @@
 from PySide6.QtCore import QObject, QTimer
 
 from src.content.constants import HL, WS
-from src.content.specs import GamePhase
+from src.content.specs import GamePhase, UnitState
+
 
 class GameController(QObject):
     def __init__(self, game_state, view, highlord_ai=False, whitestone_ai=False):
@@ -25,6 +26,7 @@ class GameController(QObject):
         self.selected_units_for_movement = []
         self.combat_attackers = []
         self._processing_automatic_phases = False  # Flag to prevent reentry
+        self._map_view_signals_connected = False  # Track if map view signals are connected
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -153,12 +155,12 @@ class GameController(QObject):
                 from PySide6.QtWidgets import QDialog, QMessageBox
 
                 dlg = DiplomacyDialog(self.game_state)
+                # Connect signal before showing dialog
+                dlg.country_activated.connect(self.handle_country_activation)
+                
                 # If player successfully activates a country
                 if dlg.exec() == QDialog.Accepted and dlg.activated_country_id:
                     country_id = dlg.activated_country_id
-
-                    # Activate the country through the game state (this will handle unit updates)
-                    self.game_state.activate_country(country_id, active_player)
 
                     # Use the same deployment handling method
                     self._handle_deployment_from_event({"alliance": country_id}, active_player)
@@ -220,9 +222,22 @@ class GameController(QObject):
 
         self.view.sync_with_model()
         self._refresh_info_panel()
+        
+        # Connect map view signals if not already connected
+        self.connect_map_view_signals()
 
         # If the new phase is AI controlled or automatic, keep the timer running/trigger next step
         self.check_active_player()
+
+    def connect_map_view_signals(self):
+        """Connect signals from map view to controller."""
+        if not hasattr(self.view, 'unit_deployment_requested'):
+            return
+            
+        if not self._map_view_signals_connected:
+            self.view.unit_deployment_requested.connect(self.handle_unit_deployment)
+            self._map_view_signals_connected = True
+            print("Map view signals connected to controller")
 
     def _refresh_info_panel(self):
         """Helper to refresh side panel if accessible."""
@@ -535,6 +550,39 @@ class GameController(QObject):
         finally:
             # Always reset the flag
             self._processing_automatic_phases = False
+
+    def handle_country_activation(self, country_id, allegiance):
+        """
+        Handle country activation signal from diplomacy dialog.
+        This method properly separates view from model manipulation.
+        
+        Args:
+            country_id: ID of the country to activate
+            allegiance: Allegiance to assign (highlord/whitestone)
+        """
+        # Activate the country through the game state
+        self.game_state.activate_country(country_id, allegiance)
+        print(f"Country {country_id} activated for {allegiance} via controller")
+
+    def handle_unit_deployment(self, unit, target_hex):
+        """
+        Handle unit deployment request from map view.
+        
+        Args:
+            unit: Unit to deploy
+            target_hex: Target hex for deployment
+        """
+        # Move the unit through the game state
+        self.game_state.move_unit(unit, target_hex)
+        
+        # Update unit state
+        unit.status = UnitState.ACTIVE
+        
+        # Sync the view
+        self.view.sync_with_model()
+        self._refresh_info_panel()
+        
+        print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
 
     def _handle_deployment_from_event(self, effects, active_player):
         """

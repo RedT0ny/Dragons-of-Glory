@@ -17,6 +17,8 @@ class AnsalonMapView(QGraphicsView):
     hex_clicked = Signal(object)
     right_clicked = Signal()
     hex_hovered = Signal(str, int, int, str)
+    unit_deployment_requested = Signal(object, object)  # unit, target_hex
+    unit_movement_requested = Signal(object, object)    # unit, target_hex
 
     def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
@@ -244,21 +246,18 @@ class AnsalonMapView(QGraphicsView):
                 break
 
         if target_hex and hasattr(target_hex, 'coords'):
-            # Execute Move
+            # Emit signal instead of directly calling game state
             from src.game.map import Hex
             col, row = target_hex.coords
             hex_obj = Hex.offset_to_axial(col, row)
 
-            self.game_state.move_unit(self.deploying_unit, hex_obj)
+            self.unit_deployment_requested.emit(self.deploying_unit, hex_obj)
 
-            # Update Unit State
-            self.deploying_unit.status = UnitState.ACTIVE
-
+            # Clear UI state (cursor, highlights)
             self.deploying_unit = None
             self.clear_highlights()
-            self.sync_with_model()
 
-            # Ideally signal the dialog to refresh, but for now user can maximize it manually
+            # Note: Let controller handle unit state updates and model sync
 
     def handle_depleted_stack_click(self, scene_pos):
         # Find units at this location
@@ -312,23 +311,14 @@ class AnsalonMapView(QGraphicsView):
         # Change cursor to indicate placement mode (overrides ScrollHandDrag)
         self.setCursor(Qt.PointingHandCursor)
 
-        # This requires HexagonItem to store its coords or a lookup
-        # For this implementation, we iterate scene items (inefficient but works for small map)
-        # or use get_hex_center if we have coords.
-
+        # Highlight all valid coordinates - let controller handle validation
         for col, row in valid_coords_list:
-            # NEW: Check stacking limits before highlighting!
-            from src.game.map import Hex
-            hex_obj = Hex.offset_to_axial(col, row)
-
-            # Highlights valid hexes where unit can move
-            if self.game_state.map.can_unit_move_to(unit, hex_obj):
-                center = self.get_hex_center(col, row)
-                items = self.scene.items(center)
-                for item in items:
-                    if isinstance(item, HexagonItem):
-                        item.set_highlight(True)
-                        break
+            center = self.get_hex_center(col, row)
+            items = self.scene.items(center)
+            for item in items:
+                if isinstance(item, HexagonItem):
+                    item.set_highlight(True)
+                    break
 
     def clear_highlights(self):
         self.deploying_unit = None
