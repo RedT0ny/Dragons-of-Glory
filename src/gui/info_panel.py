@@ -106,7 +106,7 @@ class InfoPanel(QFrame):
 
         # Control Buttons
         btn_grid = QGridLayout()
-        btns = ["Prev", "Undo", "Combine", "Next", "Redo", "End Phase"]
+        btns = ["Prev", "Undo", "(Un)Board", "Next", "Redo", "End Phase"]
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
