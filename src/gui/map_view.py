@@ -28,6 +28,12 @@ class AnsalonMapView(QGraphicsView):
         #self.setDragMode(QGraphicsView.ScrollHandDrag)
         self.setMouseTracking(True) # Enable hover tracking
 
+        # Edge scrolling
+        self.edge_scroll_timer = QTimer(self)
+        self.edge_scroll_timer.timeout.connect(self.handle_edge_scrolling)
+        self.edge_scroll_active = False
+        self.edge_scroll_direction = (0, 0)
+
         # Deployment state
         self.deploying_unit = None
 
@@ -73,6 +79,13 @@ class AnsalonMapView(QGraphicsView):
         """Hook to filter which countries are drawn. By default, draw all."""
         return True
 
+    def handle_edge_scrolling(self):
+        """Handle automatic scrolling when mouse is near screen edges."""
+        if self.edge_scroll_active:
+            dx, dy = self.edge_scroll_direction
+            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() + dx)
+            self.verticalScrollBar().setValue(self.verticalScrollBar().value() + dy)
+
     def wheelEvent(self, event):
         """Zoom with Ctrl+Wheel."""
         if event.modifiers() == Qt.ControlModifier:
@@ -85,6 +98,30 @@ class AnsalonMapView(QGraphicsView):
     def mouseMoveEvent(self, event: QMouseEvent):
         """Handle hover events to update info panel."""
         super().mouseMoveEvent(event)
+
+        # Check for edge scrolling
+        margin = 20  # pixels from edge
+        edge_scroll_speed = 10  # pixels per timer tick
+
+        dx, dy = 0, 0
+        if event.position().x() < margin:
+            dx = -edge_scroll_speed
+        elif event.position().x() > self.width() - margin:
+            dx = edge_scroll_speed
+
+        if event.position().y() < margin:
+            dy = -edge_scroll_speed
+        elif event.position().y() > self.height() - margin:
+            dy = edge_scroll_speed
+
+        if dx != 0 or dy != 0:
+            self.edge_scroll_direction = (dx, dy)
+            if not self.edge_scroll_timer.isActive():
+                self.edge_scroll_timer.start(50)  # 50ms interval
+            self.edge_scroll_active = True
+        else:
+            self.edge_scroll_timer.stop()
+            self.edge_scroll_active = False
 
         scene_pos = self.mapToScene(event.position().toPoint())
         items = self.scene.items(scene_pos)

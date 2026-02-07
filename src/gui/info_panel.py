@@ -1,6 +1,7 @@
 import os
 
-from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushButton, QHeaderView, QGraphicsView)
+from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushButton, QHeaderView, QGraphicsView,
+                               QSizePolicy)
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QPointF
 from PySide6.QtGui import QIcon, QColor, QPixmap, QFontDatabase, QFont
 
@@ -105,7 +106,7 @@ class InfoPanel(QFrame):
 
         # Control Buttons
         btn_grid = QGridLayout()
-        btns = ["Move", "Attack", "Activate", "Prev", "Undo", "Combine", "Next", "Redo", "End Phase"]
+        btns = ["Prev", "Undo", "Combine", "Next", "Redo", "End Phase"]
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
@@ -165,16 +166,15 @@ class InfoPanel(QFrame):
         stats_grid.addWidget(self.lbl_equipment, 4, 1)
 
         # Terrain Affinity
-        stats_grid.addWidget(QLabel("Terrain:"), 5, 0)
+        stats_grid.addWidget(QLabel("Affinity:"), 5, 0)
         self.lbl_terrain = QLabel("-")
         stats_grid.addWidget(self.lbl_terrain, 5, 1)
 
         unit_layout.addLayout(stats_grid)
         layout.addWidget(self.unit_box)
 
-
         # Unit Info table
-        layout.addWidget(QLabel("Selected Units Stack:"))
+        #layout.addWidget(QLabel("Selected Units Stack:"))
 
         # Use reusable UnitTable
         self.units_table = UnitTable([
@@ -184,11 +184,13 @@ class InfoPanel(QFrame):
             UnitColumn.RATING,
             UnitColumn.MOVE
         ])
+        self.units_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.units_table.setMinimumHeight(100)
         self.units_table.itemChanged.connect(self.on_item_changed)
         self.selection_changed.connect(self.update_unit_box)
 
         layout.addWidget(self.units_table)
-        layout.addStretch()
+        #layout.addStretch()
 
         self.current_units = []
 
