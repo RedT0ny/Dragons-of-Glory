@@ -12,16 +12,14 @@ TODO:
 - Implement save and load game
 - Check victory conditions
 - double-click on a unit in the status tab should show the map tab and zoom on the unit.
-- Implement dashboards
 - Implement AI player
-- Change replacements dialog to window
+- Review country colors and unit icons to make them more distinguishable.
 - I18n
 
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Fix deployment of land-less units (e.g. dragonflights) on the map.
-- Add position in the unit table.
+- Make possible for fleets to deploy in any friendly coastal hex during deployment phase?
 
 Notes:
 
@@ -32,24 +30,13 @@ main.py            ← Imports everything
 
 Every country has a color for their units. The country can be neutral, aligned with Whitestone or aligned with Highlord.
 How to show the unit allegiance without changing the original color?
-Options:
-1. Add a new color for each unit allegiance.
-2. Use a different shade of the original color.
-3. Use a different font/text color.
-4. Use a different icon color.
-5. Use a different background color.
-6. Use a different border color.
-7. Use a different shadow color.
+DECISION: Use a different icon, border and font/text color. White for Whitestone, Black for Highlord, Grey for Neutral.
 
-Moving units:
+Moving units QoL improvements needed:
 
-1. Show the unit on the map.
-2. If several units stacking on the same Hex, show the top unit but modify the border to look like a "pile".
-3. First click selects the stack, movement possibility (highlighted hex) is shown for the more restrictive unit in the stack.
-4. Second click selects the top unit, third click would select the next unit in the stack, etc.
-5. At the bottom of the right panel, a list will show the units stacked in the selected Hex.
-6. Once the unit or stack is selected, it can be dragged to a new Hex.
-7. The unit or stack will be moved to the new Hex.
+1. First click selects the stack, movement possibility (highlighted hex) is shown for the more restrictive unit in the stack. (Done)
+2. Second click selects the top unit, third click would select the next unit in the stack, etc.
+3. (UNSURE) Once the unit or stack is selected, it can be dragged to a new Hex. How to distinguish between dragging and clicking? Maybe a long click (click and hold for 0.5s) could trigger the drag mode?
 
 Events and artifacts:
 
@@ -60,6 +47,7 @@ if active_events: [{ event_id : all }] remove all possible occurrences of event_
 if possible_events [{ event_id : int(times)}] add to the game_state event list only the ones in this list.
 if possible_events: null remove all possible events from the game_state list.
 if possible_events not defined, add all events to the game_state list.
+Add a banned_events field to the scenario yaml to remove specific events from the game_state list? E.g: banned_events: ["soths_legions", "gnome_tech"] for Silvanesti scenario.  
 
 events in the event.yaml:
 
@@ -74,9 +62,3 @@ add a new field 'triggered' to the event dataclass?
 events in the game_state list:
 
 if game_state events list is empty, skip event phase and show a placeholder.
-
-How to deal with pre-requisites? List of pre_req_ids in the player dataclass.
-Or simplify them as not-assignable artifacts (dragonmetal, Knight countries at war...)
-
-
-

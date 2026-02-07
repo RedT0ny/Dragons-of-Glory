@@ -133,6 +133,7 @@ class ReplacementsDialog(QDialog):
 
         self.selected_reserve_unit = None
         self.current_unit_labels = {} # Map unit_id -> UnitLabel
+        self._processing_deployment = False  # Flag to prevent recursive calls
 
         self.setup_ui()
         self.populate_table()
@@ -359,11 +360,20 @@ class ReplacementsDialog(QDialog):
         """Minimize and show map targets."""
         #self.showMinimized()
 
-        valid_hexes = self.game_state.get_valid_deployment_hexes(
-            unit,
-            allow_territory_wide=self.allow_territory_deploy
-        )
+        # Prevent recursive calls by checking if we're already processing
+        if hasattr(self, '_processing_deployment') and self._processing_deployment:
+            return
+            
+        try:
+            self._processing_deployment = True
+            
+            valid_hexes = self.game_state.get_valid_deployment_hexes(
+                unit,
+                allow_territory_wide=self.allow_territory_deploy
+            )
 
-        self.view.highlight_deployment_targets(valid_hexes, unit)
+            self.view.highlight_deployment_targets(valid_hexes, unit)
+        finally:
+            self._processing_deployment = False
     def refresh(self):
         self.populate_table()

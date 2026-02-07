@@ -512,17 +512,17 @@ class Board:
             return False
 
         # 2. Check Phase logic
-        if phase == GamePhase.DEPLOYMENT:
-            # Ports are also valid deployment hexes
-            if self.is_coastal(hex_obj):
-                return True
+        if phase == GamePhase.REPLACEMENTS:
+            # Check if hex has a port
+            # We iterate country locations to find if one is at this hex and is a PORT
             for loc in country.locations.values():
                 if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
                     return True
             return False
-        elif phase == GamePhase.REPLACEMENTS:
-            # Check if hex has a port
-            # We iterate country locations to find if one is at this hex and is a PORT
+        else:
+            # Ports are also valid deployment hexes
+            if self.is_coastal(hex_obj):
+                return True
             for loc in country.locations.values():
                 if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
                     return True

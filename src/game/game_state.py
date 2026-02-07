@@ -250,6 +250,17 @@ class GameState:
                     for loc in country.locations.values():
                         if loc.coords:
                             candidates.append(loc.coords)
+            else:
+                # Handle stateless units (units without land) during REPLACEMENTS phase
+                # These units should be deployable in any friendly location
+                if self.phase == GamePhase.REPLACEMENTS and unit.allegiance == self.active_player:
+                    # Find all friendly locations (fortresses, cities, ports, undercities, etc.)
+                    for country_id, country_obj in self.countries.items():
+                        if country_obj.allegiance == unit.allegiance:
+                            # Add all locations from friendly countries
+                            for loc in country_obj.locations.values():
+                                if loc.coords:
+                                    candidates.append(loc.coords)
 
         # 2. Filter based on Unit Type & Terrain
         valid_hexes = []

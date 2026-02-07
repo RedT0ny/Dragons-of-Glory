@@ -24,6 +24,7 @@ class GameController(QObject):
 
         self.selected_units_for_movement = []
         self.combat_attackers = []
+        self._processing_automatic_phases = False  # Flag to prevent reentry
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -63,6 +64,10 @@ class GameController(QObject):
         Central loop for processing the game flow.
         Handles all GamePhases
         """
+        # Prevent reentry to avoid infinite recursion
+        if self._processing_automatic_phases:
+            return
+            
         # 1. AI analyzes the game_state
         # 2. AI decides what to do next
         # 3. AI calls game_state methods to update state
@@ -127,35 +132,7 @@ class GameController(QObject):
 
                     # 2. Check for Deployment Triggers (Alliance or Add Units)
                     if "alliance" in effects or "add_units" in effects:
-                        # If only alliance is present, we could filter by that country.
-                        # But if add_units is present (or both), we must allow seeing all ready units (like Wizards).
-                        country_filter = effects.get("alliance")
-                        if "add_units" in effects:
-                            country_filter = None
-
-                        from src.gui.replacements_dialog import ReplacementsDialog
-                        from PySide6.QtWidgets import QMessageBox
-
-                        # Stop timer so loop waits for user
-                        self.ai_timer.stop()
-
-                        # Open Deployment Window
-                        self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
-                                                                      parent=self.view,
-                                                                      filter_country_id=country_filter,
-                                                                      allow_territory_deploy=True)
-                        self.replacements_dialog.show()
-
-                        # Instruction Popup
-                        msg_text = "Reinforcements have arrived!\n\nDeploy your new forces."
-                        if "alliance" in effects and "add_units" not in effects:
-                            msg_text = f"{effects['alliance'].title()} has joined the war!\n\nDeploy forces in their territory."
-
-                        QMessageBox.information(self.replacements_dialog, "Deployment",
-                                                msg_text + "\nClick 'Minimize' to interact with map.\n"
-                                                           "Click 'End Turn' (End Phase) when finished.")
-
-                        # Pause loop execution here; resumed by on_end_phase_clicked
+                        self._handle_deployment_from_event(effects, active_player)
                         return
 
                     # 3. Check for Artifact/Assets
@@ -183,34 +160,8 @@ class GameController(QObject):
                     # Activate the country through the game state (this will handle unit updates)
                     self.game_state.activate_country(country_id, active_player)
 
-                    # Stop auto-timer so player can deploy
-                    self.ai_timer.stop()
-
-                    # Open Replacements for this country
-                    from src.gui.replacements_dialog import ReplacementsDialog
-                    self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
-                                                                  parent=self.view,
-                                                                  filter_country_id=country_id,
-                                                                  allow_territory_deploy=True)
-                    self.replacements_dialog.show()
-
-                    # Center map on country
-                    country = self.game_state.countries.get(country_id)
-                    if country and country.territories:
-                        # Find valid center (simplified: take first hex)
-                        first_hex = list(country.territories)[0]
-                        # This assumes view has method to center, or we just rely on user.
-                        # view.centerOn(view.get_hex_center(*first_hex)) if exposed.
-
-                    # Instruction Popup
-                    QMessageBox.information(self.replacements_dialog, "Deployment",
-                                            f"{country.id.title()} joined the war!\n\n"
-                                            "Deploy the country forces anywhere in their territory.\n"
-                                            "Click 'Minimize' to interact with map.\n"
-                                            "Click 'End Turn' (End Phase) in main window when finished.")
-
-                    # We return here to let the player interact.
-                    # Phase will assume to be "paused" until "End Phase" clicked.
+                    # Use the same deployment handling method
+                    self._handle_deployment_from_event({"alliance": country_id}, active_player)
                     return
 
                     # If AI, or human failed/cancelled activation, move on
@@ -234,7 +185,17 @@ class GameController(QObject):
             print(f"Step 4: Initiative. Winner: {winner}")
             self.game_state.set_initiative(winner)
             self.game_state.advance_phase()
-            self.process_game_turn()
+            
+            # For automatic phases, we need to continue processing the next phase
+            # Set flag to indicate we're processing automatic phases
+            self._processing_automatic_phases = True
+            try:
+                # Use QTimer.singleShot to avoid recursion
+                from PySide6.QtCore import QTimer
+                QTimer.singleShot(0, self._continue_automatic_phases)
+            except Exception as e:
+                self._processing_automatic_phases = False
+                raise
 
         # Handle "Action" phases (Movement/Combat)
         elif current_phase == GamePhase.MOVEMENT:
@@ -317,7 +278,9 @@ class GameController(QObject):
         # Trigger the loop again to handle the next state immediately.
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
         # the UI (Dialogs) for that player will be initialized.
-        self.process_game_turn()
+        # Use QTimer.singleShot to avoid potential recursion issues
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.process_game_turn)
 
 
     def execute_simple_ai_logic(self, side):
@@ -560,3 +523,55 @@ class GameController(QObject):
         """
         reachable_hexes = self.game_state.map.get_reachable_hexes(units)
         return [h.axial_to_offset() for h in reachable_hexes]
+
+    def _continue_automatic_phases(self):
+        """
+        Continue processing automatic phases after the current one completes.
+        This method is called via QTimer.singleShot to avoid recursion.
+        """
+        try:
+            # Process the next phase
+            self.process_game_turn()
+        finally:
+            # Always reset the flag
+            self._processing_automatic_phases = False
+
+    def _handle_deployment_from_event(self, effects, active_player):
+        """
+        Helper method to handle deployment UI after strategic events or activation.
+        
+        Args:
+            effects: Dictionary containing event effects (alliance, add_units, etc.)
+            active_player: The player who triggered this deployment
+        """
+        from src.gui.replacements_dialog import ReplacementsDialog
+        from PySide6.QtWidgets import QMessageBox
+
+        # Determine country filter
+        country_filter = effects.get("alliance")
+        
+        # Activate country if alliance effect is present
+        if "alliance" in effects:
+            self.game_state.activate_country(country_filter, active_player)
+        
+        if "add_units" in effects:
+            country_filter = None
+
+        # Stop timer so loop waits for user
+        self.ai_timer.stop()
+
+        # Open Deployment Window
+        self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
+                                                      parent=self.view,
+                                                      filter_country_id=country_filter,
+                                                      allow_territory_deploy=True)
+        self.replacements_dialog.show()
+
+        # Instruction Popup
+        msg_text = "Reinforcements have arrived!\n\nDeploy your new forces."
+        if "alliance" in effects and "add_units" not in effects:
+            msg_text = f"{effects['alliance'].title()} has joined the war!\n\nDeploy forces in their territory."
+
+        QMessageBox.information(self.replacements_dialog, "Deployment",
+                                msg_text + "\nClick 'Minimize' to interact with map.\n"
+                                           "Click 'End Turn' (End Phase) when finished.")

@@ -118,6 +118,7 @@ class Asset:
                 unit.equipment = []
             unit.equipment.append(self)
             self.assigned_to = unit
+            print(f"'{unit.id}' equipped '{self.id}'!")
 
     def remove_from(self, unit):
         """Remove asset effects from a unit."""
