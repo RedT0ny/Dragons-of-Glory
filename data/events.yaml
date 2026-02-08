@@ -189,7 +189,7 @@ dragonlance_forged:
     a weapon capable of slaying even the mightiest of dragons.
     
     A Dragonlance has been created!
-  picture: "dragonlance.svg"
+  picture: "dragonlance_forged.svg"
   allegiance: "whitestone"
   turn: 10
   requirements:
@@ -228,9 +228,10 @@ hl_diplomacy:
   type: "diplomacy"
   description: > 
     The Dark Queen's influence spreads like a shadow across the land. Through cunning diplomacy and ruthless 
-    intimidation, she secures the allegiance of various factions, bolstering her forces for the battles to come.
+    intimidation, she secures the allegiance of various evil factions, bolstering her forces for the battles to come.
     
-    This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
+    This turn, your efforts to secure new subjects to your cause are successful. You receive a +2 bonus in your 
+    activation roll.
   picture: "hl_diplomacy.jpg"
   turn: 10
   allegiance: "highlord"
