@@ -85,6 +85,7 @@ class MiniMapView(AnsalonMapView):
 
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
+    board_clicked = Signal()
     end_phase_clicked = Signal()
     selection_changed = Signal(list)
     minimap_clicked = Signal(QPointF)
@@ -107,10 +108,15 @@ class InfoPanel(QFrame):
         # Control Buttons
         btn_grid = QGridLayout()
         btns = ["Prev", "Undo", "(Un)Board", "Next", "Redo", "End Phase"]
+        self.btn_board = None
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
                 btn.clicked.connect(self.end_phase_clicked.emit)
+            if name == "(Un)Board":
+                # Expose board button signal for controller
+                self.btn_board = btn
+                btn.clicked.connect(self.board_clicked.emit)
             btn_grid.addWidget(btn, i // 3, i % 3)
         layout.addLayout(btn_grid)
         
@@ -354,6 +360,10 @@ class InfoPanel(QFrame):
         # Immediately notify selection if we auto-selected units
         if is_movement_phase:
             self.notify_selection()
+
+        # Enable Board button only during Movement phase
+        if hasattr(self, 'btn_board') and self.btn_board:
+            self.btn_board.setEnabled(is_movement_phase)
 
     def on_item_changed(self, item):
         if item.column() == 0:

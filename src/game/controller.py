@@ -2,7 +2,7 @@
 from PySide6.QtCore import QObject, QTimer
 
 from src.content.constants import HL, WS
-from src.content.specs import GamePhase, UnitState
+from src.content.specs import GamePhase, UnitState, UnitType
 
 
 class GameController(QObject):
@@ -584,6 +584,116 @@ class GameController(QObject):
         
         print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
 
+    def on_board_button_clicked(self):
+        """Handles the (Un)Board button during Movement phase.
+        Implements boarding algorithm: load armies into selected fleets and leaders into same ship.
+        For unboarding: if selected units are transported, unboard them to the carrier hex.
+        """
+        # Only in Movement Phase
+        if self.game_state.phase != GamePhase.MOVEMENT:
+            print("(Un)Board action is only allowed during Movement phase.")
+            return
+
+        selected = self.selected_units_for_movement
+        if not selected:
+            return
+
+        # Separate fleets, armies, leaders
+        fleets = [u for u in selected if u.unit_type == UnitType.FLEET or getattr(u, 'passengers', None) is not None]
+        armies = [u for u in selected if u.is_army()]
+        leaders = [u for u in selected if u.is_leader()]
+
+        # If selection includes transported units, unboard them (only if carrier is in coastal hex)
+        transported = [u for u in selected if getattr(u, 'transport_host', None) is not None]
+        if transported:
+            for u in transported:
+                carrier = u.transport_host
+                if not carrier or not carrier.position:
+                    print(f"Cannot unboard {u.id}: carrier missing position")
+                    continue
+                # Check carrier hex is coastal
+                from src.game.map import Hex
+                carrier_hex = Hex.offset_to_axial(*carrier.position)
+                if not self.game_state.map.is_coastal(carrier_hex):
+                    print(f"Cannot unboard {u.id}: carrier not in coastal hex")
+                    continue
+                success = self.game_state.unboard_unit(u)
+                if not success:
+                    print(f"Failed to unboard {u.id} due to stacking or location.")
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+            return
+
+        # Unboarding variant: Because transported units cannot be selected (they're removed from the spatial map),
+        # we detect carriers (fleets/wings/citadels) among the selection that have passengers and attempt to
+        # unboard their passengers if the carrier is in a coastal hex or in a port.
+        from src.game.map import Hex
+        from src.content.specs import LocType
+
+        carriers_with_passengers = [u for u in selected if getattr(u, 'passengers', None) and len(u.passengers) > 0]
+        if carriers_with_passengers:
+            for carrier in carriers_with_passengers:
+                if not carrier.position:
+                    print(f"Carrier {carrier.id} has no position, skipping unboard.")
+                    continue
+                carrier_hex = Hex.offset_to_axial(*carrier.position)
+                is_coastal = self.game_state.map.is_coastal(carrier_hex)
+                loc = self.game_state.map.get_location(carrier_hex)
+                is_port = False
+                if loc and isinstance(loc, dict):
+                    is_port = (loc.get('type') == LocType.PORT.value)
+
+                if not (is_coastal or is_port):
+                    print(f"Carrier {carrier.id} not in coastal hex or port, cannot unboard.")
+                    continue
+
+                # Unboard all passengers (copy list since unboard_unit mutates passengers)
+                for p in carrier.passengers[:]:
+                    ok = self.game_state.unboard_unit(p)
+                    if not ok:
+                        print(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+
+                # Movement restriction: if carrier is in a coastal land hex (coastal but NOT port), it cannot move further this Turn
+                if is_coastal and not is_port:
+                    # Ensure movement_points exists
+                    carrier.movement_points = 0
+
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+            return
+
+        # Otherwise attempt boarding
+        if not fleets:
+            print("No fleet selected to board units into.")
+            return
+
+        # Algorithm: 1) Try to load every ground army into one selected fleet (one per fleet). Leaders load into same ships.
+        # If there are more armies than fleets, remaining armies are not boarded.
+        target_fleets = fleets[:]
+        fi = 0
+        for army in armies:
+            if fi >= len(target_fleets):
+                print(f"No more fleets to board army {army.id}.")
+                break
+            fleet = target_fleets[fi]
+            if self.game_state.board_unit(fleet, army):
+                print(f"Boarded army {army.id} onto {fleet.id}")
+            else:
+                print(f"Failed to board army {army.id} onto {fleet.id}")
+            fi += 1
+
+        # Load leaders into the first fleet selected (if any)
+        if leaders and fleets:
+            primary = fleets[0]
+            for l in leaders:
+                if self.game_state.board_unit(primary, l):
+                    print(f"Boarded leader {l.id} onto {primary.id}")
+                else:
+                    print(f"Failed to board leader {l.id} onto {primary.id}")
+
+        self.view.sync_with_model()
+        self._refresh_info_panel()
+
     def _handle_deployment_from_event(self, effects, active_player):
         """
         Helper method to handle deployment UI after strategic events or activation.
@@ -623,3 +733,4 @@ class GameController(QObject):
         QMessageBox.information(self.replacements_dialog, "Deployment",
                                 msg_text + "\nClick 'Minimize' to interact with map.\n"
                                            "Click 'End Turn' (End Phase) when finished.")
+

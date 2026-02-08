@@ -37,6 +37,8 @@ class Unit:
 
         # Turn-based flags
         self.is_transported = False
+        # Reference to the carrier Unit (Fleet/Wing/Citadel) when transported
+        self.transport_host: Optional[Unit] = None
         self.attacked_this_turn = False
         self.moved_this_turn = False
 
@@ -233,6 +235,8 @@ class Unit:
             "position": list(self.position),
             "status": self.status.name,
             "is_transported": self.is_transported,
+            # Transport host serialized as tuple (id, ordinal) if present
+            "transport_host": (self.transport_host.id, self.transport_host.ordinal) if getattr(self, 'transport_host', None) else None,
             "attacked_this_turn": self.attacked_this_turn,
             "moved_this_turn": self.moved_this_turn
         }
@@ -246,6 +250,8 @@ class Unit:
             self.status = UnitState[status_str]
 
         self.is_transported = state_data.get("is_transported", False)
+        # transport_host will be resolved post-load by GameState if needed
+        self.transport_host = None
         self.attacked_this_turn = state_data.get("attacked_this_turn", False)
         self.moved_this_turn = state_data.get("moved_this_turn", False)
 
@@ -286,6 +292,9 @@ class Fleet(Unit):
         if self.can_carry(unit):
             self.passengers.append(unit)
             unit.is_transported = True
+            unit.transport_host = self
+            # When aboard, the unit should not remain in the spatial map; GameState
+            # is responsible for removing it from the map (controller -> game_state.board_unit)
 
     def set_river_hexside(self, hexside):
         self.river_hexside = hexside

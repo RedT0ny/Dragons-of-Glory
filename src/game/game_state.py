@@ -588,6 +588,12 @@ class GameState:
         Centralizes the move: updates unit.position AND the spatial map.
         target_hex: Hex object (axial)
         """
+        # Prevent moving units that are transported aboard a carrier
+        if getattr(unit, 'transport_host', None) is not None:
+            # Transported armies cannot move on their own while aboard
+            print(f"Unit {unit.id} is transported aboard {unit.transport_host.id} and cannot move independently.")
+            return
+
         # 1. Deduct Movement Points (Only in Movement Phase)
         # We check if unit is already on map to avoid cost calculation for deployment/teleport
         if self.phase == GamePhase.MOVEMENT and unit.position:
@@ -619,6 +625,15 @@ class GameState:
 
         # Add to new position in spatial map
         self.map.add_unit_to_spatial_map(unit)
+
+        # If this unit is a carrier (Fleet/Wing/Citadel) move its passengers implicitly
+        passengers = getattr(unit, 'passengers', None)
+        if passengers:
+            for p in passengers:
+                # Update passenger state to remain transported; do NOT add them to spatial map
+                p.position = unit.position
+                p.is_transported = True
+                p.transport_host = unit
 
     def check_event_trigger_conditions(self, conditions) -> bool:
         """Checks if a list of trigger conditions is met."""
@@ -800,16 +815,55 @@ class GameState:
     def get_map(self):
         return self.map
 
-    def resolve_combat(self, attackers, hex_position):
+    def board_unit(self, carrier, unit):
+        """Boards `unit` onto `carrier` if allowed.
+        Removes the unit from the spatial map, marks it transported and records transport_host.
+        Returns True on success, False otherwise.
         """
-        Initiates combat resolution for a specific hex.
+        if not carrier.can_carry(unit):
+            return False
+
+        # Must be co-located
+        if not carrier.position or not unit.position or carrier.position != unit.position:
+            return False
+
+        # Remove unit from spatial map so it is not considered on the hex while aboard
+        self.map.remove_unit_from_spatial_map(unit)
+        carrier.load_unit(unit)
+        unit.position = carrier.position
+        unit.is_transported = True
+        unit.transport_host = carrier
+        return True
+
+    def unboard_unit(self, unit, target_hex=None):
+        """Unboards `unit` from its transport_host into target_hex (axial Hex) or the carrier's hex if None.
+        Validates stacking limits using Board.can_stack_move_to. Returns True on success.
         """
-        defenders = self.get_units_at(hex_position)
-        # Need to convert hex_position (axial) to offset for get_terrain if it expects offset?
-        # Looking at game_state code, map.get_terrain usually takes axial object or handles conversion.
-        # Assuming hex_position is the Axial Hex object passed from controller.
+        carrier = getattr(unit, 'transport_host', None)
+        if not carrier:
+            return False
 
-        terrain = self.map.get_terrain(hex_position)
+        # Determine destination axial hex
+        dest_hex = target_hex
+        if dest_hex is None and carrier.position:
+            # Use carrier's current axial position
+            dest_hex = Hex.offset_to_axial(*carrier.position)
 
-        resolver = CombatResolver(attackers, defenders, terrain)
-        result = resolver.resolve()
+        if dest_hex is None:
+            return False
+
+        # Validate stacking limits
+        moving_units = [unit]
+        if not self.map.can_stack_move_to(moving_units, dest_hex):
+            return False
+
+        # Perform unboard: remove from carrier.passengers, clear transport flags, add to spatial map
+        if unit in carrier.passengers:
+            carrier.passengers.remove(unit)
+        unit.transport_host = None
+        unit.is_transported = False
+        # Place unit into dest offset coords
+        offset_coords = dest_hex.axial_to_offset()
+        unit.position = offset_coords
+        self.map.add_unit_to_spatial_map(unit)
+        return True

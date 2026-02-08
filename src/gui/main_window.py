@@ -176,5 +176,8 @@ class MainWindow(QMainWindow):
         """Connects UI signals to the controller."""
         self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)
         self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
+        # Board/Unboard action (only active in Movement phase)
+        if hasattr(self.info_panel, 'board_clicked'):
+            self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)

@@ -205,135 +205,145 @@ class LocationItem(QGraphicsItem):
 
 
 class UnitCounter(QGraphicsItem):
-    """Visual representation of a Unit from the model."""
+    """Clean UnitCounter that renders unit icon, id, stats and transport badges.
 
+    Badges implemented:
+    - Carrier (has .passengers): gold circular badge on the right edge with passenger count
+    - Transported unit (.is_transported): small rounded rect at top-right with carrier.ordinal
+    """
     def __init__(self, unit, color, parent=None):
         super().__init__(parent)
         self.unit = unit
         self.color = color
         size = UNIT_SIZE
         self.unit_rect = QRectF(-size, -size, size*2, size*2)
-        # Single SVG file containing both symbols and groups
         self.renderer = QSvgRenderer(os.path.join(ICONS_DIR, "units.svg"))
 
-        # Create icon ONCE, not in paint()
+        # Create and attach icon
         self.icon = self.create_unit_icon()
         if self.icon:
             self.icon.setParentItem(self)
-            # Center the icon
             self.center_icon()
 
     def center_icon(self):
-        """Center the icon within unit_rect."""
-        """Scale icon to appropriate size and center it."""
         if not self.icon:
             return
-
-        # Get icon's natural size
         icon_rect = self.icon.boundingRect()
-
-        # Target size: 60-80% of unit size
-        target_size = UNIT_SIZE * 0.9
-
-        # Calculate scale (maintain aspect ratio)
-        scale_x = target_size / icon_rect.width()
-        scale_y = target_size / icon_rect.height()
-        scale = min(scale_x, scale_y)
-
-        # Apply scale transform
-        self.icon.setScale(scale)
-
-        # Recalculate bounds after scaling
+        target = UNIT_SIZE * 0.9
+        sx = target / icon_rect.width() if icon_rect.width() else 1.0
+        sy = target / icon_rect.height() if icon_rect.height() else 1.0
+        s = min(sx, sy)
+        self.icon.setScale(s)
+        # center
         icon_rect = self.icon.sceneBoundingRect()
-
-        # Center in unit_rect
         self.icon.setPos(self.unit_rect.center() - icon_rect.center())
 
-    def paint(self, painter, option, widget):
-        # Draw background rectangle
-        painter.setBrush(QBrush(self.color))
-        painter.setPen(QPen(Qt.white if self.unit.allegiance == WS else Qt.black, 2))
-        painter.drawRoundedRect(self.unit_rect, 5, 5)
-
-        # Draw unit ID at top
-        painter.setPen(Qt.white if self.unit.allegiance == WS else Qt.black)
-        font = painter.font()
-        font.setPointSize(8)
-        font.setBold(True)
-        painter.setFont(font)
-
-        id_text = caption_id(self.unit.id)
-        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, id_text)
-
-        # Draw stats at bottom
-        # Choose combat or tactical rating
-        rating = self.unit.combat_rating if self.unit.combat_rating != 0 else self.unit.tactical_rating
-        stats_text = f"{rating}      {self.unit.movement}"
-        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats_text)
-
-    def boundingRect(self):
-        """Return bounding rectangle for the unit with padding."""
-        padding = 4  # For selection, hover effects
-        return self.unit_rect.adjusted(-padding, -padding, padding, padding)
-
     def create_unit_icon(self):
-        # Determine which SVG element to use
-        element_id = self._get_element_id()
-
-        # Create the SVG item
-        icon = QGraphicsSvgItem()
-        icon.setSharedRenderer(self.renderer)
+        item = QGraphicsSvgItem()
+        item.setSharedRenderer(self.renderer)
         try:
-            icon.setElementId(element_id)
-        except:
-            print(f"SVG element '{element_id}' not found, using fallback")
-            icon.setElementId("noicon")
-
-        # Apply coloring
-        if not self._is_precolored_group(element_id):
-            self._apply_allegiance_colors(icon)
-
-        return icon
+            item.setElementId(self._get_element_id())
+        except Exception:
+            try:
+                item.setElementId("noicon")
+            except Exception:
+                pass
+        if not self._is_precolored_group(self._get_element_id()):
+            self._apply_allegiance_colors(item)
+        return item
 
     def _get_element_id(self):
-        """Determine which SVG element to reference."""
         if self.unit.unit_type in [UnitType.WIZARD, UnitType.HIGHLORD,
                                    UnitType.EMPEROR, UnitType.CITADEL,
                                    UnitType.FLEET, UnitType.CAVALRY]:
             return self.unit.unit_type.value
-        elif self.unit.unit_type in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
+        if self.unit.unit_type in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
             if self.unit.race == UnitRace.SOLAMNIC:
                 return "knight"
             if self.unit.id in ["soth", "laurana"]:
                 return self.unit.id
-            elif self.unit.race == UnitRace.ELF:
+            if self.unit.race == UnitRace.ELF:
                 return "elflord"
-            else:
-                return "leader"
-        elif self.unit.race == UnitRace.DRAGON:
-            if self.unit.land in EVIL_DRAGONFLIGHTS:
-                return "evil_dragon"
-            else:
-                return "good_dragon"
-        elif self.unit.race in [UnitRace.HUMAN, UnitRace.SOLAMNIC]:
-            return self.unit.unit_type.value  # FIXED
-        return self.unit.race.value
+            return "leader"
+        if self.unit.race == UnitRace.DRAGON:
+            return "evil_dragon" if self.unit.land in EVIL_DRAGONFLIGHTS else "good_dragon"
+        if self.unit.race in [UnitRace.HUMAN, UnitRace.SOLAMNIC]:
+            return self.unit.unit_type.value
+        return str(self.unit.race.value)
 
     def _is_precolored_group(self, element_id):
-        """Check if this is a fixed-color group, like lord Soth, undead or locations"""
-        return element_id.startswith('full-') or element_id.startswith('loc-')
+        return isinstance(element_id, str) and (element_id.startswith('full-') or element_id.startswith('loc-'))
 
     def _apply_allegiance_colors(self, icon):
-        """Simple colorization based on allegiance."""
-        allegiance = getattr(self.unit, 'allegiance', WS)
-
         effect = QGraphicsColorizeEffect()
-
-        if allegiance == HL:
-            effect.setColor(Qt.black)
-        elif allegiance == WS:
-            effect.setColor(Qt.white)
-        else:  # NEUTRAL
-            effect.setColor(Qt.gray)  # Gray
-
+        if getattr(self.unit, 'allegiance', None) == HL:
+            effect.setColor(QColor(0, 0, 0))
+        elif getattr(self.unit, 'allegiance', None) == WS:
+            effect.setColor(QColor(255, 255, 255))
+        else:
+            effect.setColor(QColor(128, 128, 128))
         icon.setGraphicsEffect(effect)
+
+    def boundingRect(self):
+        padding = 4
+        return self.unit_rect.adjusted(-padding, -padding, padding, padding)
+
+    def paint(self, painter, option, widget):
+        # Background
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(self.color))
+        painter.setPen(QPen(QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0), 2))
+        painter.drawRoundedRect(self.unit_rect, 5, 5)
+
+        # ID
+        painter.setPen(QPen(QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)))
+        f = painter.font()
+        f.setPointSize(8)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, caption_id(self.unit.id))
+
+        # Stats
+        rating = self.unit.combat_rating if getattr(self.unit, 'combat_rating', 0) != 0 else getattr(self.unit, 'tactical_rating', 0)
+        stats = f"{rating}      {getattr(self.unit, 'movement', 0)}"
+        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats)
+
+        # Passenger badge (carriers)
+        try:
+            passengers = getattr(self.unit, 'passengers', None)
+            if passengers and len(passengers) > 0:
+                badge_text = str(len(passengers))
+                br = 10
+                bx = self.unit_rect.right() - br*2 - 2
+                by = self.unit_rect.center().y() - br
+                badge_rect = QRectF(bx, by, br*2, br*2)
+                painter.setBrush(QBrush(QColor(255, 215, 0)))
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawEllipse(badge_rect)
+                pf = painter.font()
+                pf.setPointSize(8)
+                pf.setBold(True)
+                painter.setFont(pf)
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+
+            # Transported badge (armies aboard a carrier)
+            if getattr(self.unit, 'is_transported', False) and getattr(self.unit, 'transport_host', None):
+                host = self.unit.transport_host
+                host_num = getattr(host, 'ordinal', None)
+                if host_num is not None:
+                    tw, th = 16, 14
+                    tx = self.unit_rect.right() - tw - 2
+                    ty = self.unit_rect.top() + 2
+                    trect = QRectF(tx, ty, tw, th)
+                    painter.setBrush(QBrush(QColor(200, 200, 200)))
+                    painter.setPen(QPen(QColor(0, 0, 0), 1))
+                    painter.drawRoundedRect(trect, 3, 3)
+                    pf2 = painter.font()
+                    pf2.setPointSize(8)
+                    pf2.setBold(True)
+                    painter.setFont(pf2)
+                    painter.setPen(QPen(QColor(0, 0, 0)))
+                    painter.drawText(trect, Qt.AlignCenter, str(host_num))
+        except Exception:
+            pass

@@ -443,6 +443,9 @@ class AnsalonMapView(QGraphicsView):
             units_by_hex = {} # (col, row) -> [unit, unit...]
 
             for unit in self.game_state.units:
+                # Skip transported units (they are represented on the carrier)
+                if getattr(unit, 'transport_host', None):
+                    continue
                 if hasattr(unit, 'position') and unit.is_on_map:
                     pos = unit.position # (col, row)
                     if pos not in units_by_hex:
