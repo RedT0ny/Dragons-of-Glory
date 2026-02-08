@@ -19,8 +19,6 @@ TODO:
 TODO BUGFIX:
 
 - Fleets cannot be deployed in ports that are not coastal. Probably has something to do with deep river? Happens in Castle Gunthar.
-- 
-- 
 - Fix map subset not working correctly (use full map for now).
 
 Notes:

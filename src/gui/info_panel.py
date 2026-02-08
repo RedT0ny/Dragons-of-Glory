@@ -260,7 +260,12 @@ class InfoPanel(QFrame):
         self.lbl_status.setText(unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status))
 
         # 6. Allegiance: "Allegiance (Land)"
-        land = unit.land if unit.land else "other"
+        if unit.land:
+            land = unit.land
+        elif unit.spec.dragonflight:
+            land = unit.spec.dragonflight
+        else:
+            land = "other"
         # unit.land is usually country ID or dragonflight name
         self.lbl_allegiance.setText(f"{unit.allegiance.title()} ({land.title()})")
 

@@ -335,9 +335,9 @@ class Wing(Unit):
                 # An evil (allegiance highlord) dragon Wing can transport one Leader of UnitType HIGHLORD or EMPEROR.
                 if unit.unit_type not in (UnitType.HIGHLORD, UnitType.EMPEROR):
                     return False
-                # The units transported (passengers) must be either of the same land (country or dragonflight)
-                # as that of the flying army, or landless (e.g. Wizards, Emperor).
-                return unit.land is None or unit.land == self.land
+                # The units transported (passengers) must be either of the same dragonflight
+                # as that of the dragon, or landless (e.g. Wizards, Emperor).
+                return unit.spec.dragonflight is None or unit.spec.dragonflight == self.spec.dragonflight
 
             if self.allegiance == WS:
                 # A good (allegiance whitestone) dragon Wing can transport one Leader of UnitRace Elf or Solamnic,
