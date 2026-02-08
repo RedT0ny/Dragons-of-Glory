@@ -371,16 +371,6 @@ class Board:
             if terrain in forbidden_terrain:
                 return False
 
-            # Mountain Rule: Cannot land on a mountain unless you have mountain affinity
-            if terrain == TerrainType.MOUNTAIN:
-                return unit.terrain_affinity == TerrainType.MOUNTAIN
-
-            # Glacier Rule: similar to mountain for non-natives
-            if terrain == TerrainType.GLACIER:
-                if hasattr(unit, 'terrain_affinity'):
-                    return unit.terrain_affinity == TerrainType.GLACIER
-                return False
-
             return True
 
         # Default for any other types (e.g. Wizards)

@@ -249,35 +249,61 @@ class UnitCounter(QGraphicsItem):
     def create_unit_icon(self):
         item = QGraphicsSvgItem()
         item.setSharedRenderer(self.renderer)
+        # Determine element id once and reuse; be defensive to avoid raising inside paint
         try:
-            item.setElementId(self._get_element_id())
+            element_id = self._get_element_id()
+        except Exception:
+            element_id = None
+
+        try:
+            if element_id:
+                item.setElementId(element_id)
+            else:
+                item.setElementId("noicon")
         except Exception:
             try:
                 item.setElementId("noicon")
             except Exception:
                 pass
-        if not self._is_precolored_group(self._get_element_id()):
-            self._apply_allegiance_colors(item)
+
+        try:
+            if element_id and not self._is_precolored_group(element_id):
+                self._apply_allegiance_colors(item)
+        except Exception:
+            # Don't let coloring failures crash paint
+            pass
         return item
 
     def _get_element_id(self):
-        if self.unit.unit_type in [UnitType.WIZARD, UnitType.HIGHLORD,
-                                   UnitType.EMPEROR, UnitType.CITADEL,
-                                   UnitType.FLEET, UnitType.CAVALRY]:
+        # Be defensive: unit_type and race may be None during some flows (tests/mocks)
+        utype = getattr(self.unit, 'unit_type', None)
+        urace = getattr(self.unit, 'race', None)
+        uid = getattr(self.unit, 'id', None)
+
+        if utype in [UnitType.WIZARD, UnitType.HIGHLORD,
+                     UnitType.EMPEROR, UnitType.CITADEL,
+                     UnitType.FLEET, UnitType.CAVALRY]:
             return self.unit.unit_type.value
-        if self.unit.unit_type in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
-            if self.unit.race == UnitRace.SOLAMNIC:
+        if utype in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
+            if urace == UnitRace.SOLAMNIC:
                 return "knight"
-            if self.unit.id in ["soth", "laurana"]:
-                return self.unit.id
-            if self.unit.race == UnitRace.ELF:
+            if uid in ["soth", "laurana"]:
+                return uid
+            if urace == UnitRace.ELF:
                 return "elflord"
             return "leader"
-        if self.unit.race == UnitRace.DRAGON:
-            return "evil_dragon" if self.unit.land in EVIL_DRAGONFLIGHTS else "good_dragon"
-        if self.unit.race in [UnitRace.HUMAN, UnitRace.SOLAMNIC]:
-            return self.unit.unit_type.value
-        return str(self.unit.race.value)
+        if urace == UnitRace.DRAGON:
+            land = getattr(self.unit, 'land', None)
+            return "evil_dragon" if land in EVIL_DRAGONFLIGHTS else "good_dragon"
+        if urace in [UnitRace.HUMAN, UnitRace.SOLAMNIC] and utype:
+            return utype.value
+        # Fallback: safe string or noicon
+        try:
+            if urace is not None:
+                return str(urace.value)
+        except Exception:
+            pass
+        return "noicon"
 
     def _is_precolored_group(self, element_id):
         return isinstance(element_id, str) and (element_id.startswith('full-') or element_id.startswith('loc-'))
@@ -322,38 +348,64 @@ class UnitCounter(QGraphicsItem):
         painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats)
 
         # Passenger badge (carriers)
-        passengers = getattr(self.unit, 'passengers', None)
-        if passengers and len(passengers) > 0:
-            badge_text = str(len(passengers))
-            br = 10
-            bx = self.unit_rect.right() - br*2 - 2
-            by = self.unit_rect.center().y() - br
-            badge_rect = QRectF(bx, by, br*2, br*2)
-            painter.setBrush(QBrush(QColor(255, 215, 0)))
-            painter.setPen(QPen(QColor(0, 0, 0), 1))
-            painter.drawEllipse(badge_rect)
-            pf = painter.font()
-            pf.setPointSize(8)
-            pf.setBold(True)
-            painter.setFont(pf)
-            painter.setPen(QPen(QColor(0, 0, 0)))
-            painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+        try:
+            passengers = getattr(self.unit, 'passengers', None) or []
+            # Normalize passenger count safely
+            pax_count = 0
+            if hasattr(passengers, '__len__'):
+                try:
+                    pax_count = len(passengers)
+                except Exception:
+                    try:
+                        pax_count = sum(1 for _ in passengers)
+                    except Exception:
+                        pax_count = 0
+
+            if pax_count > 0:
+                badge_text = str(pax_count)
+                br = 10
+                bx = self.unit_rect.right() - br*2 - 2
+                by = self.unit_rect.center().y() - br
+                badge_rect = QRectF(bx, by, br*2, br*2)
+                painter.setBrush(QBrush(QColor(255, 215, 0)))  # gold
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawEllipse(badge_rect)
+                pf = painter.font()
+                pf.setPointSize(8)
+                pf.setBold(True)
+                painter.setFont(pf)
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+        except Exception:
+            # Painting must not raise; swallow to avoid crashing the Qt paint loop
+            pass
 
         # Transported badge (armies aboard a carrier)
-        if getattr(self.unit, 'is_transported', False) and getattr(self.unit, 'transport_host', None):
-            host = self.unit.transport_host
-            host_num = getattr(host, 'ordinal', None)
-            if host_num is not None:
-                tw, th = 16, 14
-                tx = self.unit_rect.right() - tw - 2
-                ty = self.unit_rect.top() + 2
-                trect = QRectF(tx, ty, tw, th)
-                painter.setBrush(QBrush(QColor(200, 200, 200)))
-                painter.setPen(QPen(QColor(0, 0, 0), 1))
-                painter.drawRoundedRect(trect, 3, 3)
-                pf2 = painter.font()
-                pf2.setPointSize(8)
-                pf2.setBold(True)
-                painter.setFont(pf2)
-                painter.setPen(QPen(QColor(0, 0, 0)))
-                painter.drawText(trect, Qt.AlignCenter, str(host_num))
+        try:
+            is_transported = bool(getattr(self.unit, 'is_transported', False))
+            host = getattr(self.unit, 'transport_host', None)
+            if is_transported and host is not None:
+                host_num = getattr(host, 'ordinal', None)
+                if host_num is None:
+                    host_num = getattr(host, 'ordinal_index', None)
+                if host_num is None:
+                    host_num = getattr(host, 'id', None)
+
+                if host_num is not None:
+                    host_text = str(host_num)
+                    tw, th = 18, 14
+                    tx = self.unit_rect.right() - tw - 2
+                    ty = self.unit_rect.top() + 2
+                    trect = QRectF(tx, ty, tw, th)
+                    painter.setBrush(QBrush(QColor(200, 200, 200)))
+                    painter.setPen(QPen(QColor(0, 0, 0), 1))
+                    painter.drawRoundedRect(trect, 3, 3)
+                    pf2 = painter.font()
+                    pf2.setPointSize(8)
+                    pf2.setBold(True)
+                    painter.setFont(pf2)
+                    painter.setPen(QPen(QColor(0, 0, 0)))
+                    painter.drawText(trect, Qt.AlignCenter, host_text)
+        except Exception:
+            # Protect paint from exceptions
+            pass

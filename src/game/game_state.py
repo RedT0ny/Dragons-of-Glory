@@ -273,12 +273,14 @@ class GameState:
                 # Rule: Coastal and Port (Deployment) or Port (Replacements)
                 # Note: We pass self.phase to map validation logic
                 if country and self.map.is_valid_fleet_deployment(hex_obj, country, self.phase):
-                    valid_hexes.append((col, row))
+                    if self.map.can_stack_move_to([unit], hex_obj):
+                        valid_hexes.append((col, row))
             else:
                 # Ground Units: Cannot deploy into Ocean
                 # (Unless specific amphibious rules exist, but generally no)
-                if self.map.get_terrain(hex_obj) != "ocean":
-                    valid_hexes.append((col, row))
+                if self.map.can_unit_land_on_hex(unit, hex_obj):
+                    if self.map.can_stack_move_to([unit], hex_obj):
+                        valid_hexes.append((col, row))
 
         return valid_hexes
 

@@ -572,15 +572,24 @@ class GameController(QObject):
             unit: Unit to deploy
             target_hex: Target hex for deployment
         """
+        if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+            print(f"Cannot deploy {unit.id}: invalid terrain.")
+            return
+        if not self.game_state.map.can_stack_move_to([unit], target_hex):
+            print(f"Cannot deploy {unit.id}: stacking limit or enemy presence.")
+            return
+
         # Move the unit through the game state
         self.game_state.move_unit(unit, target_hex)
         
         # Update unit state
         unit.status = UnitState.ACTIVE
         
-        # Sync the view
-        self.view.sync_with_model()
-        self._refresh_info_panel()
+        # Sync the view on the next event loop tick to avoid scene re-entrancy
+        def _deferred_sync():
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+        QTimer.singleShot(0, _deferred_sync)
         
         print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
 
