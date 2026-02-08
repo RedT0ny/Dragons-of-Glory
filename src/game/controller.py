@@ -24,7 +24,8 @@ class GameController(QObject):
         self.ai_timer.setInterval(1000) # 1 second between AI moves
 
         self.selected_units_for_movement = []
-        self.combat_attackers = []
+        from src.game.combat import CombatClickHandler
+        self.combat_click_handler = CombatClickHandler(self.game_state, self.view)
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
 
@@ -350,187 +351,8 @@ class GameController(QObject):
             self.handle_combat_click(hex_obj)
 
     def handle_combat_click(self, target_hex):
-        """
-        Complex state machine for Combat Phase selection.
-        """
-        units_at_hex = self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
-        active_player = self.game_state.active_player
-
-        # Identify what was clicked
-        friendly_units = [u for u in units_at_hex if u.allegiance == active_player and not u.attacked_this_turn]
-        enemy_units = [u for u in units_at_hex if u.allegiance != active_player and u.allegiance != 'neutral']
-
-        # --- Scenario 2: Clicked Friendly Stack ---
-        if friendly_units:
-            # Check adjacency to EXISTING selection (if any)
-            is_adjacent = False
-            if self.combat_attackers:
-                # Check if this new stack is adjacent to ANY of the currently selected units
-                # (Actually, rule says "combine to make single attack against defender's hex")
-                # So they must be adjacent to the SAME enemy, meaning they are likely neighbors
-                # OR they share a common enemy neighbor.
-
-                # Requirement: "Click on an adjacent stack" implies adjacent to current selection?
-                # Or just "another stack that can attack the same target"?
-                # Let's assume the user builds a group.
-
-                # We add them to selection
-                new_selection = list(set(self.combat_attackers + friendly_units))
-            else:
-                new_selection = friendly_units
-
-            # Calculate common targets for this NEW proposed selection
-            common_targets = self.calculate_common_targets(new_selection)
-
-            if not common_targets:
-                # Case 2b: "Turn possible targets to none" -> Refresh and show ONLY current stack
-                self.combat_attackers = friendly_units
-                # Recalculate targets for just this stack
-                common_targets = self.calculate_common_targets(self.combat_attackers)
-            else:
-                # Case 2a: Valid combination
-                self.combat_attackers = new_selection
-
-            # Update UI
-            self.view.units_clicked.emit(self.combat_attackers) # Update Table
-            self.view.highlight_movement_range(common_targets) # Highlight targets
-            # Also highlight the attackers themselves?
-            # The view usually highlights targets (HexagonItems).
-            # We might need a separate way to highlight UnitItems if desired, but table selection does that.
-            return
-
-        # --- Scenario 3, 4, 5: Clicked Enemy or Empty ---
-
-        # Check if this hex is a Valid Target for the CURRENT selection
-        current_targets = self.calculate_common_targets(self.combat_attackers)
-        clicked_offset = target_hex.axial_to_offset()
-
-        if clicked_offset in current_targets:
-            # --- Scenario 5: Clicked a Possible Target ---
-            from PySide6.QtWidgets import QMessageBox
-
-            # Show Odds Dialog
-            odds_str = self.calculate_odds_preview(self.combat_attackers, enemy_units, target_hex)
-
-            reply = QMessageBox.question(
-                None,
-                "Confirm Attack",
-                f"Attack with {len(self.combat_attackers)} units?\nOdds: {odds_str}",
-                QMessageBox.Yes | QMessageBox.No
-            )
-
-            if reply == QMessageBox.Yes:
-                self.game_state.resolve_combat(self.combat_attackers, target_hex)
-                # Mark attackers
-                for u in self.combat_attackers:
-                    u.attacked_this_turn = True
-
-                # Clear all
-                self.reset_combat_selection()
-            return
-
-        # If not a valid target...
-        if enemy_units:
-            # --- Scenario 3: Clicked Invalid Enemy ---
-            # Clear and show only current stack? Wait, it's an enemy stack.
-            # Requirement: "clicks on an hex with enemy units not possible targets. unit_table clears and shows only the current stack."
-            # This phrasing is ambiguous. "shows only the current stack" usually refers to what was clicked.
-            # But you can't select enemy stacks in the table usually.
-            # I assume it means "Clear selection entirely" OR "Reset selection to nothing".
-            self.reset_combat_selection()
-
-        else:
-            # --- Scenario 4: Clicked Empty Hex ---
-            self.reset_combat_selection()
-
-    def reset_combat_selection(self):
-        self.combat_attackers = []
-        self.view.highlight_movement_range([])
-        self.view.units_clicked.emit([]) # Clear table
-
-    def calculate_common_targets(self, attackers):
-        """
-        Returns list of (col, row) valid targets that ALL attacker stacks can attack.
-        Actually, the rule is: "several stacks... can combine... against a defender's hex".
-        This means the target hex must be adjacent to ALL participating stacks.
-        """
-        if not attackers:
-            return []
-
-        # Group attackers by location (Stack)
-        from collections import defaultdict
-        stacks = defaultdict(list)
-        for u in attackers:
-            if u.position:
-                stacks[u.position].append(u)
-
-        if not stacks:
-            return []
-
-        # Find valid targets for EACH stack
-        stack_targets = []
-        for pos, unit_list in stacks.items():
-            # Get targets for this specific stack
-            # A target is valid if it has enemies and is adjacent (and valid terrain)
-            targets_for_this_stack = set(self.calculate_valid_targets(unit_list))
-            stack_targets.append(targets_for_this_stack)
-
-        # Find intersection
-        if not stack_targets:
-            return []
-
-        common_set = set.intersection(*stack_targets)
-        return list(common_set)
-
-    def calculate_valid_targets(self, attackers):
-        """Returns list of (col, row) tuples for valid attack targets."""
-        if not attackers:
-            return []
-
-        # 1. Get all unique positions of attackers (usually they are in one stack, but could be multi-hex attack)
-        attacker_hexes = set()
-        for u in attackers:
-            if u.position:
-                from src.game.map import Hex
-                attacker_hexes.add(Hex.offset_to_axial(*u.position))
-
-        valid_target_offsets = set()
-
-        # 2. Check neighbors of all attacker positions
-        for start_hex in attacker_hexes:
-            for next_hex in start_hex.neighbors():
-                # Is there an enemy there?
-                if self.game_state.map.has_enemy_army(next_hex, self.game_state.active_player):
-                    # Validate "Move into" rule
-                    if self.is_valid_attack_hex(attackers, start_hex, next_hex):
-                        valid_target_offsets.add(next_hex.axial_to_offset())
-
-        return list(valid_target_offsets)
-
-    def is_valid_attack_hex(self, attackers, start_hex, target_hex):
-        """
-        Checks if specific units can attack across this hexside.
-        """
-        hexside = self.game_state.map.get_hexside(start_hex, target_hex)
-
-        if hexside == "mountain":
-            # Check if ALL attackers are capable
-            for u in attackers:
-                can_cross = u.unit_type == 'wing' or u.unit_type in ['dwarves', 'ogres']
-                if not can_cross:
-                    return False
-        return True
-
-    def calculate_odds_preview(self, attackers, defenders, hex_position):
-        """Helper to just get the string "3:1" etc without rolling."""
-        from src.game.combat import CombatResolver
-        # We create a dummy resolver just to calc odds
-        terrain = self.game_state.map.get_terrain(hex_position)
-        resolver = CombatResolver(attackers, defenders, terrain)
-
-        attacker_cs = sum(u.combat_rating for u in attackers)
-        defender_cs = sum(u.combat_rating for u in defenders)
-        return resolver.calculate_odds(attacker_cs, defender_cs)
+        if self.combat_click_handler:
+            self.combat_click_handler.handle_click(target_hex)
 
     def calculate_reachable_hexes(self, units):
         """
@@ -545,12 +367,10 @@ class GameController(QObject):
         Continue processing automatic phases after the current one completes.
         This method is called via QTimer.singleShot to avoid recursion.
         """
-        try:
-            # Process the next phase
-            self.process_game_turn()
-        finally:
-            # Always reset the flag
-            self._processing_automatic_phases = False
+        # Clear the flag so the scheduled tick can run
+        self._processing_automatic_phases = False
+        # Process the next phase
+        self.process_game_turn()
 
     def handle_country_activation(self, country_id, allegiance):
         """
