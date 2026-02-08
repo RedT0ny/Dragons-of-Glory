@@ -812,6 +812,20 @@ class GameState:
     def resolve_event(self, event):
         pass
 
+    def resolve_combat(self, attackers, hex_position):
+        """
+        Initiates combat resolution for a specific hex.
+        """
+        defenders = self.get_units_at(hex_position)
+        # Need to convert hex_position (axial) to offset for get_terrain if it expects offset?
+        # Looking at game_state code, map.get_terrain usually takes axial object or handles conversion.
+        # Assuming hex_position is the Axial Hex object passed from controller.
+
+        terrain = self.map.get_terrain(hex_position)
+
+        resolver = CombatResolver(attackers, defenders, terrain)
+        result = resolver.resolve()
+
     def get_map(self):
         return self.map
 

@@ -611,12 +611,17 @@ class GameController(QObject):
                 if not carrier or not carrier.position:
                     print(f"Cannot unboard {u.id}: carrier missing position")
                     continue
-                # Check carrier hex is coastal
                 from src.game.map import Hex
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
-                if not self.game_state.map.is_coastal(carrier_hex):
-                    print(f"Cannot unboard {u.id}: carrier not in coastal hex")
-                    continue
+                if carrier.unit_type == UnitType.WING:
+                    if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
+                        print(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
+                        continue
+                else:
+                    # Check carrier hex is coastal
+                    if not self.game_state.map.is_coastal(carrier_hex):
+                        print(f"Cannot unboard {u.id}: carrier not in coastal hex")
+                        continue
                 success = self.game_state.unboard_unit(u)
                 if not success:
                     print(f"Failed to unboard {u.id} due to stacking or location.")
@@ -637,6 +642,15 @@ class GameController(QObject):
                     print(f"Carrier {carrier.id} has no position, skipping unboard.")
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
+                if carrier.unit_type == UnitType.WING:
+                    for p in carrier.passengers[:]:
+                        if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
+                            print(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
+                            continue
+                        ok = self.game_state.unboard_unit(p)
+                        if not ok:
+                            print(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+                    continue
                 is_coastal = self.game_state.map.is_coastal(carrier_hex)
                 loc = self.game_state.map.get_location(carrier_hex)
                 is_port = False

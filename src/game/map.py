@@ -342,6 +342,50 @@ class Board:
         """
         return self.can_stack_move_to([unit], target_hex)
 
+    def can_unit_land_on_hex(self, unit, target_hex):
+        """
+        Checks if a unit can be placed on a given hex, for unboarding or deployment.
+        This checks terrain restrictions only, not stacking or ZOC.
+        """
+        # Wings can't land in the desert
+        if unit.unit_type == UnitType.WING:
+            return self.get_terrain(target_hex) != TerrainType.DESERT
+
+        # Fleets can only be in water or coastal hexes
+        if unit.unit_type == UnitType.FLEET:
+            terrain = self.get_terrain(target_hex)
+            is_coastal = self.is_coastal(target_hex)
+            return terrain in [TerrainType.OCEAN, TerrainType.MAELSTROM] or is_coastal
+
+        # Ground units (Army, Leader, etc.)
+        if unit.is_army() or unit.is_leader():
+            terrain = self.get_terrain(target_hex)
+
+            # General ground unit restrictions
+            forbidden_terrain = [
+                TerrainType.OCEAN,
+                TerrainType.DESERT,
+                TerrainType.SWAMP,
+                TerrainType.MAELSTROM,
+            ]
+            if terrain in forbidden_terrain:
+                return False
+
+            # Mountain Rule: Cannot land on a mountain unless you have mountain affinity
+            if terrain == TerrainType.MOUNTAIN:
+                return unit.terrain_affinity == TerrainType.MOUNTAIN
+
+            # Glacier Rule: similar to mountain for non-natives
+            if terrain == TerrainType.GLACIER:
+                if hasattr(unit, 'terrain_affinity'):
+                    return unit.terrain_affinity == TerrainType.GLACIER
+                return False
+
+            return True
+
+        # Default for any other types (e.g. Wizards)
+        return True
+
     def has_enemy_army(self, hex_coord, alliance):
         """Rule 5: Check if hex contains any army from a different alliance."""
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)

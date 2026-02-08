@@ -91,7 +91,6 @@ scenario:
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
       deployment_area:
-        - "caergoth"
         - "coastlund"
         - "goodlund"
         - "hinterlund"
@@ -100,6 +99,7 @@ scenario:
         - "qualinesti"
         - "sancrist"
         - "solanthus"
+        - "southlund"
         - "tower"
         - [8, 31]
         - [9, 31]

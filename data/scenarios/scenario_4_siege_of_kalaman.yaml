@@ -90,7 +90,7 @@ scenario:
         countries: ["nightlund"]
 
       countries:
-        caergoth:
+        southlund:
           units: all
         nightlund:
           units: all

@@ -1,0 +1,4 @@
+pyside6==6.10.2
+pyside6_addons==6.10.2
+pyside6_essentials==6.10.2
+PyYAML==6.0.3

@@ -307,17 +307,22 @@ class Wing(Unit):
     def can_carry(self, unit: Unit) -> bool:
         # Griffons and Pegasi: Can carry 1 Infantry AND 1 Leader
         if self.race in (UnitRace.GRIFFON, UnitRace.PEGASUS):
+            # The units transported (passengers) must be either of the same land (country or dragonflight)
+            # as that of the flying army, or landless (e.g. Wizards, Emperor).
+            if unit.land and unit.land != self.land:
+                return False
+
             # Check what we already have aboard
             has_inf = any(p.unit_type == UnitType.INFANTRY for p in self.passengers)
             has_ldr = any(p.is_leader() for p in self.passengers)
 
             # Incoming unit is Infantry?
             if unit.unit_type == UnitType.INFANTRY:
-                return not has_inf # Can carry if we don't have one yet
+                return not has_inf  # Can carry if we don't have one yet
 
             # Incoming unit is Leader?
             if unit.is_leader():
-                return not has_ldr # Can carry if we don't have one yet
+                return not has_ldr  # Can carry if we don't have one yet
 
             return False
 
@@ -325,13 +330,18 @@ class Wing(Unit):
         if self.race == UnitRace.DRAGON:
             if not unit.is_leader() or len(self.passengers) >= 1:
                 return False
-        
+
             if self.allegiance == HL:
-                # Must match color (land) or be Ariakas (emperor)
-                return unit.land == self.land or unit.unit_type == UnitType.EMPEROR
-        
+                # An evil (allegiance highlord) dragon Wing can transport one Leader of UnitType HIGHLORD or EMPEROR.
+                if unit.unit_type not in (UnitType.HIGHLORD, UnitType.EMPEROR):
+                    return False
+                # The units transported (passengers) must be either of the same land (country or dragonflight)
+                # as that of the flying army, or landless (e.g. Wizards, Emperor).
+                return unit.land is None or unit.land == self.land
+
             if self.allegiance == WS:
-                # Must be Elf or Solamnic
+                # A good (allegiance whitestone) dragon Wing can transport one Leader of UnitRace Elf or Solamnic,
+                # regardless of their land.
                 return unit.race in (UnitRace.ELF, UnitRace.SOLAMNIC)
         return False
 

@@ -211,13 +211,21 @@ class UnitCounter(QGraphicsItem):
     - Carrier (has .passengers): gold circular badge on the right edge with passenger count
     - Transported unit (.is_transported): small rounded rect at top-right with carrier.ordinal
     """
+    _renderer = None
+
+    @classmethod
+    def get_shared_renderer(cls):
+        if cls._renderer is None:
+            cls._renderer = QSvgRenderer(os.path.join(ICONS_DIR, "units.svg"))
+        return cls._renderer
+
     def __init__(self, unit, color, parent=None):
         super().__init__(parent)
         self.unit = unit
         self.color = color
         size = UNIT_SIZE
         self.unit_rect = QRectF(-size, -size, size*2, size*2)
-        self.renderer = QSvgRenderer(os.path.join(ICONS_DIR, "units.svg"))
+        self.renderer = self.get_shared_renderer()
 
         # Create and attach icon
         self.icon = self.create_unit_icon()
@@ -275,13 +283,18 @@ class UnitCounter(QGraphicsItem):
         return isinstance(element_id, str) and (element_id.startswith('full-') or element_id.startswith('loc-'))
 
     def _apply_allegiance_colors(self, icon):
+        """Simple colorization based on allegiance."""
+        allegiance = getattr(self.unit, 'allegiance', WS)
+
         effect = QGraphicsColorizeEffect()
-        if getattr(self.unit, 'allegiance', None) == HL:
-            effect.setColor(QColor(0, 0, 0))
-        elif getattr(self.unit, 'allegiance', None) == WS:
-            effect.setColor(QColor(255, 255, 255))
-        else:
-            effect.setColor(QColor(128, 128, 128))
+
+        if allegiance == HL:
+            effect.setColor(Qt.black)
+        elif allegiance == WS:
+            effect.setColor(Qt.white)
+        else:  # NEUTRAL
+            effect.setColor(Qt.gray)  # Gray
+
         icon.setGraphicsEffect(effect)
 
     def boundingRect(self):
@@ -309,41 +322,38 @@ class UnitCounter(QGraphicsItem):
         painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats)
 
         # Passenger badge (carriers)
-        try:
-            passengers = getattr(self.unit, 'passengers', None)
-            if passengers and len(passengers) > 0:
-                badge_text = str(len(passengers))
-                br = 10
-                bx = self.unit_rect.right() - br*2 - 2
-                by = self.unit_rect.center().y() - br
-                badge_rect = QRectF(bx, by, br*2, br*2)
-                painter.setBrush(QBrush(QColor(255, 215, 0)))
-                painter.setPen(QPen(QColor(0, 0, 0), 1))
-                painter.drawEllipse(badge_rect)
-                pf = painter.font()
-                pf.setPointSize(8)
-                pf.setBold(True)
-                painter.setFont(pf)
-                painter.setPen(QPen(QColor(0, 0, 0)))
-                painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+        passengers = getattr(self.unit, 'passengers', None)
+        if passengers and len(passengers) > 0:
+            badge_text = str(len(passengers))
+            br = 10
+            bx = self.unit_rect.right() - br*2 - 2
+            by = self.unit_rect.center().y() - br
+            badge_rect = QRectF(bx, by, br*2, br*2)
+            painter.setBrush(QBrush(QColor(255, 215, 0)))
+            painter.setPen(QPen(QColor(0, 0, 0), 1))
+            painter.drawEllipse(badge_rect)
+            pf = painter.font()
+            pf.setPointSize(8)
+            pf.setBold(True)
+            painter.setFont(pf)
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
 
-            # Transported badge (armies aboard a carrier)
-            if getattr(self.unit, 'is_transported', False) and getattr(self.unit, 'transport_host', None):
-                host = self.unit.transport_host
-                host_num = getattr(host, 'ordinal', None)
-                if host_num is not None:
-                    tw, th = 16, 14
-                    tx = self.unit_rect.right() - tw - 2
-                    ty = self.unit_rect.top() + 2
-                    trect = QRectF(tx, ty, tw, th)
-                    painter.setBrush(QBrush(QColor(200, 200, 200)))
-                    painter.setPen(QPen(QColor(0, 0, 0), 1))
-                    painter.drawRoundedRect(trect, 3, 3)
-                    pf2 = painter.font()
-                    pf2.setPointSize(8)
-                    pf2.setBold(True)
-                    painter.setFont(pf2)
-                    painter.setPen(QPen(QColor(0, 0, 0)))
-                    painter.drawText(trect, Qt.AlignCenter, str(host_num))
-        except Exception:
-            pass
+        # Transported badge (armies aboard a carrier)
+        if getattr(self.unit, 'is_transported', False) and getattr(self.unit, 'transport_host', None):
+            host = self.unit.transport_host
+            host_num = getattr(host, 'ordinal', None)
+            if host_num is not None:
+                tw, th = 16, 14
+                tx = self.unit_rect.right() - tw - 2
+                ty = self.unit_rect.top() + 2
+                trect = QRectF(tx, ty, tw, th)
+                painter.setBrush(QBrush(QColor(200, 200, 200)))
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawRoundedRect(trect, 3, 3)
+                pf2 = painter.font()
+                pf2.setPointSize(8)
+                pf2.setBold(True)
+                painter.setFont(pf2)
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                painter.drawText(trect, Qt.AlignCenter, str(host_num))
