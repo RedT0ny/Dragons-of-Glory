@@ -90,6 +90,37 @@ class UnitTable(QTableWidget):
             elif col != UnitColumn.CHECKBOX:
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
 
+    def _get_checkbox_item(self, row):
+        if UnitColumn.CHECKBOX not in self.columns_config:
+            return None
+        return self.item(row, 0)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid() and UnitColumn.CHECKBOX in self.columns_config:
+                if index.column() != 0:
+                    item = self._get_checkbox_item(index.row())
+                    if item:
+                        new_state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
+                        item.setCheckState(new_state)
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            index = self.indexAt(event.pos())
+            if index.isValid() and UnitColumn.CHECKBOX in self.columns_config:
+                self.blockSignals(True)
+                for row in range(self.rowCount()):
+                    item = self._get_checkbox_item(row)
+                    if item:
+                        item.setCheckState(Qt.Checked if row == index.row() else Qt.Unchecked)
+                self.blockSignals(False)
+                first_item = self._get_checkbox_item(index.row())
+                if first_item:
+                    self.itemChanged.emit(first_item)
+        super().mouseDoubleClickEvent(event)
+
     def set_units(self, units, game_state=None):
         self.current_units = units
         self.game_state = game_state # Needed for colors/rendering

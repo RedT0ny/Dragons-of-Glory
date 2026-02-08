@@ -102,8 +102,8 @@ class AnsalonMapView(QGraphicsView):
         super().mouseMoveEvent(event)
 
         # Check for edge scrolling
-        margin = 20  # pixels from edge
-        edge_scroll_speed = 10  # pixels per timer tick
+        margin = 10  # pixels from edge
+        edge_scroll_speed = 20  # pixels per timer tick
 
         dx, dy = 0, 0
         if event.position().x() < margin:
