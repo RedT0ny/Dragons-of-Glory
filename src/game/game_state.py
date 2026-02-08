@@ -386,7 +386,6 @@ class GameState:
             return
 
         temple_coords = dt_country.capital.coords  # (col, row)
-        from src.game.map import Hex
         temple_axial = Hex.offset_to_axial(*temple_coords)
 
         # 2. Check Ownership/Occupation (Rule: If captured by WS, no production)
@@ -687,8 +686,6 @@ class GameState:
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
         """Resolves generic add_units keys to specific units and readies them."""
-        from src.content.specs import UnitState, UnitType
-
         candidates = []
 
         # 1. Wizards

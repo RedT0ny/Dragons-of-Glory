@@ -284,17 +284,18 @@ class GameController(QObject):
 
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
-        self.view.highlight_movement_range([])
+        def _deferred_end_phase_view_update():
+            self.view.highlight_movement_range([])
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+        QTimer.singleShot(0, _deferred_end_phase_view_update)
 
         self.game_state.advance_phase()
-        self.view.sync_with_model()
-        self._refresh_info_panel()
 
         # Trigger the loop again to handle the next state immediately.
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
         # the UI (Dialogs) for that player will be initialized.
         # Use QTimer.singleShot to avoid potential recursion issues
-        from PySide6.QtCore import QTimer
         QTimer.singleShot(0, self.process_game_turn)
 
 

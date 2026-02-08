@@ -1,4 +1,9 @@
 import sys, locale
+
+#Enable faulthandler to get better crash diagnostics, especially for native code issues in PySide6
+import faulthandler
+faulthandler.enable()
+
 from PySide6.QtWidgets import QApplication
 
 from src.gui.main_window import MainWindow
@@ -6,6 +11,8 @@ from src.gui.intro_window import IntroWindow
 from src.game.game_state import GameState
 from src.content.translator import Translator
 from src.game.controller import GameController
+
+
 
 class GameApp:
     def __init__(self):
