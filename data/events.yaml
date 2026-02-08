@@ -89,6 +89,7 @@ dragonmetal:
     
     A pool of pure dragonmetal has been found in Foghaven Vale.
   picture: "foghaven_vale.jpg"
+  allegiance: "whitestone"
   turn: 7
   effects: { grant_asset: "dragonmetal" }
 
@@ -100,6 +101,7 @@ hammer_of_kharas:
     
     Whitestone finds the Hammer of Kharas!
   picture: "arman_kharas.jpg"
+  allegiance: "whitestone"
   turn: 8
   effects:
     grant_asset: "hammer_of_kharas"
