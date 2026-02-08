@@ -1,12 +1,14 @@
 import random
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver
-from src.content.config import COUNTRIES_DATA, MAP_WIDTH, MAP_HEIGHT, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, ARTIFACTS_DATA
+from src.content.config import MAP_WIDTH, MAP_HEIGHT
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
 from src.content import loader, factory
 from src.game.map import Board, Hex
-from src.game.event import Event, Asset, check_requirements
+from src.game.deployment import DeploymentService
+from src.game.event_system import EventSystem
+from src.game.phase_manager import PhaseManager
 
 
 class GameState:
@@ -34,6 +36,9 @@ class GameState:
         self.map: Board = None  # Will be initialized by load_scenario
         self.turn = 0
         self.scenario_spec = None
+        self.event_system = EventSystem(self)
+        self.phase_manager = PhaseManager(self)
+        self.deployment_service = DeploymentService(self)
 
         # Battle Turn State
         self.phase = GamePhase.REPLACEMENTS
@@ -85,84 +90,8 @@ class GameState:
         """
         Initializes the game state from scenario data.
         """
-        self.scenario_spec = scenario_spec
-
-        # Setup live objects via Factory
-        self.units, self.countries = factory.create_scenario_items(scenario_spec)
-
-        # Apply Draconian scenario rules (ready count, production flag)
-        self._apply_draconian_setup()
-
-        # Load Artifacts Catalog
-        self.artifact_pool = loader.load_artifacts_yaml(ARTIFACTS_DATA)
-
-        # Setup the map
-        bounds = self.get_map_bounds()
-        width, height = self.get_map_dimensions()
-        offset_col = bounds["x_range"][0]
-        offset_row = bounds["y_range"][0]
-
-        if self.scenario_spec and self.scenario_spec.map_subset:
-            self._apply_map_subset_offsets(offset_col, offset_row, width, height)
-
-        # Initialize the actual HexGrid model
-        self.map = Board(width, height, offset_col=offset_col, offset_row=offset_row)
-
-        # Populate Terrain
-        terrain_data = loader.load_terrain_csv(MAP_TERRAIN_DATA)
-        self.map.populate_terrain(terrain_data)
-
-        # Populate Hexsides (Rivers, Mountains)
-        map_config = loader.load_map_config(MAP_CONFIG_DATA)
-        self.map.populate_hexsides(map_config.hexsides)
-
-        # Populate Locations (Special + Country)
-        special_locations = map_config.special_locations
-        if self.scenario_spec and self.scenario_spec.map_subset:
-            special_locations = self._adjust_special_locations(
-                special_locations, offset_col, offset_row
-            )
-        self.map.populate_locations(special_locations, self.countries)
-
-        # Initialize Players (after map offsets are applied to the spec)
-        self._initialize_players()
-
-        # Load Strategic Events
-        event_specs = loader.resolve_scenario_events(self.scenario_spec, EVENTS_DATA)
-        self.strategic_event_pool = []
-        for s in event_specs:
-            # We pass generic lambdas that delegate back to GameState logic
-            evt = Event(s,
-                        trigger_func=lambda gs, s=s: gs.check_event_trigger_conditions(s.trigger_conditions),
-                        effect_func=lambda gs, s=s: gs.apply_event_effect(s))
-            self.strategic_event_pool.append(evt)
-
-        # Register existing units on the map if they have positions
-        for unit in self.units:
-            if unit.position and unit.is_on_map:
-                self.map.add_unit_to_spatial_map(unit)
-
-        # Register existing units on the map if they have positions
-        for unit in self.units:
-            if unit.position and unit.is_on_map:
-                self.map.add_unit_to_spatial_map(unit)
-
-        # 5. Default to turn 1 if start_turn is missing from the scenario object
-        self.turn = getattr(scenario_spec, 'start_turn', 1)
-
-        # Determine initiative for Deployment
-        init_str = getattr(scenario_spec, 'initiative_start', 'highlord').lower()
-
-        # Start with Deployment Phase
-        self.phase = GamePhase.DEPLOYMENT
-
-        # The player WITHOUT initiative deploys first
-        if init_str == WS:
-            self.initiative_winner = WS
-            self.active_player = HL
-        else:
-            self.initiative_winner = HL
-            self.active_player = WS
+        builder = factory.ScenarioBuilder()
+        builder.build(self, scenario_spec)
 
     def get_map_bounds(self) -> Dict[str, List[int]]:
         """Returns the subset range or full map defaults."""
@@ -219,70 +148,10 @@ class GameState:
                     player.add_country(self.countries[cid])
 
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
-        """
-        Returns a set of (x, y) coordinates where a player can deploy.
-        Delegates to the Player object.
-        """
-        if allegiance not in self.players:
-            return set()
-
-        return self.players[allegiance].get_deployment_hexes(self.countries, self.is_hex_in_bounds)
+        return self.deployment_service.get_deployment_hexes(allegiance)
 
     def get_valid_deployment_hexes(self, unit, allow_territory_wide=False) -> List[Tuple[int, int]]:
-        """
-        Calculates valid deployment coordinates for a specific unit,
-        applying Phase rules, Unit Type restrictions (Fleets), and Terrain checks.
-        """
-        candidates = []
-
-        # 1. Gather Candidates based on Phase
-        if self.phase == GamePhase.DEPLOYMENT:
-            # Scenario specific areas
-            candidates = list(self.get_deployment_hexes(unit.allegiance))
-        else:
-            # Replacements / Activation
-            country = self.countries.get(unit.land)
-            if country:
-                if allow_territory_wide:
-                    candidates = list(country.territories)
-                else:
-                    # Cities or Fortresses
-                    for loc in country.locations.values():
-                        if loc.coords:
-                            candidates.append(loc.coords)
-            else:
-                # Handle stateless units (units without land) during REPLACEMENTS phase
-                # These units should be deployable in any friendly location
-                if self.phase == GamePhase.REPLACEMENTS and unit.allegiance == self.active_player:
-                    # Find all friendly locations (fortresses, cities, ports, undercities, etc.)
-                    for country_id, country_obj in self.countries.items():
-                        if country_obj.allegiance == unit.allegiance:
-                            # Add all locations from friendly countries
-                            for loc in country_obj.locations.values():
-                                if loc.coords:
-                                    candidates.append(loc.coords)
-
-        # 2. Filter based on Unit Type & Terrain
-        valid_hexes = []
-        country = self.countries.get(unit.land)
-
-        for col, row in candidates:
-            hex_obj = Hex.offset_to_axial(col, row)
-
-            if unit.unit_type == UnitType.FLEET:
-                # Rule: Coastal and Port (Deployment) or Port (Replacements)
-                # Note: We pass self.phase to map validation logic
-                if country and self.map.is_valid_fleet_deployment(hex_obj, country, self.phase):
-                    if self.map.can_stack_move_to([unit], hex_obj):
-                        valid_hexes.append((col, row))
-            else:
-                # Ground Units: Cannot deploy into Ocean
-                # (Unless specific amphibious rules exist, but generally no)
-                if self.map.can_unit_land_on_hex(unit, hex_obj):
-                    if self.map.can_stack_move_to([unit], hex_obj):
-                        valid_hexes.append((col, row))
-
-        return valid_hexes
+        return self.deployment_service.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide)
 
     def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
         """Normalize scenario and country coordinates to local (subset) space."""
@@ -478,99 +347,13 @@ class GameState:
                 # to prompt selection from result['options'].
 
     def advance_phase(self):
-        """
-        The State Machine: Determines the next phase based on current state.
-        This ensures the strict order of the Battle Turn.
-        """
-        if self.phase == GamePhase.DEPLOYMENT:
-            # If currently the non-initiative player, switch to initiative player
-            # If currently the initiative player, deployment is done AND it counts as their Replacements.
-
-            if self.active_player != self.initiative_winner:
-                self.active_player = self.initiative_winner
-                # Phase remains DEPLOYMENT for the second player
-            else:
-                # Initiative winner finished deployment.
-                # Proceed directly to movement (Skipping activation, events and initiative phases for this first turn)
-                self.phase = GamePhase.MOVEMENT
-
-        elif self.phase == GamePhase.REPLACEMENTS:
-            # Logic: The player that lost initiative roll goes first in replacements (Handled in nex_turn).
-            # First check if active_player is HL, to process draconian production
-            if self.active_player == HL:
-                self.process_draconian_production()
-            # Now check if we are in the first or second player replacement round
-            if self.active_player != self.initiative_winner:
-                # That means it's the first player replacing
-                self.active_player = self.initiative_winner
-                # Phase remains REPLACEMENTS for the second player
-            else:
-                self.phase = GamePhase.STRATEGIC_EVENTS
-
-        elif self.phase == GamePhase.STRATEGIC_EVENTS:
-            if self.active_player == self.initiative_winner:
-                # That means it's the event for the first player
-                self.active_player = WS if self.initiative_winner == HL else HL
-                # Phase remains STRATEGIC_EVENTS for the second player
-                # Note: since this phase is fully automatic, maybe this is not required
-                # and can be handled directly in the controller.
-            else:
-                self.phase = GamePhase.ACTIVATION
-
-        elif self.phase == GamePhase.ACTIVATION:
-            if self.active_player != self.initiative_winner:
-                # That means it's the event for the first player
-                self.active_player = self.initiative_winner
-                # Phase remains ACTIVATION for the second player
-            else:
-                self.phase = GamePhase.INITIATIVE
-
-        elif self.phase == GamePhase.INITIATIVE:
-            # Controller must have set_initiative() before calling this
-            self.phase = GamePhase.MOVEMENT
-            self.second_player_has_acted = False
-
-        elif self.phase == GamePhase.MOVEMENT:
-            self.phase = GamePhase.COMBAT
-
-        elif self.phase == GamePhase.COMBAT:
-            if not self.second_player_has_acted:
-                # End of First Player's turn (Step 6 done).
-                # Start Second Player's turn (Step 7).
-                self.phase = GamePhase.MOVEMENT
-                self.active_player = WS if self.active_player == HL else HL
-                self.second_player_has_acted = True
-            else:
-                # End of Second Player's turn. Turn over (Step 8).
-                self.next_turn()
+        return self.phase_manager.advance_phase()
 
     def next_turn(self):
-        """Advances the game to the next turn (Step 8)."""
-        self.turn += 1
-        self.phase = GamePhase.REPLACEMENTS
-        # Change active_player to the one that lost initiative roll, so they go first in replacements
-        self.active_player = WS if self.initiative_winner == HL  else HL
-
-        # Reset unit flags
-        for unit in self.units:
-            unit.movement_points = getattr(unit, 'movement', 0) # Reset MPs
-            unit.attacked_this_turn = False
-            # Handle status recovery/exhaustion here if needed
-
-        # Check events
-        self.check_events()
+        return self.phase_manager.next_turn()
 
     def check_events(self):
-        """Iterates through active events to see if turn-based triggers fire."""
-        for event in self.events[:]: # Iterate over a copy to allow removal
-            if event.check_trigger(self):
-                event.activate(self)
-
-                # Logic: If the event has hit its specific limit, remove it from the active pool
-                # and track it as completed.
-                if event.occurrence_count >= event.spec.max_occurrences:
-                    self.completed_event_ids.add(event.id)
-                    self.events.remove(event)
+        return self.event_system.check_events()
 
     def add_unit(self, unit):
         pass
@@ -637,34 +420,10 @@ class GameState:
                 p.transport_host = unit
 
     def check_event_trigger_conditions(self, conditions) -> bool:
-        """Checks if a list of trigger conditions is met."""
-        if not conditions:
-            return False
-
-        # Example condition format: "turn: 5" or "always_true" or dict
-        for cond in conditions:
-            if isinstance(cond, str):
-                if cond == "always_true":
-                    return True
-                # Parse simple strings if needed
-            elif isinstance(cond, dict):
-                if "turn" in cond and self.turn == cond["turn"]:
-                    return True
-                # Add more conditions as needed (e.g. "unit_at")
-
-        return False
+        return self.event_system.check_event_trigger_conditions(conditions)
 
     def check_event_requirements_met(self, requirements) -> bool:
-        """Checks if event prerequisites are met."""
-        if not requirements:
-            return True
-
-        current_player_obj = self.current_player
-        for req in requirements:
-            # Reusing the shared check_requirements from event.py
-            if not check_requirements(req, current_player_obj, self):
-                return False
-        return True
+        return self.event_system.check_event_requirements_met(requirements)
 
     def activate_country(self, country_id: str, allegiance: str):
         """Activates a country for the given allegiance and readies its units."""
@@ -685,128 +444,13 @@ class GameState:
         print(f"Country {country_id} activated for {allegiance}")
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
-        """Resolves generic add_units keys to specific units and readies them."""
-        candidates = []
-
-        # 1. Wizards
-        if unit_key == "wizard":
-            candidates = [u for u in self.units
-                          if u.unit_type == UnitType.WIZARD and u.allegiance == allegiance]
-
-        # 2. Flying Citadel
-        elif unit_key == "citadel":
-            # Assuming UnitType.CITADEL exists, otherwise checking string representation
-            candidates = [u for u in self.units
-                          if (u.unit_type == UnitType.CITADEL if hasattr(UnitType, 'CITADEL') else str(u.unit_type).lower() == 'citadel')
-                          and u.allegiance == allegiance]
-
-        # 3. Golden General (Laurana)
-        elif unit_key == "golden_general":
-            candidates = [u for u in self.units if u.id == "laurana"]
-
-        # 4. Good Dragons
-        elif unit_key == "good_dragons":
-            candidates = [u for u in self.units
-                          if u.unit_type == UnitType.WING and u.allegiance == "whitestone"]
-
-        # Fallback: Try to find by direct ID match
-        if not candidates:
-            candidates = [u for u in self.units if u.id == unit_key]
-
-        if not candidates:
-            print(f"Warning: No units found for add_units key '{unit_key}'")
-
-        for u in candidates:
-            # Move to READY so they appear in deployment
-            u.status = UnitState.READY
-            u.allegiance = allegiance
-            print(f"Unit {u.id} added/ready for {allegiance}")
+        self.event_system._resolve_add_units(unit_key, allegiance)
 
     def apply_event_effect(self, spec):
-        """Applies the effects of an event."""
-        if not spec.effects:
-            return
-
-        player = self.current_player
-        effects = spec.effects
-
-        # 1. Alliance: Activates country and readies units
-        if "alliance" in effects:
-            country_id = effects["alliance"]
-            self.activate_country(country_id, player.allegiance)
-
-        # 2. Add Units: Adds specific units to the pool (READY state)
-        if "add_units" in effects:
-            unit_key = effects["add_units"]
-            self._resolve_add_units(unit_key, player.allegiance)
-
-        # 3. Grant Asset: Processed last
-        if "grant_asset" in effects:
-            asset_id = effects["grant_asset"]
-            # Delegate to Player class to ensure consistent asset creation and storage
-            player.grant_asset(asset_id, self)
-
-        # Other effects...
+        return self.event_system.apply_event_effect(spec)
 
     def draw_strategic_event(self, allegiance):
-        """
-        Draws an event for the given allegiance based on triggers and probability.
-        """
-        # 1. Check for Auto-Triggers (Highest priority)
-        candidates = []
-        for event in self.strategic_event_pool:
-            if event.id in self.completed_event_ids: continue
-            if event.occurrence_count >= event.spec.max_occurrences: continue
-
-            # Allegiance check: Must match player OR be neutral (None)
-            # "Each player can only draw either an event of their allegiance or an event without allegiance"
-            if event.spec.allegiance and event.spec.allegiance != allegiance: continue
-
-            candidates.append(event)
-
-        # Check triggers
-        for event in candidates:
-            if event.spec.trigger_conditions:
-                if self.check_event_trigger_conditions(event.spec.trigger_conditions):
-                    return event
-
-        # 2. Check "Possible" Events (Random Draw)
-        possible_events = []
-        weights = []
-
-        for event in candidates:
-            # Skip if it has triggers (handled above, don't draw randomly if trigger didn't fire)
-            if event.spec.trigger_conditions:
-                continue
-
-            # Pre-requirements
-            if not self.check_event_requirements_met(event.spec.requirements):
-                continue
-
-            # Turn check and Probability Weight Calculation
-            if event.spec.turn is None:
-                diff = 0
-            else:
-                if self.turn < event.spec.turn:
-                    continue
-                diff = self.turn - event.spec.turn
-
-            # Formula: chance reduces as diff increases
-            # Base prob * (1 / (1 + 0.5 * diff)) - tunable decay
-            decay = 1.0 / (1.0 + 0.5 * diff)
-
-            # Use spec.probability (default 1.0)
-            weight = getattr(event.spec, 'probability', 1.0) * decay
-
-            possible_events.append(event)
-            weights.append(weight)
-
-        if not possible_events:
-            return None
-
-        # Draw one
-        chosen = random.choices(possible_events, weights=weights, k=1)[0]
-        return chosen
+        return self.event_system.draw_strategic_event(allegiance)
 
     def resolve_event(self, event):
         pass

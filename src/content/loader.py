@@ -5,6 +5,8 @@ from collections import defaultdict
 from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP, HL, WS, NEUTRAL
 from src.content.specs import *
 
+_UNITS_CATALOG_CACHE = None
+
 
 def _slugify(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
@@ -416,12 +418,7 @@ def parse_units_csv(path: str) -> List[UnitSpec]:
             ))
     return specs
 
-def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[UnitSpec]:
-    #Avoid crashing if no scenario is passed as argument
-    if spec is None: return []
-
-    # 1. Expand all unit specs from CSV
-    raw_specs = parse_units_csv(units_csv_path)
+def expand_units_specs(raw_specs: List[UnitSpec]) -> List[UnitSpec]:
     all_counters = []
     for s in raw_specs:
         for i in range(1, s.quantity + 1):
@@ -429,6 +426,24 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
             new_id = f"{s.id}_{i}" if s.quantity > 1 else s.id
             new_spec = UnitSpec(**{**asdict(s), "id": new_id, "quantity": 1, "ordinal": i})
             all_counters.append(new_spec)
+    return all_counters
+
+def load_units_catalog(units_csv_path: str, use_cache: bool = True) -> List[UnitSpec]:
+    global _UNITS_CATALOG_CACHE
+    if use_cache and _UNITS_CATALOG_CACHE is not None:
+        return _UNITS_CATALOG_CACHE
+
+    raw_specs = parse_units_csv(units_csv_path)
+    _UNITS_CATALOG_CACHE = expand_units_specs(raw_specs)
+    return _UNITS_CATALOG_CACHE
+
+def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[UnitSpec]:
+    #Avoid crashing if no scenario is passed as argument
+    if spec is None: return []
+
+    # 1. Expand all unit specs from CSV
+    raw_specs = parse_units_csv(units_csv_path)
+    all_counters = expand_units_specs(raw_specs)
 
     # 2. Index for lookup
     idx = {
