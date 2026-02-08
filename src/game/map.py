@@ -1,5 +1,7 @@
 import heapq
 from collections import defaultdict
+
+from src.content.loader import load_countries_yaml
 from src.content.specs import HexDirection, UnitType, UnitRace, GamePhase, LocType, TerrainType
 
 
@@ -351,11 +353,15 @@ class Board:
         if unit.unit_type == UnitType.WING:
             return self.get_terrain(target_hex) != TerrainType.DESERT
 
-        # Fleets can only be in water or coastal hexes
+        # Fleets can only be in water, ports or coastal hexes
         if unit.unit_type == UnitType.FLEET:
-            terrain = self.get_terrain(target_hex)
             is_coastal = self.is_coastal(target_hex)
-            return terrain in [TerrainType.OCEAN, TerrainType.MAELSTROM] or is_coastal
+            loc = self.get_location(target_hex)
+            is_port = False
+            if loc and isinstance(loc, dict):
+                is_port = (loc.get('type') == LocType.PORT.value)
+
+            return is_coastal or is_port
 
         # Ground units (Army, Leader, etc.)
         if unit.is_army() or unit.is_leader():
