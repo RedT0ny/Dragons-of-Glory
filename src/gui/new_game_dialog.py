@@ -127,6 +127,7 @@ class Ui_newGameDialog(object):
         self.gridLayout.setObjectName(u"gridLayout")
         self.startTurn = QLineEdit(self.detailsFrame)
         self.startTurn.setObjectName(u"startTurn")
+        self.startTurn.setReadOnly(True)
 
         self.gridLayout.addWidget(self.startTurn, 1, 1, 1, 2)
 

@@ -2,9 +2,7 @@
 scenario:
   id: "campaign_1_dragonlance_chronicles"
   picture: "campaign_1.jpg"
-  description: >
-    *** Dragonlance Chronicles ***
-    
+  description: >   
     Five years ago, a band of good friends frequented the Inn of the Last Home, the most popular tavern and inn in the 
     treetop town of Solace. They made a pact to go off on their own in search of some sign of the true gods, agreeing 
     to meet back at the Inn of the Last Home on that day five years later. Each taking a different path, they set out 

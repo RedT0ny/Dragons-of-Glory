@@ -2,9 +2,7 @@
 scenario:
   id: "campaign_0_war_of_the_lance"
   picture: "campaign_0.jpg"
-  description: >
-    *** War of the Lance ***
-    
+  description: >    
     After her defeat in the Age of Dreams, Takhisis swore that she and her children, the chromatic dragons, would leave 
     the world of mortals. The dragons knew this as the Oath of Finality. Thus the chromatic dragons slumbered for over 
     a thousand years in hidden places throughout Ansalon - from the red dragon lairs in the Khalkist Mountains, to the 
