@@ -82,7 +82,8 @@ class DeploymentService:
             else:
                 # Handle stateless units (units without land) during REPLACEMENTS phase
                 # These units should be deployable in any friendly location
-                if self.game_state.phase == GamePhase.REPLACEMENTS and unit.allegiance == self.game_state.active_player:
+                # Event-driven deployments pass allow_territory_wide to reuse the replacements logic for stateless units.
+                if (self.game_state.phase == GamePhase.REPLACEMENTS or allow_territory_wide) and unit.allegiance == self.game_state.active_player:
                     # Find all friendly locations (fortresses, cities, ports, undercities, etc.)
                     for country_id, country_obj in self.game_state.countries.items():
                         if country_obj.allegiance == unit.allegiance:

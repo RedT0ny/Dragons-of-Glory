@@ -39,7 +39,7 @@ class Ui_event_dialog(object):
         font = QFont()
         font.setPointSize(16)
         self.event_description.setFont(font)
-        self.event_description.setReadOnly(False)
+        self.event_description.setReadOnly(True)
 
         self.event_layout.addWidget(self.event_description, 4, 0, 1, 3)
 

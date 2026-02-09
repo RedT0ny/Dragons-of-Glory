@@ -189,7 +189,7 @@ dragonlance_forged:
     a weapon capable of slaying even the mightiest of dragons.
     
     A Dragonlance has been created!
-  picture: "dragonlance_forged.svg"
+  picture: "dragonlance_forged.jpg"
   allegiance: "whitestone"
   turn: 10
   requirements:
