@@ -6,10 +6,11 @@ Design overview:
 
 TODO:
 
+- Keep info_panel outside the tabs?
 - Add Dragon #170's Advanced Rules in "settings"
 - Add attribute and diplomacy logic for Knight's countries
 - Finalize movement and combat phases.
-- Implement save and load game
+- Finalize implementing save and load game
 - Check victory conditions
 - double-click on a unit in the status tab should show the map tab and zoom on the unit.
 - Implement AI player
