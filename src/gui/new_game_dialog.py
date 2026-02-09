@@ -156,6 +156,7 @@ class Ui_newGameDialog(object):
 
         self.hlCountries = QLineEdit(self.detailsFrame)
         self.hlCountries.setObjectName(u"hlCountries")
+        self.hlCountries.setReadOnly(True)
 
         self.gridLayout.addWidget(self.hlCountries, 3, 1, 1, 2)
 
@@ -171,6 +172,7 @@ class Ui_newGameDialog(object):
 
         self.wsCountries = QLineEdit(self.detailsFrame)
         self.wsCountries.setObjectName(u"wsCountries")
+        self.wsCountries.setReadOnly(True)
 
         self.gridLayout.addWidget(self.wsCountries, 3, 4, 1, 1)
 
@@ -198,11 +200,13 @@ class Ui_newGameDialog(object):
 
         self.endTurn = QLineEdit(self.detailsFrame)
         self.endTurn.setObjectName(u"endTurn")
+        self.endTurn.setReadOnly(True)
 
         self.gridLayout.addWidget(self.endTurn, 1, 4, 1, 1)
 
         self.initiative = QLineEdit(self.detailsFrame)
         self.initiative.setObjectName(u"initiative")
+        self.initiative.setReadOnly(True)
 
         self.gridLayout.addWidget(self.initiative, 2, 1, 1, 2)
 
