@@ -487,10 +487,17 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
 
                 for type_or_race, type_config in units_by_type.items():
                     # Support for simplified format: "inf: 4" instead of "inf: { quantity: 4 }"
+                    requested_qty = 1
                     if isinstance(type_config, int):
                         requested_qty = type_config
-                    else:
-                        requested_qty = 1
+                    elif isinstance(type_config, str) and type_config.lower() == "all":
+                        requested_qty = None
+                    elif isinstance(type_config, dict):
+                        qty = type_config.get("quantity", 1)
+                        if isinstance(qty, str) and qty.lower() == "all":
+                            requested_qty = None
+                        elif isinstance(qty, int):
+                            requested_qty = qty
 
                     type_or_race_lower = type_or_race.lower()
 
@@ -509,8 +516,9 @@ def resolve_scenario_units(spec: ScenarioSpec, units_csv_path: str) -> List[Unit
                                           if (u.country and u.country.lower() == lc) or
                                           (u.dragonflight and u.dragonflight.lower() == lc)]
 
-                    # Take only the requested quantity
-                    for unit_spec in matching_units[:requested_qty]:
+                    # Take only the requested quantity (or all if requested_qty is None)
+                    selected_units = matching_units if requested_qty is None else matching_units[:requested_qty]
+                    for unit_spec in selected_units:
                         unit_spec.allegiance = allegiance
                         selected_specs.append(unit_spec)
 

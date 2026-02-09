@@ -4,7 +4,7 @@ import os
 ################################################################################
 ## Form generated from reading UI file 'event_dialog.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.9.1
+## Created by: Qt User Interface Compiler version 6.10.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -30,7 +30,7 @@ class Ui_event_dialog(object):
         event_dialog.resize(1024, 576)
         self.gridLayoutWidget = QWidget(event_dialog)
         self.gridLayoutWidget.setObjectName(u"gridLayoutWidget")
-        self.gridLayoutWidget.setGeometry(QRect(0, 10, 1021, 571))
+        self.gridLayoutWidget.setGeometry(QRect(0, 10, 1021, 561))
         self.event_layout = QGridLayout(self.gridLayoutWidget)
         self.event_layout.setObjectName(u"event_layout")
         self.event_layout.setContentsMargins(0, 0, 0, 0)

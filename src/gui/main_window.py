@@ -117,6 +117,37 @@ class MainWindow(QMainWindow):
 
         super().closeEvent(event)
 
+    def keyPressEvent(self, event):
+        """Handle WASD for map navigation."""
+        # Define how many pixels to scroll per key press
+        scroll_step = 50
+
+        if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if hasattr(self, 'info_panel'):
+                self.info_panel.end_phase_clicked.emit()
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_W:
+            self.map_view.verticalScrollBar().setValue(
+                self.map_view.verticalScrollBar().value() - scroll_step
+            )
+        elif event.key() == Qt.Key_S:
+            self.map_view.verticalScrollBar().setValue(
+                self.map_view.verticalScrollBar().value() + scroll_step
+            )
+        elif event.key() == Qt.Key_A:
+            self.map_view.horizontalScrollBar().setValue(
+                self.map_view.horizontalScrollBar().value() - scroll_step
+            )
+        elif event.key() == Qt.Key_D:
+            self.map_view.horizontalScrollBar().setValue(
+                self.map_view.horizontalScrollBar().value() + scroll_step
+            )
+        else:
+            # Pass other key events (like Ctrl+S) to the original handler
+            super().keyPressEvent(event)
+
     def on_tab_changed(self, index):
         """Refreshes tab content when tab changes"""
         if self.tabs.widget(index) == self.status_tab:

@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'new_game_dialog.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.9.1
+## Created by: Qt User Interface Compiler version 6.10.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -26,16 +26,16 @@ import os
 
 
 class Ui_newGameDialog(object):
-    def setupUi(self, Dialog):
-        if not Dialog.objectName():
-            Dialog.setObjectName(u"Dialog")
-        Dialog.setWindowModality(Qt.WindowModality.NonModal)
-        Dialog.resize(1024, 768)
-        Dialog.setWindowOpacity(0.8)
-        Dialog.setModal(True)
-        self.horizontalLayout = QHBoxLayout(Dialog)
+    def setupUi(self, newGameDialog):
+        if not newGameDialog.objectName():
+            newGameDialog.setObjectName(u"newGameDialog")
+        newGameDialog.setWindowModality(Qt.WindowModality.NonModal)
+        newGameDialog.resize(1024, 768)
+        newGameDialog.setWindowOpacity(0.8)
+        newGameDialog.setModal(True)
+        self.horizontalLayout = QHBoxLayout(newGameDialog)
         self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.scGroupBox = QGroupBox(Dialog)
+        self.scGroupBox = QGroupBox(newGameDialog)
         self.scGroupBox.setObjectName(u"scGroupBox")
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
@@ -59,9 +59,10 @@ class Ui_newGameDialog(object):
 
         self.formLayout.setWidget(0, QFormLayout.ItemRole.SpanningRole, self.scListView)
 
+
         self.horizontalLayout.addWidget(self.scGroupBox)
 
-        self.detailsGroupBox = QGroupBox(Dialog)
+        self.detailsGroupBox = QGroupBox(newGameDialog)
         self.detailsGroupBox.setObjectName(u"detailsGroupBox")
         sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
@@ -73,32 +74,47 @@ class Ui_newGameDialog(object):
         self.verticalLayout.setObjectName(u"verticalLayout")
         self.horizontalLayout_2 = QHBoxLayout()
         self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
-        self.horizontalSpacer = QSpacerItem(178, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.horizontalSpacer = QSpacerItem(75, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_2.addItem(self.horizontalSpacer)
 
         self.scPicture = QLabel(self.detailsGroupBox)
         self.scPicture.setObjectName(u"scPicture")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy2.setHorizontalStretch(0)
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.scPicture.sizePolicy().hasHeightForWidth())
         self.scPicture.setSizePolicy(sizePolicy2)
         self.scPicture.setMaximumSize(QSize(592, 333))
+        self.scPicture.setStyleSheet(u"background: black")
         self.scPicture.setPixmap(QPixmap(IMAGES_DIR+'\\scenario.jpg'))
         self.scPicture.setScaledContents(True)
 
         self.horizontalLayout_2.addWidget(self.scPicture)
 
-        self.horizontalSpacer_2 = QSpacerItem(178, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        self.horizontalSpacer_2 = QSpacerItem(75, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_2.addItem(self.horizontalSpacer_2)
 
 
         self.verticalLayout.addLayout(self.horizontalLayout_2)
 
+        self.scTitle = QLabel(self.detailsGroupBox)
+        self.scTitle.setObjectName(u"scTitle")
+        self.scTitle.setMaximumSize(QSize(16777215, 25))
+        font = QFont()
+        font.setFamilies([u"Libra"])
+        font.setPointSize(20)
+        self.scTitle.setFont(font)
+        self.scTitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.verticalLayout.addWidget(self.scTitle)
+
         self.scDescription = QTextEdit(self.detailsGroupBox)
         self.scDescription.setObjectName(u"scDescription")
+        font1 = QFont()
+        font1.setPointSize(12)
+        self.scDescription.setFont(font1)
         self.scDescription.setReadOnly(True)
 
         self.verticalLayout.addWidget(self.scDescription)
@@ -109,93 +125,86 @@ class Ui_newGameDialog(object):
         self.detailsFrame.setFrameShadow(QFrame.Shadow.Raised)
         self.gridLayout = QGridLayout(self.detailsFrame)
         self.gridLayout.setObjectName(u"gridLayout")
-        self.notesButton = QPushButton(self.detailsFrame)
-        self.notesButton.setObjectName(u"notesButton")
+        self.startTurn = QLineEdit(self.detailsFrame)
+        self.startTurn.setObjectName(u"startTurn")
 
-        self.gridLayout.addWidget(self.notesButton, 7, 3, 1, 1)
+        self.gridLayout.addWidget(self.startTurn, 1, 1, 1, 2)
 
-        self.hlVictory = QTextEdit(self.detailsFrame)
-        self.hlVictory.setObjectName(u"hlVictory")
-        self.hlVictory.setMaximumSize(QSize(263, 50))
-        self.hlVictory.setReadOnly(True)
+        self.startButton = QPushButton(self.detailsFrame)
+        self.startButton.setObjectName(u"startButton")
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        sizePolicy3.setHorizontalStretch(0)
+        sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.startButton.sizePolicy().hasHeightForWidth())
+        self.startButton.setSizePolicy(sizePolicy3)
+        self.startButton.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.startButton.setAutoDefault(True)
 
-        self.gridLayout.addWidget(self.hlVictory, 4, 0, 1, 3)
-
-        self.wsVictory = QTextEdit(self.detailsFrame)
-        self.wsVictory.setObjectName(u"wsVictory")
-        self.wsVictory.setMaximumSize(QSize(263, 50))
-        self.wsVictory.setReadOnly(True)
-
-        self.gridLayout.addWidget(self.wsVictory, 6, 0, 1, 3)
-
-        self.endTurn = QLineEdit(self.detailsFrame)
-        self.endTurn.setObjectName(u"endTurn")
-        self.endTurn.setReadOnly(True)
-
-        self.gridLayout.addWidget(self.endTurn, 2, 1, 1, 2)
-
-        self.hlCountries = QLineEdit(self.detailsFrame)
-        self.hlCountries.setObjectName(u"hlCountries")
-        self.hlCountries.setReadOnly(True)
-
-        self.gridLayout.addWidget(self.hlCountries, 3, 1, 1, 2)
+        self.gridLayout.addWidget(self.startButton, 7, 2, 1, 1)
 
         self.labelHL = QLabel(self.detailsFrame)
         self.labelHL.setObjectName(u"labelHL")
 
         self.gridLayout.addWidget(self.labelHL, 3, 0, 1, 1)
 
-        self.labelOther = QLabel(self.detailsFrame)
-        self.labelOther.setObjectName(u"labelOther")
+        self.hlVictory = QTextEdit(self.detailsFrame)
+        self.hlVictory.setObjectName(u"hlVictory")
+        self.hlVictory.setMaximumSize(QSize(400, 50))
+        self.hlVictory.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.labelOther, 4, 3, 1, 2)
+        self.gridLayout.addWidget(self.hlVictory, 4, 0, 1, 3)
 
-        self.labelEnd = QLabel(self.detailsFrame)
-        self.labelEnd.setObjectName(u"labelEnd")
+        self.hlCountries = QLineEdit(self.detailsFrame)
+        self.hlCountries.setObjectName(u"hlCountries")
 
-        self.gridLayout.addWidget(self.labelEnd, 2, 0, 1, 1)
-
-        self.initiative = QLineEdit(self.detailsFrame)
-        self.initiative.setObjectName(u"initiative")
-        self.initiative.setReadOnly(True)
-
-        self.gridLayout.addWidget(self.initiative, 1, 4, 1, 1)
-
-        self.startButton = QPushButton(self.detailsFrame)
-        self.startButton.setObjectName(u"startButton")
-        sizePolicy2.setHeightForWidth(self.startButton.sizePolicy().hasHeightForWidth())
-        self.startButton.setSizePolicy(sizePolicy2)
-        self.startButton.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.startButton.setAutoDefault(True)
-
-        self.gridLayout.addWidget(self.startButton, 7, 2, 1, 1)
-
-        self.startTurn = QLineEdit(self.detailsFrame)
-        self.startTurn.setObjectName(u"startTurn")
-        self.startTurn.setReadOnly(True)
-
-        self.gridLayout.addWidget(self.startTurn, 1, 1, 1, 2)
-
-        self.labelWS = QLabel(self.detailsFrame)
-        self.labelWS.setObjectName(u"labelWS")
-
-        self.gridLayout.addWidget(self.labelWS, 5, 0, 1, 2)
-
-        self.labelInitiative = QLabel(self.detailsFrame)
-        self.labelInitiative.setObjectName(u"labelInitiative")
-
-        self.gridLayout.addWidget(self.labelInitiative, 1, 3, 1, 1)
+        self.gridLayout.addWidget(self.hlCountries, 3, 1, 1, 2)
 
         self.labelStart = QLabel(self.detailsFrame)
         self.labelStart.setObjectName(u"labelStart")
 
         self.gridLayout.addWidget(self.labelStart, 1, 0, 1, 1)
 
+        self.labelWS = QLabel(self.detailsFrame)
+        self.labelWS.setObjectName(u"labelWS")
+
+        self.gridLayout.addWidget(self.labelWS, 3, 3, 1, 1)
+
         self.wsCountries = QLineEdit(self.detailsFrame)
         self.wsCountries.setObjectName(u"wsCountries")
-        self.wsCountries.setReadOnly(True)
 
-        self.gridLayout.addWidget(self.wsCountries, 5, 2, 1, 1)
+        self.gridLayout.addWidget(self.wsCountries, 3, 4, 1, 1)
+
+        self.wsVictory = QTextEdit(self.detailsFrame)
+        self.wsVictory.setObjectName(u"wsVictory")
+        self.wsVictory.setMaximumSize(QSize(400, 50))
+        self.wsVictory.setReadOnly(True)
+
+        self.gridLayout.addWidget(self.wsVictory, 4, 3, 1, 2)
+
+        self.notesButton = QPushButton(self.detailsFrame)
+        self.notesButton.setObjectName(u"notesButton")
+
+        self.gridLayout.addWidget(self.notesButton, 7, 3, 1, 1)
+
+        self.labelEnd = QLabel(self.detailsFrame)
+        self.labelEnd.setObjectName(u"labelEnd")
+
+        self.gridLayout.addWidget(self.labelEnd, 1, 3, 1, 1)
+
+        self.labelInitiative = QLabel(self.detailsFrame)
+        self.labelInitiative.setObjectName(u"labelInitiative")
+
+        self.gridLayout.addWidget(self.labelInitiative, 2, 0, 1, 1)
+
+        self.endTurn = QLineEdit(self.detailsFrame)
+        self.endTurn.setObjectName(u"endTurn")
+
+        self.gridLayout.addWidget(self.endTurn, 1, 4, 1, 1)
+
+        self.initiative = QLineEdit(self.detailsFrame)
+        self.initiative.setObjectName(u"initiative")
+
+        self.gridLayout.addWidget(self.initiative, 2, 1, 1, 2)
 
 
         self.verticalLayout.addWidget(self.detailsFrame)
@@ -204,24 +213,24 @@ class Ui_newGameDialog(object):
         self.horizontalLayout.addWidget(self.detailsGroupBox)
 
 
-        self.retranslateUi(Dialog)
+        self.retranslateUi(newGameDialog)
 
-        QMetaObject.connectSlotsByName(Dialog)
+        QMetaObject.connectSlotsByName(newGameDialog)
     # setupUi
 
-    def retranslateUi(self, Dialog):
-        Dialog.setWindowTitle(QCoreApplication.translate("Dialog", u"New Game", None))
-        self.scGroupBox.setTitle(QCoreApplication.translate("Dialog", u"Scenarios", None))
-        self.detailsGroupBox.setTitle(QCoreApplication.translate("Dialog", u"Scenario Details", None))
+    def retranslateUi(self, newGameDialog):
+        newGameDialog.setWindowTitle(QCoreApplication.translate("newGameDialog", u"New Game", None))
+        self.scGroupBox.setTitle(QCoreApplication.translate("newGameDialog", u"Scenarios", None))
+        self.detailsGroupBox.setTitle(QCoreApplication.translate("newGameDialog", u"Scenario Details", None))
         self.scPicture.setText("")
-        self.notesButton.setText(QCoreApplication.translate("Dialog", u"Notes", None))
-        self.labelHL.setText(QCoreApplication.translate("Dialog", u"Highlord:", None))
-        self.labelOther.setText(QCoreApplication.translate("Dialog", u"Other Info", None))
-        self.labelEnd.setText(QCoreApplication.translate("Dialog", u"End:", None))
-        self.startButton.setText(QCoreApplication.translate("Dialog", u"Start Game", None))
-        self.labelWS.setText(QCoreApplication.translate("Dialog", u"Whitestone:", None))
-        self.labelInitiative.setText(QCoreApplication.translate("Dialog", u"Initiative:", None))
-        self.labelStart.setText(QCoreApplication.translate("Dialog", u"Start:", None))
+        self.scTitle.setText(QCoreApplication.translate("newGameDialog", u"Scenario Title", None))
+        self.startButton.setText(QCoreApplication.translate("newGameDialog", u"Start Game", None))
+        self.labelHL.setText(QCoreApplication.translate("newGameDialog", u"Highlord:", None))
+        self.labelStart.setText(QCoreApplication.translate("newGameDialog", u"Start:", None))
+        self.labelWS.setText(QCoreApplication.translate("newGameDialog", u"Whitestone:", None))
+        self.notesButton.setText(QCoreApplication.translate("newGameDialog", u"Notes", None))
+        self.labelEnd.setText(QCoreApplication.translate("newGameDialog", u"End:", None))
+        self.labelInitiative.setText(QCoreApplication.translate("newGameDialog", u"Initiative:", None))
     # retranslateUi
 
 
@@ -273,6 +282,8 @@ class NewGameDialog(QDialog):
     
     def _display_scenario_details(self, spec):
         """Display scenario details in the UI from the ScenarioSpec."""
+        # Title (id)
+        self.ui.scTitle.setText(spec.id)
         # Description
         self.ui.scDescription.setPlainText(spec.description)
 

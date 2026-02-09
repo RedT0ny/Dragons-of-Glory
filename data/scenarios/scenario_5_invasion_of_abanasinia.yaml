@@ -1,67 +1,101 @@
 # PLACEHOLDER, NOT YET IMPLEMENTED
 scenario:
-  id: "unique_scenario_id"
-  picture: "scenario.jpg"
+  id: "scenario_5_invasion_of_abanasinia"
+  picture: "scenario_5.jpg"
   description: >
-    Folded block scalar for historical flavor.
+    Abanasinia once was a center of trade and commerce. Great caravans would come south from the rich
+    lands of Solamnia, on their way to the dwarven kingdom of Thorbardin. One of the finest religious
+    libraries of the Age of Might, second only to that of Palanthus itself, was located at Xak Tsaroth in
+    the heart of the Abanasinic region. Though once torn by war and strife as the dwarves, Qualinesti
+    elves and Solamnic humans struggled to establish the boundaries of their land in the latter days of
+    the Age of Might, Abanasinia was a region of peace and enlightenment.
+    
+    All of that changed with the Cataclysm. Much of Abanasinia fell beneath the waves of the New Sea.
+    Xak Tsaroth was swallowed into the earth itself and all the land was plunged into fear and anarchy.
+    After an initial period of chaos, culminating with the Dwarfgate War in 121 AC, peace was again
+    restored to the land. The Thorbardin dwarves had disappeared from the face of the world, and the
+    Qualinesti elves again fell back into their enchanted lands. Mankind created new homes, some in
+    the trees of Solace and others in the plains beyond. Humans slumbered in their domestic
+    tranquility, unaware of the storms of war gathering about them in the world.
+    
+    Then in the summer of 351 AC, war came to Abanasinia. The Red Wing of the Dragon Highlords,
+    under the command of Dragon Highlord Verminaard, landed on the northern shores of Abanasinia
+    and also at the small fishing harbor of Newports. The dragons' might swept across the land and
+    moved quickly to subjugate all of the land and the population in it.
+    
+    The humans were totally disorganized and could offer only a token resistance. Only the elves and
+    the dwarves had the might and will to resist the onslaught, yet the elves wanted nothing over their
+    own survival. The dwarves were buried under the mountain and did not seem willing to appear. Not
+    until the thunder struck did either nation wake up to the conflict.
+    
+    Though not fully mobilized until the armies of the Dragon Highlords were crossing their own
+    borders, the Qualinesti elves were not unprepared. Their spirited resistance was insufficient,
+    however, to stop the juggernaut. Only by the distraction of the dwarves on the south, caused by the
+    actions of heroes, were the Qualinesti elves relieved of the constant fight and the Dwarves brought
+    into the war.
 
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
-  map_subset:
-    x_range: [35, 52]
-    y_range: [32, 47]
 
   # Timeline and Turn Logic
-  start_turn: 1
+  start_turn: 20
   end_turn: 30
   initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  possible_events: ["E1", "E10", "E20"]
+  active_events:
+    blue_crystal_staff: all
+    golden_general: all
 
   # Allegiance-based Setup
   initial_setup:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: ["abanasinia", "khur", "solanthus"]
+      countries:
+        thorbardin: all
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
-      deployment_area: null
+      deployment_area:
+        - "schallsea"
 
       countries:
-        taman:
-          # "all" is a keyword to pull every unit matching this country in units.csv
-          units: all
-        red:
-          # Explicit partial setup
+        dtemple:
           units_by_type:
-            dragon: 1
+            inf: 6
+          ready: 6
+        red:
+          units_by_type:
+            dragon: all
+        saifhum:
+          units_by_type:
+            fleet: all
+        sanction: all
+        schallsea: all
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
-      explicit_units: ["verminaard", "kitiara", "ladonna"]
-      artifacts: ["staff_of_magius"]
+      explicit_units: ["verminaard"]
+      #artifacts: ["midnight"]
 
       victory_conditions:
-        major: "Description of victory"
-        marginal: "Description of victory"
+        major: "Qualinesti conquered and Thorbardin is allied or conquered"
+        minor: "Qualinesti conquered"
 
     whitestone:
       # Example of specific deployment region (subset of countries)
       deployment_area:
-        countries: ["qualinesti", "abanasinia"]
+        - "qualinesti"
 
       countries:
-        qualinesti:
-          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
-        abanasinia:
-          units: all
+        abanasinia: null
+        qualinesti: all
 
-      explicit_units: ["fizban", "laurana"]
+      explicit_units: ["laurana"]
       artifacts: ["blue_crystal_staff"]
 
       victory_conditions:
-        major: "Protect the capital"
+        major: "No highlord units further than 2 hexes from the sea"
+        minor: "Qualinesti unconquered"
 
   notes: >
     Any additional special rules or setup instructions.

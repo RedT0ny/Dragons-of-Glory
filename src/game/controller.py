@@ -35,26 +35,8 @@ class GameController(QObject):
 
     def check_active_player(self):
         """Checks if the loop should continue running automatically."""
-        current_phase = self.game_state.phase
-
-        # Use Player object to check AI status
-        is_ai = False
-        if self.game_state.current_player:
-            is_ai = self.game_state.current_player.is_ai
-
-
-        # Fix 2: Identify "System" phases that run automatically regardless of Human/AI
-        # REPLACEMENTS, MOVEMENT, and COMBAT are 'Interactive', others are 'Automatic'
-        system_phases = [
-            GamePhase.STRATEGIC_EVENTS,
-            GamePhase.ACTIVATION,
-            GamePhase.INITIATIVE
-        ]
-
-        is_auto_phase = current_phase in system_phases
-
-        # Start timer if it's an AI turn OR if the game needs to auto-resolve a phase
-        if is_ai or is_auto_phase:
+        # Start timer if it's an AI turn OR if the phase is automatic
+        if self.game_state.phase_manager.should_auto_advance():
             if not self.ai_timer.isActive():
                 self.ai_timer.start()
         else:
@@ -299,9 +281,8 @@ class GameController(QObject):
         # Use QTimer.singleShot to avoid potential recursion issues
         QTimer.singleShot(0, self.process_game_turn)
 
-
     def execute_simple_ai_logic(self, side):
-        # ... logic to call self.game_state relevant methods (move, attack...)
+        # TODO: logic to call self.game_state relevant methods (move, attack...)
         return False # Return True if more moves are possible
 
     def on_unit_selection_changed(self, selected_units):
@@ -353,6 +334,11 @@ class GameController(QObject):
     def handle_combat_click(self, target_hex):
         if self.combat_click_handler:
             self.combat_click_handler.handle_click(target_hex)
+
+    def reset_combat_selection(self):
+        """Clear any combat selection and target highlights."""
+        if self.combat_click_handler:
+            self.combat_click_handler.reset_selection()
 
     def calculate_reachable_hexes(self, units):
         """

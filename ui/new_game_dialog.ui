@@ -72,9 +72,12 @@
           <property name="orientation">
            <enum>Qt::Orientation::Horizontal</enum>
           </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Policy::Fixed</enum>
+          </property>
           <property name="sizeHint" stdset="0">
            <size>
-            <width>178</width>
+            <width>75</width>
             <height>20</height>
            </size>
           </property>
@@ -94,6 +97,9 @@
             <height>333</height>
            </size>
           </property>
+          <property name="styleSheet">
+           <string notr="true">background: black</string>
+          </property>
           <property name="text">
            <string/>
           </property>
@@ -110,9 +116,12 @@
           <property name="orientation">
            <enum>Qt::Orientation::Horizontal</enum>
           </property>
+          <property name="sizeType">
+           <enum>QSizePolicy::Policy::Fixed</enum>
+          </property>
           <property name="sizeHint" stdset="0">
            <size>
-            <width>178</width>
+            <width>75</width>
             <height>20</height>
            </size>
           </property>
@@ -121,7 +130,38 @@
        </layout>
       </item>
       <item>
-       <widget class="QTextEdit" name="scDescription"/>
+       <widget class="QLabel" name="scTitle">
+        <property name="maximumSize">
+         <size>
+          <width>16777215</width>
+          <height>25</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <family>Libra</family>
+          <pointsize>20</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>Scenario Title</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignmentFlag::AlignCenter</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QTextEdit" name="scDescription">
+        <property name="font">
+         <font>
+          <pointsize>12</pointsize>
+         </font>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QFrame" name="detailsFrame">
@@ -132,62 +172,8 @@
          <enum>QFrame::Shadow::Raised</enum>
         </property>
         <layout class="QGridLayout" name="gridLayout">
-         <item row="7" column="3">
-          <widget class="QPushButton" name="notesButton">
-           <property name="text">
-            <string>Notes</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0" colspan="3">
-          <widget class="QTextEdit" name="hlVictory">
-           <property name="maximumSize">
-            <size>
-             <width>263</width>
-             <height>50</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item row="6" column="0" colspan="3">
-          <widget class="QTextEdit" name="wsVictory">
-           <property name="maximumSize">
-            <size>
-             <width>263</width>
-             <height>50</height>
-            </size>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="1" colspan="2">
-          <widget class="QLineEdit" name="endTurn"/>
-         </item>
-         <item row="3" column="1" colspan="2">
-          <widget class="QLineEdit" name="hlCountries"/>
-         </item>
-         <item row="3" column="0">
-          <widget class="QLabel" name="labelHL">
-           <property name="text">
-            <string>Highlord:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="3" colspan="2">
-          <widget class="QLabel" name="labelOther">
-           <property name="text">
-            <string>Other Info</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QLabel" name="labelEnd">
-           <property name="text">
-            <string>End:</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="4">
-          <widget class="QLineEdit" name="initiative"/>
+         <item row="1" column="1" colspan="2">
+          <widget class="QLineEdit" name="startTurn"/>
          </item>
          <item row="7" column="2">
           <widget class="QPushButton" name="startButton">
@@ -208,22 +194,28 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="1" colspan="2">
-          <widget class="QLineEdit" name="startTurn"/>
-         </item>
-         <item row="5" column="0" colspan="2">
-          <widget class="QLabel" name="labelWS">
+         <item row="3" column="0">
+          <widget class="QLabel" name="labelHL">
            <property name="text">
-            <string>Whitestone:</string>
+            <string>Highlord:</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="3">
-          <widget class="QLabel" name="labelInitiative">
-           <property name="text">
-            <string>Initiative:</string>
+         <item row="4" column="0" colspan="3">
+          <widget class="QTextEdit" name="hlVictory">
+           <property name="maximumSize">
+            <size>
+             <width>400</width>
+             <height>50</height>
+            </size>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
            </property>
           </widget>
+         </item>
+         <item row="3" column="1" colspan="2">
+          <widget class="QLineEdit" name="hlCountries"/>
          </item>
          <item row="1" column="0">
           <widget class="QLabel" name="labelStart">
@@ -232,8 +224,55 @@
            </property>
           </widget>
          </item>
-         <item row="5" column="2">
+         <item row="3" column="3">
+          <widget class="QLabel" name="labelWS">
+           <property name="text">
+            <string>Whitestone:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="3" column="4">
           <widget class="QLineEdit" name="wsCountries"/>
+         </item>
+         <item row="4" column="3" colspan="2">
+          <widget class="QTextEdit" name="wsVictory">
+           <property name="maximumSize">
+            <size>
+             <width>400</width>
+             <height>50</height>
+            </size>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item row="7" column="3">
+          <widget class="QPushButton" name="notesButton">
+           <property name="text">
+            <string>Notes</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="3">
+          <widget class="QLabel" name="labelEnd">
+           <property name="text">
+            <string>End:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QLabel" name="labelInitiative">
+           <property name="text">
+            <string>Initiative:</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="4">
+          <widget class="QLineEdit" name="endTurn"/>
+         </item>
+         <item row="2" column="1" colspan="2">
+          <widget class="QLineEdit" name="initiative"/>
          </item>
         </layout>
        </widget>

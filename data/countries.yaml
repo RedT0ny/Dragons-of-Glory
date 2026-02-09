@@ -1101,6 +1101,18 @@ sanction:
   territories:
     - [36, 26]
 
+schallsea:
+  territories:
+    - [26, 30]
+    - [26, 31]
+    - [27, 31]
+    - [26, 32]
+    - [27, 32]
+    - [25, 33]
+    - [26, 33]
+    - [27, 33]
+    - [26, 34]
+
 sikket:
   capital_id: manic
   color: "#DEB887"

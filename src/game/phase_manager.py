@@ -6,6 +6,26 @@ class PhaseManager:
     def __init__(self, game_state):
         self.game_state = game_state
 
+    def is_automatic_phase(self, phase=None):
+        """
+        Returns True for phases that always auto-resolve without player input.
+        """
+        if phase is None:
+            phase = self.game_state.phase
+        return phase in {
+            GamePhase.STRATEGIC_EVENTS,
+            GamePhase.ACTIVATION,
+            GamePhase.INITIATIVE,
+        }
+
+    def should_auto_advance(self):
+        """
+        Returns True if the current phase should auto-advance based on AI or phase type.
+        """
+        current_player = self.game_state.current_player
+        is_ai = bool(current_player and current_player.is_ai)
+        return is_ai or self.is_automatic_phase()
+
     def advance_phase(self):
         """
         The State Machine: Determines the next phase based on current state.
