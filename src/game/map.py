@@ -2,7 +2,7 @@ import heapq
 from collections import defaultdict
 
 from src.content.loader import load_countries_yaml
-from src.content.specs import HexDirection, UnitType, UnitRace, GamePhase, LocType, TerrainType
+from src.content.specs import HexDirection, UnitType, UnitRace, LocType, TerrainType
 
 
 class Hex:
@@ -539,36 +539,6 @@ class Board:
     def are_enemies(self, unit_a, unit_b):
         """Simple allegiance check."""
         return unit_a.allegiance != unit_b.allegiance
-
-    def is_valid_fleet_deployment(self, hex_obj: Hex, country, phase):
-        """
-        Deployment: Any coastal hex.
-        Replacements: Only ports.
-        """
-        hex_coords = hex_obj.axial_to_offset()
-
-        # 1. Must be in country
-        if not country.is_hex_in_country(*hex_coords):
-            return False
-
-        # 2. Check Phase logic
-        if phase == GamePhase.REPLACEMENTS:
-            # Check if hex has a port
-            # We iterate country locations to find if one is at this hex and is a PORT
-            for loc in country.locations.values():
-                if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
-                    return True
-            return False
-        else:
-            # Ports are also valid deployment hexes
-            if self.is_coastal(hex_obj):
-                return True
-            for loc in country.locations.values():
-                if loc.coords == hex_coords and loc.loc_type == LocType.PORT.value:
-                    return True
-            return False
-
-        return False
 
     def is_maelstrom(self, hex_obj):
         """Checks if the hex is part of the Maelstrom region."""

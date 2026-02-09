@@ -48,6 +48,7 @@ class PlayerSpec:
     allegiance: str  # "whitestone" or "highlord"
     # Scenario Setup data
     deployment_area: Optional[Union[List[Any], Dict[str, Any]]] = None
+    country_deployment: bool = False
     setup_countries: Dict[str, Any] = field(default_factory=dict)
     explicit_units: List[str] = field(default_factory=list)
     victory_conditions: Dict[str, Any] = field(default_factory=dict)

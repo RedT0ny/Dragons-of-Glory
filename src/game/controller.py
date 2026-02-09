@@ -73,6 +73,7 @@ class GameController(QObject):
                 if not self.replacements_dialog or not self.replacements_dialog.isVisible():
                     from src.gui.replacements_dialog import ReplacementsDialog
                     self.replacements_dialog = ReplacementsDialog(self.game_state, self.view, self.view)
+                    self._connect_replacements_dialog_signals()
                     self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
                     self.replacements_dialog.show()
             print(f"Step 0: Deployment Phase - {active_player}")
@@ -89,6 +90,7 @@ class GameController(QObject):
                     from src.gui.replacements_dialog import ReplacementsDialog
                     self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
                                                                   self.view)  # Parent to view
+                    self._connect_replacements_dialog_signals()
                     self.replacements_dialog.show()
                 # We do NOT advance phase automatically.
                 # User must click "End Phase" in main window (which calls on_end_phase_clicked)
@@ -553,6 +555,7 @@ class GameController(QObject):
                                                       parent=self.view,
                                                       filter_country_id=country_filter,
                                                       allow_territory_deploy=True)
+        self._connect_replacements_dialog_signals()
         self.replacements_dialog.show()
 
         # Instruction Popup
@@ -563,4 +566,22 @@ class GameController(QObject):
         QMessageBox.information(self.replacements_dialog, "Deployment",
                                 msg_text + "\nClick 'Minimize' to interact with map.\n"
                                            "Click 'End Turn' (End Phase) when finished.")
+
+    def _connect_replacements_dialog_signals(self):
+        if not self.replacements_dialog:
+            return
+        self.replacements_dialog.conscription_requested.connect(self.on_conscription_requested)
+        self.replacements_dialog.ready_unit_clicked.connect(self.on_ready_unit_clicked)
+
+    def on_conscription_requested(self, kept_unit, discarded_unit):
+        self.game_state.apply_conscription(kept_unit, discarded_unit)
+        if self.replacements_dialog:
+            self.replacements_dialog.refresh()
+
+    def on_ready_unit_clicked(self, unit, allow_territory_deploy):
+        valid_hexes = self.game_state.get_valid_deployment_hexes(
+            unit,
+            allow_territory_wide=allow_territory_deploy
+        )
+        self.view.highlight_deployment_targets(valid_hexes, unit)
 

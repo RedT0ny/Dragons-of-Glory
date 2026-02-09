@@ -100,7 +100,8 @@ scenario:
         major: "Control Caergoth, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
 
     whitestone:
-      deployment_area: null
+      deployment_area: country_based
+      #country_deployment: true
 
       countries:
         southlund:

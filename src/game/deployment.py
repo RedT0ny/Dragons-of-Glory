@@ -1,12 +1,39 @@
 from typing import List, Set, Tuple
 
-from src.content.specs import GamePhase, UnitType
+from src.content.specs import GamePhase, UnitType, LocType
 from src.game.map import Hex
 
 
 class DeploymentService:
     def __init__(self, game_state):
         self.game_state = game_state
+
+    def is_valid_fleet_deployment(self, hex_obj: Hex, country) -> bool:
+        """
+        Deployment: Any coastal hex or port.
+        Replacements: Only ports.
+        """
+        hex_coords = hex_obj.axial_to_offset()
+
+        # 1. Must be in country
+        if not country.is_hex_in_country(*hex_coords):
+            return False
+
+        # 2. Check Phase logic
+        if self.game_state.phase == GamePhase.REPLACEMENTS:
+            # Check if hex has a port
+            for loc in country.locations.values():
+                if loc.coords == hex_coords and loc.loc_type == "port":
+                    return True
+            return False
+
+        # Deployment: ports and coastal hexes
+        if self.game_state.map.is_coastal(hex_obj):
+            return True
+        for loc in country.locations.values():
+            if loc.coords == hex_coords and loc.loc_type == "port":
+                return True
+        return False
 
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
         """
@@ -27,11 +54,20 @@ class DeploymentService:
         applying Phase rules, Unit Type restrictions (Fleets), and Terrain checks.
         """
         candidates = []
+        player = self.game_state.get_player(unit.allegiance)
+        country_deployment = bool(player and player.spec.country_deployment)
 
         # 1. Gather Candidates based on Phase
         if self.game_state.phase == GamePhase.DEPLOYMENT:
-            # Scenario specific areas
-            candidates = list(self.get_deployment_hexes(unit.allegiance))
+            if country_deployment:
+                country = self.game_state.countries.get(unit.land)
+                if country:
+                    candidates = list(country.territories)
+                else:
+                    candidates = list(self.get_deployment_hexes(unit.allegiance))
+            else:
+                # Scenario specific areas
+                candidates = list(self.get_deployment_hexes(unit.allegiance))
         else:
             # Replacements / Activation
             country = self.game_state.countries.get(unit.land)
@@ -64,8 +100,11 @@ class DeploymentService:
 
             if unit.unit_type == UnitType.FLEET:
                 # Rule: Coastal and Port (Deployment) or Port (Replacements)
-                # Note: We pass self.game_state.phase to map validation logic
-                if country and self.game_state.map.is_valid_fleet_deployment(hex_obj, country, self.game_state.phase):
+                if self.game_state.phase == GamePhase.DEPLOYMENT and not country_deployment:
+                    if self._is_deployment_fleet_hex(hex_obj):
+                        if self.game_state.map.can_stack_move_to([unit], hex_obj):
+                            valid_hexes.append((col, row))
+                elif country and self.is_valid_fleet_deployment(hex_obj, country):
                     if self.game_state.map.can_stack_move_to([unit], hex_obj):
                         valid_hexes.append((col, row))
             else:
@@ -76,3 +115,10 @@ class DeploymentService:
                         valid_hexes.append((col, row))
 
         return valid_hexes
+
+    def _is_deployment_fleet_hex(self, hex_obj: Hex) -> bool:
+        """Deployment: coastal hexes or ports without country restrictions."""
+        if self.game_state.map.is_coastal(hex_obj):
+            return True
+        loc = self.game_state.map.get_location(hex_obj)
+        return bool(loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value)

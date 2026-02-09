@@ -120,10 +120,13 @@ class ReplacementsDialog(QDialog):
     Allows users to choose between two units for replacement.
     The chosen unit will be ready to deploy. The other one will be destroyed.
     """
+    conscription_requested = Signal(object, object)
+    ready_unit_clicked = Signal(object, bool)
+
     def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False):
         super().__init__(parent)
         self.game_state = game_state
-        self.view = view # We need access to map view for "Ready" unit clicks
+        self.view = view
         self.filter_country_id = filter_country_id
         self.allow_territory_deploy = allow_territory_deploy
 
@@ -351,10 +354,7 @@ class ReplacementsDialog(QDialog):
     def show_conscription_choice(self, unit1, unit2):
         dlg = UnitSelectionDialog(unit1, unit2, self)
         if dlg.exec() == QDialog.Accepted:
-            # Apply Logic
-            dlg.selected_unit.status = UnitState.READY
-            dlg.discarded_unit.status = UnitState.DESTROYED
-            self.refresh()
+            self.conscription_requested.emit(dlg.selected_unit, dlg.discarded_unit)
 
     def on_ready_unit_clicked(self, unit):
         """Minimize and show map targets."""
@@ -366,13 +366,7 @@ class ReplacementsDialog(QDialog):
             
         try:
             self._processing_deployment = True
-            
-            valid_hexes = self.game_state.get_valid_deployment_hexes(
-                unit,
-                allow_territory_wide=self.allow_territory_deploy
-            )
-
-            self.view.highlight_deployment_targets(valid_hexes, unit)
+            self.ready_unit_clicked.emit(unit, self.allow_territory_deploy)
         finally:
             self._processing_deployment = False
     def refresh(self):

@@ -124,11 +124,18 @@ class GameState:
         self.players = {}
         for allegiance in [HL, WS]:
             setup_data = self.scenario_spec.setup.get(allegiance, {})
+            deployment_area = setup_data.get("deployment_area")
+            country_deployment = bool(setup_data.get("country_deployment", False))
+
+            if isinstance(deployment_area, str) and deployment_area.lower() == "country_based":
+                deployment_area = None
+                country_deployment = True
 
             # Create spec from dictionary (handling potential missing keys)
             spec = PlayerSpec(
                 allegiance=allegiance,
-                deployment_area=setup_data.get("deployment_area"),
+                deployment_area=deployment_area,
+                country_deployment=country_deployment,
                 setup_countries=setup_data.get("countries", {}),
                 explicit_units=setup_data.get("explicit_units", []),
                 victory_conditions=setup_data.get("victory_conditions", {}) or self.scenario_spec.victory_conditions.get(allegiance, {}),
@@ -152,6 +159,11 @@ class GameState:
 
     def get_valid_deployment_hexes(self, unit, allow_territory_wide=False) -> List[Tuple[int, int]]:
         return self.deployment_service.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide)
+
+    def apply_conscription(self, kept_unit, discarded_unit):
+        """Apply conscription result: keep one unit, destroy the other."""
+        kept_unit.status = UnitState.READY
+        discarded_unit.status = UnitState.DESTROYED
 
     def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
         """Normalize scenario and country coordinates to local (subset) space."""
