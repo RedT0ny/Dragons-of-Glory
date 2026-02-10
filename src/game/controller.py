@@ -26,6 +26,9 @@ class GameController(QObject):
 
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self._invasion_deployment_active = False
+        self._invasion_deployment_country_id = None
+        self._invasion_deployment_allegiance = None
         from src.game.combat import CombatClickHandler
         self.combat_click_handler = CombatClickHandler(self.game_state, self.view)
         self.movement_service = MovementService(self.game_state)
@@ -265,6 +268,20 @@ class GameController(QObject):
 
     def on_end_phase_clicked(self):
         """Call this when Human clicks 'End Phase' button."""
+        if self._invasion_deployment_active:
+            if self.replacements_dialog:
+                self.replacements_dialog.close()
+                self.replacements_dialog = None
+            self._invasion_deployment_active = False
+            self._invasion_deployment_country_id = None
+            self._invasion_deployment_allegiance = None
+            self.selected_units_for_movement = []
+            self.neutral_warning_hexes = set()
+            self.view.highlight_movement_range([])
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+            return
+
         # Close replacement dialog if open
         if self.replacements_dialog:
             self.replacements_dialog.close()
@@ -348,7 +365,7 @@ class GameController(QObject):
                         QMessageBox.Ok | QMessageBox.Cancel
                     )
                     if reply == QMessageBox.Ok:
-                        print(f"Placeholder: invasion flow for {country_id}")
+                        self._attempt_invasion(country_id)
                 return
 
             # Move all selected units
@@ -416,6 +433,10 @@ class GameController(QObject):
         
         # Update unit state
         unit.status = UnitState.ACTIVE
+        if (self._invasion_deployment_active
+                and self._invasion_deployment_allegiance == HL
+                and unit.land == self._invasion_deployment_country_id):
+            unit.movement_points = 0
         
         # Sync the view on the next event loop tick to avoid scene re-entrancy
         def _deferred_sync():
@@ -493,6 +514,7 @@ class GameController(QObject):
             return
         self.replacements_dialog.conscription_requested.connect(self.on_conscription_requested)
         self.replacements_dialog.ready_unit_clicked.connect(self.on_ready_unit_clicked)
+        self.replacements_dialog.finish_deployment_clicked.connect(self.on_finish_deployment_clicked)
 
     def on_conscription_requested(self, kept_unit, discarded_unit):
         self.game_state.apply_conscription(kept_unit, discarded_unit)
@@ -505,4 +527,150 @@ class GameController(QObject):
             allow_territory_wide=allow_territory_deploy
         )
         self.view.highlight_deployment_targets(valid_hexes, unit)
+
+    def on_finish_deployment_clicked(self):
+        if not self._invasion_deployment_active:
+            if self.replacements_dialog:
+                self.replacements_dialog.close()
+                self.replacements_dialog = None
+            return
+
+        if self.replacements_dialog:
+            self.replacements_dialog.close()
+            self.replacements_dialog = None
+        self._invasion_deployment_active = False
+        self._invasion_deployment_country_id = None
+        self._invasion_deployment_allegiance = None
+        self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
+        self._refresh_info_panel()
+
+    def _attempt_invasion(self, country_id):
+        from PySide6.QtWidgets import QMessageBox
+        import random
+
+        country = self.game_state.countries.get(country_id)
+        if not country:
+            QMessageBox.information(self.view.window(), "Invasion", "Country not found.")
+            return
+
+        invasion_data = self.movement_service.get_invasion_force(country_id)
+        if invasion_data["strength"] <= 0:
+            reason = invasion_data.get("reason") or "No eligible invasion force."
+            QMessageBox.information(self.view.window(), "Invasion", reason)
+            return
+
+        invader_sp = invasion_data["strength"]
+        defender_sp = country.strength
+        modifier = self._invasion_modifier(invader_sp, defender_sp)
+
+        base_ws = country.alignment[0] + 2
+        base_hl = country.alignment[1] + modifier
+
+        rounds = []
+        round_bonus = 0
+        winner = None
+
+        for _ in range(20):
+            ws_target = base_ws + round_bonus
+            ws_roll = random.randint(1, 10)
+            rounds.append(f"WS roll {ws_roll} vs {ws_target}")
+            if ws_roll <= ws_target:
+                winner = WS
+                break
+
+            hl_target = base_hl + round_bonus
+            hl_roll = random.randint(1, 10)
+            rounds.append(f"HL roll {hl_roll} vs {hl_target}")
+            if hl_roll <= hl_target:
+                winner = HL
+                break
+
+            round_bonus += 1
+
+        if not winner:
+            QMessageBox.information(self.view.window(), "Invasion", "Invasion could not be resolved.")
+            return
+
+        self.game_state.activate_country(country_id, winner)
+
+        summary_lines = [
+            f"Invader SP: {invader_sp} | Defender SP: {defender_sp}",
+            f"Modifier: {modifier}",
+            "Rolls:",
+            *rounds
+        ]
+        message = "\n".join(summary_lines)
+        title = "Invasion Result"
+        if winner == HL:
+            title = f"Invasion Result - {country_id} joins Highlord"
+        else:
+            title = f"Invasion Result - {country_id} joins Whitestone"
+
+        QMessageBox.information(self.view.window(), title, message)
+        self._start_invasion_deployment(country_id, winner)
+
+    def _invasion_modifier(self, invader_sp, defender_sp):
+        if defender_sp <= 0:
+            return 6
+        ratio = invader_sp / defender_sp
+        if ratio < 0.18:
+            return -6
+        if ratio < 0.22:
+            return -5
+        if ratio < 0.29:
+            return -4
+        if ratio < 0.40:
+            return -3
+        if ratio < 0.83:
+            return -2
+        if ratio < 1.0:
+            return -1
+        if ratio == 1.0:
+            return 0
+        if ratio <= 1.5:
+            return 1
+        if ratio <= 2.0:
+            return 2
+        if ratio <= 3.0:
+            return 3
+        if ratio <= 4.0:
+            return 4
+        if ratio <= 5.0:
+            return 5
+        return 6
+
+    def _start_invasion_deployment(self, country_id, allegiance):
+        from PySide6.QtWidgets import QMessageBox
+        from src.gui.replacements_dialog import ReplacementsDialog
+
+        self._invasion_deployment_active = True
+        self._invasion_deployment_country_id = country_id
+        self._invasion_deployment_allegiance = allegiance
+
+        if self.replacements_dialog:
+            self.replacements_dialog.close()
+            self.replacements_dialog = None
+
+        self.replacements_dialog = ReplacementsDialog(
+            self.game_state,
+            self.view,
+            parent=self.view,
+            filter_country_id=country_id,
+            allow_territory_deploy=True,
+            invasion_mode=True
+        )
+        self._connect_replacements_dialog_signals()
+        self.replacements_dialog.show()
+
+        message = (
+            f"Deploy units for {country_id.title()}.\n"
+            "Click 'End Phase' when finished to return to the current turn."
+        )
+        if allegiance == HL:
+            message += "\nNewly deployed units cannot move this turn."
+
+        QMessageBox.information(self.replacements_dialog, "Invasion Deployment", message)
 

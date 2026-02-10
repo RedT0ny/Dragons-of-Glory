@@ -400,23 +400,27 @@ class GameState:
         # 1. Deduct Movement Points (Only in Movement Phase)
         # We check if unit is already on map to avoid cost calculation for deployment/teleport
         if self.phase == GamePhase.MOVEMENT and unit.position:
-            start_hex = Hex.offset_to_axial(*unit.position)
+            if unit.position[0] is None or unit.position[1] is None:
+                start_hex = None
+            else:
+                start_hex = Hex.offset_to_axial(*unit.position)
 
-            # Ensure attribute exists (defensive coding)
-            if not hasattr(unit, 'movement_points'):
-                unit.movement_points = unit.movement
+            if start_hex is not None:
+                # Ensure attribute exists (defensive coding)
+                if not hasattr(unit, 'movement_points'):
+                    unit.movement_points = unit.movement
 
-            # Calculate path cost using A* to ensure we deduct the optimal cost
-            path = self.map.find_shortest_path(unit, start_hex, target_hex)
+                # Calculate path cost using A* to ensure we deduct the optimal cost
+                path = self.map.find_shortest_path(unit, start_hex, target_hex)
 
-            cost = 0
-            current = start_hex
-            for next_step in path:
-                step_cost = self.map.get_movement_cost(unit, current, next_step)
-                cost += step_cost
-                current = next_step
+                cost = 0
+                current = start_hex
+                for next_step in path:
+                    step_cost = self.map.get_movement_cost(unit, current, next_step)
+                    cost += step_cost
+                    current = next_step
 
-            unit.movement_points = max(0, unit.movement_points - cost)
+                unit.movement_points = max(0, unit.movement_points - cost)
 
         # 2. Update Position
         # Remove from old position in spatial map
@@ -487,9 +491,15 @@ class GameState:
 
         resolver = CombatResolver(attackers, defenders, terrain)
         result = resolver.resolve()
+        self._cleanup_destroyed_units(attackers + defenders)
 
     def get_map(self):
         return self.map
+
+    def _cleanup_destroyed_units(self, units):
+        for unit in units:
+            if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
+                self.map.remove_unit_from_spatial_map(unit)
 
     def board_unit(self, carrier, unit):
         """Boards `unit` onto `carrier` if allowed.

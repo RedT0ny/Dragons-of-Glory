@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import heapq
 from typing import List, Tuple
 
-from src.content.constants import NEUTRAL
+from src.content.constants import HL, NEUTRAL
 from src.content.specs import LocType, UnitType
 from src.game.map import Hex
 
@@ -160,6 +160,167 @@ class MovementService:
             reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
             neutral_warning_coords=[h.axial_to_offset() for h in warning_hexes]
         )
+
+    def get_invasion_force(self, country_id):
+        country = self.game_state.countries.get(country_id)
+        if not country or country.allegiance != NEUTRAL:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "Country is not neutral."
+            }
+
+        target_hexes = set(country.territories)
+        if not target_hexes:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "Country has no territory."
+            }
+
+        stacks_by_hex = self._get_hl_stacks_with_passengers()
+        if not stacks_by_hex:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "No Highlord stacks available."
+            }
+
+        border_hexes = set()
+        for hex_obj, stack_units in stacks_by_hex.items():
+            if self._hex_adjacent_to_country(hex_obj, target_hexes):
+                if self._stack_can_enter_country(hex_obj, stack_units, target_hexes):
+                    border_hexes.add(hex_obj)
+
+        if not border_hexes:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "No eligible Highlord stacks adjacent to the border."
+            }
+
+        connected_hexes = self._collect_connected_stack_hexes(border_hexes, stacks_by_hex.keys())
+        eligible_units = self._collect_invasion_units(connected_hexes, stacks_by_hex, target_hexes)
+        strength = sum(u.combat_rating for u in eligible_units)
+
+        return {
+            "strength": strength,
+            "units": eligible_units,
+            "border_hexes": border_hexes,
+            "connected_hexes": connected_hexes,
+            "reason": None
+        }
+
+    def _get_hl_stacks_with_passengers(self):
+        stacks = {}
+        for hex_coords, units in self.game_state.map.unit_map.items():
+            stack_units = [u for u in units if u.allegiance == HL and u.is_on_map]
+            if not stack_units:
+                continue
+            hex_obj = Hex(*hex_coords)
+            stack_with_passengers = list(stack_units)
+            for unit in stack_units:
+                passengers = getattr(unit, "passengers", None)
+                if passengers:
+                    for passenger in passengers:
+                        if passenger.allegiance == HL:
+                            stack_with_passengers.append(passenger)
+            stacks[hex_obj] = stack_with_passengers
+        return stacks
+
+    def _hex_adjacent_to_country(self, hex_obj, target_hexes):
+        for neighbor in hex_obj.neighbors():
+            if neighbor.axial_to_offset() in target_hexes:
+                return True
+        return False
+
+    def _stack_can_enter_country(self, hex_obj, stack_units, target_hexes):
+        combat_units = [u for u in stack_units if u.unit_type != UnitType.FLEET]
+        if not combat_units:
+            return False
+
+        for neighbor in hex_obj.neighbors():
+            if neighbor.axial_to_offset() not in target_hexes:
+                continue
+            if not self.game_state.map.can_stack_move_to(combat_units, neighbor):
+                continue
+            for unit in combat_units:
+                if self._unit_can_enter_hex(unit, hex_obj, neighbor):
+                    return True
+
+        return False
+
+    def _collect_connected_stack_hexes(self, border_hexes, all_stack_hexes):
+        remaining = set(all_stack_hexes)
+        connected = set()
+        frontier = list(border_hexes)
+
+        for hex_obj in border_hexes:
+            if hex_obj in remaining:
+                remaining.remove(hex_obj)
+            connected.add(hex_obj)
+
+        while frontier:
+            current = frontier.pop()
+            for neighbor in current.neighbors():
+                if neighbor in remaining:
+                    remaining.remove(neighbor)
+                    connected.add(neighbor)
+                    frontier.append(neighbor)
+
+        return connected
+
+    def _collect_invasion_units(self, connected_hexes, stacks_by_hex, target_hexes):
+        eligible = []
+        for hex_obj in connected_hexes:
+            stack_units = stacks_by_hex.get(hex_obj, [])
+            for unit in stack_units:
+                if unit.unit_type == UnitType.FLEET:
+                    continue
+                if not self._unit_has_movement(unit):
+                    continue
+                if self._unit_can_reach_country(unit, hex_obj, target_hexes):
+                    eligible.append(unit)
+        return eligible
+
+    def _unit_can_reach_country(self, unit, from_hex, target_hexes):
+        for neighbor in from_hex.neighbors():
+            if neighbor.axial_to_offset() not in target_hexes:
+                continue
+            if self._unit_can_enter_hex(unit, from_hex, neighbor):
+                return True
+        return False
+
+    def _unit_can_enter_hex(self, unit, from_hex, target_hex):
+        carrier = getattr(unit, "transport_host", None)
+        if carrier is not None:
+            if not carrier.position:
+                return False
+            carrier_hex = Hex.offset_to_axial(*carrier.position)
+            if carrier_hex != from_hex:
+                return False
+            if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+                return False
+            return self.game_state.map.can_stack_move_to([unit], target_hex)
+
+        cost = self.game_state.map.get_movement_cost(unit, from_hex, target_hex)
+        if cost == float('inf') or cost is None:
+            return False
+        return self._unit_movement_points(unit) >= cost
+
+    def _unit_has_movement(self, unit):
+        return self._unit_movement_points(unit) > 0
+
+    def _unit_movement_points(self, unit):
+        return getattr(unit, "movement_points", unit.movement)
 
     def handle_board_action(self, selected_units):
         if not selected_units:

@@ -119,8 +119,18 @@ class CombatClickHandler:
         active_player = self.game_state.active_player
 
         # Identify what was clicked
-        friendly_units = [u for u in units_at_hex if u.allegiance == active_player and not u.attacked_this_turn]
-        enemy_units = [u for u in units_at_hex if u.allegiance != active_player and u.allegiance != 'neutral']
+        friendly_units = [
+            u for u in units_at_hex
+            if u.allegiance == active_player
+            and not u.attacked_this_turn
+            and self._is_unit_on_map(u)
+        ]
+        enemy_units = [
+            u for u in units_at_hex
+            if u.allegiance != active_player
+            and u.allegiance != 'neutral'
+            and self._is_unit_on_map(u)
+        ]
 
         # --- Scenario 2: Clicked Friendly Stack ---
         if friendly_units:
@@ -195,6 +205,7 @@ class CombatClickHandler:
         Actually, the rule is: "several stacks... can combine... against a defender's hex".
         This means the target hex must be adjacent to ALL participating stacks.
         """
+        attackers = [u for u in attackers if self._is_unit_on_map(u)]
         if not attackers:
             return []
 
@@ -202,7 +213,7 @@ class CombatClickHandler:
         from collections import defaultdict
         stacks = defaultdict(list)
         for u in attackers:
-            if u.position:
+            if u.position and u.position[0] is not None and u.position[1] is not None:
                 stacks[u.position].append(u)
 
         if not stacks:
@@ -225,13 +236,14 @@ class CombatClickHandler:
 
     def calculate_valid_targets(self, attackers):
         """Returns list of (col, row) tuples for valid attack targets."""
+        attackers = [u for u in attackers if self._is_unit_on_map(u)]
         if not attackers:
             return []
 
         # 1. Get all unique positions of attackers (usually they are in one stack, but could be multi-hex attack)
         attacker_hexes = set()
         for u in attackers:
-            if u.position:
+            if u.position and u.position[0] is not None and u.position[1] is not None:
                 from src.game.map import Hex
                 attacker_hexes.add(Hex.offset_to_axial(*u.position))
 
@@ -271,3 +283,6 @@ class CombatClickHandler:
         attacker_cs = sum(u.combat_rating for u in attackers)
         defender_cs = sum(u.combat_rating for u in defenders)
         return resolver.calculate_odds(attacker_cs, defender_cs)
+
+    def _is_unit_on_map(self, unit):
+        return bool(getattr(unit, "is_on_map", False) and unit.position and unit.position[0] is not None and unit.position[1] is not None)

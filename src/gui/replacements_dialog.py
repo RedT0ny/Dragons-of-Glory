@@ -122,13 +122,15 @@ class ReplacementsDialog(QDialog):
     """
     conscription_requested = Signal(object, object)
     ready_unit_clicked = Signal(object, bool)
+    finish_deployment_clicked = Signal()
 
-    def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False):
+    def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False, invasion_mode=False):
         super().__init__(parent)
         self.game_state = game_state
         self.view = view
         self.filter_country_id = filter_country_id
         self.allow_territory_deploy = allow_territory_deploy
+        self.invasion_mode = invasion_mode
 
         self.setWindowTitle("Replacements Pool")
         self.resize(640, 480)        # Modeless so user can interact with map
@@ -143,6 +145,12 @@ class ReplacementsDialog(QDialog):
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
+
+        if self.invasion_mode:
+            banner = QLabel("Invasion deployment active")
+            banner.setAlignment(Qt.AlignCenter)
+            banner.setStyleSheet("font-size: 14px; font-weight: bold; color: #b71c1c; background-color: #fbe9e7; padding: 6px;")
+            layout.addWidget(banner)
 
         self.table = QTableWidget()
         self.table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
@@ -164,6 +172,10 @@ class ReplacementsDialog(QDialog):
         self.btn_minimize = QPushButton("Minimize / Show Map")
         self.btn_minimize.clicked.connect(self.showMinimized)
         btn_layout.addWidget(self.btn_minimize)
+
+        self.btn_finish = QPushButton("Finish Deployment")
+        self.btn_finish.clicked.connect(self.finish_deployment_clicked.emit)
+        btn_layout.addWidget(self.btn_finish)
 
         layout.addLayout(btn_layout)
 
