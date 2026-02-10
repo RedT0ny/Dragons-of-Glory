@@ -36,7 +36,8 @@ UI_COLORS = {
     "attack_range": QColor(255, 0, 0, 30),         # Red attack area
     "reachable_hex": QColor(100, 250, 100, 80),    # Bright green reachable
     "unreachable_hex": QColor(250, 100, 100, 80),  # Red unreachable
-    "highlighted_hex": QColor(255, 255, 0, 100)    # Selected Hex
+    "highlighted_hex": QColor(255, 255, 0, 100),   # Selected Hex
+    "neutral_warning_hex": QColor(255, 80, 80, 120)
 }
 
 # --- ALLEGIANCES ---

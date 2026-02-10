@@ -379,6 +379,13 @@ class GameState:
         """
         return self.map.get_units_in_hex(hex_coord.q, hex_coord.r)
 
+    def get_country_by_hex(self, col: int, row: int):
+        """Returns the Country owning the given offset hex, if any."""
+        for country in self.countries.values():
+            if (col, row) in country.territories:
+                return country
+        return None
+
     def move_unit(self, unit, target_hex):
         """
         Centralizes the move: updates unit.position AND the spatial map.

@@ -29,6 +29,7 @@ class HexagonItem(QGraphicsItem):
         self.coastal_directions = coastal_directions or []
         self.pass_directions = pass_directions or []
         self.is_highlighted = False # Track if this hex is a valid move
+        self.highlight_color = None
         self.points = []
         self.country_id = country_id
     
@@ -48,8 +49,9 @@ class HexagonItem(QGraphicsItem):
     def boundingRect(self):
         return self.path.boundingRect()
 
-    def set_highlight(self, highlight: bool):
+    def set_highlight(self, highlight: bool, color=None):
         self.is_highlighted = highlight
+        self.highlight_color = color if highlight else None
         self.update()
 
     def paint(self, painter, option, widget):
@@ -82,8 +84,10 @@ class HexagonItem(QGraphicsItem):
 
         # Layer 6: Highlight if selected/reachable
         if self.is_highlighted:
-            painter.setBrush(QBrush(UI_COLORS["highlighted_hex"]))
-            painter.setPen(QPen(QColor(255, 255, 0), 2))
+            highlight_color = self.highlight_color or UI_COLORS["highlighted_hex"]
+            painter.setBrush(QBrush(highlight_color))
+            pen_color = QColor(200, 0, 0) if self.highlight_color else QColor(255, 255, 0)
+            painter.setPen(QPen(pen_color, 2))
             painter.drawPath(self.path)
 
     def draw_coastal_wedges(self, painter):

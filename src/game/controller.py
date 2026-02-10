@@ -2,7 +2,8 @@
 from PySide6.QtCore import QObject, QTimer
 
 from src.content.constants import HL, WS
-from src.content.specs import GamePhase, UnitState, UnitType
+from src.content.specs import GamePhase, UnitState
+from src.game.movement import MovementService
 
 
 class GameController(QObject):
@@ -24,8 +25,10 @@ class GameController(QObject):
         self.ai_timer.setInterval(1000) # 1 second between AI moves
 
         self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
         from src.game.combat import CombatClickHandler
         self.combat_click_handler = CombatClickHandler(self.game_state, self.view)
+        self.movement_service = MovementService(self.game_state)
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
 
@@ -269,6 +272,7 @@ class GameController(QObject):
 
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
         def _deferred_end_phase_view_update():
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
@@ -299,16 +303,22 @@ class GameController(QObject):
         # Clear highlights if no units selected
         if not selected_units and self.game_state.phase != GamePhase.COMBAT:
             self.view.highlight_movement_range([])
+            self.neutral_warning_hexes = set()
             return
 
         if self.game_state.phase == GamePhase.MOVEMENT:
             # Only highlight if it's the active player's turn
             if any(u.allegiance != self.game_state.active_player for u in selected_units):
                 self.view.highlight_movement_range([])
+                self.neutral_warning_hexes = set()
                 return
 
-            reachable = self.calculate_reachable_hexes(selected_units)
-            self.view.highlight_movement_range(reachable)
+            movement_range = self.movement_service.get_reachable_hexes(selected_units)
+            self.neutral_warning_hexes = set(movement_range.neutral_warning_coords)
+            self.view.highlight_movement_range(
+                movement_range.reachable_coords,
+                movement_range.neutral_warning_coords
+            )
 
         elif self.game_state.phase == GamePhase.COMBAT:
             # Visual refresh handled by handle_combat_click mostly
@@ -319,16 +329,37 @@ class GameController(QObject):
         if self.game_state.phase == GamePhase.MOVEMENT:
             if not self.selected_units_for_movement:
                 return
+            col, row = hex_obj.axial_to_offset()
+            if (col, row) in self.neutral_warning_hexes:
+                from PySide6.QtWidgets import QMessageBox
+                country = self.game_state.get_country_by_hex(col, row)
+                country_id = country.id if country else "unknown"
+                if self.game_state.active_player == WS:
+                    QMessageBox.information(
+                        self.view.window(),
+                        "Neutral Territory",
+                        "Whitestone player cannot invade neutral countries."
+                    )
+                else:
+                    reply = QMessageBox.question(
+                        self.view.window(),
+                        "Neutral Territory",
+                        f"Invade {country_id}?",
+                        QMessageBox.Ok | QMessageBox.Cancel
+                    )
+                    if reply == QMessageBox.Ok:
+                        print(f"Placeholder: invasion flow for {country_id}")
+                return
 
             # Move all selected units
-            for unit in self.selected_units_for_movement:
-                self.game_state.move_unit(unit, hex_obj)
+            self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
 
             # Clear selection/highlights
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
             self.selected_units_for_movement = []
+            self.neutral_warning_hexes = set()
 
         elif self.game_state.phase == GamePhase.COMBAT:
             self.handle_combat_click(hex_obj)
@@ -341,14 +372,6 @@ class GameController(QObject):
         """Clear any combat selection and target highlights."""
         if self.combat_click_handler:
             self.combat_click_handler.reset_selection()
-
-    def calculate_reachable_hexes(self, units):
-        """
-        Delegates calculation of reachable hexes to the map model.
-        Returns a list of (col, row) tuples.
-        """
-        reachable_hexes = self.game_state.map.get_reachable_hexes(units)
-        return [h.axial_to_offset() for h in reachable_hexes]
 
     def _continue_automatic_phases(self):
         """
@@ -415,116 +438,14 @@ class GameController(QObject):
         selected = self.selected_units_for_movement
         if not selected:
             return
-
-        # Separate fleets, armies, leaders
-        fleets = [u for u in selected if u.unit_type == UnitType.FLEET or getattr(u, 'passengers', None) is not None]
-        armies = [u for u in selected if u.is_army()]
-        leaders = [u for u in selected if u.is_leader()]
-
-        # If selection includes transported units, unboard them (only if carrier is in coastal hex)
-        transported = [u for u in selected if getattr(u, 'transport_host', None) is not None]
-        if transported:
-            for u in transported:
-                carrier = u.transport_host
-                if not carrier or not carrier.position:
-                    print(f"Cannot unboard {u.id}: carrier missing position")
-                    continue
-                from src.game.map import Hex
-                carrier_hex = Hex.offset_to_axial(*carrier.position)
-                if carrier.unit_type == UnitType.WING:
-                    if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
-                        print(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
-                        continue
-                else:
-                    # Check carrier hex is coastal
-                    if not self.game_state.map.is_coastal(carrier_hex):
-                        print(f"Cannot unboard {u.id}: carrier not in coastal hex")
-                        continue
-                success = self.game_state.unboard_unit(u)
-                if not success:
-                    print(f"Failed to unboard {u.id} due to stacking or location.")
+        result = self.movement_service.handle_board_action(selected)
+        if not result.handled:
+            return
+        for message in result.messages:
+            print(message)
+        if result.force_sync:
             self.view.sync_with_model()
             self._refresh_info_panel()
-            return
-
-        # Unboarding variant: Because transported units cannot be selected (they're removed from the spatial map),
-        # we detect carriers (fleets/wings/citadels) among the selection that have passengers and attempt to
-        # unboard their passengers if the carrier is in a coastal hex or in a port.
-        from src.game.map import Hex
-        from src.content.specs import LocType
-
-        carriers_with_passengers = [u for u in selected if getattr(u, 'passengers', None) and len(u.passengers) > 0]
-        if carriers_with_passengers:
-            for carrier in carriers_with_passengers:
-                if not carrier.position:
-                    print(f"Carrier {carrier.id} has no position, skipping unboard.")
-                    continue
-                carrier_hex = Hex.offset_to_axial(*carrier.position)
-                if carrier.unit_type == UnitType.WING:
-                    for p in carrier.passengers[:]:
-                        if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
-                            print(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
-                            continue
-                        ok = self.game_state.unboard_unit(p)
-                        if not ok:
-                            print(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
-                    continue
-                is_coastal = self.game_state.map.is_coastal(carrier_hex)
-                loc = self.game_state.map.get_location(carrier_hex)
-                is_port = False
-                if loc and isinstance(loc, dict):
-                    is_port = (loc.get('type') == LocType.PORT.value)
-
-                if not (is_coastal or is_port):
-                    print(f"Carrier {carrier.id} not in coastal hex or port, cannot unboard.")
-                    continue
-
-                # Unboard all passengers (copy list since unboard_unit mutates passengers)
-                for p in carrier.passengers[:]:
-                    ok = self.game_state.unboard_unit(p)
-                    if not ok:
-                        print(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
-
-                # Movement restriction: if carrier is in a coastal land hex (coastal but NOT port), it cannot move further this Turn
-                if is_coastal and not is_port:
-                    # Ensure movement_points exists
-                    carrier.movement_points = 0
-
-            self.view.sync_with_model()
-            self._refresh_info_panel()
-            return
-
-        # Otherwise attempt boarding
-        if not fleets:
-            print("No fleet selected to board units into.")
-            return
-
-        # Algorithm: 1) Try to load every ground army into one selected fleet (one per fleet). Leaders load into same ships.
-        # If there are more armies than fleets, remaining armies are not boarded.
-        target_fleets = fleets[:]
-        fi = 0
-        for army in armies:
-            if fi >= len(target_fleets):
-                print(f"No more fleets to board army {army.id}.")
-                break
-            fleet = target_fleets[fi]
-            if self.game_state.board_unit(fleet, army):
-                print(f"Boarded army {army.id} onto {fleet.id}")
-            else:
-                print(f"Failed to board army {army.id} onto {fleet.id}")
-            fi += 1
-
-        # Load leaders into the first fleet selected (if any)
-        if leaders and fleets:
-            primary = fleets[0]
-            for l in leaders:
-                if self.game_state.board_unit(primary, l):
-                    print(f"Boarded leader {l.id} onto {primary.id}")
-                else:
-                    print(f"Failed to board leader {l.id} onto {primary.id}")
-
-        self.view.sync_with_model()
-        self._refresh_info_panel()
 
     def _handle_deployment_from_event(self, effects, active_player):
         """

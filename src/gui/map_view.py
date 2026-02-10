@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 
-from src.content.constants import WS
+from src.content.constants import WS, UI_COLORS
 from src.content.specs import UnitState, GamePhase
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
@@ -517,16 +517,22 @@ class AnsalonMapView(QGraphicsView):
 
     # Removed the old draw_unit method as it is replaced by draw_stack logic
 
-    def highlight_movement_range(self, reachable_coords):
+    def highlight_movement_range(self, reachable_coords, warning_coords=None):
         """
         Loops through all HexagonItems in the scene and highlights them
         if their coordinates are in the reachable_coords list.
         reachable_coords: List of (col, row) tuples.
         """
         reachable_set = set(reachable_coords)
+        warning_set = set(warning_coords or [])
         # Highlights reachable hexagons by comparing item coordinates
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
-                should_highlight = item.coords in reachable_set
-                if item.is_highlighted != should_highlight:
-                    item.set_highlight(should_highlight)
+                if item.coords in warning_set:
+                    item.set_highlight(True, UI_COLORS["neutral_warning_hex"])
+                elif item.coords in reachable_set:
+                    if not item.is_highlighted or item.highlight_color is not None:
+                        item.set_highlight(True)
+                else:
+                    if item.is_highlighted:
+                        item.set_highlight(False)
