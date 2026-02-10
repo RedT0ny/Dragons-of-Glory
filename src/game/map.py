@@ -759,7 +759,7 @@ class Board:
                     # Check 2: Sea Barrier (if not handled by cost)
                     # Note: get_movement_cost usually returns inf for ground vs sea,
                     # but explicit hexside check mimics get_neighbors behavior.
-                    if unit.unit_type != 'wing':
+                    if unit.unit_type != UnitType.WING:
                         hexside = self.get_hexside(current_hex, next_hex)
                         if hexside == "sea":
                             possible = False
@@ -768,7 +768,7 @@ class Board:
                     # Check 3: ZOC (Rule 5)
                     # If currently in ZOC, cannot move to another ZOC hex.
                     # Exemptions: Cavalry, Wing, Leader (UnitType check or method)
-                    is_exempt = unit.unit_type in ['cavalry', 'wing'] or (hasattr(unit, 'is_leader') and unit.is_leader())
+                    is_exempt = unit.unit_type in (UnitType.CAVALRY, UnitType.WING) or (hasattr(unit, 'is_leader') and unit.is_leader())
                     if not is_exempt:
                         if self.is_adjacent_to_enemy(current_hex, unit) and self.is_adjacent_to_enemy(next_hex, unit):
                             possible = False
