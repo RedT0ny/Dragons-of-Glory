@@ -381,8 +381,9 @@ class GameController(QObject):
 
             # Clear selection/highlights
             self.view.highlight_movement_range([])
-            self.view.sync_with_model()
-            self._refresh_info_panel()
+            # Defer redraw to avoid mutating the scene while click dispatch is active.
+            QTimer.singleShot(0, self.view.sync_with_model)
+            QTimer.singleShot(0, self._refresh_info_panel)
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
 
@@ -473,8 +474,8 @@ class GameController(QObject):
         for message in result.messages:
             print(message)
         if result.force_sync:
-            self.view.sync_with_model()
-            self._refresh_info_panel()
+            QTimer.singleShot(0, self.view.sync_with_model)
+            QTimer.singleShot(0, self._refresh_info_panel)
 
     def _handle_deployment_from_event(self, effects, active_player):
         """

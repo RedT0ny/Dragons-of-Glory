@@ -162,14 +162,13 @@ class AnsalonMapView(QGraphicsView):
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""
-        super().mousePressEvent(event)
-
         # Scenario 1: Right-click Deselect
         if event.button() == Qt.RightButton:
             self.right_clicked.emit()
             return
 
         if event.button() != Qt.LeftButton:
+            super().mousePressEvent(event)
             return
 
         scene_pos = self.mapToScene(event.position().toPoint())
@@ -208,6 +207,9 @@ class AnsalonMapView(QGraphicsView):
         # 4. Handle Depleted Unit Stacking (only in Replacements Phase)
         if self.game_state.phase == GamePhase.REPLACEMENTS:
             self.handle_depleted_stack_click(scene_pos)
+            return
+
+        super().mousePressEvent(event)
 
     def handle_movement_click(self, scene_pos):
         items = self.scene.items(scene_pos)
@@ -216,7 +218,8 @@ class AnsalonMapView(QGraphicsView):
                 from src.game.map import Hex
                 col, row = item.coords
                 hex_obj = Hex.offset_to_axial(col, row)
-                self.hex_clicked.emit(hex_obj)
+                # Defer to avoid scene mutation re-entrancy during mouse event dispatch.
+                QTimer.singleShot(0, lambda h=hex_obj: self.hex_clicked.emit(h))
                 return True
         return False
 
@@ -230,7 +233,8 @@ class AnsalonMapView(QGraphicsView):
                 from src.game.map import Hex
                 col, row = item.coords
                 hex_obj = Hex.offset_to_axial(col, row)
-                self.hex_clicked.emit(hex_obj)
+                # Defer to avoid scene mutation re-entrancy during mouse event dispatch.
+                QTimer.singleShot(0, lambda h=hex_obj: self.hex_clicked.emit(h))
                 return True
         return False
 
@@ -251,7 +255,9 @@ class AnsalonMapView(QGraphicsView):
             col, row = target_hex.coords
             hex_obj = Hex.offset_to_axial(col, row)
 
-            self.unit_deployment_requested.emit(self.deploying_unit, hex_obj)
+            # Defer to avoid scene mutation re-entrancy during mouse event dispatch.
+            unit = self.deploying_unit
+            QTimer.singleShot(0, lambda u=unit, h=hex_obj: self.unit_deployment_requested.emit(u, h))
 
             # Clear UI state (cursor, highlights)
             self.deploying_unit = None
