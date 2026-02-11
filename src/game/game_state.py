@@ -412,6 +412,8 @@ class GameState:
 
                 # Calculate path cost using A* to ensure we deduct the optimal cost
                 path = self.map.find_shortest_path(unit, start_hex, target_hex)
+                if not path and start_hex != target_hex:
+                    return
 
                 cost = 0
                 current = start_hex
@@ -420,6 +422,8 @@ class GameState:
                     cost += step_cost
                     current = next_step
 
+                if cost > unit.movement_points:
+                    return
                 unit.movement_points = max(0, unit.movement_points - cost)
 
         # 2. Update Position
@@ -432,6 +436,9 @@ class GameState:
 
         # Add to new position in spatial map
         self.map.add_unit_to_spatial_map(unit)
+
+        if self.phase == GamePhase.MOVEMENT:
+            unit.moved_this_turn = True
 
         # If this unit is a carrier (Fleet/Wing/Citadel) move its passengers implicitly
         passengers = getattr(unit, 'passengers', None)

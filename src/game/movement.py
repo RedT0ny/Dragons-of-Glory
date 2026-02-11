@@ -19,6 +19,11 @@ class MovementRangeResult:
     reachable_coords: List[Tuple[int, int]]
     neutral_warning_coords: List[Tuple[int, int]]
 
+@dataclass
+class MoveUnitsResult:
+    moved: List[object]
+    errors: List[str]
+
 
 class MovementService:
     def __init__(self, game_state):
@@ -46,13 +51,22 @@ class MovementService:
 
     def move_units_to_hex(self, units, target_hex):
         if not units:
-            return []
+            return MoveUnitsResult(moved=[], errors=[])
+
+        errors = []
+        for unit in units:
+            ok, reason = self._can_unit_reach_target(unit, target_hex)
+            if not ok:
+                errors.append(reason or f"{unit.id} cannot move.")
+
+        if errors:
+            return MoveUnitsResult(moved=[], errors=errors)
 
         moved = []
         for unit in units:
             self.game_state.move_unit(unit, target_hex)
             moved.append(unit)
-        return moved
+        return MoveUnitsResult(moved=moved, errors=[])
 
     def _get_stack_start_and_min_mp(self, units):
         start_hex = None
@@ -69,7 +83,7 @@ class MovementService:
                 elif start_hex != h:
                     return None, 0
 
-            m = unit.movement
+            m = self._unit_movement_points(unit)
             min_mp = min(min_mp, m)
 
         return start_hex, min_mp
@@ -321,6 +335,30 @@ class MovementService:
 
     def _unit_movement_points(self, unit):
         return getattr(unit, "movement_points", unit.movement)
+
+    def _can_unit_reach_target(self, unit, target_hex):
+        if getattr(unit, "transport_host", None) is not None:
+            return False, f"{unit.id} is transported and cannot move independently."
+
+        if not unit.position or unit.position[0] is None or unit.position[1] is None:
+            return True, None
+
+        start_hex = Hex.offset_to_axial(*unit.position)
+        path = self.game_state.map.find_shortest_path(unit, start_hex, target_hex)
+        if not path and start_hex != target_hex:
+            return False, f"{unit.id} has no valid path."
+
+        cost = 0
+        current = start_hex
+        for next_step in path:
+            step_cost = self.game_state.map.get_movement_cost(unit, current, next_step)
+            cost += step_cost
+            current = next_step
+
+        if cost > self._unit_movement_points(unit):
+            return False, f"{unit.id} lacks movement points."
+
+        return True, None
 
     def handle_board_action(self, selected_units):
         if not selected_units:

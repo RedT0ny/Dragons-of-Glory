@@ -369,7 +369,15 @@ class GameController(QObject):
                 return
 
             # Move all selected units
-            self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
+            move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
+            if move_result.errors:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.information(
+                    self.view.window(),
+                    "Move Blocked",
+                    move_result.errors[0]
+                )
+                return
 
             # Clear selection/highlights
             self.view.highlight_movement_range([])

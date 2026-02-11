@@ -80,6 +80,9 @@ class PhaseManager:
             self.game_state.second_player_has_acted = False
 
         elif self.game_state.phase == GamePhase.MOVEMENT:
+            for unit in self.game_state.units:
+                unit.movement_points = getattr(unit, "movement", 0)
+                unit.moved_this_turn = False
             self.game_state.phase = GamePhase.COMBAT
 
         elif self.game_state.phase == GamePhase.COMBAT:
@@ -104,6 +107,7 @@ class PhaseManager:
         for unit in self.game_state.units:
             unit.movement_points = getattr(unit, 'movement', 0)  # Reset MPs
             unit.attacked_this_turn = False
+            unit.moved_this_turn = False
             # Handle status recovery/exhaustion here if needed
 
         # Check events

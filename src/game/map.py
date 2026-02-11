@@ -651,6 +651,7 @@ class Board:
         Calculates the shortest path using A* algorithm.
         Returns a list of hex coordinates.
         """
+        max_mp = getattr(unit, "movement_points", unit.movement)
         frontier = []
         heapq.heappush(frontier, (0, start_hex))
         came_from = {start_hex: None}
@@ -664,7 +665,7 @@ class Board:
                 cost = self.get_movement_cost(unit, current, neighbor)
                 new_cost = cost_so_far[current] + cost
                 
-                if new_cost <= unit.movement:
+                if new_cost <= max_mp:
                     if neighbor not in cost_so_far or new_cost < cost_so_far[neighbor]:
                         cost_so_far[neighbor] = new_cost
                         priority = new_cost + self.heuristic(target_hex, neighbor)
@@ -712,7 +713,7 @@ class Board:
                     # Units in different locations cannot move as a stack
                     return []
 
-            m = unit.movement
+            m = getattr(unit, "movement_points", unit.movement)
             min_mp = min(min_mp, m)
 
         if not start_hex or min_mp <= 0:

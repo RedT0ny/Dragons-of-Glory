@@ -339,7 +339,29 @@ class UnitCounter(QGraphicsItem):
         painter.drawRoundedRect(self.unit_rect, 5, 5)
 
         # ID
-        painter.setPen(QPen(QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)))
+        base_text_color = QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)
+        gray_text_color = QColor(160, 160, 160)
+        max_movement = getattr(self.unit, "movement", 0)
+        remaining_movement = getattr(self.unit, "movement_points", max_movement)
+        remaining_movement = max(0, remaining_movement)
+
+        if remaining_movement == 0:
+            id_color = gray_text_color
+            rating_color = gray_text_color
+            move_color = gray_text_color
+            movement_display = 0
+        elif remaining_movement < max_movement:
+            id_color = base_text_color
+            rating_color = base_text_color
+            move_color = gray_text_color
+            movement_display = remaining_movement
+        else:
+            id_color = base_text_color
+            rating_color = base_text_color
+            move_color = base_text_color
+            movement_display = max_movement
+
+        painter.setPen(QPen(id_color))
         f = painter.font()
         f.setPointSize(8)
         f.setBold(True)
@@ -348,8 +370,14 @@ class UnitCounter(QGraphicsItem):
 
         # Stats
         rating = self.unit.combat_rating if getattr(self.unit, 'combat_rating', 0) != 0 else getattr(self.unit, 'tactical_rating', 0)
-        stats = f"{rating}      {getattr(self.unit, 'movement', 0)}"
-        painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignBottom, stats)
+        stats_rect = self.unit_rect.adjusted(4, 0, -4, -2)
+        left_rect = QRectF(stats_rect.left(), stats_rect.top(), stats_rect.width() / 2, stats_rect.height())
+        right_rect = QRectF(stats_rect.center().x(), stats_rect.top(), stats_rect.width() / 2, stats_rect.height())
+
+        painter.setPen(QPen(rating_color))
+        painter.drawText(left_rect, Qt.AlignHCenter | Qt.AlignBottom, str(rating))
+        painter.setPen(QPen(move_color))
+        painter.drawText(right_rect, Qt.AlignHCenter | Qt.AlignBottom, str(movement_display))
 
         # Passenger badge (carriers)
         try:
