@@ -1,4 +1,5 @@
 import os
+from time import perf_counter
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QTreeWidget, QTreeWidgetItem, QFrame, QPushButton, QLineEdit, QTextEdit,
@@ -9,7 +10,7 @@ from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
 from src.content.constants import WS, HL
-from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR
+from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR, DEBUG
 
 
 class AssetDetails(QFrame):
@@ -159,6 +160,9 @@ class AssetsTab(QWidget):
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
+        self._last_signature = None
+        self.unit_panel = None
+        self.unit_panel_allegiance = None
         self.init_ui()
 
     def init_ui(self):
@@ -194,31 +198,80 @@ class AssetsTab(QWidget):
         
         self.current_selected_unit = None
 
+    def _build_signature(self):
+        if not self.game_state or not self.game_state.current_player:
+            return None
+        player = self.game_state.current_player
+
+        units = []
+        for u in self.game_state.units:
+            if u.allegiance != player.allegiance:
+                continue
+            equip = tuple(sorted(getattr(a.spec, "id", str(a)) for a in getattr(u, "equipment", []) or []))
+            units.append((
+                str(getattr(u, "id", "")),
+                int(getattr(u, "ordinal", 0) or 0),
+                str(getattr(getattr(u, "status", None), "name", getattr(u, "status", ""))),
+                tuple(getattr(u, "position", (None, None)) or (None, None)),
+                int(getattr(u, "movement_points", getattr(u, "movement", 0)) or 0),
+                bool(getattr(u, "attacked_this_turn", False)),
+                equip,
+            ))
+        units.sort()
+
+        assets = []
+        for aid, asset in sorted(player.assets.items(), key=lambda kv: kv[0]):
+            assigned = getattr(asset, "assigned_to", None)
+            if assigned is None:
+                assigned_key = None
+            else:
+                assigned_key = (
+                    str(getattr(assigned, "id", "")),
+                    int(getattr(assigned, "ordinal", 0) or 0),
+                )
+            assets.append((
+                str(aid),
+                str(getattr(getattr(asset, "asset_type", None), "value", getattr(asset, "asset_type", ""))),
+                assigned_key,
+            ))
+
+        return (player.allegiance, tuple(units), tuple(assets))
+
     def refresh(self):
         """Reloads data from GameState."""
+        t0 = perf_counter()
         if not self.game_state or not self.game_state.current_player:
             return
+
+        signature = self._build_signature()
+        if signature == self._last_signature:
+            if DEBUG:
+                print("[perf] AssetsTab.refresh skipped (signature unchanged)")
+            return
+        self._last_signature = signature
 
         player = self.game_state.current_player
 
         # 1. Refresh Unit Panel
-        while self.panel_layout.count():
-             item = self.panel_layout.takeAt(0)
-             if item.widget():
-                 item.widget().deleteLater()
+        if self.unit_panel is None or self.unit_panel_allegiance != player.allegiance:
+            while self.panel_layout.count():
+                item = self.panel_layout.takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
 
-        # Use columns: Icon, Name, Type, Equipment
-        columns = [
-            UnitColumn.ICON,
-            UnitColumn.NAME,
-            UnitColumn.TYPE,
-            UnitColumn.POS,
-            UnitColumn.EQUIPMENT
-        ]
-        self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")
-        self.unit_panel.unit_selected.connect(self.on_unit_selected)
-
-        self.panel_layout.addWidget(self.unit_panel)
+            columns = [
+                UnitColumn.ICON,
+                UnitColumn.NAME,
+                UnitColumn.TYPE,
+                UnitColumn.POS,
+                UnitColumn.EQUIPMENT
+            ]
+            self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")
+            self.unit_panel.unit_selected.connect(self.on_unit_selected)
+            self.panel_layout.addWidget(self.unit_panel)
+            self.unit_panel_allegiance = player.allegiance
+        else:
+            self.unit_panel.refresh()
 
         # 2. Refresh Asset Tree
         self.asset_tree.blockSignals(True)
@@ -244,6 +297,9 @@ class AssetsTab(QWidget):
 
         self.asset_tree.expandAll()
         self.asset_tree.blockSignals(False)
+        dt_ms = (perf_counter() - t0) * 1000.0
+        if DEBUG:
+            print(f"[perf] AssetsTab.refresh rebuilt assets={len(player.assets)} time_ms={dt_ms:.1f}")
 
     def select_asset_by_id(self, asset_id):
         """Selects an asset in the tree by its ID."""

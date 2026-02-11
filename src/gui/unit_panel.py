@@ -1,10 +1,11 @@
 import sys
+from time import perf_counter
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTableWidget,
                                QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle, QGraphicsScene)
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
-from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT
+from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
 from src.gui.map_items import UnitCounter
@@ -56,6 +57,10 @@ class UnitTable(QTableWidget):
     columns: list of UnitColumn enums.
     """
     
+    _icon_cache = {}
+    _icon_cache_hits = 0
+    _icon_cache_misses = 0
+
     def __init__(self, columns, parent=None):
         super().__init__(parent)
         self.columns_config = columns
@@ -69,6 +74,7 @@ class UnitTable(QTableWidget):
         headers = [col.value for col in self.columns_config]
         self.setHorizontalHeaderLabels(headers)
         self.verticalHeader().setVisible(False)
+        self.verticalHeader().setDefaultSectionSize(max(UNIT_ICON_SIZE + 4, 28))
         self.setIconSize(QSize(UNIT_ICON_SIZE, UNIT_ICON_SIZE))
         
         # Default behavior
@@ -122,6 +128,8 @@ class UnitTable(QTableWidget):
         super().mouseDoubleClickEvent(event)
 
     def set_units(self, units, game_state=None):
+        t0 = perf_counter()
+        hits_before, misses_before = self.get_icon_cache_stats()
         self.current_units = units
         self.game_state = game_state # Needed for colors/rendering
         self.blockSignals(True)
@@ -139,7 +147,15 @@ class UnitTable(QTableWidget):
                 self.item(row, 0).setData(Qt.UserRole, unit)
                 
         self.blockSignals(False)
-        self.resizeRowsToContents()
+        dt_ms = (perf_counter() - t0) * 1000.0
+        hits_after, misses_after = self.get_icon_cache_stats()
+        delta_hits = hits_after - hits_before
+        delta_misses = misses_after - misses_before
+        if DEBUG and (dt_ms >= 40.0 or len(units) >= 60):
+            print(
+                f"[perf] UnitTable.set_units rows={len(units)} "
+                f"time_ms={dt_ms:.1f} icon_hits={delta_hits} icon_misses={delta_misses}"
+            )
 
     def _create_item(self, col_type: UnitColumn, unit):
         item = QTableWidgetItem()
@@ -196,6 +212,28 @@ class UnitTable(QTableWidget):
         if hasattr(self, 'game_state') and self.game_state and unit.land in self.game_state.countries:
             color = QColor(self.game_state.countries[unit.land].color)
 
+        color_key = color.name(QColor.HexArgb)
+        cache_key = (
+            UNIT_ICON_SIZE,
+            color_key,
+            str(getattr(unit, "id", "")),
+            int(getattr(unit, "ordinal", 0) or 0),
+            str(getattr(getattr(unit, "unit_type", None), "value", getattr(unit, "unit_type", ""))),
+            str(getattr(getattr(unit, "race", None), "value", getattr(unit, "race", ""))),
+            str(getattr(unit, "allegiance", "")),
+            str(getattr(getattr(unit, "status", None), "name", getattr(unit, "status", ""))),
+            int(getattr(unit, "movement", 0) or 0),
+            int(getattr(unit, "movement_points", getattr(unit, "movement", 0)) or 0),
+            bool(getattr(unit, "attacked_this_turn", False)),
+            int(getattr(unit, "combat_rating", 0) or 0),
+            int(getattr(unit, "tactical_rating", 0) or 0),
+        )
+        cached = self._icon_cache.get(cache_key)
+        if cached is not None:
+            self.__class__._icon_cache_hits += 1
+            return cached
+
+        self.__class__._icon_cache_misses += 1
         scene = QGraphicsScene()
         counter = UnitCounter(unit, color)
         scene.addItem(counter)
@@ -211,7 +249,15 @@ class UnitTable(QTableWidget):
 
         scene.render(painter, target_rect, source_rect)
         painter.end()
+
+        if len(self._icon_cache) > 5000:
+            self._icon_cache.clear()
+        self._icon_cache[cache_key] = pixmap
         return pixmap
+
+    @classmethod
+    def get_icon_cache_stats(cls):
+        return cls._icon_cache_hits, cls._icon_cache_misses
 
     def toggle_all_rows(self, checked):
         self.blockSignals(True)
@@ -236,6 +282,8 @@ class AllegiancePanel(QWidget):
         self.allegiance = allegiance
         self.columns = columns
         self.tables = [] # Keep track of created tables
+        self._group_order = []
+        self._group_widgets = {}  # group_name -> (label_widget, table_widget)
         
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(0,0,0,0)
@@ -271,92 +319,102 @@ class AllegiancePanel(QWidget):
         self.refresh()
 
     def refresh(self):
-        # Clear existing
-        while self.container_layout.count():
-            item = self.container_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-        self.tables.clear()
-        
+        t0 = perf_counter()
         if not self.game_state:
             return
+        groups_data = self._build_groups_data()
+        new_order = [name for name, _units, _style in groups_data]
 
+        if new_order != self._group_order:
+            self._rebuild_group_widgets(groups_data)
+            phase = "rebuilt"
+        else:
+            self._update_existing_group_widgets(groups_data)
+            phase = "updated"
+
+        dt_ms = (perf_counter() - t0) * 1000.0
+        if DEBUG:
+            print(
+                f"[perf] AllegiancePanel.refresh allegiance={self.allegiance} "
+                f"tables={len(self.tables)} mode={phase} time_ms={dt_ms:.1f}"
+            )
+
+    def _build_groups_data(self):
         processed_units = set()
+        groups_data = []
 
-        # Filter countries
         countries = [c for c in self.game_state.countries.values() if c.allegiance == self.allegiance]
         countries.sort(key=lambda x: x.id)
-        
+
         for country in countries:
-             # Get units
             units = [u for u in self.game_state.units if u.land == country.id]
             processed_units.update(units)
+            groups_data.append((
+                country.id.title(),
+                units,
+                "font-weight: bold; background-color: #EEE; border: 1px solid #CCC;",
+            ))
 
-            # Show empty countries logic same as original StatusTab
-            
-            # Header
-            c_lbl = QLabel(country.id.title())
-            c_lbl.setStyleSheet("font-weight: bold; background-color: #EEE; border: 1px solid #CCC;")
-            c_lbl.setAlignment(Qt.AlignCenter)
-            self.container_layout.addWidget(c_lbl)
-            
-            # Table
-            table = UnitTable(self.columns)
-            # Connect selection
-            table.itemSelectionChanged.connect(lambda t=table: self.on_table_selection(t))
-            
-            table.set_units(units, self.game_state)
-            
-            # Adjust height
-            h = table.horizontalHeader().height()
-            for r in range(table.rowCount()):
-                h += table.rowHeight(r)
-            table.setFixedHeight(h + 2)
-            
-            self.container_layout.addWidget(table)
-            self.tables.append(table)
-
-        # --- Handle Stateless / Independent Units ---
-        remaining_units = [u for u in self.game_state.units
-                           if u.allegiance == self.allegiance and u not in processed_units]
-
+        remaining_units = [u for u in self.game_state.units if u.allegiance == self.allegiance and u not in processed_units]
         if remaining_units:
-            groups = {}
+            grouped = {}
             for unit in remaining_units:
-                # Determine Group
                 land_val = str(unit.land).lower() if unit.land else ""
                 if land_val in DRAGONFLIGHTS:
                     group_name = f"{land_val.title()} Dragonflight"
                 else:
                     group_name = "Others / Independent"
+                grouped.setdefault(group_name, []).append(unit)
 
-                if group_name not in groups:
-                    groups[group_name] = []
-                groups[group_name].append(unit)
+            for name in sorted(grouped.keys()):
+                groups_data.append((
+                    name,
+                    grouped[name],
+                    "font-weight: bold; background-color: #E0E0E0; border: 1px dashed #999;",
+                ))
+        return groups_data
 
-            # Create Tables for groups
-            for name in sorted(groups.keys()):
-                units = groups[name]
+    def _rebuild_group_widgets(self, groups_data):
+        while self.container_layout.count():
+            item = self.container_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.tables.clear()
+        self._group_widgets.clear()
 
-                # Header
-                c_lbl = QLabel(name)
-                c_lbl.setStyleSheet("font-weight: bold; background-color: #E0E0E0; border: 1px dashed #999;")
-                c_lbl.setAlignment(Qt.AlignCenter)
-                self.container_layout.addWidget(c_lbl)
+        for name, units, style in groups_data:
+            c_lbl = QLabel(name)
+            c_lbl.setStyleSheet(style)
+            c_lbl.setAlignment(Qt.AlignCenter)
+            self.container_layout.addWidget(c_lbl)
 
-                # Table
-                table = UnitTable(self.columns)
-                table.itemSelectionChanged.connect(lambda t=table: self.on_table_selection(t))
-                table.set_units(units, self.game_state)
+            table = UnitTable(self.columns)
+            table.itemSelectionChanged.connect(lambda t=table: self.on_table_selection(t))
+            table.set_units(units, self.game_state)
+            self._adjust_table_height(table)
+            self.container_layout.addWidget(table)
+            self.tables.append(table)
+            self._group_widgets[name] = (c_lbl, table)
 
-                # Adjust height
-                h = table.horizontalHeader().height()
-                for r in range(table.rowCount()):
-                    h += table.rowHeight(r)
-                table.setFixedHeight(h + 2)
+        self._group_order = [name for name, _units, _style in groups_data]
 
-                self.container_layout.addWidget(table)
-                self.tables.append(table)
+    def _update_existing_group_widgets(self, groups_data):
+        self.tables = []
+        for name, units, _style in groups_data:
+            pair = self._group_widgets.get(name)
+            if not pair:
+                self._rebuild_group_widgets(groups_data)
+                return
+            _label, table = pair
+            table.set_units(units, self.game_state)
+            self._adjust_table_height(table)
+            self.tables.append(table)
+
+    def _adjust_table_height(self, table):
+        h = table.horizontalHeader().height()
+        for r in range(table.rowCount()):
+            h += table.rowHeight(r)
+        table.setFixedHeight(h + 2)
 
     def on_table_selection(self, sender_table):
         # Enforce exclusive selection across tables

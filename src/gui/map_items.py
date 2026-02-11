@@ -358,6 +358,7 @@ class UnitCounter(QGraphicsItem):
         painter.drawText(left_rect, Qt.AlignHCenter | Qt.AlignBottom, str(rating))
         painter.setPen(QPen(move_color))
         painter.drawText(right_rect, Qt.AlignHCenter | Qt.AlignBottom, str(movement_display))
+        self._draw_badges(painter)
 
     def _get_text_colors_and_movement(self):
         base_text_color = QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)
@@ -398,10 +399,10 @@ class UnitCounter(QGraphicsItem):
 
         return id_color, rating_color, move_color, movement_display
 
+    def _draw_badges(self, painter):
         # Passenger badge (carriers)
         try:
             passengers = getattr(self.unit, 'passengers', None) or []
-            # Normalize passenger count safely
             pax_count = 0
             if hasattr(passengers, '__len__'):
                 try:
@@ -415,9 +416,9 @@ class UnitCounter(QGraphicsItem):
             if pax_count > 0:
                 badge_text = str(pax_count)
                 br = 10
-                bx = self.unit_rect.right() - br*2 - 2
+                bx = self.unit_rect.right() - br * 2 - 2
                 by = self.unit_rect.center().y() - br
-                badge_rect = QRectF(bx, by, br*2, br*2)
+                badge_rect = QRectF(bx, by, br * 2, br * 2)
                 painter.setBrush(QBrush(QColor(255, 215, 0)))  # gold
                 painter.setPen(QPen(QColor(0, 0, 0), 1))
                 painter.drawEllipse(badge_rect)
@@ -428,7 +429,6 @@ class UnitCounter(QGraphicsItem):
                 painter.setPen(QPen(QColor(0, 0, 0)))
                 painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
         except Exception:
-            # Painting must not raise; swallow to avoid crashing the Qt paint loop
             pass
 
         # Transported badge (armies aboard a carrier)
@@ -458,5 +458,4 @@ class UnitCounter(QGraphicsItem):
                     painter.setPen(QPen(QColor(0, 0, 0)))
                     painter.drawText(trect, Qt.AlignCenter, host_text)
         except Exception:
-            # Protect paint from exceptions
             pass

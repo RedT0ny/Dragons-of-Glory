@@ -8,7 +8,7 @@ blue_crystal_staff:
     The wielder of the staff is guided and protected by the goddess, Mishakal, ensuring the forces of evil 
     cannot benefit from it.
   effect: "+1 Tactical Rating. Revives a dead leader, self-destructing in the process."
-  picture: "bluestaff.jpg"
+  picture: "blue_crystal_staff.jpg"
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "leader" }

@@ -1,14 +1,21 @@
 import sys
+from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel)
 from PySide6.QtGui import QAction, QCloseEvent
-from PySide6.QtCore import Qt, Slot, QObject, Signal
+from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
-from src.content.config import APP_NAME
+from src.content.config import APP_NAME, DEBUG
 from src.gui.map_view import AnsalonMapView
 from src.gui.status_tab import StatusTab
 from src.gui.assets_tab import AssetsTab
 from src.gui.info_panel import InfoPanel
+from src.gui.unit_panel import UnitTable
+
+
+def _perf_print(message):
+    if DEBUG:
+        print(message)
 
 class ConsoleRedirector(QObject):
     """Custom stream object to redirect stdout/stderr to a Qt Signal while keeping original output."""
@@ -33,6 +40,8 @@ class MainWindow(QMainWindow):
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
+        self._tab_switch_seq = 0
+        self._tab_switch_started = {}
         self.setWindowTitle(APP_NAME)
         self.resize(1920, 1080)
 
@@ -150,10 +159,30 @@ class MainWindow(QMainWindow):
 
     def on_tab_changed(self, index):
         """Refreshes tab content when tab changes"""
+        t0 = perf_counter()
+        self._tab_switch_seq += 1
+        seq = self._tab_switch_seq
+        self._tab_switch_started[seq] = t0
+        hits_before, misses_before = UnitTable.get_icon_cache_stats()
+        tab_name = self.tabs.tabText(index)
         if self.tabs.widget(index) == self.status_tab:
             self.status_tab.refresh()
         elif self.tabs.widget(index) == self.assets_tab:
             self.assets_tab.refresh()
+        dt_ms = (perf_counter() - t0) * 1000.0
+        hits_after, misses_after = UnitTable.get_icon_cache_stats()
+        _perf_print(
+            f"[perf] MainWindow.on_tab_changed tab={tab_name} time_ms={dt_ms:.1f} "
+            f"icon_hits={hits_after - hits_before} icon_misses={misses_after - misses_before}"
+        )
+        QTimer.singleShot(0, lambda s=seq, n=tab_name: self._log_tab_switch_settled(s, n))
+
+    def _log_tab_switch_settled(self, seq, tab_name):
+        t0 = self._tab_switch_started.pop(seq, None)
+        if t0 is None:
+            return
+        total_ms = (perf_counter() - t0) * 1000.0
+        _perf_print(f"[perf] MainWindow.tab_settled tab={tab_name} total_ms={total_ms:.1f}")
 
     def setup_menu_bar(self):
         """Initializes the top menu bar."""
