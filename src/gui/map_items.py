@@ -7,7 +7,7 @@ from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
 from PySide6.QtCore import Qt, QPointF, QRectF
 
 from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, HL
-from src.content.specs import UnitType, UnitRace
+from src.content.specs import UnitType, UnitRace, UnitState
 from src.content.utils import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
@@ -339,27 +339,7 @@ class UnitCounter(QGraphicsItem):
         painter.drawRoundedRect(self.unit_rect, 5, 5)
 
         # ID
-        base_text_color = QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)
-        gray_text_color = QColor(160, 160, 160)
-        max_movement = getattr(self.unit, "movement", 0)
-        remaining_movement = getattr(self.unit, "movement_points", max_movement)
-        remaining_movement = max(0, remaining_movement)
-
-        if remaining_movement == 0:
-            id_color = gray_text_color
-            rating_color = gray_text_color
-            move_color = gray_text_color
-            movement_display = 0
-        elif remaining_movement < max_movement:
-            id_color = base_text_color
-            rating_color = base_text_color
-            move_color = gray_text_color
-            movement_display = remaining_movement
-        else:
-            id_color = base_text_color
-            rating_color = base_text_color
-            move_color = base_text_color
-            movement_display = max_movement
+        id_color, rating_color, move_color, movement_display = self._get_text_colors_and_movement()
 
         painter.setPen(QPen(id_color))
         f = painter.font()
@@ -378,6 +358,45 @@ class UnitCounter(QGraphicsItem):
         painter.drawText(left_rect, Qt.AlignHCenter | Qt.AlignBottom, str(rating))
         painter.setPen(QPen(move_color))
         painter.drawText(right_rect, Qt.AlignHCenter | Qt.AlignBottom, str(movement_display))
+
+    def _get_text_colors_and_movement(self):
+        base_text_color = QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)
+        gray_text_color = QColor(160, 160, 160)
+
+        max_movement = getattr(self.unit, "movement", 0)
+        remaining_movement = getattr(self.unit, "movement_points", max_movement)
+        remaining_movement = max(0, remaining_movement)
+
+        attacked = bool(getattr(self.unit, "attacked_this_turn", False))
+        depleted = bool(getattr(self.unit, "status", None) == UnitState.DEPLETED)
+
+        if attacked:
+            id_color = gray_text_color
+            rating_color = gray_text_color
+            move_color = gray_text_color
+            movement_display = remaining_movement
+            return id_color, rating_color, move_color, movement_display
+
+        if remaining_movement == 0:
+            id_color = gray_text_color
+            rating_color = gray_text_color
+            move_color = gray_text_color
+            movement_display = 0
+        elif remaining_movement < max_movement:
+            id_color = base_text_color
+            rating_color = base_text_color
+            move_color = gray_text_color
+            movement_display = remaining_movement
+        else:
+            id_color = base_text_color
+            rating_color = base_text_color
+            move_color = base_text_color
+            movement_display = max_movement
+
+        if depleted:
+            rating_color = gray_text_color
+
+        return id_color, rating_color, move_color, movement_display
 
         # Passenger badge (carriers)
         try:

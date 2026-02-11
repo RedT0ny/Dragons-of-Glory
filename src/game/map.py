@@ -196,12 +196,25 @@ class Board:
     def remove_unit_from_spatial_map(self, unit):
         """Removes a unit from the spatial lookup."""
         if not hasattr(unit, 'position') or not unit.position:
+            # Fallback: unit may have cleared its position before removal.
+            for key, units in list(self.unit_map.items()):
+                if unit in units:
+                    units.remove(unit)
+                    if not units:
+                        del self.unit_map[key]
+                    break
             return
 
         col, row = unit.position
 
         # Fix: Ensure position coordinates are valid integers before converting
         if col is None or row is None:
+            for key, units in list(self.unit_map.items()):
+                if unit in units:
+                    units.remove(unit)
+                    if not units:
+                        del self.unit_map[key]
+                    break
             return
 
         hex_obj = Hex.offset_to_axial(col, row)

@@ -1,6 +1,6 @@
 import random
 from typing import Set, Tuple, List, Dict, Optional
-from src.game.combat import CombatResolver
+from src.game.combat import CombatResolver, LeaderEscapeRequest
 from src.content.config import MAP_WIDTH, MAP_HEIGHT
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
@@ -489,16 +489,330 @@ class GameState:
         """
         Initiates combat resolution for a specific hex.
         """
-        defenders = self.get_units_at(hex_position)
-        # Need to convert hex_position (axial) to offset for get_terrain if it expects offset?
-        # Looking at game_state code, map.get_terrain usually takes axial object or handles conversion.
-        # Assuming hex_position is the Axial Hex object passed from controller.
-
+        defenders = list(self.get_units_at(hex_position))
         terrain = self.map.get_terrain(hex_position)
+        defender_allegiances = {
+            u.allegiance for u in defenders
+            if u.allegiance not in ("neutral", None)
+        }
 
-        resolver = CombatResolver(attackers, defenders, terrain)
+        # Cumulative pre-combat special retreats for wings/cavalry.
+        special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
+        if special_retreat["applied"]:
+            self._cleanup_destroyed_units(defenders)
+            defenders = list(self.get_units_at(hex_position))
+            if not any(self._is_combat_stack_unit(u) for u in defenders):
+                result = special_retreat["result"]
+                advance_available = self._can_advance_after_combat(
+                    attackers=attackers,
+                    target_hex=hex_position,
+                    defender_allegiances=defender_allegiances,
+                    attacker_had_to_retreat=False,
+                )
+                print(self._format_combat_log_entry(attackers, defenders, result))
+                return {
+                    "result": result,
+                    "leader_escape_requests": [],
+                    "advance_available": advance_available,
+                }
+
+        leader_origins = {}
+        leader_stack_has_army = {}
+        for unit in attackers + defenders:
+            if hasattr(unit, "is_leader") and unit.is_leader() and unit.position:
+                origin_hex = Hex.offset_to_axial(*unit.position)
+                leader_origins[unit] = origin_hex
+                units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
+                leader_stack_has_army[unit] = any(
+                    u.allegiance == unit.allegiance and self._is_combat_stack_unit(u)
+                    for u in units_in_hex
+                )
+
+        resolver = CombatResolver(attackers, defenders, terrain, game_state=self)
         result = resolver.resolve()
+        print(self._format_combat_log_entry(attackers, defenders, result))
         self._cleanup_destroyed_units(attackers + defenders)
+        leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
+
+        attacker_result_code = result.split('/')[0] if '/' in result else result
+        attacker_had_to_retreat = 'R' in attacker_result_code
+        advance_available = self._can_advance_after_combat(
+            attackers=attackers,
+            target_hex=hex_position,
+            defender_allegiances=defender_allegiances,
+            attacker_had_to_retreat=attacker_had_to_retreat,
+        )
+
+        return {
+            "result": result,
+            "leader_escape_requests": leader_escape_requests or [],
+            "advance_available": advance_available,
+        }
+
+    def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
+        combat_defenders = [
+            u for u in defenders
+            if u.is_on_map
+            and u.position and u.position[0] is not None and u.position[1] is not None
+            and self._is_combat_stack_unit(u)
+        ]
+        if not combat_defenders:
+            return {"applied": False, "result": None}
+
+        # These rules do not apply while defending any location.
+        if self.map.get_location(target_hex):
+            return {"applied": False, "result": None}
+
+        combat_attackers = [
+            u for u in attackers
+            if u.is_on_map
+            and u.position and u.position[0] is not None and u.position[1] is not None
+            and self._is_combat_stack_unit(u)
+        ]
+        if not combat_attackers:
+            return {"applied": False, "result": None}
+
+        # No partial retreats: if any non-wing/cavalry combat defender exists (e.g. infantry),
+        # entire defending stack remains to fight.
+        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in combat_defenders):
+            return {"applied": False, "result": None}
+
+        attacker_has_wing = any(u.unit_type == UnitType.WING for u in combat_attackers)
+        attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in combat_attackers)
+
+        wing_rule = not attacker_has_wing
+        cavalry_rule = not attacker_has_wing and not attacker_has_cavalry
+        if not (wing_rule or cavalry_rule):
+            return {"applied": False, "result": None}
+
+        for unit in combat_defenders:
+            self._retreat_single_unit(unit)
+
+        # If cavalry rule applies at all, use the more restrictive marker.
+        result = "-/SRC" if cavalry_rule else "-/SRW"
+        return {"applied": True, "result": result}
+
+    def _retreat_single_unit(self, unit):
+        if not unit.position or unit.position[0] is None or unit.position[1] is None:
+            return
+        status_before = unit.status
+        start_hex = Hex.offset_to_axial(*unit.position)
+        valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
+        if not valid_hexes:
+            unit.eliminate()
+            return
+        retreat_hex = random.choice(valid_hexes)
+        self.move_unit(unit, retreat_hex)
+        # Special pre-combat retreat never applies damage/depletion.
+        if unit.is_on_map:
+            unit.status = status_before
+
+    def _get_valid_retreat_hexes(self, unit, start_hex):
+        valid = []
+        for neighbor in start_hex.neighbors():
+            col, row = neighbor.axial_to_offset()
+            if not self.is_hex_in_bounds(col, row):
+                continue
+            if not self.map.can_unit_land_on_hex(unit, neighbor):
+                continue
+            if self.map.has_enemy_army(neighbor, unit.allegiance):
+                continue
+            if not self.map.can_stack_move_to([unit], neighbor):
+                continue
+
+            cost = self.map.get_movement_cost(unit, start_hex, neighbor)
+            if cost == float('inf') or cost is None:
+                continue
+
+            friendly_present = any(
+                u.allegiance == unit.allegiance and (u.is_army() or u.unit_type == UnitType.WING)
+                for u in self.map.get_units_in_hex(neighbor.q, neighbor.r)
+            )
+            if not friendly_present and self.map.is_adjacent_to_enemy(neighbor, unit):
+                continue
+
+            valid.append(neighbor)
+        return valid
+
+    def _can_advance_after_combat(self, attackers, target_hex, defender_allegiances, attacker_had_to_retreat):
+        if attacker_had_to_retreat:
+            return False
+        if not defender_allegiances:
+            return False
+
+        target_offset = target_hex.axial_to_offset()
+        remaining_defender_combat_units = [
+            u for u in self.map.get_units_in_hex(target_hex.q, target_hex.r)
+            if u.is_on_map
+            and u.position == target_offset
+            and u.allegiance in defender_allegiances
+            and self._is_combat_stack_unit(u)
+        ]
+        if remaining_defender_combat_units:
+            return False
+
+        for unit in attackers:
+            if not unit.is_on_map or not unit.position:
+                continue
+            if unit.position[0] is None or unit.position[1] is None:
+                continue
+            if not (unit.is_army() or unit.unit_type == UnitType.WING):
+                continue
+            if unit.allegiance != self.active_player:
+                continue
+            from_hex = Hex.offset_to_axial(*unit.position)
+            if target_hex not in from_hex.neighbors():
+                continue
+            if self.map.can_stack_move_to([unit], target_hex):
+                return True
+        return False
+
+    def advance_after_combat(self, attackers, target_hex):
+        candidates = []
+        for unit in attackers:
+            if not unit.is_on_map or not unit.position:
+                continue
+            if unit.position[0] is None or unit.position[1] is None:
+                continue
+            if not (unit.is_army() or unit.unit_type == UnitType.WING):
+                continue
+
+            from_hex = Hex.offset_to_axial(*unit.position)
+            if target_hex not in from_hex.neighbors():
+                continue
+            candidates.append(unit)
+
+        if not candidates:
+            return []
+
+        remaining_by_source = {}
+        no_adjacent_enemy = {}
+        for u in candidates:
+            src = tuple(u.position)
+            remaining_by_source[src] = remaining_by_source.get(src, 0) + 1
+            if src not in no_adjacent_enemy:
+                src_hex = Hex.offset_to_axial(*src)
+                no_adjacent_enemy[src] = not self.map.is_adjacent_to_enemy(src_hex, u)
+
+        moved = []
+        groups = [
+            [u for u in candidates if u.unit_type == UnitType.WING],
+            [u for u in candidates if u.unit_type == UnitType.CAVALRY],
+            [u for u in candidates if u.is_army() and u.unit_type != UnitType.CAVALRY],
+        ]
+
+        for group in groups:
+            pool = list(group)
+            while pool:
+                legal = [u for u in pool if self.map.can_stack_move_to([u], target_hex)]
+                if not legal:
+                    break
+
+                random.shuffle(legal)
+                legal.sort(key=lambda u: self._advance_priority_key(u, remaining_by_source, no_adjacent_enemy))
+                chosen = legal[0]
+                source_before_move = tuple(chosen.position)
+                self.move_unit(chosen, target_hex)
+                moved.append(chosen)
+
+                if source_before_move in remaining_by_source and remaining_by_source[source_before_move] > 0:
+                    remaining_by_source[source_before_move] -= 1
+
+                pool.remove(chosen)
+
+        return moved
+
+    def _advance_priority_key(self, unit, remaining_by_source, no_adjacent_enemy):
+        src = tuple(unit.position)
+        source_has_no_adjacent_enemy = no_adjacent_enemy.get(src, False)
+        leaves_source_empty = remaining_by_source.get(src, 0) <= 1
+        return (
+            0 if source_has_no_adjacent_enemy else 1,
+            1 if leaves_source_empty else 0,
+        )
+
+    def _resolve_leader_escapes(self, leader_origins, leader_stack_has_army):
+        requests = []
+        leaders_to_cleanup = []
+
+        for leader, origin_hex in leader_origins.items():
+            if not leader_stack_has_army.get(leader):
+                continue
+            if not leader.is_on_map or not leader.position:
+                continue
+
+            units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
+            has_allied_army = any(
+                u.allegiance == leader.allegiance and self._is_combat_stack_unit(u)
+                for u in units_in_hex
+            )
+            if has_allied_army:
+                continue
+
+            roll = random.randint(1, 6)
+            if roll <= 3:
+                leader.destroy()
+                leaders_to_cleanup.append(leader)
+                print(f"Leader {leader.id} eliminated after battle (roll {roll}).")
+                continue
+
+            options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
+            if not options:
+                leader.destroy()
+                leaders_to_cleanup.append(leader)
+                print(f"Leader {leader.id} eliminated (no friendly stacks to escape).")
+                continue
+
+            print(f"Leader {leader.id} escapes (roll {roll}).")
+            requests.append(LeaderEscapeRequest(leader=leader, options=options))
+
+        if leaders_to_cleanup:
+            self._cleanup_destroyed_units(leaders_to_cleanup)
+
+        return requests
+
+    def _get_nearest_friendly_combat_stacks(self, leader, origin_hex):
+        candidates = []
+        for (q, r), units in self.map.unit_map.items():
+            if not units:
+                continue
+            if not any(
+                u.allegiance == leader.allegiance
+                and u.is_on_map
+                and self._is_combat_stack_unit(u)
+                for u in units
+            ):
+                continue
+            candidates.append(Hex(q, r))
+
+        if not candidates:
+            return []
+
+        min_distance = min(origin_hex.distance_to(h) for h in candidates)
+        return [h for h in candidates if origin_hex.distance_to(h) == min_distance]
+
+    def _is_combat_stack_unit(self, unit):
+        return bool(
+            (hasattr(unit, "is_army") and unit.is_army())
+            or unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING)
+        )
+
+    def _format_combat_log_entry(self, attackers, defenders, result):
+        attacker_names = ", ".join(self._format_unit_for_log(u) for u in attackers)
+        defender_names = ", ".join(self._format_unit_for_log(u) for u in defenders)
+        return f"Combat result {result}: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
+
+    def _format_unit_for_log(self, unit):
+        ordinal = getattr(unit, "ordinal", None)
+        if ordinal is None:
+            return str(unit.id)
+        return f"{unit.id}#{ordinal}"
+
+    def clear_leader_tactical_overrides(self):
+        for unit in self.units:
+            if hasattr(unit, "is_leader") and unit.is_leader():
+                if hasattr(unit, "_tactical_rating_override"):
+                    unit._tactical_rating_override = None
 
     def get_map(self):
         return self.map

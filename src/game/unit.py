@@ -44,6 +44,7 @@ class Unit:
 
         # Temporary effects
         self._movement_override = None
+        self._tactical_rating_override = None
 
         # Initialize current movement points to max (for the first turn)
         self.movement_points = self.movement
@@ -87,6 +88,9 @@ class Unit:
 
     @property
     def tactical_rating(self) -> int:
+        if self._tactical_rating_override is not None:
+            return self._tactical_rating_override
+
         base = self.spec.tactical_rating or 0
 
         # Add bonuses from equipped assets
@@ -109,6 +113,10 @@ class Unit:
             elif hasattr(item, 'bonus') and isinstance(item.bonus, dict):
                 # Handle dict bonus e.g. {'combat': 2}
                 total += item.bonus.get('combat', 0)
+        if self.status == UnitState.DEPLETED:
+            if self.unit_type == UnitType.FLEET:
+                return max(0, total - 1)
+            return max(0, total // 2)
         return total
 
     @property

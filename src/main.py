@@ -1,8 +1,10 @@
-import sys, locale
+import sys, locale, signal
 
 #Enable faulthandler to get better crash diagnostics, especially for native code issues in PySide6
 import faulthandler
-faulthandler.enable()
+faulthandler.enable(all_threads=True)
+if hasattr(faulthandler, "register"):
+    faulthandler.register(signal.SIGABRT, all_threads=True, chain=True)
 
 from PySide6.QtWidgets import QApplication
 

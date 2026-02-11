@@ -1,16 +1,24 @@
 import random
+from dataclasses import dataclass
+from typing import List
 from src.content.config import CRT_DATA
+from src.content.specs import UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
+@dataclass
+class LeaderEscapeRequest:
+    leader: object
+    options: List[object]
 
 class CombatResolver:
     """
     Handles resolution of Land and Air combat according to Rule 7 (DL_11).
     """
-    def __init__(self, attackers, defenders, terrain_type):
+    def __init__(self, attackers, defenders, terrain_type, game_state=None):
         self.attackers = attackers
         self.defenders = defenders
         self.terrain_type = terrain_type
+        self.game_state = game_state
         # Use the centralized loader
         self.crt_data = load_data(CRT_DATA) # csv or yaml?
 
@@ -82,24 +90,32 @@ class CombatResolver:
         if result == '-':
             return
 
-        # Handle cumulative results like "DR" (Damage + Retreat)
-        if len(result) > 1:
-            # If result is "DR", first char is 'D', second is 'R' (retreat)
-            # If result is "1R", first char is '1', second is 'R'
-            if 'R' in result:
-                must_retreat = True
-            result = result[0]
+        if 'R' in result:
+            must_retreat = True
 
-        # If result is "D" or "E", apply to all units
-        if result in ['D', 'E']:
-            for unit in units:
-                unit.apply_combat_loss(result, must_retreat)
+        apply_deplete_all = 'D' in result
+        apply_eliminate_all = 'E' in result
+        depletion_steps = sum(int(ch) for ch in result if ch.isdigit())
 
-        elif result in ['1', '2']:
-            #TODO: Let the player choose which units take damage and retreat
-            return NotImplementedError
+        affected = self._get_affected_armies(units)
 
-        else:  # Error
+        if apply_eliminate_all:
+            for unit in affected:
+                unit.eliminate()
+        elif apply_deplete_all:
+            for unit in affected:
+                if unit.status.name == "DEPLETED":
+                    unit.eliminate()
+                elif unit.status.name == "ACTIVE":
+                    unit.deplete()
+
+        if depletion_steps:
+            self._apply_depletion_steps(affected, depletion_steps)
+
+        if must_retreat:
+            self._apply_retreats(affected)
+
+        if not (apply_eliminate_all or apply_deplete_all or depletion_steps or must_retreat):
             error_msg = f"Invalid combat result: {result_code}"
             raise ValueError(error_msg)
 
@@ -107,14 +123,104 @@ class CombatResolver:
         # TODO: Implement Rule 7.4 (Leaders and Terrain)
         return 0
 
+    def _get_affected_armies(self, units):
+        affected = []
+        for unit in units:
+            if hasattr(unit, "is_leader") and unit.is_leader():
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if unit.unit_type == UnitType.WING or (hasattr(unit, "is_army") and unit.is_army()):
+                affected.append(unit)
+        return affected
+
+    def _apply_depletion_steps(self, units, steps):
+        for _ in range(steps):
+            ground_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type != UnitType.WING]
+            if ground_active:
+                target = min(ground_active, key=lambda u: u.combat_rating)
+                target.deplete()
+                continue
+
+            ground_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type != UnitType.WING]
+            if ground_depleted:
+                target = min(ground_depleted, key=lambda u: u.combat_rating)
+                target.eliminate()
+                continue
+
+            wing_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type == UnitType.WING]
+            if wing_active:
+                target = min(wing_active, key=lambda u: u.combat_rating)
+                target.deplete()
+                continue
+
+            wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type == UnitType.WING]
+            if wing_depleted:
+                target = min(wing_depleted, key=lambda u: u.combat_rating)
+                target.eliminate()
+                continue
+
+            break
+
+    def _apply_retreats(self, units):
+        if not self.game_state or not self.game_state.map:
+            return
+
+        from src.game.map import Hex
+
+        for unit in units:
+            if not unit.position or unit.position[0] is None or unit.position[1] is None:
+                continue
+            start_hex = Hex.offset_to_axial(*unit.position)
+            valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
+            if not valid_hexes:
+                unit.eliminate()
+                continue
+            retreat_hex = random.choice(valid_hexes)
+            self.game_state.move_unit(unit, retreat_hex)
+
+    def _get_valid_retreat_hexes(self, unit, start_hex):
+        valid = []
+        for neighbor in start_hex.neighbors():
+            col, row = neighbor.axial_to_offset()
+            if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            if not self.game_state.map.can_unit_land_on_hex(unit, neighbor):
+                continue
+            if self.game_state.map.has_enemy_army(neighbor, unit.allegiance):
+                continue
+            if not self.game_state.map.can_stack_move_to([unit], neighbor):
+                continue
+            cost = self.game_state.map.get_movement_cost(unit, start_hex, neighbor)
+            if cost == float('inf') or cost is None:
+                continue
+
+            friendly_present = any(
+                u.allegiance == unit.allegiance and (u.is_army() or u.unit_type == UnitType.WING)
+                for u in self.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
+            )
+            if not friendly_present and self.game_state.map.is_adjacent_to_enemy(neighbor, unit):
+                continue
+
+            valid.append(neighbor)
+        return valid
+
 
 class CombatClickHandler:
     def __init__(self, game_state, view):
         self.game_state = game_state
         self.view = view
         self.attackers = []
+        self.leader_escape_queue = []
+        self.active_leader_escape = None
+        self.escape_hexes = set()
+        self.pending_advance = None
 
     def handle_click(self, target_hex):
+        if self.active_leader_escape:
+            self._handle_leader_escape_click(target_hex)
+            return
+
         units_at_hex = self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
         active_player = self.game_state.active_player
 
@@ -177,13 +283,26 @@ class CombatClickHandler:
             )
 
             if reply == QMessageBox.Yes:
-                self.game_state.resolve_combat(self.attackers, target_hex)
+                committed_attackers = list(self.attackers)
+                resolution = self.game_state.resolve_combat(self.attackers, target_hex)
                 # Mark attackers
                 for u in self.attackers:
                     u.attacked_this_turn = True
 
                 # Clear all
                 self.reset_selection()
+
+                leader_escape = resolution.get("leader_escape_requests", []) if resolution else []
+                advance_available = bool(resolution and resolution.get("advance_available"))
+                if advance_available:
+                    self.pending_advance = {
+                        "attackers": committed_attackers,
+                        "target_hex": target_hex,
+                    }
+                if leader_escape:
+                    self._begin_leader_escape(leader_escape)
+                else:
+                    self._prompt_advance_after_combat()
             return
 
         # If not a valid target...
@@ -196,7 +315,8 @@ class CombatClickHandler:
 
     def reset_selection(self):
         self.attackers = []
-        self.view.highlight_movement_range([])
+        if not self.active_leader_escape:
+            self.view.highlight_movement_range([])
         self.view.units_clicked.emit([])
 
     def calculate_common_targets(self, attackers):
@@ -278,7 +398,7 @@ class CombatClickHandler:
         """Helper to just get the string "3:1" etc without rolling."""
         # We create a dummy resolver just to calc odds
         terrain = self.game_state.map.get_terrain(hex_position)
-        resolver = CombatResolver(attackers, defenders, terrain)
+        resolver = CombatResolver(attackers, defenders, terrain, game_state=self.game_state)
 
         attacker_cs = sum(u.combat_rating for u in attackers)
         defender_cs = sum(u.combat_rating for u in defenders)
@@ -286,3 +406,62 @@ class CombatClickHandler:
 
     def _is_unit_on_map(self, unit):
         return bool(getattr(unit, "is_on_map", False) and unit.position and unit.position[0] is not None and unit.position[1] is not None)
+
+    def _begin_leader_escape(self, leader_escape_requests):
+        self.leader_escape_queue = list(leader_escape_requests)
+        self._activate_next_leader_escape()
+
+    def _activate_next_leader_escape(self):
+        if not self.leader_escape_queue:
+            self.active_leader_escape = None
+            self.escape_hexes = set()
+            self.view.highlight_movement_range([])
+            self._prompt_advance_after_combat()
+            return
+
+        self.active_leader_escape = self.leader_escape_queue.pop(0)
+        self.escape_hexes = {h.axial_to_offset() for h in self.active_leader_escape.options}
+        self.view.highlight_movement_range(list(self.escape_hexes))
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            None,
+            "Leader Escape",
+            f"Select a friendly stack for {self.active_leader_escape.leader.id} to escape."
+        )
+
+    def _handle_leader_escape_click(self, target_hex):
+        clicked_offset = target_hex.axial_to_offset()
+        if clicked_offset not in self.escape_hexes:
+            return
+
+        leader = self.active_leader_escape.leader
+        self.game_state.move_unit(leader, target_hex)
+        leader._tactical_rating_override = 0
+        print(f"Leader {leader.id} escaped to {clicked_offset}.")
+
+        self.active_leader_escape = None
+        self.escape_hexes = set()
+        self.view.sync_with_model()
+        self._activate_next_leader_escape()
+
+    def _prompt_advance_after_combat(self):
+        if not self.pending_advance:
+            return
+
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            None,
+            "Advance?",
+            "Advance?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            moved_units = self.game_state.advance_after_combat(
+                self.pending_advance["attackers"],
+                self.pending_advance["target_hex"],
+            )
+            if moved_units:
+                print(f"Advance after combat: moved {len(moved_units)} units.")
+
+        self.pending_advance = None
+        self.view.sync_with_model()

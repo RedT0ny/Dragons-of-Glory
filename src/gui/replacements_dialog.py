@@ -3,6 +3,8 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
                                QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene, QGridLayout,
                                QAbstractItemView)
 from PySide6.QtCore import Qt, QSize, Signal, QTimer, QRectF
+import shiboken6
+import weakref
 from PySide6.QtGui import QPixmap, QPainter, QColor
 
 from src.content.specs import UnitState
@@ -52,8 +54,17 @@ class UnitLabel(QLabel):
         return pixmap
 
     def mousePressEvent(self, event):
-        # Defer the signal to prevent the widget from being destroyed while handling the event
-        QTimer.singleShot(0, lambda: self.clicked.emit(self.unit))
+        # Defer the signal and guard against deleted widgets to avoid Qt aborts
+        self_ref = weakref.ref(self)
+        unit = self.unit
+
+        def _emit_click():
+            self_obj = self_ref()
+            if self_obj is None or not shiboken6.isValid(self_obj):
+                return
+            self_obj.clicked.emit(unit)
+
+        QTimer.singleShot(0, _emit_click)
 
         # Visual feedback for selection
         self.setStyleSheet("background-color: rgba(255, 255, 0, 50); border: 1px solid yellow; border-radius: 4px;")

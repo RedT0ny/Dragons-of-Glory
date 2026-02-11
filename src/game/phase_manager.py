@@ -86,6 +86,9 @@ class PhaseManager:
             self.game_state.phase = GamePhase.COMBAT
 
         elif self.game_state.phase == GamePhase.COMBAT:
+            self.game_state.clear_leader_tactical_overrides()
+            for unit in self.game_state.units:
+                unit.attacked_this_turn = False
             if not self.game_state.second_player_has_acted:
                 # End of First Player's turn (Step 6 done).
                 # Start Second Player's turn (Step 7).

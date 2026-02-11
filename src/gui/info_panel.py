@@ -133,7 +133,7 @@ class InfoPanel(QFrame):
 
         # 1. Picture
         self.lbl_unit_img = QLabel()
-        self.lbl_unit_img.setFixedSize(250, 250)
+        self.lbl_unit_img.setFixedSize(280, 280)
         self.lbl_unit_img.setStyleSheet("border: 1px solid black; background-color: grey;")
         self.lbl_unit_img.setScaledContents(True)
         unit_layout.addWidget(self.lbl_unit_img, alignment=Qt.AlignCenter)
