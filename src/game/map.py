@@ -127,6 +127,7 @@ class Board:
                     'is_capital': False,
                     'country_id': None,
                     'location_id': loc_spec.id,
+                    'occupier': None,
                 }
 
         # 2. Add country locations (Cities, Capitals) - Override if conflict?
@@ -144,6 +145,7 @@ class Board:
                     'is_capital': loc_spec.is_capital,
                     'country_id': country.id,
                     'location_id': loc_spec.id,
+                    'occupier': None,
                 }
 
     def populate_hexsides(self, hexsides_data: dict):

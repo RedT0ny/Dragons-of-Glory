@@ -2,7 +2,7 @@ import random
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver, LeaderEscapeRequest
 from src.content.config import MAP_WIDTH, MAP_HEIGHT
-from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS
+from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
 from src.content import loader, factory
 from src.game.map import Board, Hex
@@ -56,6 +56,10 @@ class GameState:
 
         # Draconian rules
         self.draconian_ready_at_start = 0
+
+        # Rule tags for country-specific activation logic.
+        self.tag_knight_countries = "knight_countries"
+        self.tower_country_id = "tower"
 
     @property
     def current_player(self):
@@ -462,16 +466,221 @@ class GameState:
             print(f"Warning: Country {country_id} not found for activation.")
             return
 
+        previous_allegiance = country.allegiance
         country.allegiance = allegiance
 
         # Update units status to READY
-        from src.content.specs import UnitState
         for u in self.units:
             if u.land == country_id:
                 u.status = UnitState.READY
                 u.allegiance = allegiance
 
+        self._apply_solamnic_tower_activation(country_id, previous_allegiance)
+
         print(f"Country {country_id} activated for {allegiance}")
+
+    def is_solamnic_country_for_tower_rule(self, country_id: str) -> bool:
+        country = self.countries.get(country_id)
+        return bool(
+            country
+            and country.id != self.tower_country_id
+            and self._country_has_tag(country, self.tag_knight_countries)
+        )
+
+    def get_ws_solamnic_activation_bonus(self) -> int:
+        """+1 WS activation rating per linked Solamnic nation controlled by HL."""
+        return sum(
+            1
+            for country in self._countries_with_tag(self.tag_knight_countries)
+            if country.id != self.tower_country_id
+            if country.allegiance == HL
+        )
+
+    def _apply_solamnic_tower_activation(self, country_id: str, previous_allegiance: str):
+        """
+        Rule: when the first linked Solamnic nation becomes activated (leaves neutral),
+        Tower is activated for WS as well.
+        """
+        country = self.countries.get(country_id)
+        if (
+            not country
+            or country.id == self.tower_country_id
+            or not self._country_has_tag(country, self.tag_knight_countries)
+        ):
+            return
+        if previous_allegiance != NEUTRAL:
+            return
+
+        # "First activated" means all other linked nations are still neutral.
+        any_other_already_activated = any(
+            c.id != country_id and c.allegiance != NEUTRAL
+            for c in self._countries_with_tag(self.tag_knight_countries)
+            if c.id != self.tower_country_id
+        )
+        if any_other_already_activated:
+            return
+
+        tower = self.countries.get(self.tower_country_id)
+        if not tower or tower.allegiance != NEUTRAL:
+            return
+
+        tower.allegiance = WS
+        for u in self.units:
+            if u.land == tower.id:
+                u.status = UnitState.READY
+                u.allegiance = WS
+
+        print(f"Country {tower.id} activated for whitestone (first Solamnic activation).")
+
+    def _country_has_tag(self, country, tag: str) -> bool:
+        if hasattr(country, "has_tag"):
+            return country.has_tag(tag)
+        return tag in set(getattr(country, "tags", []))
+
+    def _countries_with_tag(self, tag: str):
+        return [c for c in self.countries.values() if self._country_has_tag(c, tag)]
+
+    def get_enemy_allegiance(self, allegiance: str) -> Optional[str]:
+        if allegiance == HL:
+            return WS
+        if allegiance == WS:
+            return HL
+        return None
+
+    def can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
+        """
+        Rule 9 deployment ownership:
+        - Original owner can deploy only while location is not enemy-occupied.
+        - Conqueror can deploy from locations they occupy.
+        """
+        if allegiance not in (HL, WS):
+            return False
+        if not location or not location.coords:
+            return False
+
+        if location.occupier == allegiance:
+            return True
+        return country.allegiance == allegiance and location.occupier is None
+
+    def get_solamnic_group_deployment_locations(self, allegiance: str):
+        """
+        Returns deployable locations in the Solamnic conquest group for the given side.
+        Used to allow pooled replacements before the group is fully conquered.
+        """
+        coords = []
+        for country in self._countries_with_tag(self.tag_knight_countries):
+            if country.allegiance != allegiance:
+                continue
+            if country.conquered:
+                continue
+            for loc in country.locations.values():
+                if loc.coords and self.can_use_location_for_deployment(country, loc, allegiance):
+                    coords.append(loc.coords)
+        return coords
+
+    def _update_location_occupiers(self):
+        """
+        Rule 9: location conquest status is evaluated at end of combat phase.
+        """
+        from src.game.map import Hex
+
+        for country in self.countries.values():
+            for loc in country.locations.values():
+                if not loc.coords:
+                    continue
+
+                enemy = self.get_enemy_allegiance(country.allegiance)
+                occupier = None
+                hex_obj = Hex.offset_to_axial(*loc.coords)
+
+                if enemy:
+                    armies = [
+                        u for u in self.map.get_units_in_hex(hex_obj.q, hex_obj.r)
+                        if u.is_on_map and hasattr(u, "is_army") and u.is_army() and u.allegiance == enemy
+                    ]
+                    if armies:
+                        occupier = enemy
+
+                loc.occupier = occupier
+                if hasattr(self.map, "locations"):
+                    key = (hex_obj.q, hex_obj.r)
+                    if key in self.map.locations:
+                        self.map.locations[key]["occupier"] = occupier
+
+    def _is_country_fully_occupied_by_enemy(self, country) -> bool:
+        enemy = self.get_enemy_allegiance(country.allegiance)
+        if not enemy:
+            return False
+        if not country.locations:
+            return False
+        return all(loc.occupier == enemy for loc in country.locations.values())
+
+    def _destroy_country_upon_conquest(self, country):
+        """
+        Rule 9 effects:
+        - Armies, Wings and Leaders are permanently DESTROYED.
+        - Fleets remain.
+        """
+        destroyed_count = 0
+        for unit in self.units:
+            if unit.land != country.id:
+                continue
+
+            is_army = hasattr(unit, "is_army") and unit.is_army()
+            is_wing = unit.unit_type == UnitType.WING
+            is_leader = hasattr(unit, "is_leader") and unit.is_leader()
+            if not (is_army or is_wing or is_leader):
+                continue
+
+            if unit.status == UnitState.DESTROYED:
+                continue
+
+            unit.destroy()
+            self.map.remove_unit_from_spatial_map(unit)
+            destroyed_count += 1
+
+        country.conquered = True
+        print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
+
+    def _apply_standard_country_conquests(self):
+        for country in self.countries.values():
+            if country.allegiance not in (HL, WS):
+                continue
+            if country.conquered:
+                continue
+            if self._country_has_tag(country, self.tag_knight_countries):
+                # Solamnic conquest is resolved as a pooled rule below.
+                continue
+            if self._is_country_fully_occupied_by_enemy(country):
+                self._destroy_country_upon_conquest(country)
+
+    def _apply_solamnic_group_conquest(self):
+        """
+        Solamnic rule:
+        WS-controlled countries in this group (including Tower) are conquered only when
+        all their locations are occupied by HL.
+        """
+        group = [c for c in self._countries_with_tag(self.tag_knight_countries) if c.allegiance == WS]
+        if not group:
+            return
+
+        fully_occupied = all(self._is_country_fully_occupied_by_enemy(c) for c in group)
+        if not fully_occupied:
+            return
+
+        for country in group:
+            if not country.conquered:
+                self._destroy_country_upon_conquest(country)
+
+    def resolve_end_of_combat_conquest(self):
+        """
+        Full Rule 9 pass. Call exactly when leaving COMBAT phase.
+        """
+        if not self.map:
+            return
+        self._update_location_occupiers()
+        self._apply_standard_country_conquests()
+        self._apply_solamnic_group_conquest()
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
         self.event_system._resolve_add_units(unit_key, allegiance)

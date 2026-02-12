@@ -1,7 +1,7 @@
 # Example scenario YAML
 scenario:
   id: "unique_scenario_id"
-  picture: "scenario.jpg"
+  picture: "scenario_7.jpg"
   description: >
     Folded block scalar for historical flavor.
 

@@ -51,7 +51,8 @@ class Country:
         self.id = spec.id
 
         # Dynamic State
-        self.conquerable = False # Default for rule 9: Conquest
+        self.conquerable = True
+        self.conquered = False
         self.capital_id = spec.capital_id  # The ID of the location currently serving as capital
         self.allegiance = spec.allegiance  # 'whitestone', 'highlord', or 'neutral'
 
@@ -82,6 +83,10 @@ class Country:
         # Convert list of lists to set of tuples on the fly or cache it
         # Since territories don't change, we rely on the spec
         return {tuple(t) for t in self.spec.territories}
+
+    @property
+    def tags(self):
+        return set(self.spec.tags or [])
 
     @property
     def capital(self):
@@ -120,6 +125,9 @@ class Country:
         unit.allegiance = self.allegiance
         self.units.append(unit)
 
+    def has_tag(self, tag: str) -> bool:
+        return tag in self.tags
+
     @property
     def total_military_strength(self):
         """Calculates current CR of all active/alive units."""
@@ -132,19 +140,11 @@ class Country:
             unit.allegiance = new_allegiance
 
     def is_conquered(self):
-        """Victory Check: Conquered if ALL locations are held by the enemy side."""
-        if not self.conquerable: return False
-
-        # Determine enemy based on current allegiance
-        enemy = HL if self.allegiance == WS else WS
-        if not self.locations: 
-            return False
-
-        # Check if ALL locations are occupied by the enemy
-        return all(loc.occupier == enemy for loc in self.locations.values())
+        """Returns whether this country has already been conquered (Rule 9)."""
+        return self.conquered
 
     def surrender(self):
-        """Destroys all units upon total conquest, including reserves."""
+        """Rule 9: destroys all units upon total conquest, including reserves."""
         for unit in self.units:
             unit.destroy()
 

@@ -86,6 +86,7 @@ class PhaseManager:
             self.game_state.phase = GamePhase.COMBAT
 
         elif self.game_state.phase == GamePhase.COMBAT:
+            self.game_state.resolve_end_of_combat_conquest()
             self.game_state.clear_leader_tactical_overrides()
             for unit in self.game_state.units:
                 unit.attacked_this_turn = False

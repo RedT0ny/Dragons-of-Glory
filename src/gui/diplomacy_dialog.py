@@ -90,8 +90,12 @@ class DiplomacyDialog(QDialog):
         # alignment: Tuple (WS, HL)
         ws_rating = country.alignment[0]
         hl_rating = country.alignment[1]
-        
-        target_rating = ws_rating if active_side == WS else hl_rating
+
+        solamnic_bonus = 0
+        if active_side == WS and self.game_state.is_solamnic_country_for_tower_rule(country.id):
+            solamnic_bonus = self.game_state.get_ws_solamnic_activation_bonus()
+
+        target_rating = (ws_rating + solamnic_bonus) if active_side == WS else hl_rating
         
         # Determine color for display
         def get_color(val):
@@ -113,7 +117,10 @@ class DiplomacyDialog(QDialog):
         info_lbl.setStyleSheet("font-size: 14px;")
         dlg_layout.addWidget(info_lbl)
         
-        stats_lbl = QLabel(f"Rating needed: {target_rating} or less")
+        stats_text = f"Rating needed: {target_rating} or less"
+        if solamnic_bonus:
+            stats_text += f" (base {ws_rating} + {solamnic_bonus})"
+        stats_lbl = QLabel(stats_text)
         stats_lbl.setAlignment(Qt.AlignCenter)
         stats_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {color_style};")
         dlg_layout.addWidget(stats_lbl)

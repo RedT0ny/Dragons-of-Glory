@@ -170,6 +170,7 @@ coastlund:
   allegiance: neutral
   alignment: [3, -2]
   strength: 18
+  tags: [knight_countries]
   locations:
     hargoth: {loc_type: city, coords: [19, 16]}
   territories:
@@ -740,6 +741,7 @@ hinterlund:
   allegiance: neutral
   alignment: [3, -2]
   strength: 18
+  tags: [knight_countries]
   locations:
     maelgoth: {loc_type: port, coords: [28, 14]}
   territories:
@@ -1070,6 +1072,7 @@ sancrist:
   allegiance: neutral
   alignment: [4, -3]
   strength: 44
+  tags: [knight_countries]
   locations:
     castle_wistan: {loc_type: port, coords: [3, 26]}
   territories:
@@ -1274,6 +1277,7 @@ solanthus:
   allegiance: neutral
   alignment: [3, -2]
   strength: 30
+  tags: [knight_countries]
   locations:
     solanthus_city: {loc_type: city, coords: [25, 22]}
     thelgaard: {loc_type: fortress, coords: [22, 23]}
@@ -1322,6 +1326,7 @@ southlund:
   allegiance: neutral
   alignment: [3, -2]
   strength: 30
+  tags: [knight_countries]
   locations:
     caergoth: {loc_type: port, coords: [19, 29]}
     starport: {loc_type: port, coords: [21, 26]}
@@ -1471,8 +1476,9 @@ tower:
   capital_id: high_clerist_tower
   color: "#94B1B7"
   allegiance: neutral
-  alignment: [0, 0]
-  strength: 0
+  alignment: [-10, -10]
+  strength: 12
+  tags: [knight_countries]
   locations:
     high_clerist_tower: {loc_type: fortress, coords: [23, 16]}
   territories:

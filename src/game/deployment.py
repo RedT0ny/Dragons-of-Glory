@@ -1,5 +1,6 @@
 from typing import List, Set, Tuple
 
+from src.content.constants import WS
 from src.content.specs import GamePhase, UnitType, LocType
 from src.game.map import Hex
 
@@ -75,22 +76,31 @@ class DeploymentService:
                 if allow_territory_wide:
                     candidates = list(country.territories)
                 else:
-                    # Cities or Fortresses
-                    for loc in country.locations.values():
-                        if loc.coords:
-                            candidates.append(loc.coords)
+                    # Solamnic conquest exception:
+                    # WS units from a Solamnic country can deploy in any still-unconquered
+                    # allied Solamnic location (including Tower).
+                    if (
+                        unit.allegiance == WS
+                        and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
+                        and not country.conquered
+                    ):
+                        candidates = list(self.game_state.get_solamnic_group_deployment_locations(unit.allegiance))
+                    else:
+                    # Rule 9: owner cannot deploy into enemy-occupied locations.
+                    # Conqueror can deploy from occupied locations (handled for stateless below).
+                        for loc in country.locations.values():
+                            if loc.coords and self.game_state.can_use_location_for_deployment(country, loc, unit.allegiance):
+                                candidates.append(loc.coords)
             else:
                 # Handle stateless units (units without land) during REPLACEMENTS phase
                 # These units should be deployable in any friendly location
                 # Event-driven deployments pass allow_territory_wide to reuse the replacements logic for stateless units.
                 if (self.game_state.phase == GamePhase.REPLACEMENTS or allow_territory_wide) and unit.allegiance == self.game_state.active_player:
-                    # Find all friendly locations (fortresses, cities, ports, undercities, etc.)
-                    for country_id, country_obj in self.game_state.countries.items():
-                        if country_obj.allegiance == unit.allegiance:
-                            # Add all locations from friendly countries
-                            for loc in country_obj.locations.values():
-                                if loc.coords:
-                                    candidates.append(loc.coords)
+                    # Rule 9: includes original friendly locations plus conquered occupied locations.
+                    for country_obj in self.game_state.countries.values():
+                        for loc in country_obj.locations.values():
+                            if loc.coords and self.game_state.can_use_location_for_deployment(country_obj, loc, unit.allegiance):
+                                candidates.append(loc.coords)
 
         # 2. Filter based on Unit Type & Terrain
         valid_hexes = []

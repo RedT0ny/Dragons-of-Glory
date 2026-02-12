@@ -41,6 +41,7 @@ class CountrySpec:
     color: str
     locations: List[LocationSpec]
     territories: List[Tuple[int, int]]
+    tags: List[str] = field(default_factory=list)
 
 
 @dataclass

@@ -343,7 +343,8 @@ def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
             alignment=tuple(info.get("alignment", [0, 0])),
             color=info.get("color", "#00000000"),
             locations=locations,
-            territories=[tuple(t) for t in info.get("territories", [])]
+            territories=[tuple(t) for t in info.get("territories", [])],
+            tags=list(info.get("tags", []))
         )
     return specs
 
