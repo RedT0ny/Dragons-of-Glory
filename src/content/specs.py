@@ -187,6 +187,7 @@ class EventType(Enum):
     ARTIFACT = "artifact"
 
 class HexsideType(Enum):
+    SEA = "sea"
     RIVER = "river"
     DEEP_RIVER = "deep_river"
     MOUNTAIN = "mountain"

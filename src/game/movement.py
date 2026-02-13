@@ -3,7 +3,7 @@ import heapq
 from typing import List, Tuple
 
 from src.content.constants import HL, NEUTRAL
-from src.content.specs import LocType, UnitType
+from src.content.specs import HexsideType, LocType, UnitType
 from src.game.map import Hex
 
 
@@ -139,7 +139,9 @@ class MovementService:
                 continue
 
             if current_hex != start_hex:
-                if self.game_state.map.can_stack_move_to(units, current_hex):
+                if self.game_state.map.can_stack_move_to(units, current_hex) and all(
+                    self.game_state.map.can_unit_land_on_hex(u, current_hex) for u in units
+                ):
                     if self._is_neutral_hex(current_hex):
                         warning_hexes.append(current_hex)
                     else:
@@ -166,7 +168,7 @@ class MovementService:
                     # Check 2: Sea Barrier
                     if unit.unit_type != UnitType.WING:
                         hexside = self.game_state.map.get_hexside(current_hex, next_hex)
-                        if hexside == "sea":
+                        if hexside in (HexsideType.SEA, HexsideType.SEA.value):
                             possible = False
                             break
 
@@ -367,6 +369,9 @@ class MovementService:
     def _can_unit_reach_target(self, unit, target_hex):
         if getattr(unit, "transport_host", None) is not None:
             return False, f"{unit.id} is transported and cannot move independently."
+
+        if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+            return False, f"{unit.id} cannot end movement on that terrain."
 
         if not unit.position or unit.position[0] is None or unit.position[1] is None:
             return True, None

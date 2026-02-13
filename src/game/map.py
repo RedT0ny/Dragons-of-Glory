@@ -2,7 +2,7 @@ import heapq
 from collections import defaultdict
 
 from src.content.loader import load_countries_yaml
-from src.content.specs import HexDirection, UnitType, UnitRace, LocType, TerrainType
+from src.content.specs import HexDirection, HexsideType, UnitType, UnitRace, LocType, TerrainType
 
 
 class Hex:
@@ -172,8 +172,14 @@ class Board:
 
         # Rule 4: Ships can only move along Deep Rivers.
         # Fords and Bridges are for ground units and usually block large ships.
-        if side_type == "deep_river":
+        if self._hexside_is(side_type, HexsideType.DEEP_RIVER):
             self.navigable_edges.add(key)
+
+    @staticmethod
+    def _hexside_is(value, hexside_type: HexsideType) -> bool:
+        if isinstance(value, HexsideType):
+            return value == hexside_type
+        return value == hexside_type.value
 
     def add_unit_to_spatial_map(self, unit):
         """Registers a unit at its current position in the spatial lookup."""
@@ -364,9 +370,15 @@ class Board:
         Checks if a unit can be placed on a given hex, for unboarding or deployment.
         This checks terrain restrictions only, not stacking or ZOC.
         """
-        # Wings can't land in the desert
+        # Wings can fly over sea, but must start/end on land (including coastal).
         if unit.unit_type == UnitType.WING:
-            return self.get_terrain(target_hex) != TerrainType.DESERT
+            terrain = self.get_terrain(target_hex)
+            forbidden_terrain = {
+                TerrainType.DESERT,
+                TerrainType.OCEAN,
+                TerrainType.MAELSTROM,
+            }
+            return terrain not in forbidden_terrain
 
         # Fleets can only be in water, ports or coastal hexes
         if unit.unit_type == UnitType.FLEET:
@@ -416,7 +428,11 @@ class Board:
             if self.has_enemy_army(neighbor, unit.allegiance):
                 hexside = self.get_hexside(hex_coord, neighbor)
                 # "Armies are never considered adjacent if separated by mountain or deep river"
-                if hexside not in ["mountain", "deep_river"]:
+                blocked = (
+                    self._hexside_is(hexside, HexsideType.MOUNTAIN)
+                    or self._hexside_is(hexside, HexsideType.DEEP_RIVER)
+                )
+                if not blocked:
                     return True
         return False
 
@@ -438,11 +454,12 @@ class Board:
     def _get_wing_movement_cost(self, unit, from_hex, to_hex):
         """Rule 6: Flying creatures."""
         terrain = self.get_terrain(to_hex)
-        if terrain == "desert": return float('inf')  # Cannot enter desert
+        if terrain == TerrainType.DESERT:
+            return float('inf')  # Cannot enter desert
 
         cost = 1
         # It costs one extra Movement Point for an air army to fly over a mountain hexside.
-        if self.get_hexside(from_hex, to_hex) == "mountain":
+        if self._hexside_is(self.get_hexside(from_hex, to_hex), HexsideType.MOUNTAIN):
             cost += 1
         return cost
 
@@ -463,7 +480,7 @@ class Board:
 
         # 2. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
-        if self.get_hexside(from_hex, to_hex) == "deep_river":
+        if self._hexside_is(self.get_hexside(from_hex, to_hex), HexsideType.DEEP_RIVER):
             # Count friendly fleets currently in destination that are also 'in river'
             # Assuming 'river_hexside' property indicates if they are in a river state
             fleets_in_river = [
@@ -518,7 +535,7 @@ class Board:
                 # Must be water/coastal
                 is_valid_terrain = (self.get_terrain(curr) == "ocean" or
                                     self.is_coastal(curr) or
-                                    self.get_hexside(current_hex, curr) == "deep_river") # Simplified river check
+                                    self._hexside_is(self.get_hexside(current_hex, curr), HexsideType.DEEP_RIVER)) # Simplified river check
 
                 if is_valid_terrain:
                     # Check for enemy armies
@@ -605,7 +622,7 @@ class Board:
 
         # Mountains are impassable, unless there is a pass
         if terrain == TerrainType.MOUNTAIN:
-            if hexside_type != "pass":
+            if not self._hexside_is(hexside_type, HexsideType.PASS):
                 return float('inf')
             else:
                 cost += 1
@@ -618,13 +635,13 @@ class Board:
                 cost += 1
 
         # Rule 5: Hexside Barriers
-        if hexside_type in ["sea","deep_river"]:
+        if self._hexside_is(hexside_type, HexsideType.SEA) or self._hexside_is(hexside_type, HexsideType.DEEP_RIVER):
             return float('inf')
 
-        if hexside_type == "river":
+        if self._hexside_is(hexside_type, HexsideType.RIVER):
             cost += 2
 
-        if hexside_type == "mountain":
+        if self._hexside_is(hexside_type, HexsideType.MOUNTAIN):
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
             if unit.terrain_affinity == TerrainType.MOUNTAIN:
                 cost += 1
@@ -651,7 +668,7 @@ class Board:
             # If ground unit, check if the hexside between current and neighbor is 'sea'
             if unit.unit_type != UnitType.WING:
                 hexside = self.get_hexside(hex_coord, neighbor)
-                if hexside == "sea":  # Explicitly mark water-only boundaries in config
+                if self._hexside_is(hexside, HexsideType.SEA):  # Explicitly mark water-only boundaries in config
                     continue
 
             # 3. Cannot occupy enemy hex
@@ -758,7 +775,9 @@ class Board:
             # VALID DESTINATION CHECK
             # We can only stop (highlight) this hex if stacking limits allow it.
             if current_hex != start_hex:
-                if self.can_stack_move_to(units, current_hex):
+                if self.can_stack_move_to(units, current_hex) and all(
+                    self.can_unit_land_on_hex(u, current_hex) for u in units
+                ):
                     reachable_hexes.append(current_hex)
 
             # Explore neighbors using stack movement rules
@@ -782,7 +801,7 @@ class Board:
                     # but explicit hexside check mimics get_neighbors behavior.
                     if unit.unit_type != UnitType.WING:
                         hexside = self.get_hexside(current_hex, next_hex)
-                        if hexside == "sea":
+                        if self._hexside_is(hexside, HexsideType.SEA):
                             possible = False
                             break
 
