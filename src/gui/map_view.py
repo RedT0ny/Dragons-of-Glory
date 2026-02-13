@@ -5,7 +5,7 @@ from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 
 from src.content.constants import WS, UI_COLORS
-from src.content.specs import UnitState, GamePhase
+from src.content.specs import UnitState, GamePhase, UnitType
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
@@ -278,18 +278,19 @@ class AnsalonMapView(QGraphicsView):
         if not clicked_units:
             return
 
-        # Filter for Depleted + Same Nationality + Active Player
+        # Filter for Depleted + Active Player + eligible conscription types.
         candidates = [u for u in clicked_units
                       if u.status == UnitState.DEPLETED
-                      and u.allegiance == self.game_state.active_player]
+                      and u.allegiance == self.game_state.active_player
+                      and (u.unit_type == UnitType.FLEET or u.is_army())]
 
-        # Group by country
+        # Group by replacement rule key (army country/dragonflight or fleet country).
         from collections import defaultdict
-        by_country = defaultdict(list)
+        by_group = defaultdict(list)
         for u in candidates:
-            by_country[u.land].append(u)
+            by_group[self.game_state.get_replacement_group_key(u)].append(u)
 
-        for country, units in by_country.items():
+        for _, units in by_group.items():
             if len(units) >= 2:
                 # Trigger Merge Dialog deferred to avoid scene clearing during event processing
                 QTimer.singleShot(0, lambda: self.show_merge_dialog(units[0], units[1]))

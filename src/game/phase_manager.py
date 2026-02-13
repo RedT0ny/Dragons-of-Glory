@@ -106,6 +106,7 @@ class PhaseManager:
         self.game_state.phase = GamePhase.REPLACEMENTS
         # Change active_player to the one that lost initiative roll, so they go first in replacements
         self.game_state.active_player = WS if self.game_state.initiative_winner == HL else HL
+        self.game_state.process_delayed_fleet_replacements()
 
         # Reset unit flags
         for unit in self.game_state.units:

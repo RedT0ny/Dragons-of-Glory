@@ -166,8 +166,50 @@ class GameState:
 
     def apply_conscription(self, kept_unit, discarded_unit):
         """Apply conscription result: keep one unit, destroy the other."""
-        kept_unit.status = UnitState.READY
+        if kept_unit.unit_type == UnitType.FLEET:
+            # Fleet replacements become READY on the next replacements turn.
+            kept_unit.status = UnitState.INACTIVE
+            kept_unit.replacement_ready_turn = self.turn + 1
+        else:
+            kept_unit.status = UnitState.READY
+
         discarded_unit.status = UnitState.DESTROYED
+        discarded_unit.position = (None, None)
+
+    def process_delayed_fleet_replacements(self):
+        """
+        Promotes fleets recovered by conscription to READY at the start of a later replacement turn.
+        """
+        for unit in self.units:
+            if unit.unit_type != UnitType.FLEET:
+                continue
+            ready_turn = getattr(unit, "replacement_ready_turn", None)
+            if ready_turn is None:
+                continue
+            if self.turn >= ready_turn and unit.status == UnitState.INACTIVE:
+                unit.status = UnitState.READY
+                delattr(unit, "replacement_ready_turn")
+
+    def get_replacement_group_key(self, unit):
+        """
+        Group key for replacement/conscription pairing.
+        - Armies: same country OR same dragonflight.
+        - Fleets: same country only.
+        """
+        if unit.unit_type == UnitType.FLEET:
+            return ("fleet", unit.land)
+        if hasattr(unit, "is_army") and unit.is_army():
+            dragonflight = getattr(unit.spec, "dragonflight", None)
+            return ("army", dragonflight or unit.land)
+        return (None, None)
+
+    def can_conscript_pair(self, unit_a, unit_b) -> bool:
+        """
+        Validates replacement/conscription pair eligibility without mixing unit types.
+        """
+        key_a = self.get_replacement_group_key(unit_a)
+        key_b = self.get_replacement_group_key(unit_b)
+        return key_a[0] is not None and key_a == key_b
 
     def _apply_map_subset_offsets(self, offset_col: int, offset_row: int, width: int, height: int):
         """Normalize scenario and country coordinates to local (subset) space."""
@@ -623,11 +665,18 @@ class GameState:
         """
         Rule 9 effects:
         - Armies, Wings and Leaders are permanently DESTROYED.
-        - Fleets remain.
+        - Fleets remain only if currently on map (ACTIVE/DEPLETED).
         """
         destroyed_count = 0
         for unit in self.units:
             if unit.land != country.id:
+                continue
+
+            if unit.unit_type == UnitType.FLEET:
+                if unit.status not in UnitState.on_map_states() and unit.status != UnitState.DESTROYED:
+                    unit.destroy()
+                    self.map.remove_unit_from_spatial_map(unit)
+                    destroyed_count += 1
                 continue
 
             is_army = hasattr(unit, "is_army") and unit.is_army()
@@ -645,6 +694,29 @@ class GameState:
 
         country.conquered = True
         print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
+
+    def _enforce_conquered_fleet_replacement_rule(self):
+        """
+        Fleets from conquered countries that reach RESERVE are DESTROYED,
+        except for knight-country fleets while at least one knight country is unconquered.
+        """
+        any_knight_unconquered = any(
+            (not c.conquered) for c in self._countries_with_tag(self.tag_knight_countries)
+        )
+
+        for unit in self.units:
+            if unit.unit_type != UnitType.FLEET or unit.status != UnitState.RESERVE:
+                continue
+            country = self.countries.get(unit.land)
+            if not country or not country.conquered:
+                continue
+
+            is_knight_country = self._country_has_tag(country, self.tag_knight_countries)
+            if is_knight_country and any_knight_unconquered:
+                continue
+
+            unit.destroy()
+            self.map.remove_unit_from_spatial_map(unit)
 
     def _apply_standard_country_conquests(self):
         for country in self.countries.values():
@@ -685,6 +757,7 @@ class GameState:
         self._update_location_occupiers()
         self._apply_standard_country_conquests()
         self._apply_solamnic_group_conquest()
+        self._enforce_conquered_fleet_replacement_rule()
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
         self.event_system._resolve_add_units(unit_key, allegiance)

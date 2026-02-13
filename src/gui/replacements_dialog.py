@@ -358,7 +358,7 @@ class ReplacementsDialog(QDialog):
             self.selected_reserve_unit = None
             sender_lbl.deselect()
 
-        elif self.selected_reserve_unit.land == unit.land:
+        elif self.game_state.can_conscript_pair(self.selected_reserve_unit, unit):
             # Pair found!
             self.show_conscription_choice(self.selected_reserve_unit, unit)
             # Reset selection visual
