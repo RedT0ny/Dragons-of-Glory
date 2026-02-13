@@ -247,10 +247,9 @@ class Board:
         for hex_coord in [from_hex, to_hex]:
             units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
             for u in units:
-                if u.unit_type == "fleet" and u.allegiance == alliance:
+                if u.unit_type == UnitType.FLEET and u.allegiance == alliance:
                     # Check if this ship is stationed on THIS specific hexside
-                    if getattr(u, 'river_hexside', None) == key:
-                        # Optional: Add check for 'has_moved_this_turn' if you track that
+                    if getattr(u, 'river_hexside', None) == key and not getattr(u, "moved_this_turn", False):
                         return True
         return False
 
@@ -299,6 +298,11 @@ class Board:
         key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
         return self.hexside_data.get(key)
 
+    def get_hexside_key(self, from_hex, to_hex):
+        m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
+        m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
+        return tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
+
     def get_effective_hexside(self, from_hex, to_hex):
         """
         Returns the gameplay-effective hexside type.
@@ -316,6 +320,263 @@ class Board:
             return HexsideType.MOUNTAIN.value
 
         return raw
+
+    @staticmethod
+    def _fleet_state_key(state):
+        hex_obj, river_hexside = state
+        return (hex_obj.q, hex_obj.r, river_hexside)
+
+    def _local_hex_from_master_coords(self, master_q, master_r):
+        master_col, master_row = Hex(master_q, master_r).axial_to_offset()
+        local_col = master_col - self.offset_col
+        local_row = master_row - self.offset_row
+        return Hex.offset_to_axial(local_col, local_row)
+
+    def _river_endpoints_local(self, river_hexside):
+        if not river_hexside:
+            return []
+        (q1, r1), (q2, r2) = river_hexside
+        return [
+            self._local_hex_from_master_coords(q1, r1),
+            self._local_hex_from_master_coords(q2, r2),
+        ]
+
+    def _is_valid_local_hex(self, hex_obj):
+        col, row = hex_obj.axial_to_offset()
+        return 0 <= col < self.width and 0 <= row < self.height
+
+    def is_valid_hex(self, hex_obj):
+        """Compatibility wrapper used by older BFS helpers."""
+        return self._is_valid_local_hex(hex_obj)
+
+    def _is_enemy_for_fleet(self, unit, other):
+        return (
+            other.allegiance != unit.allegiance
+            and other.allegiance != "neutral"
+            and getattr(other, "is_on_map", True)
+        )
+
+    def _hex_has_enemy_unit_for_fleet(self, hex_obj, unit):
+        for other in self.get_units_in_hex(hex_obj.q, hex_obj.r):
+            if self._is_enemy_for_fleet(unit, other):
+                return True
+        return False
+
+    def _hexside_has_enemy_ship(self, river_hexside, unit):
+        for units in self.unit_map.values():
+            for other in units:
+                if (
+                    other is not unit
+                    and getattr(other, "unit_type", None) == UnitType.FLEET
+                    and getattr(other, "river_hexside", None) == river_hexside
+                    and self._is_enemy_for_fleet(unit, other)
+                ):
+                    return True
+        return False
+
+    def _fleet_count_on_river_hexside(self, river_hexside, exclude_unit=None):
+        count = 0
+        for units in self.unit_map.values():
+            for other in units:
+                if other is exclude_unit:
+                    continue
+                if (
+                    getattr(other, "unit_type", None) == UnitType.FLEET
+                    and getattr(other, "river_hexside", None) == river_hexside
+                    and getattr(other, "is_on_map", True)
+                ):
+                    count += 1
+        return count
+
+    def _fleet_can_enter_hex(self, unit, hex_obj):
+        if not self._is_valid_local_hex(hex_obj):
+            return False
+        if self._hex_has_enemy_unit_for_fleet(hex_obj, unit):
+            return False
+        loc = self.get_location(hex_obj)
+        if loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value:
+            return True
+        terrain = self.get_terrain(hex_obj)
+        return terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM) or self.is_coastal(hex_obj)
+
+    def _fleet_can_enter_river_hexside(self, unit, river_hexside):
+        if self._hexside_has_enemy_ship(river_hexside, unit):
+            return False
+
+        endpoints = self._river_endpoints_local(river_hexside)
+        if len(endpoints) != 2:
+            return False
+
+        if not all(self._is_valid_local_hex(h) for h in endpoints):
+            return False
+
+        if any(self._hex_has_enemy_unit_for_fleet(h, unit) for h in endpoints):
+            return False
+
+        return self._fleet_count_on_river_hexside(river_hexside, exclude_unit=unit) < 2
+
+    def _fleet_neighbor_states(self, unit, state):
+        current_hex, river_hexside = state
+        neighbors = []
+
+        if river_hexside is None:
+            for next_hex in current_hex.neighbors():
+                if not self._is_valid_local_hex(next_hex):
+                    continue
+                edge = self.get_effective_hexside(current_hex, next_hex)
+                if self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                    next_side = self.get_hexside_key(current_hex, next_hex)
+                    if not self._fleet_can_enter_river_hexside(unit, next_side):
+                        continue
+                    neighbors.append(((current_hex, next_side), 1))
+                    neighbors.append(((next_hex, next_side), 1))
+                    continue
+
+                if self._fleet_can_enter_hex(unit, next_hex):
+                    neighbors.append(((next_hex, None), 1))
+
+            # Port special-case: a fleet in port may enter an adjacent deep-river
+            # hexside formed by two neighboring hexes of the port.
+            loc = self.get_location(current_hex)
+            if loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value:
+                adjacent = [h for h in current_hex.neighbors() if self._is_valid_local_hex(h)]
+                for i in range(len(adjacent)):
+                    for j in range(i + 1, len(adjacent)):
+                        a = adjacent[i]
+                        b = adjacent[j]
+                        edge = self.get_effective_hexside(a, b)
+                        if not self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                            continue
+                        side = self.get_hexside_key(a, b)
+                        if not self._fleet_can_enter_river_hexside(unit, side):
+                            continue
+                        neighbors.append(((a, side), 1))
+                        neighbors.append(((b, side), 1))
+            return neighbors
+
+        endpoints = self._river_endpoints_local(river_hexside)
+        if len(endpoints) != 2:
+            return neighbors
+        a, b = endpoints
+        if current_hex == a:
+            neighbors.append(((b, river_hexside), 0))
+        elif current_hex == b:
+            neighbors.append(((a, river_hexside), 0))
+
+        for endpoint in endpoints:
+            if self._fleet_can_enter_hex(unit, endpoint):
+                neighbors.append(((endpoint, None), 1))
+
+            for next_hex in endpoint.neighbors():
+                if not self._is_valid_local_hex(next_hex):
+                    continue
+                edge = self.get_effective_hexside(endpoint, next_hex)
+                if self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                    continue
+                if self._fleet_can_enter_hex(unit, next_hex):
+                    neighbors.append(((next_hex, None), 1))
+
+            for next_hex in endpoint.neighbors():
+                if not self._is_valid_local_hex(next_hex):
+                    continue
+                edge = self.get_effective_hexside(endpoint, next_hex)
+                if not self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                    continue
+                next_side = self.get_hexside_key(endpoint, next_hex)
+                if next_side == river_hexside:
+                    continue
+                if not self._fleet_can_enter_river_hexside(unit, next_side):
+                    continue
+                neighbors.append(((endpoint, next_side), 1))
+                neighbors.append(((next_hex, next_side), 1))
+        return neighbors
+
+    def find_fleet_route(self, unit, start_hex, target_hex):
+        """
+        Finds minimum-MP route for fleets using hex/hexside state.
+        Returns (state_path, cost), where state_path includes start and end states.
+        """
+        start_state = (start_hex, getattr(unit, "river_hexside", None))
+        start_key = self._fleet_state_key(start_state)
+        frontier = []
+        heapq.heappush(frontier, (0, 0, start_state))
+        cost_so_far = {start_key: 0}
+        came_from = {start_key: None}
+        state_by_key = {start_key: start_state}
+        counter = 1
+
+        best_target_key = None
+        best_target_cost = float("inf")
+
+        while frontier:
+            current_cost, _, current_state = heapq.heappop(frontier)
+            current_key = self._fleet_state_key(current_state)
+            if current_cost > cost_so_far.get(current_key, float("inf")):
+                continue
+
+            current_hex, _ = current_state
+            if current_hex == target_hex and current_cost < best_target_cost:
+                best_target_key = current_key
+                best_target_cost = current_cost
+
+            for next_state, step_cost in self._fleet_neighbor_states(unit, current_state):
+                next_key = self._fleet_state_key(next_state)
+                new_cost = current_cost + step_cost
+                if new_cost < cost_so_far.get(next_key, float("inf")):
+                    cost_so_far[next_key] = new_cost
+                    came_from[next_key] = current_key
+                    state_by_key[next_key] = next_state
+                    heapq.heappush(frontier, (new_cost, counter, next_state))
+                    counter += 1
+
+        if best_target_key is None:
+            return [], float("inf")
+
+        rev_keys = []
+        node = best_target_key
+        while node is not None:
+            rev_keys.append(node)
+            node = came_from.get(node)
+        rev_keys.reverse()
+        path = [state_by_key[k] for k in rev_keys]
+        return path, best_target_cost
+
+    def get_reachable_hexes_for_fleet(self, unit):
+        if not getattr(unit, "position", None):
+            return []
+        start_hex = Hex.offset_to_axial(*unit.position)
+        max_mp = getattr(unit, "movement_points", unit.movement)
+        start_state = (start_hex, getattr(unit, "river_hexside", None))
+        start_key = self._fleet_state_key(start_state)
+        frontier = []
+        heapq.heappush(frontier, (0, 0, start_state))
+        cost_so_far = {start_key: 0}
+        counter = 1
+        reachable = set()
+
+        while frontier:
+            current_cost, _, state = heapq.heappop(frontier)
+            state_key = self._fleet_state_key(state)
+            if current_cost > cost_so_far.get(state_key, float("inf")):
+                continue
+            if current_cost > max_mp:
+                continue
+
+            current_hex, _ = state
+            if current_hex != start_hex and self.can_stack_move_to([unit], current_hex):
+                reachable.add(current_hex)
+
+            for next_state, step_cost in self._fleet_neighbor_states(unit, state):
+                new_cost = current_cost + step_cost
+                if new_cost > max_mp:
+                    continue
+                next_key = self._fleet_state_key(next_state)
+                if new_cost < cost_so_far.get(next_key, float("inf")):
+                    cost_so_far[next_key] = new_cost
+                    heapq.heappush(frontier, (new_cost, counter, next_state))
+                    counter += 1
+
+        return list(reachable)
 
     def get_location(self, hex_coord):
         """Returns location dict if one exists at this hex."""
@@ -486,27 +747,21 @@ class Board:
         Rule 4: Ships count hexsides moved along (deep rivers).
         Also checks for enemy ships/armies (Blocking) and Stacking.
         """
-        # 1. Check for Blocking Enemies
-        # "A ship cannot enter a hex... containing an enemy ship... or enemy army."
-        target_units = self.get_units_in_hex(to_hex.q, to_hex.r)
-        for u in target_units:
-            if self.are_enemies(unit, u):
-                if u.unit_type == UnitType.FLEET:
-                    return float('inf') # Blocked by enemy ship
-                if u.is_army():
-                    return float('inf') # Blocked by enemy army
+        # 1. Check for blocking enemies in the destination hex.
+        if self._hex_has_enemy_unit_for_fleet(to_hex, unit):
+            return float('inf')
 
         # 2. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
         if self._hexside_is(self.get_effective_hexside(from_hex, to_hex), HexsideType.DEEP_RIVER):
-            # Count friendly fleets currently in destination that are also 'in river'
-            # Assuming 'river_hexside' property indicates if they are in a river state
-            fleets_in_river = [
-                u for u in target_units
-                if u.unit_type == UnitType.FLEET and u.river_hexside is not None
-            ]
-            if len(fleets_in_river) >= 2:
-                return float('inf') # Stacking limit reached
+            river_side = self.get_hexside_key(from_hex, to_hex)
+            if self._hexside_has_enemy_ship(river_side, unit):
+                return float('inf')
+            if self._fleet_count_on_river_hexside(river_side, exclude_unit=unit) >= 2:
+                return float('inf')
+            endpoints = self._river_endpoints_local(river_side)
+            if any(self._hex_has_enemy_unit_for_fleet(h, unit) for h in endpoints):
+                return float('inf')
             return 1
 
         # 3. Standard Sea/Coastal/Maelstrom Movement
@@ -529,16 +784,47 @@ class Board:
 
         for u in units_in_hex:
             if u.unit_type == UnitType.FLEET and self.are_enemies(army, u):
-                # Find retreat location
-                retreat_hex = self._find_nearest_safe_sea_hex(u, target_hex, army.allegiance)
-
-                if retreat_hex:
+                retreat_state = self._find_nearest_safe_fleet_state(u, target_hex, army.allegiance)
+                if retreat_state:
+                    retreat_hex, retreat_side = retreat_state
                     self.move_unit_internal(u, retreat_hex)
-                    # Reset river status if forced out to sea
-                    if self.get_terrain(retreat_hex) == "ocean":
-                        u.river_hexside = None
+                    u.river_hexside = retreat_side
                 else:
                     u.destroy() # No escape, ship destroyed
+
+    def _find_nearest_safe_fleet_state(self, fleet, start_hex, enemy_allegiance):
+        start_state = (start_hex, getattr(fleet, "river_hexside", None))
+        start_key = self._fleet_state_key(start_state)
+        frontier = []
+        heapq.heappush(frontier, (0, 0, start_state))
+        cost_so_far = {start_key: 0}
+        counter = 1
+
+        while frontier:
+            current_cost, _, state = heapq.heappop(frontier)
+            state_key = self._fleet_state_key(state)
+            if current_cost > cost_so_far.get(state_key, float("inf")):
+                continue
+
+            current_hex, _ = state
+            if state_key != start_key:
+                units = self.get_units_in_hex(current_hex.q, current_hex.r)
+                has_enemy_army = any(
+                    getattr(u, "is_army", lambda: False)() and u.allegiance == enemy_allegiance
+                    for u in units
+                )
+                if not has_enemy_army:
+                    return state
+
+            for next_state, step_cost in self._fleet_neighbor_states(fleet, state):
+                next_key = self._fleet_state_key(next_state)
+                new_cost = current_cost + step_cost
+                if new_cost < cost_so_far.get(next_key, float("inf")):
+                    cost_so_far[next_key] = new_cost
+                    heapq.heappush(frontier, (new_cost, counter, next_state))
+                    counter += 1
+
+        return None
 
     def _find_nearest_safe_sea_hex(self, fleet, current_hex, enemy_allegiance):
         """BFS to find nearest hex that is water/coastal and free of enemy armies."""
@@ -551,7 +837,7 @@ class Board:
             # Check if this hex is valid destination (excluding the one we are being kicked out of)
             if curr != current_hex:
                 # Must be water/coastal
-                is_valid_terrain = (self.get_terrain(curr) == "ocean" or
+                is_valid_terrain = (self.get_terrain(curr) == TerrainType.OCEAN or
                                     self.is_coastal(curr) or
                                     self._hexside_is(self.get_effective_hexside(current_hex, curr), HexsideType.DEEP_RIVER)) # Simplified river check
 
@@ -750,6 +1036,8 @@ class Board:
         """
         if not units:
             return []
+        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
+            return self.get_reachable_hexes_for_fleet(units[0])
 
         # 1. Determine Stack Constraints
         start_hex = None

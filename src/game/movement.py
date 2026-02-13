@@ -43,6 +43,12 @@ class MovementService:
         """
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
+        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
+            reachable_hexes = self.game_state.map.get_reachable_hexes(units)
+            return MovementRangeResult(
+                reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
+                neutral_warning_coords=[]
+            )
 
         start_hex, min_mp = self._get_stack_start_and_min_mp(units)
         if not start_hex or min_mp <= 0:
@@ -370,23 +376,28 @@ class MovementService:
         if getattr(unit, "transport_host", None) is not None:
             return False, f"{unit.id} is transported and cannot move independently."
 
-        if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+        if unit.unit_type != UnitType.FLEET and not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
             return False, f"{unit.id} cannot end movement on that terrain."
 
         if not unit.position or unit.position[0] is None or unit.position[1] is None:
             return True, None
 
         start_hex = Hex.offset_to_axial(*unit.position)
-        path = self.game_state.map.find_shortest_path(unit, start_hex, target_hex)
-        if not path and start_hex != target_hex:
-            return False, f"{unit.id} has no valid path."
+        if unit.unit_type == UnitType.FLEET:
+            _, cost = self.game_state.map.find_fleet_route(unit, start_hex, target_hex)
+            if cost == float("inf"):
+                return False, f"{unit.id} has no valid path."
+        else:
+            path = self.game_state.map.find_shortest_path(unit, start_hex, target_hex)
+            if not path and start_hex != target_hex:
+                return False, f"{unit.id} has no valid path."
 
-        cost = 0
-        current = start_hex
-        for next_step in path:
-            step_cost = self.game_state.map.get_movement_cost(unit, current, next_step)
-            cost += step_cost
-            current = next_step
+            cost = 0
+            current = start_hex
+            for next_step in path:
+                step_cost = self.game_state.map.get_movement_cost(unit, current, next_step)
+                cost += step_cost
+                current = next_step
 
         if cost > self._unit_movement_points(unit):
             return False, f"{unit.id} lacks movement points."

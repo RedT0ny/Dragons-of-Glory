@@ -449,6 +449,7 @@ class GameState:
 
         # 1. Deduct Movement Points (Only in Movement Phase)
         # We check if unit is already on map to avoid cost calculation for deployment/teleport
+        fleet_final_hexside = getattr(unit, "river_hexside", None)
         if self.phase == GamePhase.MOVEMENT and unit.position:
             if unit.position[0] is None or unit.position[1] is None:
                 start_hex = None
@@ -460,17 +461,33 @@ class GameState:
                 if not hasattr(unit, 'movement_points'):
                     unit.movement_points = unit.movement
 
-                # Calculate path cost using A* to ensure we deduct the optimal cost
-                path = self.map.find_shortest_path(unit, start_hex, target_hex)
-                if not path and start_hex != target_hex:
-                    return
+                if unit.unit_type == UnitType.FLEET:
+                    state_path, cost = self.map.find_fleet_route(unit, start_hex, target_hex)
+                    if not state_path and start_hex != target_hex:
+                        return
+                    if state_path:
+                        fleet_final_hexside = state_path[-1][1]
+                        for i in range(1, len(state_path)):
+                            prev_hex, prev_side = state_path[i - 1]
+                            curr_hex, curr_side = state_path[i]
+                            if prev_side is None and curr_side is not None:
+                                print(f"Fleet {unit.id} enters deep_river hexside {curr_side} (hex -> hexside).")
+                            elif prev_side is not None and curr_side is None:
+                                print(f"Fleet {unit.id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
+                            elif prev_side is not None and curr_side != prev_side:
+                                print(f"Fleet {unit.id} moves along deep_river to hexside {curr_side}.")
+                else:
+                    # Calculate path cost using A* to ensure we deduct the optimal cost
+                    path = self.map.find_shortest_path(unit, start_hex, target_hex)
+                    if not path and start_hex != target_hex:
+                        return
 
-                cost = 0
-                current = start_hex
-                for next_step in path:
-                    step_cost = self.map.get_movement_cost(unit, current, next_step)
-                    cost += step_cost
-                    current = next_step
+                    cost = 0
+                    current = start_hex
+                    for next_step in path:
+                        step_cost = self.map.get_movement_cost(unit, current, next_step)
+                        cost += step_cost
+                        current = next_step
 
                 if cost > unit.movement_points:
                     return
@@ -489,6 +506,8 @@ class GameState:
 
         if self.phase == GamePhase.MOVEMENT:
             unit.moved_this_turn = True
+            if unit.unit_type == UnitType.FLEET:
+                unit.river_hexside = fleet_final_hexside
 
         # If this unit is a carrier (Fleet/Wing/Citadel) move its passengers implicitly
         passengers = getattr(unit, 'passengers', None)
