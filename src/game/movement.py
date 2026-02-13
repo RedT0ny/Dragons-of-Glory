@@ -170,9 +170,9 @@ class MovementService:
                             possible = False
                             break
 
-                    # Check 3: ZOC (Rule 5)
-                    is_exempt = unit.unit_type in (UnitType.CAVALRY, UnitType.WING) or (hasattr(unit, 'is_leader') and unit.is_leader())
-                    if not is_exempt:
+                    # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
+                    zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
+                    if zoc_restricted:
                         if self.game_state.map.is_adjacent_to_enemy(current_hex, unit) and self.game_state.map.is_adjacent_to_enemy(next_hex, unit):
                             possible = False
                             break

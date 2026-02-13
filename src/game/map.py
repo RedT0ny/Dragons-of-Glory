@@ -401,7 +401,12 @@ class Board:
         """Rule 5: Check if hex contains any army from a different alliance."""
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
         for u in units:
-            if u.allegiance != alliance and u.allegiance != 'neutral':
+            if (
+                u.allegiance != alliance
+                and u.allegiance != 'neutral'
+                and hasattr(u, "is_army")
+                and u.is_army()
+            ):
                 return True
         return False
 
@@ -634,7 +639,7 @@ class Board:
         """
         neighbors = []
         currently_in_zoc = self.is_adjacent_to_enemy(hex_coord, unit)
-        is_exempt = unit.unit_type in [UnitType.CAVALRY, UnitType.WING] or unit.is_leader()
+        zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
 
         for neighbor in hex_coord.neighbors():
             # 1. Basic Bounds Check
@@ -654,7 +659,7 @@ class Board:
                 continue
 
             # Rule 5: Movement must stop if moving from ZOC to another ZOC hex
-            if currently_in_zoc and not is_exempt:
+            if currently_in_zoc and zoc_restricted:
                 if self.is_adjacent_to_enemy(neighbor, unit):
                     continue
 
@@ -781,11 +786,9 @@ class Board:
                             possible = False
                             break
 
-                    # Check 3: ZOC (Rule 5)
-                    # If currently in ZOC, cannot move to another ZOC hex.
-                    # Exemptions: Cavalry, Wing, Leader (UnitType check or method)
-                    is_exempt = unit.unit_type in (UnitType.CAVALRY, UnitType.WING) or (hasattr(unit, 'is_leader') and unit.is_leader())
-                    if not is_exempt:
+                    # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
+                    zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
+                    if zoc_restricted:
                         if self.is_adjacent_to_enemy(current_hex, unit) and self.is_adjacent_to_enemy(next_hex, unit):
                             possible = False
                             break

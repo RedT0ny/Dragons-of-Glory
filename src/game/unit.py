@@ -402,7 +402,7 @@ class Hero(Unit):
 
 class Army(Unit):
     """
-    Represents an army (Infantry/Cavalry).
+    Represents a ground army (Infantry/Cavalry).
     """
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
