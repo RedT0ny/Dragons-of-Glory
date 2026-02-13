@@ -81,7 +81,8 @@ class DiplomacyActivationService:
 
     def build_deployment_plan(self, effects: dict, active_player: str) -> DeploymentPlan:
         country_filter = effects.get("alliance")
-        if "alliance" in effects:
+        alliance_already_activated = bool(effects.get("alliance_already_activated"))
+        if "alliance" in effects and not alliance_already_activated:
             self.game_state.activate_country(country_filter, active_player)
 
         if "add_units" in effects:

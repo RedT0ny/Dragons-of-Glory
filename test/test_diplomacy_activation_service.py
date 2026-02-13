@@ -112,6 +112,22 @@ def test_build_deployment_plan_clears_filter_for_add_units():
     assert plan.country_filter is None
 
 
+def test_build_deployment_plan_skips_activation_when_already_activated():
+    gs = _game_state(
+        active_player=HL,
+        countries={"icewall": _country("icewall", NEUTRAL, (2, 6))},
+    )
+    service = DiplomacyActivationService(gs)
+
+    plan = service.build_deployment_plan(
+        {"alliance": "icewall", "alliance_already_activated": True},
+        HL,
+    )
+
+    assert plan.country_filter == "icewall"
+    assert gs.activated == []
+
+
 def test_resolve_invasion_success_activates_country_and_returns_outcome():
     country = _country("coastlund", NEUTRAL, (5, 3))
     country.strength = 4

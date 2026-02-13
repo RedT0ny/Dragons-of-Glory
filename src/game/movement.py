@@ -25,6 +25,14 @@ class MoveUnitsResult:
     errors: List[str]
 
 
+@dataclass
+class NeutralEntryDecision:
+    is_neutral_entry: bool
+    country_id: str | None = None
+    blocked_message: str | None = None
+    confirmation_prompt: str | None = None
+
+
 class MovementService:
     def __init__(self, game_state):
         self.game_state = game_state
@@ -67,6 +75,26 @@ class MovementService:
             self.game_state.move_unit(unit, target_hex)
             moved.append(unit)
         return MoveUnitsResult(moved=moved, errors=[])
+
+    def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
+        col, row = target_hex.axial_to_offset()
+        country = self.game_state.get_country_by_hex(col, row)
+        if not country or country.allegiance != NEUTRAL:
+            return NeutralEntryDecision(is_neutral_entry=False)
+
+        country_id = country.id
+        if self.game_state.active_player != HL:
+            return NeutralEntryDecision(
+                is_neutral_entry=True,
+                country_id=country_id,
+                blocked_message="Whitestone player cannot invade neutral countries.",
+            )
+
+        return NeutralEntryDecision(
+            is_neutral_entry=True,
+            country_id=country_id,
+            confirmation_prompt=f"Invade {country_id}?",
+        )
 
     def _get_stack_start_and_min_mp(self, units):
         start_hex = None

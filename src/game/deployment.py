@@ -1,8 +1,15 @@
+from dataclasses import dataclass
 from typing import List, Set, Tuple
 
-from src.content.constants import WS
-from src.content.specs import GamePhase, UnitType, LocType
+from src.content.constants import WS, HL
+from src.content.specs import GamePhase, UnitType, LocType, UnitState
 from src.game.map import Hex
+
+
+@dataclass(frozen=True)
+class UnitDeploymentResult:
+    success: bool
+    error: str | None = None
 
 
 class DeploymentService:
@@ -133,3 +140,30 @@ class DeploymentService:
             return True
         loc = self.game_state.map.get_location(hex_obj)
         return bool(loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value)
+
+    def deploy_unit(
+        self,
+        unit,
+        target_hex: Hex,
+        invasion_deployment_active: bool = False,
+        invasion_deployment_allegiance: str | None = None,
+        invasion_deployment_country_id: str | None = None,
+        highlord_allegiance: str = HL,
+    ) -> UnitDeploymentResult:
+        if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: invalid terrain.")
+
+        if not self.game_state.map.can_stack_move_to([unit], target_hex):
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: stacking limit or enemy presence.")
+
+        self.game_state.move_unit(unit, target_hex)
+        unit.status = UnitState.ACTIVE
+
+        if (
+            invasion_deployment_active
+            and invasion_deployment_allegiance == highlord_allegiance
+            and unit.land == invasion_deployment_country_id
+        ):
+            unit.movement_points = 0
+
+        return UnitDeploymentResult(success=True)

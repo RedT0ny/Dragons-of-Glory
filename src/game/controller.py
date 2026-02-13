@@ -2,7 +2,7 @@
 from PySide6.QtCore import QObject, QTimer
 
 from src.content.constants import HL, WS
-from src.content.specs import GamePhase, UnitState
+from src.content.specs import GamePhase
 from src.game.diplomacy import DiplomacyActivationService
 from src.game.movement import MovementService
 
@@ -33,6 +33,7 @@ class GameController(QObject):
         from src.game.combat import CombatClickHandler
         self.combat_click_handler = CombatClickHandler(self.game_state, self.view)
         self.movement_service = MovementService(self.game_state)
+        self.deployment_service = self.game_state.deployment_service
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
@@ -156,7 +157,10 @@ class GameController(QObject):
                     country_id = dlg.activated_country_id
 
                     # Use the same deployment handling method
-                    self._handle_deployment_from_event({"alliance": country_id}, active_player)
+                    self._handle_deployment_from_event(
+                        {"alliance": country_id, "alliance_already_activated": True},
+                        active_player,
+                    )
                     return
 
                     # If AI, or human failed/cancelled activation, move on
@@ -351,24 +355,26 @@ class GameController(QObject):
             col, row = hex_obj.axial_to_offset()
             if (col, row) in self.neutral_warning_hexes:
                 from PySide6.QtWidgets import QMessageBox
-                country = self.game_state.get_country_by_hex(col, row)
-                country_id = country.id if country else "unknown"
-                if self.game_state.active_player == WS:
+                decision = self.movement_service.evaluate_neutral_entry(hex_obj)
+                if not decision.is_neutral_entry:
+                    pass
+                elif decision.blocked_message:
                     QMessageBox.information(
                         self.view.window(),
                         "Neutral Territory",
-                        "Whitestone player cannot invade neutral countries."
+                        decision.blocked_message
                     )
-                else:
+                    return
+                elif decision.confirmation_prompt:
                     reply = QMessageBox.question(
                         self.view.window(),
                         "Neutral Territory",
-                        f"Invade {country_id}?",
+                        decision.confirmation_prompt,
                         QMessageBox.Ok | QMessageBox.Cancel
                     )
                     if reply == QMessageBox.Ok:
-                        self._attempt_invasion(country_id)
-                return
+                        self._attempt_invasion(decision.country_id or "unknown")
+                    return
 
             # Move all selected units
             move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
@@ -433,22 +439,16 @@ class GameController(QObject):
             unit: Unit to deploy
             target_hex: Target hex for deployment
         """
-        if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
-            print(f"Cannot deploy {unit.id}: invalid terrain.")
+        result = self.deployment_service.deploy_unit(
+            unit,
+            target_hex,
+            invasion_deployment_active=self._invasion_deployment_active,
+            invasion_deployment_allegiance=self._invasion_deployment_allegiance,
+            invasion_deployment_country_id=self._invasion_deployment_country_id,
+        )
+        if not result.success:
+            print(result.error)
             return
-        if not self.game_state.map.can_stack_move_to([unit], target_hex):
-            print(f"Cannot deploy {unit.id}: stacking limit or enemy presence.")
-            return
-
-        # Move the unit through the game state
-        self.game_state.move_unit(unit, target_hex)
-        
-        # Update unit state
-        unit.status = UnitState.ACTIVE
-        if (self._invasion_deployment_active
-                and self._invasion_deployment_allegiance == HL
-                and unit.land == self._invasion_deployment_country_id):
-            unit.movement_points = 0
         
         # Sync the view on the next event loop tick to avoid scene re-entrancy
         def _deferred_sync():
