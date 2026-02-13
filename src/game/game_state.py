@@ -390,6 +390,10 @@ class GameState:
                 return country
         return None
 
+    def is_country_neutral(self, country_id: str) -> bool:
+        country = self.countries.get(country_id)
+        return bool(country and country.allegiance == NEUTRAL)
+
     def move_unit(self, unit, target_hex):
         """
         Centralizes the move: updates unit.position AND the spatial map.

@@ -3,6 +3,7 @@ from PySide6.QtCore import QObject, QTimer
 
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
+from src.game.diplomacy import DiplomacyActivationService
 from src.game.movement import MovementService
 
 
@@ -34,6 +35,7 @@ class GameController(QObject):
         self.movement_service = MovementService(self.game_state)
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
+        self.diplomacy_service = DiplomacyActivationService(self.game_state)
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -418,9 +420,10 @@ class GameController(QObject):
             country_id: ID of the country to activate
             allegiance: Allegiance to assign (highlord/whitestone)
         """
-        # Activate the country through the game state
-        self.game_state.activate_country(country_id, allegiance)
-        print(f"Country {country_id} activated for {allegiance} via controller")
+        if self.diplomacy_service.activate_country(country_id, allegiance):
+            print(f"Country {country_id} activated for {allegiance} via controller")
+        else:
+            print(f"Country {country_id} not found for activation.")
 
     def handle_unit_deployment(self, unit, target_hex):
         """
@@ -488,15 +491,7 @@ class GameController(QObject):
         from src.gui.replacements_dialog import ReplacementsDialog
         from PySide6.QtWidgets import QMessageBox
 
-        # Determine country filter
-        country_filter = effects.get("alliance")
-        
-        # Activate country if alliance effect is present
-        if "alliance" in effects:
-            self.game_state.activate_country(country_filter, active_player)
-        
-        if "add_units" in effects:
-            country_filter = None
+        deployment_plan = self.diplomacy_service.build_deployment_plan(effects, active_player)
 
         # Stop timer so loop waits for user
         self.ai_timer.stop()
@@ -504,19 +499,18 @@ class GameController(QObject):
         # Open Deployment Window
         self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
                                                       parent=self.view,
-                                                      filter_country_id=country_filter,
+                                                      filter_country_id=deployment_plan.country_filter,
                                                       allow_territory_deploy=True)
         self._connect_replacements_dialog_signals()
         self.replacements_dialog.show()
 
-        # Instruction Popup
-        msg_text = "Reinforcements have arrived!\n\nDeploy your new forces."
-        if "alliance" in effects and "add_units" not in effects:
-            msg_text = f"{effects['alliance'].title()} has joined the war!\n\nDeploy forces in their territory."
-
-        QMessageBox.information(self.replacements_dialog, "Deployment",
-                                msg_text + "\nClick 'Minimize' to interact with map.\n"
-                                           "Click 'End Turn' (End Phase) when finished.")
+        QMessageBox.information(
+            self.replacements_dialog,
+            deployment_plan.message_title,
+            deployment_plan.message_text
+            + "\nClick 'Minimize' to interact with map.\n"
+            "Click 'End Turn' (End Phase) when finished.",
+        )
 
     def _connect_replacements_dialog_signals(self):
         if not self.replacements_dialog:
@@ -558,98 +552,12 @@ class GameController(QObject):
 
     def _attempt_invasion(self, country_id):
         from PySide6.QtWidgets import QMessageBox
-        import random
-
-        country = self.game_state.countries.get(country_id)
-        if not country:
-            QMessageBox.information(self.view.window(), "Invasion", "Country not found.")
-            return
 
         invasion_data = self.movement_service.get_invasion_force(country_id)
-        if invasion_data["strength"] <= 0:
-            reason = invasion_data.get("reason") or "No eligible invasion force."
-            QMessageBox.information(self.view.window(), "Invasion", reason)
-            return
-
-        invader_sp = invasion_data["strength"]
-        defender_sp = country.strength
-        modifier = self._invasion_modifier(invader_sp, defender_sp)
-
-        base_ws = country.alignment[0] + 2
-        base_hl = country.alignment[1] + modifier
-
-        rounds = []
-        round_bonus = 0
-        winner = None
-
-        for _ in range(20):
-            ws_target = base_ws + round_bonus
-            ws_roll = random.randint(1, 10)
-            rounds.append(f"WS roll {ws_roll} vs {ws_target}")
-            if ws_roll <= ws_target:
-                winner = WS
-                break
-
-            hl_target = base_hl + round_bonus
-            hl_roll = random.randint(1, 10)
-            rounds.append(f"HL roll {hl_roll} vs {hl_target}")
-            if hl_roll <= hl_target:
-                winner = HL
-                break
-
-            round_bonus += 1
-
-        if not winner:
-            QMessageBox.information(self.view.window(), "Invasion", "Invasion could not be resolved.")
-            return
-
-        self.game_state.activate_country(country_id, winner)
-
-        summary_lines = [
-            f"Invader SP: {invader_sp} | Defender SP: {defender_sp}",
-            f"Modifier: {modifier}",
-            "Rolls:",
-            *rounds
-        ]
-        message = "\n".join(summary_lines)
-        title = "Invasion Result"
-        if winner == HL:
-            title = f"Invasion Result - {country_id} joins Highlord"
-        else:
-            title = f"Invasion Result - {country_id} joins Whitestone"
-
-        QMessageBox.information(self.view.window(), title, message)
-        self._start_invasion_deployment(country_id, winner)
-
-    def _invasion_modifier(self, invader_sp, defender_sp):
-        if defender_sp <= 0:
-            return 6
-        ratio = invader_sp / defender_sp
-        if ratio < 0.18:
-            return -6
-        if ratio < 0.22:
-            return -5
-        if ratio < 0.29:
-            return -4
-        if ratio < 0.40:
-            return -3
-        if ratio < 0.83:
-            return -2
-        if ratio < 1.0:
-            return -1
-        if ratio == 1.0:
-            return 0
-        if ratio <= 1.5:
-            return 1
-        if ratio <= 2.0:
-            return 2
-        if ratio <= 3.0:
-            return 3
-        if ratio <= 4.0:
-            return 4
-        if ratio <= 5.0:
-            return 5
-        return 6
+        outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
+        QMessageBox.information(self.view.window(), outcome.title, outcome.message)
+        if outcome.success and outcome.winner:
+            self._start_invasion_deployment(country_id, outcome.winner)
 
     def _start_invasion_deployment(self, country_id, allegiance):
         from PySide6.QtWidgets import QMessageBox
