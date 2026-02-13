@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List
 from src.content.config import CRT_DATA
-from src.content.specs import UnitType
+from src.content.specs import HexsideType, UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
 @dataclass
@@ -384,9 +384,9 @@ class CombatClickHandler:
         """
         Checks if specific units can attack across this hexside.
         """
-        hexside = self.game_state.map.get_hexside(start_hex, target_hex)
+        hexside = self.game_state.map.get_effective_hexside(start_hex, target_hex)
 
-        if hexside == "mountain":
+        if hexside in (HexsideType.MOUNTAIN, HexsideType.MOUNTAIN.value):
             # Check if ALL attackers are capable
             for u in attackers:
                 can_cross = u.unit_type == 'wing' or u.unit_type in ['dwarves', 'ogres']

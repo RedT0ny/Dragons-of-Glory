@@ -299,6 +299,24 @@ class Board:
         key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
         return self.hexside_data.get(key)
 
+    def get_effective_hexside(self, from_hex, to_hex):
+        """
+        Returns the gameplay-effective hexside type.
+        Rule: all six hexsides adjacent to a mountain hex are treated as mountain,
+        except when explicitly defined as a pass.
+        """
+        raw = self.get_hexside(from_hex, to_hex)
+        if self._hexside_is(raw, HexsideType.PASS):
+            return raw
+
+        if (
+            self.get_terrain(from_hex) == TerrainType.MOUNTAIN
+            or self.get_terrain(to_hex) == TerrainType.MOUNTAIN
+        ):
+            return HexsideType.MOUNTAIN.value
+
+        return raw
+
     def get_location(self, hex_coord):
         """Returns location dict if one exists at this hex."""
         return self.locations.get((hex_coord.q, hex_coord.r))
@@ -426,7 +444,7 @@ class Board:
         """Rule 5: Check ZOC proximity, respecting terrain barriers."""
         for neighbor in hex_coord.neighbors():
             if self.has_enemy_army(neighbor, unit.allegiance):
-                hexside = self.get_hexside(hex_coord, neighbor)
+                hexside = self.get_effective_hexside(hex_coord, neighbor)
                 # "Armies are never considered adjacent if separated by mountain or deep river"
                 blocked = (
                     self._hexside_is(hexside, HexsideType.MOUNTAIN)
@@ -459,7 +477,7 @@ class Board:
 
         cost = 1
         # It costs one extra Movement Point for an air army to fly over a mountain hexside.
-        if self._hexside_is(self.get_hexside(from_hex, to_hex), HexsideType.MOUNTAIN):
+        if self._hexside_is(self.get_effective_hexside(from_hex, to_hex), HexsideType.MOUNTAIN):
             cost += 1
         return cost
 
@@ -480,7 +498,7 @@ class Board:
 
         # 2. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
-        if self._hexside_is(self.get_hexside(from_hex, to_hex), HexsideType.DEEP_RIVER):
+        if self._hexside_is(self.get_effective_hexside(from_hex, to_hex), HexsideType.DEEP_RIVER):
             # Count friendly fleets currently in destination that are also 'in river'
             # Assuming 'river_hexside' property indicates if they are in a river state
             fleets_in_river = [
@@ -535,7 +553,7 @@ class Board:
                 # Must be water/coastal
                 is_valid_terrain = (self.get_terrain(curr) == "ocean" or
                                     self.is_coastal(curr) or
-                                    self._hexside_is(self.get_hexside(current_hex, curr), HexsideType.DEEP_RIVER)) # Simplified river check
+                                    self._hexside_is(self.get_effective_hexside(current_hex, curr), HexsideType.DEEP_RIVER)) # Simplified river check
 
                 if is_valid_terrain:
                     # Check for enemy armies
@@ -605,7 +623,7 @@ class Board:
         """Rule 5: Moving Ground troops. Restrictions and Hexside Barriers"""
 
         terrain = self.get_terrain(to_hex)
-        hexside_type = self.get_hexside(from_hex, to_hex)
+        hexside_type = self.get_effective_hexside(from_hex, to_hex)
 
         # Rule 5: Ground Army Restrictions
         forbidden_terrain = [
@@ -667,7 +685,7 @@ class Board:
             # 2. Check for Sea Barriers (Rule 5)
             # If ground unit, check if the hexside between current and neighbor is 'sea'
             if unit.unit_type != UnitType.WING:
-                hexside = self.get_hexside(hex_coord, neighbor)
+                hexside = self.get_effective_hexside(hex_coord, neighbor)
                 if self._hexside_is(hexside, HexsideType.SEA):  # Explicitly mark water-only boundaries in config
                     continue
 
@@ -800,7 +818,7 @@ class Board:
                     # Note: get_movement_cost usually returns inf for ground vs sea,
                     # but explicit hexside check mimics get_neighbors behavior.
                     if unit.unit_type != UnitType.WING:
-                        hexside = self.get_hexside(current_hex, next_hex)
+                        hexside = self.get_effective_hexside(current_hex, next_hex)
                         if self._hexside_is(hexside, HexsideType.SEA):
                             possible = False
                             break

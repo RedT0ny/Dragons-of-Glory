@@ -167,7 +167,7 @@ class MovementService:
 
                     # Check 2: Sea Barrier
                     if unit.unit_type != UnitType.WING:
-                        hexside = self.game_state.map.get_hexside(current_hex, next_hex)
+                        hexside = self.game_state.map.get_effective_hexside(current_hex, next_hex)
                         if hexside in (HexsideType.SEA, HexsideType.SEA.value):
                             possible = False
                             break
