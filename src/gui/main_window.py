@@ -253,14 +253,17 @@ class MainWindow(QMainWindow):
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
 
     def on_save_clicked(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Game",
-            "",
-            "YAML Files (*.yaml *.yml);;All Files (*)",
-        )
-        if not path:
+        dialog = QFileDialog(self, "Save Game")
+        dialog.setAcceptMode(QFileDialog.AcceptSave)
+        dialog.setFileMode(QFileDialog.AnyFile)
+        dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        if not dialog.exec():
             return
+        files = dialog.selectedFiles()
+        if not files:
+            return
+        path = files[0]
         try:
             self.game_state.save_state(path)
             self.append_log(f"Game saved to {path}\n")
@@ -268,14 +271,17 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", str(exc))
 
     def on_load_clicked(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self,
-            "Load Game",
-            "",
-            "YAML Files (*.yaml *.yml);;All Files (*)",
-        )
-        if not path:
+        dialog = QFileDialog(self, "Load Game")
+        dialog.setAcceptMode(QFileDialog.AcceptOpen)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
+        if not dialog.exec():
             return
+        files = dialog.selectedFiles()
+        if not files:
+            return
+        path = files[0]
         try:
             self.game_state.load_state(path)
             self.map_view.sync_with_model()
