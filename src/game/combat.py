@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List
 from src.content.config import CRT_DATA
-from src.content.specs import HexsideType, UnitType
+from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
 @dataclass
@@ -50,6 +50,7 @@ class CombatResolver:
         # 1. Calculate Odds
         attacker_cs = sum(u.combat_rating for u in self.attackers)
         defender_cs = sum(u.combat_rating for u in self.defenders)
+        defender_cs *= self._get_defender_combat_multiplier()
         
         odds_str = self.calculate_odds(attacker_cs, defender_cs)
         
@@ -112,7 +113,7 @@ class CombatResolver:
         if depletion_steps:
             self._apply_depletion_steps(affected, depletion_steps)
 
-        if must_retreat:
+        if must_retreat and not (not is_attacker and self._defender_ignores_retreat()):
             self._apply_retreats(affected)
 
         if not (apply_eliminate_all or apply_deplete_all or depletion_steps or must_retreat):
@@ -120,8 +121,195 @@ class CombatResolver:
             raise ValueError(error_msg)
 
     def calculate_total_drm(self):
-        # TODO: Implement Rule 7.4 (Leaders and Terrain)
-        return 0
+        drm = 0
+        defender_hex = self._get_defender_hex()
+        defender_terrain = self.terrain_type
+        defender_location = self._get_defender_location()
+        defender_loc_type = self._normalize_loc_type(defender_location)
+
+        # LEADERS
+        atk_leader = max(
+            [u.tactical_rating for u in self.attackers if hasattr(u, "is_leader") and u.is_leader()],
+            default=0,
+        )
+        def_leader = max(
+            [u.tactical_rating for u in self.defenders if hasattr(u, "is_leader") and u.is_leader()],
+            default=0,
+        )
+        drm += atk_leader
+        drm -= def_leader
+
+        # DRAGONS (Dragon wings only)
+        drm += sum(
+            u.combat_rating
+            for u in self.attackers
+            if u.unit_type == UnitType.WING and self._is_dragon_race(u)
+        )
+        drm -= sum(
+            u.combat_rating
+            for u in self.defenders
+            if u.unit_type == UnitType.WING and self._is_dragon_race(u)
+        )
+
+        # CAVALRY (+1 attacker only, not vs location/forest/jungle)
+        cavalry_blocked = bool(defender_location) or defender_terrain in (TerrainType.FOREST, TerrainType.JUNGLE)
+        if not cavalry_blocked and any(u.unit_type == UnitType.CAVALRY for u in self.attackers):
+            drm += 1
+
+        # FLIGHT (+1 attacker if has fliers, -1 defender if has fliers)
+        flight_blocked = (
+            defender_loc_type == LocType.UNDERCITY.value
+            or defender_terrain in (TerrainType.FOREST, TerrainType.MOUNTAIN, TerrainType.JUNGLE)
+        )
+        if not flight_blocked:
+            if any(self._is_flier(u) for u in self.attackers):
+                drm += 1
+            if any(self._is_flier(u) for u in self.defenders):
+                drm -= 1
+
+        # LOCATIONS (defender benefit only)
+        if defender_loc_type == LocType.FORTRESS.value:
+            drm -= 4
+        elif defender_loc_type in (LocType.CITY.value, LocType.PORT.value):
+            drm -= 2
+        elif defender_loc_type == LocType.UNDERCITY.value:
+            drm -= 10
+
+        # CROSSINGS (if any attacking army crosses these)
+        crossings = self._get_attacker_crossing_types(defender_hex)
+        if "river" in crossings:
+            drm -= 4
+        if "bridge" in crossings:
+            drm -= 4
+        if "ford" in crossings:
+            drm -= 3
+        if "pass" in crossings:
+            drm -= 2
+
+        # TERRAIN AFFINITY
+        drm += self._count_attacker_terrain_affinity_bonus()
+        drm -= self._count_defender_terrain_affinity_bonus(defender_hex)
+
+        return drm
+
+    def _is_dragon_race(self, unit):
+        race = getattr(unit, "race", None)
+        if race == UnitRace.DRAGON:
+            return True
+        if isinstance(race, str) and race.lower() == UnitRace.DRAGON.value:
+            return True
+        return False
+
+    def _is_flier(self, unit):
+        return unit.unit_type in (UnitType.WING, UnitType.CITADEL)
+
+    def _get_defender_hex(self):
+        if not self.game_state or not self.game_state.map:
+            return None
+        for unit in self.defenders:
+            if not getattr(unit, "position", None):
+                continue
+            col, row = unit.position
+            if col is None or row is None:
+                continue
+            from src.game.map import Hex
+            return Hex.offset_to_axial(col, row)
+        return None
+
+    def _get_defender_location(self):
+        defender_hex = self._get_defender_hex()
+        if not defender_hex or not self.game_state or not self.game_state.map:
+            return None
+        return self.game_state.map.get_location(defender_hex)
+
+    def _get_defender_combat_multiplier(self):
+        loc = self._get_defender_location()
+        loc_type = self._normalize_loc_type(loc)
+        if loc_type == LocType.FORTRESS.value:
+            return 3
+        if loc_type in (LocType.CITY.value, LocType.PORT.value):
+            return 2
+        return 1
+
+    def _defender_ignores_retreat(self):
+        return bool(self._get_defender_location())
+
+    def _get_attacker_crossing_types(self, defender_hex):
+        crossings = set()
+        if not defender_hex or not self.game_state or not self.game_state.map:
+            return crossings
+        for unit in self.attackers:
+            if not (hasattr(unit, "is_army") and unit.is_army()):
+                continue
+            if not getattr(unit, "position", None):
+                continue
+            col, row = unit.position
+            if col is None or row is None:
+                continue
+            from src.game.map import Hex
+            attacker_hex = Hex.offset_to_axial(col, row)
+            if attacker_hex == defender_hex:
+                continue
+            if defender_hex not in attacker_hex.neighbors():
+                continue
+
+            if self.game_state.map.is_ship_bridge(attacker_hex, defender_hex, unit.allegiance):
+                crossings.add("bridge")
+                continue
+
+            hexside = self.game_state.map.get_effective_hexside(attacker_hex, defender_hex)
+            if hexside in (
+                HexsideType.RIVER,
+                HexsideType.RIVER.value,
+                HexsideType.DEEP_RIVER,
+                HexsideType.DEEP_RIVER.value,
+            ):
+                crossings.add("river")
+            elif hexside in (HexsideType.BRIDGE, HexsideType.BRIDGE.value):
+                crossings.add("bridge")
+            elif hexside in (HexsideType.FORD, HexsideType.FORD.value):
+                crossings.add("ford")
+            elif hexside in (HexsideType.PASS, HexsideType.PASS.value):
+                crossings.add("pass")
+        return crossings
+
+    def _normalize_loc_type(self, loc):
+        if not isinstance(loc, dict):
+            return None
+        value = loc.get("type")
+        if isinstance(value, LocType):
+            return value.value
+        return value
+
+    def _count_attacker_terrain_affinity_bonus(self):
+        if not self.game_state or not self.game_state.map:
+            return 0
+        bonus = 0
+        from src.game.map import Hex
+        for unit in self.attackers:
+            if not (hasattr(unit, "is_army") and unit.is_army()):
+                continue
+            if not getattr(unit, "position", None):
+                continue
+            col, row = unit.position
+            if col is None or row is None:
+                continue
+            terrain = self.game_state.map.get_terrain(Hex.offset_to_axial(col, row))
+            if getattr(unit, "terrain_affinity", None) == terrain:
+                bonus += 1
+        return bonus
+
+    def _count_defender_terrain_affinity_bonus(self, defender_hex):
+        if not self.game_state or not self.game_state.map or not defender_hex:
+            return 0
+        terrain = self.game_state.map.get_terrain(defender_hex)
+        bonus = 0
+        for unit in self.defenders:
+            if not (hasattr(unit, "is_army") and unit.is_army()):
+                continue
+            if getattr(unit, "terrain_affinity", None) == terrain:
+                bonus += 1
+        return bonus
 
     def _get_affected_armies(self, units):
         affected = []
@@ -402,6 +590,7 @@ class CombatClickHandler:
 
         attacker_cs = sum(u.combat_rating for u in attackers)
         defender_cs = sum(u.combat_rating for u in defenders)
+        defender_cs *= resolver._get_defender_combat_multiplier()
         return resolver.calculate_odds(attacker_cs, defender_cs)
 
     def _is_unit_on_map(self, unit):
