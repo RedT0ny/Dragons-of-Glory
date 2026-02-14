@@ -931,6 +931,10 @@ class Board:
             else:
                 cost += 1
 
+        # Jungle costs 2
+        if terrain == TerrainType.JUNGLE:
+            cost += 1
+
         # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
         if terrain == TerrainType.FOREST:
             if unit.terrain_affinity == TerrainType.FOREST:
