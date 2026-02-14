@@ -370,7 +370,10 @@ class MovementService:
         return self._unit_movement_points(unit) > 0
 
     def _unit_movement_points(self, unit):
-        return getattr(unit, "movement_points", unit.movement)
+        current = getattr(unit, "movement_points", unit.movement)
+        # Passengers can reduce effective movement (e.g. Wings/Fleets).
+        # Keep movement logic aligned with what the UI shows.
+        return min(current, unit.movement)
 
     def _can_unit_reach_target(self, unit, target_hex):
         if getattr(unit, "transport_host", None) is not None:

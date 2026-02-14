@@ -1494,6 +1494,10 @@ class GameState:
         Removes the unit from the spatial map, marks it transported and records transport_host.
         Returns True on success, False otherwise.
         """
+        # Rule: a Wing cannot move and then load a unit in the same turn.
+        if carrier.unit_type == UnitType.WING and getattr(carrier, "moved_this_turn", False):
+            return False
+
         if not carrier.can_carry(unit):
             return False
 
@@ -1507,6 +1511,11 @@ class GameState:
         unit.position = carrier.position
         unit.is_transported = True
         unit.transport_host = carrier
+
+        # If transport load changes carrier movement allowance (e.g. Wing with passengers),
+        # clamp remaining movement immediately to avoid range/deduction mismatches.
+        if hasattr(carrier, "movement_points"):
+            carrier.movement_points = min(carrier.movement_points, carrier.movement)
         return True
 
     def unboard_unit(self, unit, target_hex=None):

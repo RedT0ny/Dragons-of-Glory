@@ -1,4 +1,5 @@
 import sys
+from types import SimpleNamespace
 from time import perf_counter
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTableWidget,
                                QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle, QGraphicsScene)
@@ -227,6 +228,16 @@ class UnitTable(QTableWidget):
             bool(getattr(unit, "attacked_this_turn", False)),
             int(getattr(unit, "combat_rating", 0) or 0),
             int(getattr(unit, "tactical_rating", 0) or 0),
+            bool(getattr(unit, "is_transported", False)),
+            (
+                str(getattr(getattr(unit, "transport_host", None), "id", "")),
+                int(getattr(getattr(unit, "transport_host", None), "ordinal", 0) or 0),
+            ),
+            int(
+                len(getattr(unit, "passengers", []) or [])
+                if hasattr(unit, "passengers")
+                else 0
+            ),
         )
         cached = self._icon_cache.get(cache_key)
         if cached is not None:
@@ -234,8 +245,29 @@ class UnitTable(QTableWidget):
             return cached
 
         self.__class__._icon_cache_misses += 1
+        # Render base counter using a proxy that suppresses transport badges.
+        # Then paint badges directly onto the pixmap to avoid Qt scene instability
+        # with transport-host object references during rapid UI refresh.
+        icon_unit = SimpleNamespace(
+            id=getattr(unit, "id", ""),
+            ordinal=getattr(unit, "ordinal", 0),
+            unit_type=getattr(unit, "unit_type", None),
+            race=getattr(unit, "race", None),
+            land=getattr(unit, "land", None),
+            allegiance=getattr(unit, "allegiance", None),
+            status=getattr(unit, "status", None),
+            movement=getattr(unit, "movement", 0),
+            movement_points=getattr(unit, "movement_points", getattr(unit, "movement", 0)),
+            attacked_this_turn=getattr(unit, "attacked_this_turn", False),
+            combat_rating=getattr(unit, "combat_rating", 0),
+            tactical_rating=getattr(unit, "tactical_rating", 0),
+            passengers=[],
+            is_transported=False,
+            transport_host=None,
+        )
+
         scene = QGraphicsScene()
-        counter = UnitCounter(unit, color)
+        counter = UnitCounter(icon_unit, color)
         scene.addItem(counter)
 
         pixmap = QPixmap(UNIT_ICON_SIZE, UNIT_ICON_SIZE)
@@ -248,12 +280,54 @@ class UnitTable(QTableWidget):
         source_rect = counter.boundingRect()
 
         scene.render(painter, target_rect, source_rect)
+        self._draw_transport_overlays(painter, unit, UNIT_ICON_SIZE)
         painter.end()
 
         if len(self._icon_cache) > 5000:
             self._icon_cache.clear()
         self._icon_cache[cache_key] = pixmap
         return pixmap
+
+    def _draw_transport_overlays(self, painter, unit, size):
+        # Carrier passenger-count badge
+        passengers = getattr(unit, "passengers", None) or []
+        if len(passengers) > 0:
+            badge_text = str(len(passengers))
+            br = max(5, size // 7)
+            bx = size - (br * 2) - 2
+            by = (size // 2) - br
+            badge_rect = QRectF(bx, by, br * 2, br * 2)
+            painter.setBrush(QColor(255, 215, 0))
+            painter.setPen(QColor(0, 0, 0))
+            painter.drawEllipse(badge_rect)
+            f = painter.font()
+            f.setPointSize(max(6, size // 8))
+            f.setBold(True)
+            painter.setFont(f)
+            painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
+
+        # Transported marker badge (host ordinal)
+        if bool(getattr(unit, "is_transported", False)):
+            host = getattr(unit, "transport_host", None)
+            if host is not None:
+                host_num = getattr(host, "ordinal", None)
+                if host_num is None:
+                    host_num = getattr(host, "ordinal_index", None)
+                if host_num is not None:
+                    host_text = str(host_num)
+                    tw = max(12, size // 2 - 2)
+                    th = max(10, size // 3 - 1)
+                    tx = size - tw - 2
+                    ty = 2
+                    rect = QRectF(tx, ty, tw, th)
+                    painter.setBrush(QColor(200, 200, 200))
+                    painter.setPen(QColor(0, 0, 0))
+                    painter.drawRoundedRect(rect, 3, 3)
+                    f = painter.font()
+                    f.setPointSize(max(6, size // 8))
+                    f.setBold(True)
+                    painter.setFont(f)
+                    painter.drawText(rect, Qt.AlignCenter, host_text)
 
     @classmethod
     def get_icon_cache_stats(cls):

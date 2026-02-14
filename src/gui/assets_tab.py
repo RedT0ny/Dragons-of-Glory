@@ -215,6 +215,11 @@ class AssetsTab(QWidget):
                 tuple(getattr(u, "position", (None, None)) or (None, None)),
                 int(getattr(u, "movement_points", getattr(u, "movement", 0)) or 0),
                 bool(getattr(u, "attacked_this_turn", False)),
+                bool(getattr(u, "is_transported", False)),
+                (
+                    str(getattr(getattr(u, "transport_host", None), "id", "")),
+                    int(getattr(getattr(u, "transport_host", None), "ordinal", 0) or 0),
+                ),
                 equip,
             ))
         units.sort()

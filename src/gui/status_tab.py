@@ -48,6 +48,11 @@ class StatusTab(QWidget):
                 bool(getattr(u, "attacked_this_turn", False)),
                 int(getattr(u, "combat_rating", 0) or 0),
                 int(getattr(u, "tactical_rating", 0) or 0),
+                bool(getattr(u, "is_transported", False)),
+                (
+                    str(getattr(getattr(u, "transport_host", None), "id", "")),
+                    int(getattr(getattr(u, "transport_host", None), "ordinal", 0) or 0),
+                ),
             ))
         units.sort()
         return tuple(units)
