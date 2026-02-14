@@ -37,6 +37,7 @@ class GameController(QObject):
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
+        self._movement_undo_context = None
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -199,6 +200,10 @@ class GameController(QObject):
         # Handle "Action" phases (Movement/Combat)
         elif current_phase == GamePhase.MOVEMENT:
             print(f"Step 5: Movement phase - {active_player}")
+            context = (self.game_state.turn, active_player, current_phase)
+            if self._movement_undo_context != context:
+                self.game_state.clear_movement_undo()
+                self._movement_undo_context = context
             if is_ai:
                 moved = self.execute_simple_ai_logic(active_player)
                 if not moved: # AI is done moving
@@ -241,6 +246,9 @@ class GameController(QObject):
         main_window = self.view.window()
         if hasattr(main_window, 'info_panel'):
             main_window.info_panel.refresh()
+            main_window.info_panel.set_undo_enabled(
+                self.game_state.phase == GamePhase.MOVEMENT and self.game_state.can_undo_movement()
+            )
 
     def open_assets_tab_for_assignment(self, asset_id=None):
         """
@@ -286,6 +294,7 @@ class GameController(QObject):
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
+            self.game_state.clear_movement_undo()
             return
 
         # Close replacement dialog if open
@@ -296,6 +305,7 @@ class GameController(QObject):
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.game_state.clear_movement_undo()
         def _deferred_end_phase_view_update():
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
@@ -377,8 +387,10 @@ class GameController(QObject):
                     return
 
             # Move all selected units
+            self.game_state.push_movement_undo_snapshot()
             move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
             if move_result.errors:
+                self.game_state.discard_last_movement_snapshot()
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
                     self.view.window(),
@@ -557,7 +569,20 @@ class GameController(QObject):
         outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
         QMessageBox.information(self.view.window(), outcome.title, outcome.message)
         if outcome.success and outcome.winner:
+            # Invasion creates a new checkpoint: previous movement undo is no longer allowed.
+            self.game_state.clear_movement_undo()
             self._start_invasion_deployment(country_id, outcome.winner)
+
+    def on_undo_clicked(self):
+        if self.game_state.phase != GamePhase.MOVEMENT:
+            return
+        if not self.game_state.undo_last_movement():
+            return
+        self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
+        self._refresh_info_panel()
 
     def _start_invasion_deployment(self, country_id, allegiance):
         from PySide6.QtWidgets import QMessageBox

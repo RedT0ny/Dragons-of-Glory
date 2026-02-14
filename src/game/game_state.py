@@ -1,4 +1,5 @@
 import random
+from collections import defaultdict
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver, LeaderEscapeRequest
 from src.content.config import MAP_WIDTH, MAP_HEIGHT
@@ -60,6 +61,7 @@ class GameState:
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
         self.tower_country_id = "tower"
+        self._movement_undo_stack = []
 
     @property
     def current_player(self):
@@ -517,6 +519,79 @@ class GameState:
                 p.position = unit.position
                 p.is_transported = True
                 p.transport_host = unit
+
+    def clear_movement_undo(self):
+        self._movement_undo_stack.clear()
+
+    def can_undo_movement(self):
+        return bool(self._movement_undo_stack)
+
+    def push_movement_undo_snapshot(self):
+        """
+        Stores a full-unit snapshot before a movement action.
+        Snapshot scope is turn/player-bound so undo cannot cross turns or active player.
+        """
+        unit_states = []
+        for unit in self.units:
+            unit_states.append({
+                "unit": unit,
+                "position": tuple(unit.position) if getattr(unit, "position", None) else (None, None),
+                "status": unit.status,
+                "movement_points": getattr(unit, "movement_points", None),
+                "moved_this_turn": getattr(unit, "moved_this_turn", False),
+                "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
+                "is_transported": getattr(unit, "is_transported", False),
+                "transport_host": getattr(unit, "transport_host", None),
+                "river_hexside": getattr(unit, "river_hexside", None),
+                "passengers": list(getattr(unit, "passengers", [])),
+            })
+        self._movement_undo_stack.append({
+            "turn": self.turn,
+            "active_player": self.active_player,
+            "units": unit_states,
+        })
+
+    def discard_last_movement_snapshot(self):
+        if self._movement_undo_stack:
+            self._movement_undo_stack.pop()
+
+    def undo_last_movement(self):
+        if not self._movement_undo_stack:
+            return False
+
+        snapshot = self._movement_undo_stack.pop()
+        if snapshot["turn"] != self.turn or snapshot["active_player"] != self.active_player:
+            self._movement_undo_stack.clear()
+            return False
+
+        for state in snapshot["units"]:
+            unit = state["unit"]
+            unit.position = state["position"]
+            unit.status = state["status"]
+            if state["movement_points"] is not None:
+                unit.movement_points = state["movement_points"]
+            unit.moved_this_turn = state["moved_this_turn"]
+            unit.attacked_this_turn = state["attacked_this_turn"]
+            unit.is_transported = state["is_transported"]
+            unit.transport_host = state["transport_host"]
+            if hasattr(unit, "river_hexside"):
+                unit.river_hexside = state["river_hexside"]
+            if hasattr(unit, "passengers"):
+                unit.passengers = list(state["passengers"])
+
+        # Rebuild spatial map after restoring all unit states.
+        self.map.unit_map = defaultdict(list)
+        for unit in self.units:
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None or pos[1] is None:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            self.map.add_unit_to_spatial_map(unit)
+
+        return True
 
     def check_event_trigger_conditions(self, conditions) -> bool:
         return self.event_system.check_event_trigger_conditions(conditions)

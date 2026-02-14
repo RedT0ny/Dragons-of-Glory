@@ -86,6 +86,7 @@ class MiniMapView(AnsalonMapView):
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
     board_clicked = Signal()
+    undo_clicked = Signal()
     end_phase_clicked = Signal()
     selection_changed = Signal(list)
     minimap_clicked = Signal(QPointF)
@@ -109,10 +110,14 @@ class InfoPanel(QFrame):
         btn_grid = QGridLayout()
         btns = ["Prev", "Undo", "(Un)Board", "Next", "Redo", "End Phase"]
         self.btn_board = None
+        self.btn_undo = None
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
                 btn.clicked.connect(self.end_phase_clicked.emit)
+            if name == "Undo":
+                self.btn_undo = btn
+                btn.clicked.connect(self.undo_clicked.emit)
             if name == "(Un)Board":
                 # Expose board button signal for controller
                 self.btn_board = btn
@@ -369,6 +374,13 @@ class InfoPanel(QFrame):
         # Enable Board button only during Movement phase
         if hasattr(self, 'btn_board') and self.btn_board:
             self.btn_board.setEnabled(is_movement_phase)
+        if hasattr(self, 'btn_undo') and self.btn_undo:
+            # Controller refines this with stack availability.
+            self.btn_undo.setEnabled(is_movement_phase)
+
+    def set_undo_enabled(self, enabled):
+        if hasattr(self, "btn_undo") and self.btn_undo:
+            self.btn_undo.setEnabled(enabled)
 
     def on_item_changed(self, item):
         if item.column() == 0:

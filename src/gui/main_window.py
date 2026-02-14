@@ -131,6 +131,12 @@ class MainWindow(QMainWindow):
         # Define how many pixels to scroll per key press
         scroll_step = 50
 
+        if event.key() == Qt.Key_Z and (event.modifiers() & Qt.ControlModifier):
+            if hasattr(self, 'info_panel'):
+                self.info_panel.undo_clicked.emit()
+            event.accept()
+            return
+
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
             if hasattr(self, 'info_panel'):
                 self.info_panel.end_phase_clicked.emit()
@@ -236,6 +242,7 @@ class MainWindow(QMainWindow):
         """Connects UI signals to the controller."""
         self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)
         self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
+        self.info_panel.undo_clicked.connect(controller.on_undo_clicked)
         # Board/Unboard action (only active in Movement phase)
         if hasattr(self.info_panel, 'board_clicked'):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
