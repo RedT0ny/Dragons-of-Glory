@@ -2,7 +2,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
-from src.game.combat import CombatResolver, LeaderEscapeRequest
+from src.game.combat import CombatResolver, LeaderEscapeRequest, NavalCombatResolver
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
@@ -1084,7 +1084,7 @@ class GameState:
     def resolve_event(self, event):
         pass
 
-    def resolve_combat(self, attackers, hex_position):
+    def resolve_combat(self, attackers, hex_position, naval_withdraw_decider=None):
         """
         Initiates combat resolution for a specific hex.
         """
@@ -1094,6 +1094,19 @@ class GameState:
             u.allegiance for u in defenders
             if u.allegiance not in ("neutral", None)
         }
+
+        if self._is_naval_combat(attackers, defenders):
+            naval_resolver = NavalCombatResolver(self, attackers, defenders)
+            outcome = naval_resolver.resolve(withdraw_decider=naval_withdraw_decider)
+            self._cleanup_destroyed_units(attackers + defenders)
+            print(self._format_naval_log_entry(attackers, defenders, outcome))
+            return {
+                "result": outcome.get("result", "-/-"),
+                "leader_escape_requests": [],
+                "advance_available": False,
+                "combat_type": "naval",
+                "rounds": outcome.get("rounds", 0),
+            }
 
         # Cumulative pre-combat special retreats for wings/cavalry.
         special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
@@ -1147,6 +1160,61 @@ class GameState:
             "leader_escape_requests": leader_escape_requests or [],
             "advance_available": advance_available,
         }
+
+    def _is_naval_combat(self, attackers, defenders):
+        atk_fleets = [u for u in attackers if u.unit_type == UnitType.FLEET and u.is_on_map]
+        if not atk_fleets or len(atk_fleets) != len([u for u in attackers if u.is_on_map]):
+            return False
+        def_fleets = [u for u in defenders if u.unit_type == UnitType.FLEET and u.is_on_map and u.allegiance != self.active_player]
+        return bool(def_fleets)
+
+    def _fleet_attack_nodes(self, fleet):
+        if not fleet.position or fleet.position[0] is None or fleet.position[1] is None:
+            return []
+        nodes = []
+        start_hex = Hex.offset_to_axial(*fleet.position)
+        nodes.append(start_hex)
+        river_side = getattr(fleet, "river_hexside", None)
+        if river_side:
+            endpoints = self.map._river_endpoints_local(river_side)
+            for ep in endpoints:
+                if ep not in nodes:
+                    nodes.append(ep)
+        return nodes
+
+    def _fleets_are_adjacent_for_combat(self, attacker_fleet, defender_fleet):
+        attacker_nodes = self._fleet_attack_nodes(attacker_fleet)
+        defender_nodes = self._fleet_attack_nodes(defender_fleet)
+        if not attacker_nodes or not defender_nodes:
+            return False
+        for a in attacker_nodes:
+            for d in defender_nodes:
+                if a == d:
+                    return True
+                if d in a.neighbors():
+                    return True
+        return False
+
+    def can_fleet_attack_hex(self, fleet, target_hex):
+        if fleet.unit_type != UnitType.FLEET or not fleet.is_on_map:
+            return False
+        defenders = [
+            u for u in self.get_units_at(target_hex)
+            if u.unit_type == UnitType.FLEET
+            and u.allegiance != fleet.allegiance
+            and u.allegiance != NEUTRAL
+            and u.is_on_map
+        ]
+        if not defenders:
+            return False
+        return any(self._fleets_are_adjacent_for_combat(fleet, d) for d in defenders)
+
+    def _format_naval_log_entry(self, attackers, defenders, outcome):
+        attacker_names = ", ".join(self._format_unit_for_log(u) for u in attackers if u.unit_type == UnitType.FLEET)
+        defender_names = ", ".join(self._format_unit_for_log(u) for u in defenders if u.unit_type == UnitType.FLEET)
+        rounds = outcome.get("rounds", 0)
+        result = outcome.get("result", "-/-")
+        return f"Naval combat {result} after {rounds} rounds: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
 
     def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
         combat_defenders = [

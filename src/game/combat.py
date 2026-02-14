@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List
 from src.content.config import CRT_DATA
-from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitType
+from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
 from src.content.loader import load_data
 @dataclass
@@ -394,6 +394,208 @@ class CombatResolver:
         return valid
 
 
+class NavalCombatResolver:
+    """
+    Resolves Rule 8 fleet-to-fleet combat.
+    """
+    def __init__(self, game_state, attackers, defenders, roll_d10_fn=None, roll_d6_fn=None):
+        self.game_state = game_state
+        self.attackers = [u for u in attackers if getattr(u, "unit_type", None) == UnitType.FLEET and getattr(u, "is_on_map", False)]
+        self.defenders = [u for u in defenders if getattr(u, "unit_type", None) == UnitType.FLEET and getattr(u, "is_on_map", False)]
+        self._roll_d10 = roll_d10_fn or (lambda: random.randint(1, 10))
+        self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
+
+    def resolve(self, withdraw_decider=None):
+        rounds = 0
+        while self.attackers and self.defenders:
+            rounds += 1
+            atk_round = [u for u in self.attackers if getattr(u, "is_on_map", False)]
+            def_round = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+            if not atk_round or not def_round:
+                break
+
+            hits = {}
+            for ship in atk_round:
+                target = self._select_target(ship, def_round)
+                if target is None:
+                    continue
+                if self._roll_hits(ship):
+                    hits[target] = hits.get(target, 0) + 1
+
+            for ship in def_round:
+                target = self._select_target(ship, atk_round)
+                if target is None:
+                    continue
+                if self._roll_hits(ship):
+                    hits[target] = hits.get(target, 0) + 1
+
+            for target, amount in hits.items():
+                for _ in range(amount):
+                    if not getattr(target, "is_on_map", False):
+                        break
+                    self._apply_hit_to_fleet(target)
+
+            self._sync_combat_lists()
+            if not self.attackers or not self.defenders:
+                break
+
+            if withdraw_decider and withdraw_decider(self._defender_side(), rounds):
+                self._withdraw_all(self.defenders)
+                break
+            if withdraw_decider and withdraw_decider(self._attacker_side(), rounds):
+                self._withdraw_all(self.attackers)
+                break
+
+        result = self._result_code()
+        return {
+            "result": result,
+            "rounds": rounds,
+            "attacker_survivors": len([u for u in self.attackers if getattr(u, "is_on_map", False)]),
+            "defender_survivors": len([u for u in self.defenders if getattr(u, "is_on_map", False)]),
+        }
+
+    def _roll_hits(self, fleet):
+        threshold = self._fleet_attack_rating(fleet)
+        roll = self._roll_d10()
+        return roll <= threshold
+
+    def _fleet_attack_rating(self, fleet):
+        base = getattr(fleet, "combat_rating", 0)
+        passengers = list(getattr(fleet, "passengers", []) or [])
+        leader_bonus = 0
+        for p in passengers:
+            if not (hasattr(p, "is_leader") and p.is_leader()):
+                continue
+            if p.unit_type not in (UnitType.WIZARD, UnitType.ADMIRAL):
+                continue
+            leader_bonus = max(leader_bonus, getattr(p, "tactical_rating", 0))
+        return base + leader_bonus
+
+    def _select_target(self, attacker, candidates):
+        live = [u for u in candidates if getattr(u, "is_on_map", False)]
+        if not live:
+            return None
+        live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
+        return live[0]
+
+    def _apply_hit_to_fleet(self, fleet):
+        if fleet.status.name == "ACTIVE":
+            fleet.deplete()
+            return
+        if fleet.status.name == "DEPLETED":
+            self._sink_fleet(fleet)
+
+    def _sink_fleet(self, fleet):
+        if not getattr(fleet, "position", None) or fleet.position[0] is None or fleet.position[1] is None:
+            fleet.eliminate()
+            return
+
+        origin_hex = None
+        from src.game.map import Hex
+        origin_hex = Hex.offset_to_axial(*fleet.position)
+
+        passengers = list(getattr(fleet, "passengers", []) or [])
+        fleet.eliminate()
+        fleet.river_hexside = None
+        if hasattr(fleet, "passengers"):
+            fleet.passengers = []
+        self.game_state.map.remove_unit_from_spatial_map(fleet)
+
+        for passenger in passengers:
+            passenger.transport_host = None
+            passenger.is_transported = False
+            passenger.position = (None, None)
+
+            if hasattr(passenger, "is_leader") and passenger.is_leader():
+                self._resolve_sunk_leader(passenger, origin_hex)
+                continue
+
+            if hasattr(passenger, "eliminate"):
+                passenger.eliminate()
+                self.game_state.map.remove_unit_from_spatial_map(passenger)
+
+    def _resolve_sunk_leader(self, leader, origin_hex):
+        if leader.unit_type == UnitType.WIZARD:
+            if self._place_leader_with_nearest_friendly(leader, origin_hex, allow_fleet=True):
+                return
+            leader.destroy()
+            return
+
+        roll = self._roll_d6()
+        if roll <= 3:
+            leader.destroy()
+            return
+        if self._place_leader_with_nearest_friendly(leader, origin_hex, allow_fleet=False):
+            return
+        leader.destroy()
+
+    def _place_leader_with_nearest_friendly(self, leader, origin_hex, allow_fleet):
+        candidates = []
+        for (q, r), units in self.game_state.map.unit_map.items():
+            for unit in units:
+                if unit.allegiance != leader.allegiance:
+                    continue
+                if not getattr(unit, "is_on_map", False):
+                    continue
+                if allow_fleet and unit.unit_type == UnitType.FLEET:
+                    candidates.append((q, r))
+                    break
+                if hasattr(unit, "is_army") and unit.is_army():
+                    candidates.append((q, r))
+                    break
+
+        if not candidates:
+            return False
+
+        from src.game.map import Hex
+        hexes = [Hex(q, r) for q, r in candidates]
+        target = min(hexes, key=lambda h: origin_hex.distance_to(h))
+        if leader.status not in UnitState.on_map_states():
+            leader.status = UnitState.ACTIVE
+        leader.position = target.axial_to_offset()
+        self.game_state.map.add_unit_to_spatial_map(leader)
+        return True
+
+    def _withdraw_all(self, side_fleets):
+        for fleet in list(side_fleets):
+            if not getattr(fleet, "is_on_map", False) or not getattr(fleet, "position", None):
+                continue
+            if fleet.position[0] is None or fleet.position[1] is None:
+                continue
+            from src.game.map import Hex
+            start_hex = Hex.offset_to_axial(*fleet.position)
+            state = (start_hex, getattr(fleet, "river_hexside", None))
+            neighbors = self.game_state.map._fleet_neighbor_states(fleet, state)
+            if not neighbors:
+                continue
+            next_hex, next_side = neighbors[0][0]
+            self.game_state.move_unit(fleet, next_hex)
+            fleet.river_hexside = next_side
+
+    def _sync_combat_lists(self):
+        self.attackers = [u for u in self.attackers if getattr(u, "is_on_map", False)]
+        self.defenders = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+
+    def _result_code(self):
+        if self.attackers and not self.defenders:
+            return "N/NS"
+        if self.defenders and not self.attackers:
+            return "NS/N"
+        if not self.attackers and not self.defenders:
+            return "NS/NS"
+        return "-/-"
+
+    def _attacker_side(self):
+        if self.attackers:
+            return self.attackers[0].allegiance
+        return None
+
+    def _defender_side(self):
+        if self.defenders:
+            return self.defenders[0].allegiance
+        return None
+
+
 class CombatClickHandler:
     def __init__(self, game_state, view):
         self.game_state = game_state
@@ -428,6 +630,14 @@ class CombatClickHandler:
 
         # --- Scenario 2: Clicked Friendly Stack ---
         if friendly_units:
+            mode = self._selection_mode(self.attackers)
+            if mode == "naval":
+                friendly_units = [u for u in friendly_units if u.unit_type == UnitType.FLEET]
+            elif mode == "land":
+                friendly_units = [u for u in friendly_units if u.unit_type != UnitType.FLEET]
+            if not friendly_units:
+                return
+
             if self.attackers:
                 new_selection = list(set(self.attackers + friendly_units))
             else:
@@ -460,25 +670,37 @@ class CombatClickHandler:
             # --- Scenario 5: Clicked a Possible Target ---
             from PySide6.QtWidgets import QMessageBox
 
-            # Show Odds Dialog
-            odds_str = self.calculate_odds_preview(self.attackers, enemy_units, target_hex)
+            is_naval = self._selection_mode(self.attackers) == "naval"
+            if is_naval:
+                prompt_text = f"Start naval combat with {len(self.attackers)} fleet(s)?"
+            else:
+                odds_str = self.calculate_odds_preview(self.attackers, enemy_units, target_hex)
+                prompt_text = f"Attack with {len(self.attackers)} units?\nOdds: {odds_str}"
 
             reply = QMessageBox.question(
                 None,
                 "Confirm Attack",
-                f"Attack with {len(self.attackers)} units?\nOdds: {odds_str}",
+                prompt_text,
                 QMessageBox.Yes | QMessageBox.No
             )
 
             if reply == QMessageBox.Yes:
                 committed_attackers = list(self.attackers)
-                resolution = self.game_state.resolve_combat(self.attackers, target_hex)
+                resolution = self.game_state.resolve_combat(
+                    self.attackers,
+                    target_hex,
+                    naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
+                )
                 # Mark attackers
                 for u in self.attackers:
                     u.attacked_this_turn = True
 
                 # Clear all
                 self.reset_selection()
+
+                if is_naval:
+                    self.view.sync_with_model()
+                    return
 
                 leader_escape = resolution.get("leader_escape_requests", []) if resolution else []
                 advance_available = bool(resolution and resolution.get("advance_available"))
@@ -548,6 +770,9 @@ class CombatClickHandler:
         if not attackers:
             return []
 
+        if self._selection_mode(attackers) == "naval":
+            return self._calculate_naval_targets(attackers)
+
         # 1. Get all unique positions of attackers (usually they are in one stack, but could be multi-hex attack)
         attacker_hexes = set()
         for u in attackers:
@@ -565,6 +790,29 @@ class CombatClickHandler:
                     # Validate "Move into" rule
                     if self.is_valid_attack_hex(attackers, start_hex, next_hex):
                         valid_target_offsets.add(next_hex.axial_to_offset())
+
+        return list(valid_target_offsets)
+
+    def _calculate_naval_targets(self, attackers):
+        fleets = [u for u in attackers if u.unit_type == UnitType.FLEET]
+        if not fleets:
+            return []
+
+        valid_target_offsets = set()
+        for (q, r), units in self.game_state.map.unit_map.items():
+            enemy_fleets = [
+                u for u in units
+                if u.unit_type == UnitType.FLEET
+                and u.allegiance != self.game_state.active_player
+                and u.allegiance != "neutral"
+                and self._is_unit_on_map(u)
+            ]
+            if not enemy_fleets:
+                continue
+            from src.game.map import Hex
+            target_hex = Hex(q, r)
+            if any(self.game_state.can_fleet_attack_hex(f, target_hex) for f in fleets):
+                valid_target_offsets.add(target_hex.axial_to_offset())
 
         return list(valid_target_offsets)
 
@@ -595,6 +843,24 @@ class CombatClickHandler:
 
     def _is_unit_on_map(self, unit):
         return bool(getattr(unit, "is_on_map", False) and unit.position and unit.position[0] is not None and unit.position[1] is not None)
+
+    def _selection_mode(self, attackers):
+        if not attackers:
+            return None
+        fleets = [u for u in attackers if u.unit_type == UnitType.FLEET]
+        if fleets and len(fleets) == len(attackers):
+            return "naval"
+        return "land"
+
+    def _ask_naval_withdraw(self, side_allegiance, round_number):
+        from PySide6.QtWidgets import QMessageBox
+        answer = QMessageBox.question(
+            None,
+            "Naval Withdrawal",
+            f"Round {round_number}: should {side_allegiance} withdraw all fleets and end naval combat?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
 
     def _begin_leader_escape(self, leader_escape_requests):
         self.leader_escape_queue = list(leader_escape_requests)
