@@ -1,8 +1,9 @@
 import random
 from collections import defaultdict
+from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import CombatResolver, LeaderEscapeRequest
-from src.content.config import MAP_WIDTH, MAP_HEIGHT
+from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
 from src.content import loader, factory
@@ -75,22 +76,103 @@ class GameState:
         pass
 
     def save_state(self, filename: str):
-        # Gather unit data using the to_dict method
-        unit_data = [u.to_dict() for u in self.units.values()]
-        activated = [c.id for c in self.countries.values() if c.is_activated]
-
-        loader.save_game_state(
-            path=filename,
-            scenario_id=self.current_scenario.spec.id,
-            turn=self.turn,
-            phase=self.phase,
-            active_player=self.active_player,
-            units=unit_data,
-            activated_countries=activated
-        )
+        phase_name = self.phase.name if hasattr(self.phase, "name") else str(self.phase)
+        payload = {
+            "metadata": {
+                "scenario_id": self.scenario_spec.id if self.scenario_spec else None,
+                "turn": self.turn,
+                "phase": phase_name,
+                "active_player": self.active_player,
+                "initiative_winner": self.initiative_winner,
+                "second_player_has_acted": self.second_player_has_acted,
+            },
+            "world_state": {
+                "countries": {
+                    cid: {
+                        "allegiance": country.allegiance,
+                        "conquered": bool(country.conquered),
+                        "capital_id": country.capital_id,
+                        "locations": {
+                            lid: {"occupier": loc.occupier, "is_capital": bool(loc.is_capital)}
+                            for lid, loc in country.locations.items()
+                        },
+                    }
+                    for cid, country in self.countries.items()
+                },
+                "units": [u.to_dict() for u in self.units],
+                "unit_runtime": {
+                    f"{u.id}|{u.ordinal}": {
+                        "movement_points": getattr(u, "movement_points", None),
+                        "river_hexside": getattr(u, "river_hexside", None),
+                        "replacement_ready_turn": getattr(u, "replacement_ready_turn", None),
+                    }
+                    for u in self.units
+                },
+                "players": {
+                    allegiance: {
+                        "is_ai": bool(player.is_ai),
+                        "assets": [
+                            {
+                                "id": asset_id,
+                                "assigned_to": (
+                                    [asset.assigned_to.id, asset.assigned_to.ordinal]
+                                    if getattr(asset, "assigned_to", None)
+                                    else None
+                                ),
+                            }
+                            for asset_id, asset in player.assets.items()
+                        ],
+                    }
+                    for allegiance, player in self.players.items()
+                },
+                "completed_event_ids": sorted(self.completed_event_ids),
+                "strategic_events": {
+                    evt.id: {
+                        "occurrence_count": evt.occurrence_count,
+                        "is_active": evt.is_active,
+                    }
+                    for evt in self.strategic_event_pool
+                },
+            },
+        }
+        loader.save_game_state(path=filename, payload=payload)
 
     def load_state(self, filename):
-        pass
+        save_data = loader.load_game_state(filename)
+        metadata = save_data.metadata or {}
+        world_state = save_data.world_state or {}
+
+        scenario_id = metadata.get("scenario_id")
+        if not scenario_id:
+            raise ValueError("Save file missing metadata.scenario_id")
+
+        scenario_spec = self._find_scenario_spec_by_id(scenario_id)
+        if not scenario_spec:
+            raise ValueError(f"Scenario '{scenario_id}' not found in {SCENARIOS_DIR}")
+
+        self.load_scenario(scenario_spec)
+
+        self.turn = int(metadata.get("turn", self.turn))
+        phase_raw = metadata.get("phase")
+        if phase_raw:
+            try:
+                self.phase = GamePhase[phase_raw] if isinstance(phase_raw, str) else GamePhase(phase_raw)
+            except Exception:
+                pass
+        self.active_player = metadata.get("active_player", self.active_player)
+        self.initiative_winner = metadata.get("initiative_winner", self.initiative_winner)
+        self.second_player_has_acted = bool(
+            metadata.get("second_player_has_acted", self.second_player_has_acted)
+        )
+
+        self._restore_countries_from_save(world_state.get("countries", {}))
+        self._restore_units_from_save(
+            world_state.get("units", []),
+            world_state.get("unit_runtime", {}),
+        )
+        self._restore_players_from_save(world_state.get("players", {}))
+        self._restore_events_from_save(world_state)
+        self.clear_movement_undo()
 
     def load_scenario(self, scenario_spec):
         """
@@ -98,6 +180,143 @@ class GameState:
         """
         builder = factory.ScenarioBuilder()
         builder.build(self, scenario_spec)
+
+    def _find_scenario_spec_by_id(self, scenario_id: str):
+        scenarios_dir = Path(SCENARIOS_DIR)
+        if not scenarios_dir.exists():
+            return None
+        for path in sorted(scenarios_dir.glob("*.yaml")):
+            try:
+                spec = loader.load_scenario_yaml(str(path))
+            except Exception:
+                continue
+            if spec.id == scenario_id:
+                return spec
+        return None
+
+    def _restore_countries_from_save(self, countries_state):
+        if not isinstance(countries_state, dict):
+            return
+        for cid, state in countries_state.items():
+            country = self.countries.get(cid)
+            if not country or not isinstance(state, dict):
+                continue
+            country.allegiance = state.get("allegiance", country.allegiance)
+            country.conquered = bool(state.get("conquered", country.conquered))
+            if state.get("capital_id") in country.locations:
+                country.capital_id = state["capital_id"]
+                for loc in country.locations.values():
+                    loc.is_capital = (loc.id == country.capital_id)
+
+            for lid, loc_state in (state.get("locations", {}) or {}).items():
+                if lid not in country.locations or not isinstance(loc_state, dict):
+                    continue
+                loc = country.locations[lid]
+                loc.occupier = loc_state.get("occupier", loc.occupier)
+                if "is_capital" in loc_state:
+                    loc.is_capital = bool(loc_state["is_capital"])
+
+    def _restore_units_from_save(self, units_state, unit_runtime_state):
+        if not isinstance(units_state, list):
+            return
+
+        by_key = {(u.id, u.ordinal): u for u in self.units}
+        transport_refs = []
+
+        for state in units_state:
+            if not isinstance(state, dict):
+                continue
+            key = (state.get("unit_id"), int(state.get("ordinal", 1) or 1))
+            unit = by_key.get(key)
+            if not unit:
+                continue
+            unit.load_state(state)
+            runtime = (unit_runtime_state or {}).get(f"{unit.id}|{unit.ordinal}", {})
+            if isinstance(runtime, dict):
+                mp = runtime.get("movement_points")
+                if mp is not None:
+                    unit.movement_points = mp
+                if hasattr(unit, "river_hexside"):
+                    river_hexside = runtime.get("river_hexside")
+                    if (
+                        isinstance(river_hexside, (list, tuple))
+                        and len(river_hexside) == 2
+                        and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in river_hexside)
+                    ):
+                        unit.river_hexside = tuple((int(p[0]), int(p[1])) for p in river_hexside)
+                    else:
+                        unit.river_hexside = None
+                if runtime.get("replacement_ready_turn") is not None:
+                    unit.replacement_ready_turn = runtime.get("replacement_ready_turn")
+
+            host_raw = state.get("transport_host")
+            if host_raw:
+                try:
+                    host_key = (host_raw[0], int(host_raw[1]))
+                    transport_refs.append((unit, host_key))
+                except Exception:
+                    pass
+
+            if hasattr(unit, "passengers"):
+                unit.passengers = []
+            if hasattr(unit, "equipment"):
+                unit.equipment = []
+
+        for unit, host_key in transport_refs:
+            host = by_key.get(host_key)
+            if not host:
+                unit.transport_host = None
+                unit.is_transported = False
+                continue
+            unit.transport_host = host
+            unit.is_transported = True
+            if hasattr(host, "passengers") and unit not in host.passengers:
+                host.passengers.append(unit)
+
+        self.map.unit_map = defaultdict(list)
+        for unit in self.units:
+            if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            self.map.add_unit_to_spatial_map(unit)
+
+    def _restore_players_from_save(self, players_state):
+        if not isinstance(players_state, dict):
+            return
+
+        by_key = {(u.id, u.ordinal): u for u in self.units}
+
+        for allegiance, p_state in players_state.items():
+            player = self.players.get(allegiance)
+            if not player or not isinstance(p_state, dict):
+                continue
+            player.set_ai(bool(p_state.get("is_ai", player.is_ai)))
+            player.assets = {}
+            for asset_data in p_state.get("assets", []) or []:
+                if not isinstance(asset_data, dict):
+                    continue
+                asset_id = asset_data.get("id")
+                if not asset_id:
+                    continue
+                player.grant_asset(asset_id, self)
+                asset = player.assets.get(asset_id)
+                assigned = asset_data.get("assigned_to")
+                if asset and assigned and isinstance(assigned, (list, tuple)) and len(assigned) == 2:
+                    unit = by_key.get((assigned[0], int(assigned[1])))
+                    if unit and asset.can_equip(unit):
+                        asset.apply_to(unit)
+
+    def _restore_events_from_save(self, world_state):
+        completed_ids = world_state.get("completed_event_ids", [])
+        self.completed_event_ids = set(completed_ids or [])
+        strategic_state = world_state.get("strategic_events", {}) or {}
+        for event in self.strategic_event_pool:
+            state = strategic_state.get(event.id)
+            if not isinstance(state, dict):
+                continue
+            event.occurrence_count = int(state.get("occurrence_count", event.occurrence_count))
+            event.is_active = bool(state.get("is_active", event.is_active))
 
     def get_map_bounds(self) -> Dict[str, List[int]]:
         """Returns the subset range or full map defaults."""

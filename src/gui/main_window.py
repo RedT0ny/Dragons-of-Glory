@@ -1,7 +1,7 @@
 import sys
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                               QFrame, QTextEdit, QTabWidget, QLabel)
+                               QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox)
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
@@ -40,6 +40,7 @@ class MainWindow(QMainWindow):
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
+        self.controller = None
         self._tab_switch_seq = 0
         self._tab_switch_started = {}
         self.setWindowTitle(APP_NAME)
@@ -199,11 +200,12 @@ class MainWindow(QMainWindow):
 
         save_action = QAction("&Save Game", self)
         save_action.setShortcut("Ctrl+S")
-        # save_action.triggered.connect(self.on_save_clicked)
+        save_action.triggered.connect(self.on_save_clicked)
         game_menu.addAction(save_action)
 
         load_action = QAction("&Load Game", self)
         load_action.setShortcut("Ctrl+L")
+        load_action.triggered.connect(self.on_load_clicked)
         game_menu.addAction(load_action)
 
         game_menu.addSeparator()
@@ -240,6 +242,7 @@ class MainWindow(QMainWindow):
 
     def set_controller(self, controller):
         """Connects UI signals to the controller."""
+        self.controller = controller
         self.info_panel.end_phase_clicked.connect(controller.on_end_phase_clicked)
         self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
         self.info_panel.undo_clicked.connect(controller.on_undo_clicked)
@@ -248,3 +251,40 @@ class MainWindow(QMainWindow):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
+
+    def on_save_clicked(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "Save Game",
+            "",
+            "YAML Files (*.yaml *.yml);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            self.game_state.save_state(path)
+            self.append_log(f"Game saved to {path}\n")
+        except Exception as exc:
+            QMessageBox.critical(self, "Save Failed", str(exc))
+
+    def on_load_clicked(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Load Game",
+            "",
+            "YAML Files (*.yaml *.yml);;All Files (*)",
+        )
+        if not path:
+            return
+        try:
+            self.game_state.load_state(path)
+            self.map_view.sync_with_model()
+            self.info_panel.set_game_state(self.game_state)
+            self.info_panel.refresh()
+            self.status_tab.refresh()
+            self.assets_tab.refresh()
+            if self.controller:
+                self.controller.process_game_turn()
+            self.append_log(f"Game loaded from {path}\n")
+        except Exception as exc:
+            QMessageBox.critical(self, "Load Failed", str(exc))

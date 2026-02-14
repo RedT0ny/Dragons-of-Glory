@@ -1,5 +1,6 @@
 import csv, yaml, json
 import os, re
+from datetime import datetime, timezone
 from dataclasses import asdict
 from collections import defaultdict
 from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP, HL, WS, NEUTRAL
@@ -182,25 +183,39 @@ def resolve_scenario_events(spec: ScenarioSpec, events_yaml_path: str) -> List[E
     return list(final_pool.values())
 
 
-def save_game_state(path: str, scenario_id: str, turn: int, phase: str, active_player: str, units: List[Dict[str, Any]], activated_countries: List[str]):
+def save_game_state(path: str, payload: Dict[str, Any] = None, **legacy_kwargs):
     """
-    Serializes the current game state into a YAML file.
+    Serializes a game state YAML file.
+    Supports:
+    - New mode: pass `payload` with top-level `metadata` and `world_state`.
+    - Legacy mode: pass old keyword arguments.
     """
-    data = {
-        "metadata": {
-            "scenario_id": scenario_id,
-            "turn": turn,
-            "phase": phase,
-            "active_player": active_player,
-            "save_timestamp": os.path.getmtime(path) if os.path.exists(path) else None # Placeholder for actual time
-        },
-        "world_state": {
-            "activated_countries": activated_countries,
-            "units": units
+    if payload is None:
+        scenario_id = legacy_kwargs.get("scenario_id")
+        turn = legacy_kwargs.get("turn")
+        phase = legacy_kwargs.get("phase")
+        active_player = legacy_kwargs.get("active_player")
+        units = legacy_kwargs.get("units", [])
+        activated_countries = legacy_kwargs.get("activated_countries", [])
+        payload = {
+            "metadata": {
+                "scenario_id": scenario_id,
+                "turn": turn,
+                "phase": phase,
+                "active_player": active_player,
+                "save_timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            "world_state": {
+                "activated_countries": activated_countries,
+                "units": units,
+            },
         }
-    }
+    else:
+        metadata = payload.setdefault("metadata", {})
+        metadata["save_timestamp"] = datetime.now(timezone.utc).isoformat()
+
     with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, default_flow_style=False)
+        yaml.safe_dump(payload, f, default_flow_style=False, sort_keys=False)
 
 def load_map_config(path: str) -> MapConfigSpec:
     """
