@@ -309,14 +309,17 @@ class MainWindow(QMainWindow):
             return
         path = files[0]
         try:
+            if self.controller:
+                self.controller.prepare_for_state_load()
             self.game_state.load_state(path)
+            self.map_view.reset_view_for_new_map()
             self.map_view.sync_with_model()
             self.info_panel.set_game_state(self.game_state)
             self.info_panel.refresh()
             self.status_tab.refresh()
             self.assets_tab.refresh()
             if self.controller:
-                self.controller.process_game_turn()
+                QTimer.singleShot(0, self.controller.process_game_turn)
             self.append_log(f"Game loaded from {path}\n")
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", str(exc))

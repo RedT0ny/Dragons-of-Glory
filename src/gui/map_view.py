@@ -476,6 +476,18 @@ class AnsalonMapView(QGraphicsView):
             if self._sync_pending:
                 QTimer.singleShot(0, self.sync_with_model)
 
+    def reset_view_for_new_map(self):
+        """
+        Hard reset scene/render caches after loading a save, so static map and unit items
+        are rebuilt against the new model state.
+        """
+        self.deploying_unit = None
+        self._sync_pending = False
+        self._sync_in_progress = False
+        self.unit_items.clear()
+        self.scene.clear()
+        self.map_rendered = False
+
     def draw_stack(self, stack, col, row):
         """Draws a list of units at a specific hex with visual stacking offset."""
         base_center = self.get_hex_center(col, row)

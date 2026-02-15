@@ -41,6 +41,34 @@ class GameController(QObject):
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
         self._movement_undo_context = None
         self._calendar_by_turn = self._load_calendar()
+        self._deferred_epoch = 0
+
+    def _schedule_deferred(self, callback):
+        epoch = self._deferred_epoch
+        QTimer.singleShot(0, lambda: self._run_deferred_if_current(epoch, callback))
+
+    def _run_deferred_if_current(self, epoch, callback):
+        if epoch != self._deferred_epoch:
+            return
+        callback()
+
+    def prepare_for_state_load(self):
+        """
+        Quiesce controller/UI state before loading a new save into the same runtime objects.
+        This invalidates pending deferred callbacks tied to previous state.
+        """
+        self.ai_timer.stop()
+        self._deferred_epoch += 1
+        self._processing_automatic_phases = False
+        self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
+        self.game_state.clear_movement_undo()
+        if self.replacements_dialog:
+            self.replacements_dialog.close()
+            self.replacements_dialog = None
+        if self.combat_click_handler:
+            self.combat_click_handler.reset_selection()
+        self.view.highlight_movement_range([])
 
     def _load_calendar(self):
         try:
@@ -205,7 +233,7 @@ class GameController(QObject):
             try:
                 # Use QTimer.singleShot to avoid recursion
                 from PySide6.QtCore import QTimer
-                QTimer.singleShot(0, self._continue_automatic_phases)
+                self._schedule_deferred(self._continue_automatic_phases)
             except Exception as e:
                 self._processing_automatic_phases = False
                 raise
@@ -346,7 +374,7 @@ class GameController(QObject):
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
-        QTimer.singleShot(0, _deferred_end_phase_view_update)
+        self._schedule_deferred(_deferred_end_phase_view_update)
 
         self.game_state.advance_phase()
 
@@ -354,7 +382,7 @@ class GameController(QObject):
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
         # the UI (Dialogs) for that player will be initialized.
         # Use QTimer.singleShot to avoid potential recursion issues
-        QTimer.singleShot(0, self.process_game_turn)
+        self._schedule_deferred(self.process_game_turn)
 
     def execute_simple_ai_logic(self, side):
         # TODO: logic to call self.game_state relevant methods (move, attack...)
@@ -438,8 +466,8 @@ class GameController(QObject):
             # Clear selection/highlights
             self.view.highlight_movement_range([])
             # Defer redraw to avoid mutating the scene while click dispatch is active.
-            QTimer.singleShot(0, self.view.sync_with_model)
-            QTimer.singleShot(0, self._refresh_info_panel)
+            self._schedule_deferred(self.view.sync_with_model)
+            self._schedule_deferred(self._refresh_info_panel)
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
 
@@ -502,7 +530,7 @@ class GameController(QObject):
         def _deferred_sync():
             self.view.sync_with_model()
             self._refresh_info_panel()
-        QTimer.singleShot(0, _deferred_sync)
+        self._schedule_deferred(_deferred_sync)
         
         print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
 
@@ -525,8 +553,8 @@ class GameController(QObject):
         for message in result.messages:
             print(message)
         if result.force_sync:
-            QTimer.singleShot(0, self.view.sync_with_model)
-            QTimer.singleShot(0, self._refresh_info_panel)
+            self._schedule_deferred(self.view.sync_with_model)
+            self._schedule_deferred(self._refresh_info_panel)
 
     def _handle_deployment_from_event(self, effects, active_player):
         """

@@ -930,6 +930,8 @@ class Board:
         """
         if not units:
             return []
+        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
+            return self.get_reachable_hexes_for_fleet(units[0])
 
         # 1. Determine Stack Constraints
         start_hex = None

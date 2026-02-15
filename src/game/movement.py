@@ -90,8 +90,15 @@ class MovementService:
         """
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
-        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
-            return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes_for_fleet(units[0]))
+        if all(u.unit_type == UnitType.FLEET for u in units):
+            start_hex, _ = self._get_stack_start_and_min_mp(units)
+            # A selected "stack" of fleets must be co-located.
+            if not start_hex:
+                return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
+            most_restrictive_fleet = min(units, key=effective_movement_points)
+            return self._range_result_from_hexes(
+                self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
+            )
 
         start_hex, min_mp = self._get_stack_start_and_min_mp(units)
         if not start_hex or min_mp <= 0:
@@ -112,6 +119,8 @@ class MovementService:
     def move_units_to_hex(self, units, target_hex):
         if not units:
             return MoveUnitsResult(moved=[], errors=[])
+        # Defensive de-duplication in case the UI passes duplicate selections.
+        units = list(dict.fromkeys(units))
 
         errors = []
         for unit in units:
