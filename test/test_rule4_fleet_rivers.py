@@ -6,6 +6,7 @@ from src.content.loader import load_scenario_yaml
 from src.content.config import SCENARIOS_DIR
 from src.game.game_state import GameState
 from src.game.map import Board, Hex
+from src.game.movement import MovementService
 from pathlib import Path
 
 
@@ -13,6 +14,7 @@ def _fleet(allegiance, col, row, movement=4, moved=False):
     return SimpleNamespace(
         id=f"fleet_{allegiance}_{col}_{row}",
         unit_type=UnitType.FLEET,
+        race=None,
         allegiance=allegiance,
         movement=movement,
         movement_points=movement,
@@ -29,12 +31,44 @@ def _army(allegiance, col, row):
     return SimpleNamespace(
         id=f"army_{allegiance}_{col}_{row}",
         unit_type=UnitType.INFANTRY,
+        race=None,
         allegiance=allegiance,
         movement=1,
         movement_points=1,
         position=(col, row),
         is_on_map=True,
         is_army=lambda: True,
+    )
+
+
+def _wing(allegiance, col, row, movement=4):
+    return SimpleNamespace(
+        id=f"wing_{allegiance}_{col}_{row}",
+        unit_type=UnitType.WING,
+        race=None,
+        allegiance=allegiance,
+        movement=movement,
+        movement_points=movement,
+        position=(col, row),
+        is_on_map=True,
+        is_army=lambda: False,
+        is_leader=lambda: False,
+    )
+
+
+def _leader(allegiance, col, row, movement=2):
+    return SimpleNamespace(
+        id=f"leader_{allegiance}_{col}_{row}",
+        unit_type=UnitType.HERO,
+        race=None,
+        allegiance=allegiance,
+        movement=movement,
+        movement_points=movement,
+        position=(col, row),
+        is_on_map=True,
+        is_army=lambda: False,
+        is_leader=lambda: True,
+        terrain_affinity=None,
     )
 
 
@@ -194,3 +228,53 @@ def test_ground_army_entry_displaces_enemy_fleet_to_nearest_safe_water():
     assert enemy_fleet.position != (3, 2)
     displaced_hex = Hex.offset_to_axial(*enemy_fleet.position)
     assert not gs.map.has_enemy_army(displaced_hex, enemy_fleet.allegiance)
+
+
+def test_non_ground_stack_cannot_enter_enemy_fleet_hex():
+    board = Board(width=8, height=8)
+    board.populate_terrain({"2,2": "grassland", "3,2": "grassland"})
+
+    wing = _wing(HL, 2, 2)
+    leader = _leader(HL, 2, 2)
+    enemy_fleet = _fleet(WS, 3, 2)
+    board.add_unit_to_spatial_map(wing)
+    board.add_unit_to_spatial_map(leader)
+    board.add_unit_to_spatial_map(enemy_fleet)
+
+    target = Hex.offset_to_axial(3, 2)
+
+    assert board.can_stack_move_to([wing, leader], target) is False
+    reachable = {h.axial_to_offset() for h in board.get_reachable_hexes([wing, leader])}
+    assert (3, 2) not in reachable
+
+
+def test_movement_service_allows_ground_stack_into_enemy_fleet_hex():
+    gs = GameState()
+    gs.map = Board(width=10, height=10)
+    gs.phase = GamePhase.MOVEMENT
+
+    # Start and target are land/coastal; extra water provides a legal displacement destination.
+    gs.map.populate_terrain({
+        "2,2": "grassland",
+        "3,2": "c_grassland",
+        "4,2": "ocean",
+        "3,1": "ocean",
+        "3,3": "ocean",
+    })
+
+    army = _army(HL, 2, 2)
+    leader = _leader(HL, 2, 2)
+    enemy_fleet = _fleet(WS, 3, 2, movement=6)
+    gs.units = [army, leader, enemy_fleet]
+    gs.map.add_unit_to_spatial_map(army)
+    gs.map.add_unit_to_spatial_map(leader)
+    gs.map.add_unit_to_spatial_map(enemy_fleet)
+
+    service = MovementService(gs)
+    target_hex = Hex.offset_to_axial(3, 2)
+    result = service.move_units_to_hex([leader, army], target_hex)
+
+    assert result.errors == []
+    assert army.position == (3, 2)
+    assert leader.position == (3, 2)
+    assert enemy_fleet.position != (3, 2)

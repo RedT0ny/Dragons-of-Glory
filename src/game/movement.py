@@ -120,7 +120,35 @@ class MovementService:
         if not units:
             return MoveUnitsResult(moved=[], errors=[])
         # Defensive de-duplication in case the UI passes duplicate selections.
-        units = list(dict.fromkeys(units))
+        deduped = []
+        seen_ids = set()
+        for unit in units:
+            marker = id(unit)
+            if marker in seen_ids:
+                continue
+            seen_ids.add(marker)
+            deduped.append(unit)
+        units = deduped
+
+        # Mixed stacks that include ground armies can legally enter enemy-fleet hexes.
+        # Validate these as a stack, not unit-by-unit, to avoid false "no valid path".
+        if len(units) > 1 and any(self._is_ground_army(u) for u in units):
+            ok, reason = self._can_stack_reach_target(units, target_hex)
+            if not ok:
+                return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
+
+            target_offset = target_hex.axial_to_offset()
+            moved = []
+            ordered_units = sorted(units, key=lambda u: 0 if self._is_ground_army(u) else 1)
+            for unit in ordered_units:
+                self.game_state.move_unit(unit, target_hex)
+                if getattr(unit, "position", None) != target_offset:
+                    return MoveUnitsResult(
+                        moved=moved,
+                        errors=[f"{unit.id} cannot move."],
+                    )
+                moved.append(unit)
+            return MoveUnitsResult(moved=moved, errors=[])
 
         errors = []
         for unit in units:
@@ -136,6 +164,25 @@ class MovementService:
             self.game_state.move_unit(unit, target_hex)
             moved.append(unit)
         return MoveUnitsResult(moved=moved, errors=[])
+
+    @staticmethod
+    def _is_ground_army(unit):
+        return (
+            hasattr(unit, "is_army")
+            and unit.is_army()
+            and unit.unit_type not in (UnitType.FLEET, UnitType.WING)
+        )
+
+    def _can_stack_reach_target(self, units, target_hex):
+        start_hex, _ = self._get_stack_start_and_min_mp(units)
+        if not start_hex:
+            return False, "Selected units are not in the same hex."
+        if start_hex == target_hex:
+            return True, None
+        reachable = self.game_state.map.get_reachable_hexes(units)
+        if target_hex in reachable:
+            return True, None
+        return False, "Selected stack has no valid path."
 
     def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
         col, row = target_hex.axial_to_offset()
@@ -245,12 +292,12 @@ class MovementService:
         )
 
     def _stack_step_cost(self, units, current_hex, next_hex, board):
+        # Check 1: Enemy occupancy based on stack composition.
+        if not board.can_stack_enter_enemy_occupied_hex(units, next_hex):
+            return None
+
         stack_cost = 0
         for unit in units:
-            # Check 1: Is hex occupied by enemy?
-            if board.has_enemy_army(next_hex, unit.allegiance):
-                return None
-
             # Check 2: Sea Barrier
             if unit.unit_type != UnitType.WING:
                 hexside = board.get_effective_hexside(current_hex, next_hex)

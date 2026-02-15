@@ -619,6 +619,38 @@ class Board:
     def get_units_in_hex(self, q, r):
         return self.unit_map.get((q, r), [])
 
+    def _stack_has_ground_army(self, moving_units):
+        return any(
+            hasattr(u, "is_army")
+            and u.is_army()
+            and u.unit_type not in (UnitType.FLEET, UnitType.WING)
+            for u in moving_units
+        )
+
+    def has_enemy_unit(self, hex_coord, alliance):
+        units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
+        for u in units:
+            if (
+                u.allegiance != alliance
+                and u.allegiance != "neutral"
+                and getattr(u, "is_on_map", True)
+            ):
+                return True
+        return False
+
+    def can_stack_enter_enemy_occupied_hex(self, moving_units, target_hex):
+        """
+        Occupancy rule:
+        - Stacks containing a ground Army may enter enemy Fleet hexes (fleets are displaced).
+        - Stacks with no ground Army cannot enter any enemy-occupied hex.
+        """
+        if not moving_units:
+            return True
+        alliance = moving_units[0].allegiance
+        if self._stack_has_ground_army(moving_units):
+            return not self.has_enemy_army(target_hex, alliance)
+        return not self.has_enemy_unit(target_hex, alliance)
+
     def can_stack_move_to(self, moving_units, target_hex):
         """
         Checks if a stack of units can end their movement in the target hex
@@ -627,9 +659,8 @@ class Board:
         if not moving_units:
             return True
 
-        # 1. Enemy Check (Assumes all moving units share allegiance)
-        # We check the first unit, as stacks are usually single-allegiance
-        if self.has_enemy_army(target_hex, moving_units[0].allegiance):
+        # 1. Enemy Occupancy Check (Assumes all moving units share allegiance)
+        if not self.can_stack_enter_enemy_occupied_hex(moving_units, target_hex):
             return False
 
         # 2. Combine moving stack with units ALREADY at destination
@@ -908,8 +939,8 @@ class Board:
                 if self._hexside_is(hexside, HexsideType.SEA):  # Explicitly mark water-only boundaries in config
                     continue
 
-            # 3. Cannot occupy enemy hex
-            if self.has_enemy_army(neighbor, unit.allegiance):
+            # 3. Cannot occupy enemy hex, except ground-army displacement rule.
+            if not self.can_stack_enter_enemy_occupied_hex([unit], neighbor):
                 continue
 
             # Rule 5: Movement must stop if moving from ZOC to another ZOC hex
@@ -1029,11 +1060,12 @@ class Board:
                 stack_cost = 0
                 possible = True
 
+                # Check 1: Is hex occupied by enemy?
+                if not self.can_stack_enter_enemy_occupied_hex(units, next_hex):
+                    possible = False
+                    continue
+
                 for unit in units:
-                    # Check 1: Is hex occupied by enemy?
-                    if self.has_enemy_army(next_hex, unit.allegiance):
-                        possible = False
-                        break
 
                     # Check 2: Sea Barrier (if not handled by cost)
                     # Note: get_movement_cost usually returns inf for ground vs sea,
