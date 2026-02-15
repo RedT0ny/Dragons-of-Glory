@@ -27,6 +27,8 @@ def test_save_load_roundtrip_restores_core_runtime_state():
     gs.active_player = WS
     gs.initiative_winner = HL
     gs.second_player_has_acted = True
+    gs.activation_bonuses = {HL: 2, WS: 1}
+    gs.combat_bonuses = {HL: 3, WS: 0}
 
     # Country runtime state
     country = next(iter(gs.countries.values()))
@@ -80,6 +82,8 @@ def test_save_load_roundtrip_restores_core_runtime_state():
         assert loaded.active_player == WS
         assert loaded.initiative_winner == HL
         assert loaded.second_player_has_acted is True
+        assert loaded.activation_bonuses == {HL: 2, WS: 1}
+        assert loaded.combat_bonuses == {HL: 3, WS: 0}
 
         loaded_country = loaded.countries[country.id]
         assert loaded_country.allegiance == WS

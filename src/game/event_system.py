@@ -117,6 +117,10 @@ class EventSystem:
         if "activation_bonus" in effects:
             self.game_state.add_activation_bonus(player.allegiance, effects["activation_bonus"])
 
+        # 5. Combat bonus (applies to this turn's Step 6 rolls for the drawing player)
+        if "combat_bonus" in effects:
+            self.game_state.add_combat_bonus(player.allegiance, effects["combat_bonus"])
+
     def draw_strategic_event(self, allegiance):
         """
         Draws an event for the given allegiance based on triggers and probability.

@@ -25,7 +25,7 @@ ws_minor_diplomacy:
   picture: "ws_minor_diplomacy.jpg"
   turn: 2
   allegiance: "whitestone"
-  effects: { gain_alliance: "neutral" }
+  effects: { activation_bonus: 1 }
   max_occurrences: 3
 
 hl_minor_diplomacy:

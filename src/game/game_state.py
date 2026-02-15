@@ -60,6 +60,7 @@ class GameState:
         # Draconian rules
         self.draconian_ready_at_start = 0
         self.activation_bonuses = {HL: 0, WS: 0}
+        self.combat_bonuses = {HL: 0, WS: 0}
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -88,6 +89,7 @@ class GameState:
                 "initiative_winner": self.initiative_winner,
                 "second_player_has_acted": self.second_player_has_acted,
                 "activation_bonuses": dict(self.activation_bonuses),
+                "combat_bonuses": dict(self.combat_bonuses),
             },
             "world_state": {
                 "countries": {
@@ -171,6 +173,11 @@ class GameState:
         self.activation_bonuses = {
             HL: int(saved_bonuses.get(HL, 0) or 0),
             WS: int(saved_bonuses.get(WS, 0) or 0),
+        }
+        saved_combat_bonuses = metadata.get("combat_bonuses", {}) or {}
+        self.combat_bonuses = {
+            HL: int(saved_combat_bonuses.get(HL, 0) or 0),
+            WS: int(saved_combat_bonuses.get(WS, 0) or 0),
         }
 
         self._restore_countries_from_save(world_state.get("countries", {}))
@@ -676,6 +683,23 @@ class GameState:
     def clear_activation_bonuses(self):
         for key in list(self.activation_bonuses.keys()):
             self.activation_bonuses[key] = 0
+
+    def add_combat_bonus(self, allegiance: str, amount: int):
+        if allegiance not in self.combat_bonuses:
+            return
+        self.combat_bonuses[allegiance] += int(amount)
+
+    def get_combat_bonus(self, allegiance: str) -> int:
+        return int(self.combat_bonuses.get(allegiance, 0))
+
+    def clear_combat_bonus(self, allegiance: str):
+        if allegiance not in self.combat_bonuses:
+            return
+        self.combat_bonuses[allegiance] = 0
+
+    def clear_combat_bonuses(self):
+        for key in list(self.combat_bonuses.keys()):
+            self.combat_bonuses[key] = 0
 
     def _force_move_fleet_to_state(self, fleet, state):
         retreat_hex, retreat_side = state

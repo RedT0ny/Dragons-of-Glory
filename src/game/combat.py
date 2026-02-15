@@ -190,6 +190,12 @@ class CombatResolver:
         drm += self._count_attacker_terrain_affinity_bonus()
         drm -= self._count_defender_terrain_affinity_bonus(defender_hex)
 
+        # EVENT COMBAT BONUS (active player, current battle turn only)
+        if self.game_state and hasattr(self.game_state, "get_combat_bonus"):
+            active_player = getattr(self.game_state, "active_player", None)
+            if active_player and any(getattr(u, "allegiance", None) == active_player for u in self.attackers):
+                drm += int(self.game_state.get_combat_bonus(active_player))
+
         return drm
 
     def _is_dragon_race(self, unit):

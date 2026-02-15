@@ -268,3 +268,20 @@ def test_defender_in_location_ignores_retreat_result():
     resolver._apply_retreats = _count_retreats
     resolver.apply_results("-/R", defenders, is_attacker=False)
     assert calls["count"] == 1
+
+
+def test_combat_bonus_is_added_for_active_player_attack_rolls():
+    fmap = FakeMap()
+    attackers = [DummyUnit(unit_type=UnitType.INFANTRY, allegiance=HL, position=(4, 4), is_army=True)]
+    defenders = [DummyUnit(unit_type=UnitType.INFANTRY, allegiance=WS, position=(5, 4), is_army=True)]
+
+    game_state = SimpleNamespace(
+        map=fmap,
+        move_unit=lambda unit, hex_obj: None,
+        is_hex_in_bounds=lambda col, row: True,
+        active_player=HL,
+        get_combat_bonus=lambda allegiance: 2 if allegiance == HL else 0,
+    )
+    resolver = CombatResolver(attackers, defenders, TerrainType.GRASSLAND, game_state=game_state)
+
+    assert resolver.calculate_total_drm() == 2

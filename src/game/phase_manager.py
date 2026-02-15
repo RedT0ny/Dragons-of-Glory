@@ -90,6 +90,8 @@ class PhaseManager:
         elif self.game_state.phase == GamePhase.COMBAT:
             self.game_state.resolve_end_of_combat_conquest()
             self.game_state.clear_leader_tactical_overrides()
+            # Combat bonuses apply only during the active player's Step 6 of this turn.
+            self.game_state.clear_combat_bonus(self.game_state.active_player)
             for unit in self.game_state.units:
                 unit.attacked_this_turn = False
             if not self.game_state.second_player_has_acted:
