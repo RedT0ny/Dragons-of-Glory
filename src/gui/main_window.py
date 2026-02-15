@@ -84,34 +84,33 @@ class MainWindow(QMainWindow):
         # Connect signals after all UI elements are initialized
         self.tabs.currentChanged.connect(self.on_tab_changed)
 
-        # Bottom row: game log (left) + turn panel (right)
-        self.bottom_row = QWidget()
-        self.bottom_row.setFixedHeight(100)
-        bottom_layout = QHBoxLayout(self.bottom_row)
-        bottom_layout.setContentsMargins(0, 0, 0, 0)
-        bottom_layout.setSpacing(8)
+        # Main body: left column (tabs + log), right column (persistent info panel)
+        self.body_row = QWidget()
+        body_layout = QHBoxLayout(self.body_row)
+        body_layout.setContentsMargins(0, 0, 0, 0)
+        body_layout.setSpacing(8)
+
+        self.left_column = QWidget()
+        left_layout = QVBoxLayout(self.left_column)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(8)
+        left_layout.addWidget(self.tabs, stretch=1)
 
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
         self.log_area.setFixedHeight(100)
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
-        bottom_layout.addWidget(self.log_area, stretch=1)
+        left_layout.addWidget(self.log_area, stretch=0)
 
-        self.turn_panel = TurnPanel(self.bottom_row)
-        bottom_layout.addWidget(self.turn_panel, stretch=0, alignment=Qt.AlignRight)
-        main_layout.addWidget(self.bottom_row)
+        body_layout.addWidget(self.left_column, stretch=1)
 
-        # Persistent right sidebar outside tabs (always visible)
+        # Persistent right sidebar outside tabs (always visible, full height)
         self.info_panel = InfoPanel(game_state=self.game_state)
+        self.turn_panel = TurnPanel(self.info_panel)
+        self.info_panel.layout().insertWidget(0, self.turn_panel)
+        body_layout.addWidget(self.info_panel, stretch=0)
 
-        # Main content row below top strip
-        self.content_row = QWidget()
-        content_layout = QHBoxLayout(self.content_row)
-        content_layout.setContentsMargins(0, 0, 0, 0)
-        content_layout.setSpacing(8)
-        content_layout.addWidget(self.tabs, stretch=1)
-        content_layout.addWidget(self.info_panel, stretch=0)
-        main_layout.addWidget(self.content_row)
+        main_layout.addWidget(self.body_row, stretch=1)
 
         # Redirect console output to the log area while keeping original console
         self.stdout_redirector = ConsoleRedirector(sys.stdout)

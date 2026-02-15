@@ -18,7 +18,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel,
     QSizePolicy, QVBoxLayout, QWidget)
 
-from src.content.config import BASE_DIR, LOGO_HL, LOGO_WS
+from src.content.config import LOGO_HL, LOGO_WS
 from src.content.constants import HL, WS
 
 import os
@@ -101,7 +101,7 @@ class TurnPanel(QFrame):
         super().__init__(parent)
         self._ui = Ui_turn_panel()
         self._ui.setupUi(self)
-        self.setFixedWidth(self.width())
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.setFixedHeight(100)
         self.sideLbl = self._ui.sideLbl
         self.turnLbl = self._ui.turnLbl

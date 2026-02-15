@@ -97,12 +97,16 @@ class InfoPanel(QFrame):
         self.game_state = game_state
         self.setFixedWidth(350)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
+        self._minimap_refresh_queued = False
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
 
         # Mini-map
         self.mini_map = MiniMapView(self.game_state)
-        self.mini_map.setFixedSize(320, 240)
+        self.mini_map.setFixedHeight(240)
+        self.mini_map.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.mini_map.clicked.connect(self.minimap_clicked.emit)
         layout.addWidget(self.mini_map)
 
@@ -134,6 +138,7 @@ class InfoPanel(QFrame):
         # Unit Info Frame
         self.unit_box = QFrame()
         self.unit_box.setFrameStyle(QFrame.Box)
+        self.unit_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         unit_layout = QVBoxLayout(self.unit_box)
 
         # 1. Picture
@@ -214,8 +219,17 @@ class InfoPanel(QFrame):
 
     def refresh(self):
         """Manually refreshes the panel content (minimap, etc)."""
-        if self.mini_map:
-            self.mini_map.sync_with_model()
+        if not self.mini_map or self._minimap_refresh_queued:
+            return
+        self._minimap_refresh_queued = True
+
+        def _do_refresh():
+            self._minimap_refresh_queued = False
+            if self.mini_map:
+                self.mini_map.sync_with_model()
+
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, _do_refresh)
 
     @Slot(list)
     def update_unit_box(self, selected_units):

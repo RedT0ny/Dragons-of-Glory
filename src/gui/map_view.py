@@ -44,6 +44,8 @@ class AnsalonMapView(QGraphicsView):
         self.map_rendered = False
         self.initial_fit_done = False
         self.zoom_on_show = 1.0
+        self._sync_in_progress = False
+        self._sync_pending = False
 
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
@@ -433,35 +435,46 @@ class AnsalonMapView(QGraphicsView):
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
-        if not self.map_rendered:
-            self.scene.clear()
-            self.draw_static_map()
-            self.map_rendered = True
+        if self._sync_in_progress:
+            self._sync_pending = True
+            return
 
-        # Clean up old unit items
-        for item in self.unit_items:
-            if item.scene() == self.scene:
-                self.scene.removeItem(item)
-        self.unit_items.clear()
+        self._sync_in_progress = True
+        try:
+            self._sync_pending = False
+            if not self.map_rendered:
+                self.scene.clear()
+                self.draw_static_map()
+                self.map_rendered = True
 
-        # Draw units if map is initialized
-        if self.game_state.map:
-            # Group units by position to handle stacking
-            units_by_hex = {} # (col, row) -> [unit, unit...]
+            # Clean up old unit items
+            for item in self.unit_items:
+                if item.scene() == self.scene:
+                    self.scene.removeItem(item)
+            self.unit_items.clear()
 
-            for unit in self.game_state.units:
-                # Skip transported units (they are represented on the carrier)
-                if getattr(unit, 'transport_host', None):
-                    continue
-                if hasattr(unit, 'position') and unit.is_on_map:
-                    pos = unit.position # (col, row)
-                    if pos not in units_by_hex:
-                        units_by_hex[pos] = []
-                    units_by_hex[pos].append(unit)
+            # Draw units if map is initialized
+            if self.game_state.map:
+                # Group units by position to handle stacking
+                units_by_hex = {} # (col, row) -> [unit, unit...]
 
-            # Draw each stack
-            for pos, stack in units_by_hex.items():
-                self.draw_stack(stack, pos[0], pos[1])
+                for unit in self.game_state.units:
+                    # Skip transported units (they are represented on the carrier)
+                    if getattr(unit, 'transport_host', None):
+                        continue
+                    if hasattr(unit, 'position') and unit.is_on_map:
+                        pos = unit.position # (col, row)
+                        if pos not in units_by_hex:
+                            units_by_hex[pos] = []
+                        units_by_hex[pos].append(unit)
+
+                # Draw each stack
+                for pos, stack in units_by_hex.items():
+                    self.draw_stack(stack, pos[0], pos[1])
+        finally:
+            self._sync_in_progress = False
+            if self._sync_pending:
+                QTimer.singleShot(0, self.sync_with_model)
 
     def draw_stack(self, stack, col, row):
         """Draws a list of units at a specific hex with visual stacking offset."""
