@@ -54,9 +54,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # Initialize Tab Widget
+        # Initialize Tab Widget (left side content)
         self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs)
 
         # --- Tab 1: Map Tab ---
         self.map_tab = QWidget()
@@ -65,11 +64,7 @@ class MainWindow(QMainWindow):
         # Hex Map
         self.map_view = AnsalonMapView(self.game_state)
         self.map_view.zoom_on_show = 2
-        map_layout.addWidget(self.map_view, stretch=4)
-
-        # Sidebar
-        self.info_panel = InfoPanel(game_state=self.game_state)
-        map_layout.addWidget(self.info_panel, stretch=1)
+        map_layout.addWidget(self.map_view, stretch=1)
 
         self.tabs.addTab(self.map_tab, "Map")
 
@@ -105,6 +100,18 @@ class MainWindow(QMainWindow):
         self.turn_panel = TurnPanel(self.bottom_row)
         bottom_layout.addWidget(self.turn_panel, stretch=0, alignment=Qt.AlignRight)
         main_layout.addWidget(self.bottom_row)
+
+        # Persistent right sidebar outside tabs (always visible)
+        self.info_panel = InfoPanel(game_state=self.game_state)
+
+        # Main content row below top strip
+        self.content_row = QWidget()
+        content_layout = QHBoxLayout(self.content_row)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(8)
+        content_layout.addWidget(self.tabs, stretch=1)
+        content_layout.addWidget(self.info_panel, stretch=0)
+        main_layout.addWidget(self.content_row)
 
         # Redirect console output to the log area while keeping original console
         self.stdout_redirector = ConsoleRedirector(sys.stdout)
