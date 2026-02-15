@@ -11,6 +11,7 @@ from src.gui.status_tab import StatusTab
 from src.gui.assets_tab import AssetsTab
 from src.gui.info_panel import InfoPanel
 from src.gui.unit_panel import UnitTable
+from src.gui.turn_panel import TurnPanel
 
 
 def _perf_print(message):
@@ -88,12 +89,22 @@ class MainWindow(QMainWindow):
         # Connect signals after all UI elements are initialized
         self.tabs.currentChanged.connect(self.on_tab_changed)
 
-        # Game Log
+        # Bottom row: game log (left) + turn panel (right)
+        self.bottom_row = QWidget()
+        self.bottom_row.setFixedHeight(100)
+        bottom_layout = QHBoxLayout(self.bottom_row)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(8)
+
         self.log_area = QTextEdit()
         self.log_area.setReadOnly(True)
         self.log_area.setFixedHeight(100)
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
-        main_layout.addWidget(self.log_area)
+        bottom_layout.addWidget(self.log_area, stretch=1)
+
+        self.turn_panel = TurnPanel(self.bottom_row)
+        bottom_layout.addWidget(self.turn_panel, stretch=0, alignment=Qt.AlignRight)
+        main_layout.addWidget(self.bottom_row)
 
         # Redirect console output to the log area while keeping original console
         self.stdout_redirector = ConsoleRedirector(sys.stdout)
@@ -251,6 +262,15 @@ class MainWindow(QMainWindow):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
+
+    def update_turn_panel(self, active_player: str, turn: int, calendar_upper_label: str, phase_label: str):
+        if hasattr(self, "turn_panel") and self.turn_panel:
+            self.turn_panel.update_state(
+                active_player=active_player,
+                turn=turn,
+                calendar_upper_label=calendar_upper_label,
+                phase_label=phase_label,
+            )
 
     def on_save_clicked(self):
         dialog = QFileDialog(self, "Save Game")

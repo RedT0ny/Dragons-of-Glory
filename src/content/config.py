@@ -27,7 +27,10 @@ MAP_TERRAIN_DATA = os.path.join(DATA_DIR, "ansalon_map.csv")
 UNITS_DATA = os.path.join(DATA_DIR, "units.csv")
 EVENTS_DATA = os.path.join(DATA_DIR, "events.yaml")
 ARTIFACTS_DATA = os.path.join(DATA_DIR, "artifacts.yaml")
+CALENDAR_DATA = os.path.join(DATA_DIR, "calendar.csv")
 LIBRA_FONT = os.path.join(FONTS_DIR, "Libra Regular.otf")
+LOGO_HL = os.path.join(ICONS_DIR, "logo_hl.png")
+LOGO_WS = os.path.join(ICONS_DIR, "logo_ws.png")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77

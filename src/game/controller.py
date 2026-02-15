@@ -1,6 +1,8 @@
 # Conceptual example for game flow
 from PySide6.QtCore import QObject, QTimer
 
+from src.content import loader
+from src.content.config import CALENDAR_DATA
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase
 from src.game.diplomacy import DiplomacyActivationService
@@ -38,6 +40,14 @@ class GameController(QObject):
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
         self._movement_undo_context = None
+        self._calendar_by_turn = self._load_calendar()
+
+    def _load_calendar(self):
+        try:
+            return loader.load_calendar_csv(CALENDAR_DATA)
+        except Exception as exc:
+            print(f"Failed to load calendar data: {exc}")
+            return {}
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -130,6 +140,7 @@ class GameController(QObject):
                     # 2. Check for Deployment Triggers (Alliance or Add Units)
                     if "alliance" in effects or "add_units" in effects:
                         self._handle_deployment_from_event(effects, active_player)
+                        self._refresh_turn_panel()
                         return
 
                     # 3. Check for Artifact/Assets
@@ -138,6 +149,7 @@ class GameController(QObject):
                     if event.spec.event_type == "artifact" or "grant_asset" in event.spec.effects:
                         asset_id = event.spec.effects.get("grant_asset")
                         self.open_assets_tab_for_assignment(asset_id)
+                        self._refresh_turn_panel()
                         return # Stop loop, wait for user interaction (End Turn)
 
             # If no event or event handled (and not requiring UI pause)
@@ -162,6 +174,7 @@ class GameController(QObject):
                         {"alliance": country_id, "alliance_already_activated": True},
                         active_player,
                     )
+                    self._refresh_turn_panel()
                     return
 
                     # If AI, or human failed/cancelled activation, move on
@@ -224,6 +237,7 @@ class GameController(QObject):
 
         self.view.sync_with_model()
         self._refresh_info_panel()
+        self._refresh_turn_panel()
         
         # Connect map view signals if not already connected
         self.connect_map_view_signals()
@@ -249,6 +263,28 @@ class GameController(QObject):
             main_window.info_panel.set_undo_enabled(
                 self.game_state.phase == GamePhase.MOVEMENT and self.game_state.can_undo_movement()
             )
+
+    def _refresh_turn_panel(self):
+        main_window = self.view.window()
+        if not hasattr(main_window, "update_turn_panel"):
+            return
+
+        turn = self.game_state.turn
+        calendar_spec = self._calendar_by_turn.get(turn)
+        calendar_upper = calendar_spec.upper_label if calendar_spec else ""
+
+        main_window.update_turn_panel(
+            active_player=self.game_state.active_player,
+            turn=turn,
+            calendar_upper_label=calendar_upper,
+            phase_label=self._format_phase_label(self.game_state.phase),
+        )
+
+    @staticmethod
+    def _format_phase_label(phase):
+        if hasattr(phase, "name"):
+            return phase.name.replace("_", " ").title()
+        return str(phase)
 
     def open_assets_tab_for_assignment(self, asset_id=None):
         """

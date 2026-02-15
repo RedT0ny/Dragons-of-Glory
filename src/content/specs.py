@@ -174,6 +174,29 @@ class EventSpec:
     max_occurrences: int = 1  # Default to 1 (one-time event)
     probability: float = 1.0  # New field for Pseudo-Random Distribution
 
+@dataclass(frozen=True)
+class CalendarTurnSpec:
+    """
+    Calendar row used for turn-tracking labels.
+
+    `upper_label` is intended for "{period} {year}".
+    `lower_label` is intended for "Turn {turn}" or plain turn number if configured.
+    """
+    turn: int
+    period: str
+    year: int
+    lower_label_prefix: str = "Turn"
+
+    @property
+    def upper_label(self) -> str:
+        return f"{self.period} {self.year}"
+
+    @property
+    def lower_label(self) -> str:
+        if self.lower_label_prefix:
+            return f"{self.lower_label_prefix} {self.turn}"
+        return str(self.turn)
+
 # --- ENUMS ---
 class AssetType(Enum):
     ARTIFACT = "artifact"

@@ -331,6 +331,67 @@ def load_terrain_csv(path: str) -> Dict[str, str]:
             
     return terrain_map
 
+def load_calendar_csv(
+    path: str,
+    include_winter: bool = True,
+    lower_label_prefix: str = "",
+) -> Dict[int, CalendarTurnSpec]:
+    """
+    Parses calendar.csv and returns turn-indexed CalendarTurnSpec values.
+
+    CSV expected columns:
+      - turn
+      - period
+      - year
+
+    Args:
+        include_winter: When False, rows with period "Winter" are skipped.
+        lower_label_prefix: Prefix for lower label (default "" => turn number alone).
+    """
+    calendar: Dict[int, CalendarTurnSpec] = {}
+    if not os.path.exists(path):
+        return calendar
+
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.DictReader(fh, delimiter=";")
+        required = {"turn", "period", "year"}
+        if not reader.fieldnames or not required.issubset(set(reader.fieldnames)):
+            raise ValueError(
+                f"Invalid calendar CSV headers in {path}. "
+                f"Expected at least: {sorted(required)}"
+            )
+
+        for row in reader:
+            turn_raw = (row.get("turn") or "").strip()
+            period = (row.get("period") or "").strip()
+            year_raw = (row.get("year") or "").strip()
+
+            if not turn_raw or not year_raw or not period:
+                continue
+
+            try:
+                turn = int(turn_raw)
+                year = int(year_raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Invalid calendar row in {path}: turn='{turn_raw}', year='{year_raw}'"
+                ) from exc
+
+            if not include_winter and period.lower() == "winter":
+                continue
+
+            if turn in calendar:
+                raise ValueError(f"Duplicate turn '{turn}' in calendar CSV: {path}")
+
+            calendar[turn] = CalendarTurnSpec(
+                turn=turn,
+                period=period,
+                year=year,
+                lower_label_prefix=lower_label_prefix.strip(),
+            )
+
+    return calendar
+
 def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
     """
     Returns a dictionary of country raw data specs,
