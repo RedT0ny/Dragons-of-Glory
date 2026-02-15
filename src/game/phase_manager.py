@@ -72,6 +72,8 @@ class PhaseManager:
                 self.game_state.active_player = self.game_state.initiative_winner
                 # Phase remains ACTIVATION for the second player
             else:
+                # Activation bonuses are only valid during Step 3 of the current battle turn.
+                self.game_state.clear_activation_bonuses()
                 self.game_state.phase = GamePhase.INITIATIVE
 
         elif self.game_state.phase == GamePhase.INITIATIVE:

@@ -113,7 +113,9 @@ class EventSystem:
             # Delegate to Player class to ensure consistent asset creation and storage
             player.grant_asset(asset_id, self.game_state)
 
-        # Other effects...
+        # 4. Activation bonus (applies to this turn's Step 3 roll for the drawing player)
+        if "activation_bonus" in effects:
+            self.game_state.add_activation_bonus(player.allegiance, effects["activation_bonus"])
 
     def draw_strategic_event(self, allegiance):
         """

@@ -103,6 +103,8 @@ class DiplomacyDialog(QDialog):
         stats_text = f"Rating needed: {attempt.target_rating} or less"
         if attempt.solamnic_bonus:
             stats_text += f" (base {attempt.ws_rating} + {attempt.solamnic_bonus})"
+        if attempt.event_activation_bonus:
+            stats_text += f" | Event roll bonus: -{attempt.event_activation_bonus}"
         stats_lbl = QLabel(stats_text)
         stats_lbl.setAlignment(Qt.AlignCenter)
         stats_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {color_style};")
@@ -136,7 +138,10 @@ class DiplomacyDialog(QDialog):
             dice_sound.play()
 
             self.roll_ticks = 0
-            roll_result = self.diplomacy_service.roll_activation(attempt.target_rating)
+            roll_result = self.diplomacy_service.roll_activation(
+                attempt.target_rating,
+                roll_bonus=attempt.event_activation_bonus,
+            )
 
             animation_timer = QTimer(dlg)
 
@@ -151,7 +156,13 @@ class DiplomacyDialog(QDialog):
                     animation_timer.deleteLater()
                     dice_sound.stop()
 
-                    final_text = f"Rolled: {roll_result.roll}..."
+                    if roll_result.bonus_applied:
+                        final_text = (
+                            f"Rolled: {roll_result.roll} "
+                            f"(effective {roll_result.effective_roll} after -{roll_result.bonus_applied})..."
+                        )
+                    else:
+                        final_text = f"Rolled: {roll_result.roll}..."
 
                     if roll_result.success:
                         res_lbl.setText(f"{final_text} SUCCESS!")

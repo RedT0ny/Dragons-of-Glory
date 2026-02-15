@@ -12,12 +12,15 @@ class ActivationAttempt:
     ws_rating: int
     hl_rating: int
     solamnic_bonus: int
+    event_activation_bonus: int
     target_rating: int
 
 
 @dataclass(frozen=True)
 class ActivationRollResult:
     roll: int
+    effective_roll: int
+    bonus_applied: int
     success: bool
 
 
@@ -57,6 +60,9 @@ class DiplomacyActivationService:
         solamnic_bonus = 0
         if active_side == WS and self.game_state.is_solamnic_country_for_tower_rule(country.id):
             solamnic_bonus = self.game_state.get_ws_solamnic_activation_bonus()
+        event_bonus = 0
+        if hasattr(self.game_state, "get_activation_bonus"):
+            event_bonus = self.game_state.get_activation_bonus(active_side)
 
         target_rating = ws_rating + solamnic_bonus if active_side == WS else hl_rating
         return ActivationAttempt(
@@ -65,12 +71,19 @@ class DiplomacyActivationService:
             ws_rating=ws_rating,
             hl_rating=hl_rating,
             solamnic_bonus=solamnic_bonus,
+            event_activation_bonus=event_bonus,
             target_rating=target_rating,
         )
 
-    def roll_activation(self, target_rating: int) -> ActivationRollResult:
+    def roll_activation(self, target_rating: int, roll_bonus: int = 0) -> ActivationRollResult:
         roll = random.randint(1, 10)
-        return ActivationRollResult(roll=roll, success=roll <= target_rating)
+        effective_roll = max(1, roll - int(roll_bonus or 0))
+        return ActivationRollResult(
+            roll=roll,
+            effective_roll=effective_roll,
+            bonus_applied=int(roll_bonus or 0),
+            success=effective_roll <= target_rating,
+        )
 
     def activate_country(self, country_id: str, allegiance: str) -> bool:
         country = self.game_state.countries.get(country_id)

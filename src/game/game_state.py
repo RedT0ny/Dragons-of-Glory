@@ -59,6 +59,7 @@ class GameState:
 
         # Draconian rules
         self.draconian_ready_at_start = 0
+        self.activation_bonuses = {HL: 0, WS: 0}
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -86,6 +87,7 @@ class GameState:
                 "active_player": self.active_player,
                 "initiative_winner": self.initiative_winner,
                 "second_player_has_acted": self.second_player_has_acted,
+                "activation_bonuses": dict(self.activation_bonuses),
             },
             "world_state": {
                 "countries": {
@@ -165,6 +167,11 @@ class GameState:
         self.second_player_has_acted = bool(
             metadata.get("second_player_has_acted", self.second_player_has_acted)
         )
+        saved_bonuses = metadata.get("activation_bonuses", {}) or {}
+        self.activation_bonuses = {
+            HL: int(saved_bonuses.get(HL, 0) or 0),
+            WS: int(saved_bonuses.get(WS, 0) or 0),
+        }
 
         self._restore_countries_from_save(world_state.get("countries", {}))
         self._restore_units_from_save(
@@ -657,6 +664,18 @@ class GameState:
     def is_country_neutral(self, country_id: str) -> bool:
         country = self.countries.get(country_id)
         return bool(country and country.allegiance == NEUTRAL)
+
+    def add_activation_bonus(self, allegiance: str, amount: int):
+        if allegiance not in self.activation_bonuses:
+            return
+        self.activation_bonuses[allegiance] += int(amount)
+
+    def get_activation_bonus(self, allegiance: str) -> int:
+        return int(self.activation_bonuses.get(allegiance, 0))
+
+    def clear_activation_bonuses(self):
+        for key in list(self.activation_bonuses.keys()):
+            self.activation_bonuses[key] = 0
 
     def _force_move_fleet_to_state(self, fleet, state):
         retreat_hex, retreat_side = state
