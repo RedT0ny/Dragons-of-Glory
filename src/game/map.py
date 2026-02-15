@@ -573,6 +573,45 @@ class Board:
 
         return list(reachable)
 
+    def _is_safe_fleet_displacement_state(self, fleet, state):
+        current_hex, river_hexside = state
+        if self._hex_has_enemy_unit_for_fleet(current_hex, fleet):
+            return False
+        if river_hexside is None:
+            return True
+        return self._fleet_can_enter_river_hexside(fleet, river_hexside)
+
+    def find_nearest_safe_fleet_state(self, fleet, start_hex):
+        """
+        Finds the nearest legal destination state (hex or deep-river hexside endpoint)
+        for a displaced fleet. Returns (hex_obj, river_hexside) or None.
+        """
+        start_state = (start_hex, getattr(fleet, "river_hexside", None))
+        start_key = self._fleet_state_key(start_state)
+        frontier = []
+        heapq.heappush(frontier, (0, 0, start_state))
+        cost_so_far = {start_key: 0}
+        counter = 1
+
+        while frontier:
+            current_cost, _, state = heapq.heappop(frontier)
+            state_key = self._fleet_state_key(state)
+            if current_cost > cost_so_far.get(state_key, float("inf")):
+                continue
+
+            if state_key != start_key and self._is_safe_fleet_displacement_state(fleet, state):
+                return state
+
+            for next_state, step_cost in self._fleet_neighbor_states(fleet, state):
+                next_key = self._fleet_state_key(next_state)
+                new_cost = current_cost + step_cost
+                if new_cost < cost_so_far.get(next_key, float("inf")):
+                    cost_so_far[next_key] = new_cost
+                    heapq.heappush(frontier, (new_cost, counter, next_state))
+                    counter += 1
+
+        return None
+
     def get_location(self, hex_coord):
         """Returns location dict if one exists at this hex."""
         return self.locations.get((hex_coord.q, hex_coord.r))

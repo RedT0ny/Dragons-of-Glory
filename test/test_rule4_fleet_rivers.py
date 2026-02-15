@@ -164,3 +164,33 @@ def test_campaign_port_326_can_exit_via_river_to_324():
 
     assert cost == 2
     assert (3, 24) in reachable
+
+
+def test_ground_army_entry_displaces_enemy_fleet_to_nearest_safe_water():
+    gs = GameState()
+    gs.map = Board(width=10, height=10)
+    gs.phase = GamePhase.MOVEMENT
+
+    terrain = {
+        "2,2": "grassland",
+        "3,2": "c_grassland",
+        "4,2": "ocean",
+        "3,1": "ocean",
+        "4,1": "ocean",
+        "3,3": "ocean",
+    }
+    gs.map.populate_terrain(terrain)
+
+    army = _army(HL, 2, 2)
+    enemy_fleet = _fleet(WS, 3, 2, movement=6)
+    gs.units = [army, enemy_fleet]
+    gs.map.add_unit_to_spatial_map(army)
+    gs.map.add_unit_to_spatial_map(enemy_fleet)
+
+    target_hex = Hex.offset_to_axial(3, 2)
+    gs.move_unit(army, target_hex)
+
+    assert army.position == (3, 2)
+    assert enemy_fleet.position != (3, 2)
+    displaced_hex = Hex.offset_to_axial(*enemy_fleet.position)
+    assert not gs.map.has_enemy_army(displaced_hex, enemy_fleet.allegiance)

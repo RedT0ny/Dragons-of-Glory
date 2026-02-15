@@ -658,6 +658,44 @@ class GameState:
         country = self.countries.get(country_id)
         return bool(country and country.allegiance == NEUTRAL)
 
+    def _force_move_fleet_to_state(self, fleet, state):
+        retreat_hex, retreat_side = state
+        self.map.remove_unit_from_spatial_map(fleet)
+        fleet.position = retreat_hex.axial_to_offset()
+        fleet.river_hexside = retreat_side
+        if hasattr(fleet, "moved_this_turn"):
+            fleet.moved_this_turn = True
+        self.map.add_unit_to_spatial_map(fleet)
+
+        passengers = getattr(fleet, "passengers", None)
+        if passengers:
+            for passenger in passengers:
+                passenger.position = fleet.position
+                passenger.is_transported = True
+                passenger.transport_host = fleet
+
+    def _displace_enemy_fleets_in_hex(self, invading_unit, target_hex):
+        units_in_hex = list(self.map.get_units_in_hex(target_hex.q, target_hex.r))
+        enemy_fleets = [
+            u for u in units_in_hex
+            if (
+                u is not invading_unit
+                and u.unit_type == UnitType.FLEET
+                and getattr(u, "is_on_map", True)
+                and u.allegiance not in (invading_unit.allegiance, NEUTRAL)
+            )
+        ]
+
+        for fleet in enemy_fleets:
+            if not fleet.position or fleet.position[0] is None or fleet.position[1] is None:
+                continue
+            start_hex = Hex.offset_to_axial(*fleet.position)
+            retreat_state = self.map.find_nearest_safe_fleet_state(fleet, start_hex)
+            if retreat_state is None:
+                print(f"No legal displacement hex found for fleet {fleet.id}.")
+                continue
+            self._force_move_fleet_to_state(fleet, retreat_state)
+
     def move_unit(self, unit, target_hex):
         """
         Centralizes the move: updates unit.position AND the spatial map.
@@ -722,6 +760,14 @@ class GameState:
                 p.position = unit.position
                 p.is_transported = True
                 p.transport_host = unit
+
+        # Rule: Ground armies displace enemy fleets from the entered hex.
+        if (
+            hasattr(unit, "is_army")
+            and unit.is_army()
+            and unit.unit_type not in (UnitType.FLEET, UnitType.WING)
+        ):
+            self._displace_enemy_fleets_in_hex(unit, target_hex)
 
     def clear_movement_undo(self):
         self._movement_undo_stack.clear()
