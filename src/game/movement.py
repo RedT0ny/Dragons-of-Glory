@@ -7,6 +7,53 @@ from src.content.specs import HexsideType, LocType, UnitType
 from src.game.map import Hex
 
 
+def effective_movement_points(unit):
+    current = getattr(unit, "movement_points", unit.movement)
+    # Passengers can reduce effective movement (e.g. Wings/Fleets).
+    return min(current, unit.movement)
+
+
+def evaluate_unit_move(game_state, unit, target_hex):
+    """
+    Shared movement validation/cost calculation used by UI and move execution.
+    Returns: (ok, reason, cost, start_hex, fleet_state_path)
+    """
+    if getattr(unit, "transport_host", None) is not None:
+        return False, f"{unit.id} is transported and cannot move independently.", 0, None, []
+
+    if unit.unit_type != UnitType.FLEET and not game_state.map.can_unit_land_on_hex(unit, target_hex):
+        return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
+
+    if not unit.position or unit.position[0] is None or unit.position[1] is None:
+        return True, None, 0, None, []
+
+    max_mp = effective_movement_points(unit)
+    start_hex = Hex.offset_to_axial(*unit.position)
+    if unit.unit_type == UnitType.FLEET:
+        state_path, cost = game_state.map.find_fleet_route(unit, start_hex, target_hex)
+        if cost == float("inf") or (not state_path and start_hex != target_hex):
+            return False, f"{unit.id} has no valid path.", 0, start_hex, []
+        if cost > max_mp:
+            return False, f"{unit.id} lacks movement points.", cost, start_hex, state_path
+        return True, None, cost, start_hex, state_path
+
+    path = game_state.map.find_shortest_path(unit, start_hex, target_hex)
+    if not path and start_hex != target_hex:
+        return False, f"{unit.id} has no valid path.", 0, start_hex, []
+
+    cost = 0
+    current = start_hex
+    for next_step in path:
+        step_cost = game_state.map.get_movement_cost(unit, current, next_step)
+        cost += step_cost
+        current = next_step
+
+    if cost > max_mp:
+        return False, f"{unit.id} lacks movement points.", cost, start_hex, []
+
+    return True, None, cost, start_hex, []
+
+
 @dataclass
 class BoardActionResult:
     handled: bool
@@ -44,24 +91,23 @@ class MovementService:
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
         if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
-            reachable_hexes = self.game_state.map.get_reachable_hexes(units)
-            return MovementRangeResult(
-                reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
-                neutral_warning_coords=[]
-            )
+            return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes(units))
 
         start_hex, min_mp = self._get_stack_start_and_min_mp(units)
         if not start_hex or min_mp <= 0:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
 
         if self._is_neutral_hex(start_hex):
-            reachable_hexes = self.game_state.map.get_reachable_hexes(units)
-            return MovementRangeResult(
-                reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
-                neutral_warning_coords=[]
-            )
+            return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes(units))
 
         return self._get_neutral_limited_range(units, start_hex, min_mp)
+
+    @staticmethod
+    def _range_result_from_hexes(reachable_hexes):
+        return MovementRangeResult(
+            reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
+            neutral_warning_coords=[],
+        )
 
     def move_units_to_hex(self, units, target_hex):
         if not units:
@@ -128,12 +174,20 @@ class MovementService:
         return bool(country and country.allegiance == NEUTRAL)
 
     def _get_neutral_limited_range(self, units, start_hex, min_mp):
+        board = self.game_state.map
         frontier = []
         heapq.heappush(frontier, (0, start_hex, False))
         cost_so_far = {(start_hex, False): 0}
 
         reachable_hexes = []
         warning_hexes = []
+        neutral_cache = {}
+
+        def is_neutral_cached(hex_obj):
+            key = (hex_obj.q, hex_obj.r)
+            if key not in neutral_cache:
+                neutral_cache[key] = self._is_neutral_hex(hex_obj)
+            return neutral_cache[key]
 
         while frontier:
             current_cost, current_hex, entered_neutral = heapq.heappop(frontier)
@@ -145,10 +199,10 @@ class MovementService:
                 continue
 
             if current_hex != start_hex:
-                if self.game_state.map.can_stack_move_to(units, current_hex) and all(
-                    self.game_state.map.can_unit_land_on_hex(u, current_hex) for u in units
+                if board.can_stack_move_to(units, current_hex) and all(
+                    board.can_unit_land_on_hex(u, current_hex) for u in units
                 ):
-                    if self._is_neutral_hex(current_hex):
+                    if is_neutral_cached(current_hex):
                         warning_hexes.append(current_hex)
                     else:
                         reachable_hexes.append(current_hex)
@@ -159,46 +213,16 @@ class MovementService:
             for next_hex in current_hex.neighbors():
                 # 1. Bounds check
                 c, r = next_hex.axial_to_offset()
-                if not (0 <= c < self.game_state.map.width and 0 <= r < self.game_state.map.height):
+                if not (0 <= c < board.width and 0 <= r < board.height):
                     continue
 
-                stack_cost = 0
-                possible = True
-
-                for unit in units:
-                    # Check 1: Is hex occupied by enemy?
-                    if self.game_state.map.has_enemy_army(next_hex, unit.allegiance):
-                        possible = False
-                        break
-
-                    # Check 2: Sea Barrier
-                    if unit.unit_type != UnitType.WING:
-                        hexside = self.game_state.map.get_effective_hexside(current_hex, next_hex)
-                        if hexside in (HexsideType.SEA, HexsideType.SEA.value):
-                            possible = False
-                            break
-
-                    # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
-                    zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
-                    if zoc_restricted:
-                        if self.game_state.map.is_adjacent_to_enemy(current_hex, unit) and self.game_state.map.is_adjacent_to_enemy(next_hex, unit):
-                            possible = False
-                            break
-
-                    # Check 4: Movement Cost
-                    cost = self.game_state.map.get_movement_cost(unit, current_hex, next_hex)
-                    if cost == float('inf') or cost is None:
-                        possible = False
-                        break
-
-                    stack_cost = max(stack_cost, cost)
-
-                if not possible:
+                stack_cost = self._stack_step_cost(units, current_hex, next_hex, board)
+                if stack_cost is None:
                     continue
 
                 new_cost = current_cost + stack_cost
                 if new_cost <= min_mp:
-                    next_entered_neutral = self._is_neutral_hex(next_hex)
+                    next_entered_neutral = is_neutral_cached(next_hex)
                     key = (next_hex, next_entered_neutral)
                     if next_hex == start_hex:
                         continue
@@ -210,6 +234,32 @@ class MovementService:
             reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
             neutral_warning_coords=[h.axial_to_offset() for h in warning_hexes]
         )
+
+    def _stack_step_cost(self, units, current_hex, next_hex, board):
+        stack_cost = 0
+        for unit in units:
+            # Check 1: Is hex occupied by enemy?
+            if board.has_enemy_army(next_hex, unit.allegiance):
+                return None
+
+            # Check 2: Sea Barrier
+            if unit.unit_type != UnitType.WING:
+                hexside = board.get_effective_hexside(current_hex, next_hex)
+                if hexside in (HexsideType.SEA, HexsideType.SEA.value):
+                    return None
+
+            # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
+            zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
+            if zoc_restricted and board.is_adjacent_to_enemy(current_hex, unit) and board.is_adjacent_to_enemy(next_hex, unit):
+                return None
+
+            # Check 4: Movement Cost
+            cost = board.get_movement_cost(unit, current_hex, next_hex)
+            if cost == float('inf') or cost is None:
+                return None
+
+            stack_cost = max(stack_cost, cost)
+        return stack_cost
 
     def get_invasion_force(self, country_id):
         country = self.game_state.countries.get(country_id)
@@ -280,17 +330,14 @@ class MovementService:
             for unit in stack_units:
                 passengers = getattr(unit, "passengers", None)
                 if passengers:
-                    for passenger in passengers:
-                        if passenger.allegiance == HL:
-                            stack_with_passengers.append(passenger)
+                    stack_with_passengers.extend(
+                        passenger for passenger in passengers if passenger.allegiance == HL
+                    )
             stacks[hex_obj] = stack_with_passengers
         return stacks
 
     def _hex_adjacent_to_country(self, hex_obj, target_hexes):
-        for neighbor in hex_obj.neighbors():
-            if neighbor.axial_to_offset() in target_hexes:
-                return True
-        return False
+        return any(neighbor.axial_to_offset() in target_hexes for neighbor in hex_obj.neighbors())
 
     def _stack_can_enter_country(self, hex_obj, stack_units, target_hexes):
         combat_units = [u for u in stack_units if u.unit_type != UnitType.FLEET]
@@ -342,12 +389,10 @@ class MovementService:
         return eligible
 
     def _unit_can_reach_country(self, unit, from_hex, target_hexes):
-        for neighbor in from_hex.neighbors():
-            if neighbor.axial_to_offset() not in target_hexes:
-                continue
-            if self._unit_can_enter_hex(unit, from_hex, neighbor):
-                return True
-        return False
+        return any(
+            neighbor.axial_to_offset() in target_hexes and self._unit_can_enter_hex(unit, from_hex, neighbor)
+            for neighbor in from_hex.neighbors()
+        )
 
     def _unit_can_enter_hex(self, unit, from_hex, target_hex):
         carrier = getattr(unit, "transport_host", None)
@@ -370,42 +415,11 @@ class MovementService:
         return self._unit_movement_points(unit) > 0
 
     def _unit_movement_points(self, unit):
-        current = getattr(unit, "movement_points", unit.movement)
-        # Passengers can reduce effective movement (e.g. Wings/Fleets).
-        # Keep movement logic aligned with what the UI shows.
-        return min(current, unit.movement)
+        return effective_movement_points(unit)
 
     def _can_unit_reach_target(self, unit, target_hex):
-        if getattr(unit, "transport_host", None) is not None:
-            return False, f"{unit.id} is transported and cannot move independently."
-
-        if unit.unit_type != UnitType.FLEET and not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
-            return False, f"{unit.id} cannot end movement on that terrain."
-
-        if not unit.position or unit.position[0] is None or unit.position[1] is None:
-            return True, None
-
-        start_hex = Hex.offset_to_axial(*unit.position)
-        if unit.unit_type == UnitType.FLEET:
-            _, cost = self.game_state.map.find_fleet_route(unit, start_hex, target_hex)
-            if cost == float("inf"):
-                return False, f"{unit.id} has no valid path."
-        else:
-            path = self.game_state.map.find_shortest_path(unit, start_hex, target_hex)
-            if not path and start_hex != target_hex:
-                return False, f"{unit.id} has no valid path."
-
-            cost = 0
-            current = start_hex
-            for next_step in path:
-                step_cost = self.game_state.map.get_movement_cost(unit, current, next_step)
-                cost += step_cost
-                current = next_step
-
-        if cost > self._unit_movement_points(unit):
-            return False, f"{unit.id} lacks movement points."
-
-        return True, None
+        ok, reason, _, _, _ = evaluate_unit_move(self.game_state, unit, target_hex)
+        return ok, reason
 
     def handle_board_action(self, selected_units):
         if not selected_units:

@@ -10,6 +10,7 @@ from src.content import loader, factory
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
+from src.game.movement import evaluate_unit_move, effective_movement_points
 from src.game.phase_manager import PhaseManager
 
 
@@ -672,47 +673,30 @@ class GameState:
         # We check if unit is already on map to avoid cost calculation for deployment/teleport
         fleet_final_hexside = getattr(unit, "river_hexside", None)
         if self.phase == GamePhase.MOVEMENT and unit.position:
-            if unit.position[0] is None or unit.position[1] is None:
-                start_hex = None
-            else:
-                start_hex = Hex.offset_to_axial(*unit.position)
+            ok, _, cost, _, state_path = evaluate_unit_move(self, unit, target_hex)
+            if not ok:
+                return
 
-            if start_hex is not None:
-                # Ensure attribute exists (defensive coding)
-                if not hasattr(unit, 'movement_points'):
-                    unit.movement_points = unit.movement
+            # Ensure attribute exists (defensive coding)
+            if not hasattr(unit, 'movement_points'):
+                unit.movement_points = unit.movement
 
-                if unit.unit_type == UnitType.FLEET:
-                    state_path, cost = self.map.find_fleet_route(unit, start_hex, target_hex)
-                    if not state_path and start_hex != target_hex:
-                        return
-                    if state_path:
-                        fleet_final_hexside = state_path[-1][1]
-                        for i in range(1, len(state_path)):
-                            prev_hex, prev_side = state_path[i - 1]
-                            curr_hex, curr_side = state_path[i]
-                            if prev_side is None and curr_side is not None:
-                                print(f"Fleet {unit.id} enters deep_river hexside {curr_side} (hex -> hexside).")
-                            elif prev_side is not None and curr_side is None:
-                                print(f"Fleet {unit.id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
-                            elif prev_side is not None and curr_side != prev_side:
-                                print(f"Fleet {unit.id} moves along deep_river to hexside {curr_side}.")
-                else:
-                    # Calculate path cost using A* to ensure we deduct the optimal cost
-                    path = self.map.find_shortest_path(unit, start_hex, target_hex)
-                    if not path and start_hex != target_hex:
-                        return
+            if unit.unit_type == UnitType.FLEET and state_path:
+                fleet_final_hexside = state_path[-1][1]
+                for i in range(1, len(state_path)):
+                    prev_hex, prev_side = state_path[i - 1]
+                    curr_hex, curr_side = state_path[i]
+                    if prev_side is None and curr_side is not None:
+                        print(f"Fleet {unit.id} enters deep_river hexside {curr_side} (hex -> hexside).")
+                    elif prev_side is not None and curr_side is None:
+                        print(f"Fleet {unit.id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
+                    elif prev_side is not None and curr_side != prev_side:
+                        print(f"Fleet {unit.id} moves along deep_river to hexside {curr_side}.")
 
-                    cost = 0
-                    current = start_hex
-                    for next_step in path:
-                        step_cost = self.map.get_movement_cost(unit, current, next_step)
-                        cost += step_cost
-                        current = next_step
-
-                if cost > unit.movement_points:
-                    return
-                unit.movement_points = max(0, unit.movement_points - cost)
+            effective_mp = effective_movement_points(unit)
+            if cost > effective_mp:
+                return
+            unit.movement_points = max(0, effective_mp - cost)
 
         # 2. Update Position
         # Remove from old position in spatial map

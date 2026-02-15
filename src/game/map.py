@@ -1,8 +1,7 @@
 import heapq
 from collections import defaultdict
 
-from src.content.loader import load_countries_yaml
-from src.content.specs import HexDirection, HexsideType, UnitType, UnitRace, LocType, TerrainType
+from src.content.specs import HexsideType, UnitType, UnitRace, LocType, TerrainType
 
 
 class Hex:
@@ -344,10 +343,6 @@ class Board:
     def _is_valid_local_hex(self, hex_obj):
         col, row = hex_obj.axial_to_offset()
         return 0 <= col < self.width and 0 <= row < self.height
-
-    def is_valid_hex(self, hex_obj):
-        """Compatibility wrapper used by older BFS helpers."""
-        return self._is_valid_local_hex(hex_obj)
 
     def _is_enemy_for_fleet(self, unit, other):
         return (
@@ -775,111 +770,6 @@ class Board:
 
         return float('inf')
 
-
-    def displace_enemy_fleets(self, army, target_hex):
-        """
-        Rule: Army entering hex moves enemy ships to nearest safe hex.
-        """
-        units_in_hex = self.get_units_in_hex(target_hex.q, target_hex.r)[:]
-
-        for u in units_in_hex:
-            if u.unit_type == UnitType.FLEET and self.are_enemies(army, u):
-                retreat_state = self._find_nearest_safe_fleet_state(u, target_hex, army.allegiance)
-                if retreat_state:
-                    retreat_hex, retreat_side = retreat_state
-                    self.move_unit_internal(u, retreat_hex)
-                    u.river_hexside = retreat_side
-                else:
-                    u.destroy() # No escape, ship destroyed
-
-    def _find_nearest_safe_fleet_state(self, fleet, start_hex, enemy_allegiance):
-        start_state = (start_hex, getattr(fleet, "river_hexside", None))
-        start_key = self._fleet_state_key(start_state)
-        frontier = []
-        heapq.heappush(frontier, (0, 0, start_state))
-        cost_so_far = {start_key: 0}
-        counter = 1
-
-        while frontier:
-            current_cost, _, state = heapq.heappop(frontier)
-            state_key = self._fleet_state_key(state)
-            if current_cost > cost_so_far.get(state_key, float("inf")):
-                continue
-
-            current_hex, _ = state
-            if state_key != start_key:
-                units = self.get_units_in_hex(current_hex.q, current_hex.r)
-                has_enemy_army = any(
-                    getattr(u, "is_army", lambda: False)() and u.allegiance == enemy_allegiance
-                    for u in units
-                )
-                if not has_enemy_army:
-                    return state
-
-            for next_state, step_cost in self._fleet_neighbor_states(fleet, state):
-                next_key = self._fleet_state_key(next_state)
-                new_cost = current_cost + step_cost
-                if new_cost < cost_so_far.get(next_key, float("inf")):
-                    cost_so_far[next_key] = new_cost
-                    heapq.heappush(frontier, (new_cost, counter, next_state))
-                    counter += 1
-
-        return None
-
-    def _find_nearest_safe_sea_hex(self, fleet, current_hex, enemy_allegiance):
-        """BFS to find nearest hex that is water/coastal and free of enemy armies."""
-        queue = [(current_hex, 0)]
-        visited = {current_hex}
-
-        while queue:
-            curr, dist = queue.pop(0)
-
-            # Check if this hex is valid destination (excluding the one we are being kicked out of)
-            if curr != current_hex:
-                # Must be water/coastal
-                is_valid_terrain = (self.get_terrain(curr) == TerrainType.OCEAN or
-                                    self.is_coastal(curr) or
-                                    self._hexside_is(self.get_effective_hexside(current_hex, curr), HexsideType.DEEP_RIVER)) # Simplified river check
-
-                if is_valid_terrain:
-                    # Check for enemy armies
-                    units = self.get_units_in_hex(curr.q, curr.r)
-                    has_enemy_army = any(
-                        u.is_army() and u.allegiance == enemy_allegiance
-                        for u in units
-                    )
-
-                    if not has_enemy_army:
-                        return curr
-
-            # Add neighbors
-            for neighbor in curr.neighbors():
-                if neighbor not in visited and self.is_valid_hex(neighbor):
-                    visited.add(neighbor)
-                    queue.append((neighbor, dist + 1))
-
-        return None
-
-    def move_unit_internal(self, unit, new_hex):
-        """Helper to update unit position and internal unit map."""
-        # Remove from old
-        if unit.position:
-            old_q, old_r = unit.position
-            if (old_q, old_r) in self.unit_map:
-                if unit in self.unit_map[(old_q, old_r)]:
-                    self.unit_map[(old_q, old_r)].remove(unit)
-
-        # Update unit
-        unit.position = (new_hex.q, new_hex.r)
-
-        # Add to new
-        if (new_hex.q, new_hex.r) not in self.unit_map:
-            self.unit_map[(new_hex.q, new_hex.r)] = []
-        self.unit_map[(new_hex.q, new_hex.r)].append(unit)
-
-    def are_enemies(self, unit_a, unit_b):
-        """Simple allegiance check."""
-        return unit_a.allegiance != unit_b.allegiance
 
     def is_maelstrom(self, hex_obj):
         """Checks if the hex is part of the Maelstrom region."""
