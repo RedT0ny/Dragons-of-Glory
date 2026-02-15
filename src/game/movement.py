@@ -91,7 +91,7 @@ class MovementService:
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
         if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
-            return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes(units))
+            return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes_for_fleet(units[0]))
 
         start_hex, min_mp = self._get_stack_start_and_min_mp(units)
         if not start_hex or min_mp <= 0:
