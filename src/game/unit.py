@@ -160,9 +160,9 @@ class Unit:
             return base
 
         # 3. Transport logic
-        # Assuming passengers is defined in subclasses or mixed-in
+        # Passenger movement reduction applies only to Wings.
         has_passengers = getattr(self, 'passengers', False)
-        if has_passengers and self.unit_type != UnitType.CITADEL:
+        if has_passengers and self.unit_type == UnitType.WING:
             return base // 2
 
         return base

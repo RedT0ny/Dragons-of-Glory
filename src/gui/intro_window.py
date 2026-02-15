@@ -104,19 +104,25 @@ class IntroWindow(QMainWindow):
         # (You can implement the flag QHBoxLayout here later)
 
     def on_continue(self):
-        """Opens a native file dialog to load a game."""
+        """Opens a file dialog to load a game."""
         save_dir = SAVEGAME_DIR
         if not os.path.exists(save_dir):
             os.makedirs(save_dir, exist_ok=True)
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            self.translator.get_text("intro", "menu_continue"),
-            save_dir,
-            "Save Files (*.yaml *.json)"
-        )
+        dialog = QFileDialog(self, self.translator.get_text("intro", "menu_continue"))
+        dialog.setAcceptMode(QFileDialog.AcceptOpen)
+        dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setDirectory(save_dir)
+        dialog.setNameFilter("Save Files (*.yaml *.yml *.json);;All Files (*)")
+        # Avoid native Windows dialog COM/threading issues (0x8001010e).
+        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
 
-        if file_path:
+        if not dialog.exec():
+            return
+
+        files = dialog.selectedFiles()
+        if files:
+            file_path = files[0]
             print(f"Loading game from: {file_path}")
             # Emit a signal or call the controller to load the state
             self.ready_to_load.emit(file_path)
