@@ -120,6 +120,23 @@ def test_location_is_liberated_when_enemy_army_no_longer_occupies_it():
     assert loc.occupier is None
 
 
+def test_location_is_occupied_by_enemy_wing():
+    gs = GameState()
+    gs.map = FakeMap()
+    ws_country = _country("ergoth", WS, coords=(6, 6))
+    gs.countries = {"ergoth": ws_country}
+    _register_country_locations(gs, ws_country)
+
+    loc_hex = Hex.offset_to_axial(6, 6)
+    enemy_wing = FakeUnit("enemy", HL, UnitType.WING, UnitState.ACTIVE, (6, 6))
+    gs.map.units_by_hex[(loc_hex.q, loc_hex.r)] = [enemy_wing]
+
+    gs.resolve_end_of_combat_conquest()
+
+    loc = ws_country.locations[f"{ws_country.id}_cap"]
+    assert loc.occupier == HL
+
+
 def test_solamnic_group_conquest_is_pooled_for_ws():
     gs = GameState()
     gs.map = FakeMap()

@@ -983,11 +983,18 @@ class GameState:
                 hex_obj = Hex.offset_to_axial(*loc.coords)
 
                 if enemy:
-                    armies = [
+                    occupying_units = [
                         u for u in self.map.get_units_in_hex(hex_obj.q, hex_obj.r)
-                        if u.is_on_map and hasattr(u, "is_army") and u.is_army() and u.allegiance == enemy
+                        if (
+                            u.is_on_map
+                            and u.allegiance == enemy
+                            and (
+                                (hasattr(u, "is_army") and u.is_army())
+                                or u.unit_type == UnitType.WING
+                            )
+                        )
                     ]
-                    if armies:
+                    if occupying_units:
                         occupier = enemy
 
                 loc.occupier = occupier
