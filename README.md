@@ -6,11 +6,9 @@ Design overview:
 
 TODO:
 
-- Keep info_panel outside the tabs?
+- Implement Dragon Orb mechanics (add a new "Use" button in the info_panel, unit_box or assets_tab?).
+- Implement Flying Citadels.
 - Add Dragon #170's Advanced Rules in "settings"
-- Add attribute and diplomacy logic for Knight's countries
-- Finalize movement and combat phases.
-- Finalize implementing save and load game
 - Check victory conditions
 - double-click on a unit in the status tab should show the map tab and zoom on the unit.
 - Implement AI player
@@ -19,7 +17,6 @@ TODO:
 
 TODO BUGFIX:
 
-- Fleets cannot be deployed in ports that are not coastal. Probably has something to do with deep river? Happens in Castle Gunthar.
 - Fix map subset not working correctly (use full map for now).
 
 Notes:
