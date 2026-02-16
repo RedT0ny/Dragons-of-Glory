@@ -49,6 +49,13 @@ class HexagonItem(QGraphicsItem):
     def boundingRect(self):
         return self.path.boundingRect()
 
+    def shape(self):
+        # Use the real hex polygon for scene hit-testing instead of the bounding rectangle.
+        return self.path
+
+    def contains(self, point):
+        return self.path.contains(point)
+
     def set_highlight(self, highlight: bool, color=None):
         self.is_highlighted = highlight
         self.highlight_color = color if highlight else None
