@@ -1,7 +1,9 @@
 import sys
+from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                               QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox)
+                               QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox, QApplication,
+                               QAbstractButton)
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
@@ -44,6 +46,7 @@ class MainWindow(QMainWindow):
         self.controller = None
         self._tab_switch_seq = 0
         self._tab_switch_started = {}
+        self._suppress_end_phase_hotkey_until = 0.0
         self.setWindowTitle(APP_NAME)
         self.resize(1920, 1080)
 
@@ -149,6 +152,10 @@ class MainWindow(QMainWindow):
         # Define how many pixels to scroll per key press
         scroll_step = 50
 
+        if event.isAutoRepeat() and event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            event.accept()
+            return
+
         if event.key() == Qt.Key_Z and (event.modifiers() & Qt.ControlModifier):
             if hasattr(self, 'info_panel'):
                 self.info_panel.undo_clicked.emit()
@@ -156,6 +163,14 @@ class MainWindow(QMainWindow):
             return
 
         if event.key() in (Qt.Key_Return, Qt.Key_Enter):
+            if monotonic() < self._suppress_end_phase_hotkey_until:
+                event.accept()
+                return
+            # Let focused buttons process Enter themselves to avoid duplicate end-phase triggers.
+            focus_widget = QApplication.focusWidget()
+            if isinstance(focus_widget, QAbstractButton):
+                super().keyPressEvent(event)
+                return
             if hasattr(self, 'info_panel'):
                 self.info_panel.end_phase_clicked.emit()
             event.accept()
@@ -309,6 +324,8 @@ class MainWindow(QMainWindow):
             return
         path = files[0]
         try:
+            # Prevent Enter from leaking from the file dialog into an immediate phase change.
+            self._suppress_end_phase_hotkey_until = monotonic() + 0.6
             if self.controller:
                 self.controller.prepare_for_state_load()
             self.game_state.load_state(path)

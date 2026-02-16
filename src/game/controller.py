@@ -1,5 +1,6 @@
 # Conceptual example for game flow
 from PySide6.QtCore import QObject, QTimer
+from time import monotonic
 
 from src.content import loader
 from src.content.config import CALENDAR_DATA
@@ -42,6 +43,8 @@ class GameController(QObject):
         self._movement_undo_context = None
         self._calendar_by_turn = self._load_calendar()
         self._deferred_epoch = 0
+        self._end_phase_transition_pending = False
+        self._last_end_phase_request_at = 0.0
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch
@@ -60,6 +63,8 @@ class GameController(QObject):
         self.ai_timer.stop()
         self._deferred_epoch += 1
         self._processing_automatic_phases = False
+        self._end_phase_transition_pending = False
+        self._last_end_phase_request_at = 0.0
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
         self.game_state.clear_movement_undo()
@@ -97,6 +102,9 @@ class GameController(QObject):
         Central loop for processing the game flow.
         Handles all GamePhases
         """
+        # A queued human "End Phase" request is consumed by this processing tick.
+        self._end_phase_transition_pending = False
+
         # Prevent reentry to avoid infinite recursion
         if self._processing_automatic_phases:
             return
@@ -346,6 +354,12 @@ class GameController(QObject):
 
     def on_end_phase_clicked(self):
         """Call this when Human clicks 'End Phase' button."""
+        now = monotonic()
+        # Ignore key/button repeats that arrive within the same interaction burst.
+        if now - self._last_end_phase_request_at < 0.2:
+            return
+        self._last_end_phase_request_at = now
+
         if self._invasion_deployment_active:
             if self.replacements_dialog:
                 self.replacements_dialog.close()
@@ -360,6 +374,11 @@ class GameController(QObject):
             self._refresh_info_panel()
             self.game_state.clear_movement_undo()
             return
+
+        # Drop repeated "End Phase" triggers until the queued phase transition is processed.
+        if self._end_phase_transition_pending:
+            return
+        self._end_phase_transition_pending = True
 
         # Close replacement dialog if open
         if self.replacements_dialog:
