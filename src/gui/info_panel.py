@@ -112,7 +112,7 @@ class InfoPanel(QFrame):
 
         # Control Buttons
         btn_grid = QGridLayout()
-        btns = ["Prev", "Undo", "(Un)Board", "Next", "Redo", "End Phase"]
+        btns = ["Prev", "Undo", "(Un)Board", "Next", "Use", "End Phase"]
         self.btn_board = None
         self.btn_undo = None
         for i, name in enumerate(btns):

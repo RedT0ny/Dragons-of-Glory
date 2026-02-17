@@ -10,6 +10,88 @@ class LeaderEscapeRequest:
     leader: object
     options: List[object]
 
+
+def apply_dragon_orb_precombat(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
+    """
+    Resolves Dragon Orb usage before normal land combat.
+
+    Trigger condition per side:
+    - Side has a leader equipped with dragon_orb
+    - Opposing force includes at least one DRAGON or DRACONIAN unit
+    """
+    roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
+    logs = []
+
+    for side_name, friendly, opposing in (
+        ("attacker", attackers, defenders),
+        ("defender", defenders, attackers),
+    ):
+        if not any(_is_dragon_or_draconian(unit) for unit in opposing):
+            continue
+
+        orb_users = []
+        for unit in friendly:
+            if not (hasattr(unit, "is_leader") and unit.is_leader() and unit.is_on_map):
+                continue
+            orb = _get_equipped_asset(unit, "dragon_orb")
+            if orb:
+                orb_users.append((unit, orb))
+
+        for leader, orb in orb_users:
+            if not leader.is_on_map:
+                continue
+            roll = roll_d6()
+            tactical_rating = int(getattr(leader, "tactical_rating", 0) or 0)
+            if roll > tactical_rating:
+                leader.destroy()
+                consume_asset_fn(orb, leader)
+                logs.append(
+                    f"Dragon Orb ({side_name}) failed: {leader.id} rolled {roll} > TR {tactical_rating}; leader and orb destroyed."
+                )
+                continue
+
+            destroyed_dragons = []
+            for enemy in opposing:
+                if not (enemy.is_on_map and _is_dragon(enemy)):
+                    continue
+                enemy.destroy()
+                destroyed_dragons.append(enemy)
+            consume_asset_fn(orb, leader)
+            logs.append(
+                f"Dragon Orb ({side_name}) succeeded: {leader.id} rolled {roll} <= TR {tactical_rating}; destroyed {len(destroyed_dragons)} dragon unit(s)."
+            )
+
+    return logs
+
+
+def _get_equipped_asset(unit, asset_id: str):
+    for asset in getattr(unit, "equipment", []) or []:
+        if getattr(asset, "id", None) == asset_id:
+            return asset
+    return None
+
+
+def _is_dragon(unit) -> bool:
+    race = getattr(unit, "race", None)
+    if race == UnitRace.DRAGON:
+        return True
+    if isinstance(race, str):
+        return race.lower() == UnitRace.DRAGON.value
+    return False
+
+
+def _is_draconian(unit) -> bool:
+    race = getattr(unit, "race", None)
+    if race == UnitRace.DRACONIAN:
+        return True
+    if isinstance(race, str):
+        return race.lower() == UnitRace.DRACONIAN.value
+    return False
+
+
+def _is_dragon_or_draconian(unit) -> bool:
+    return _is_dragon(unit) or _is_draconian(unit)
+
 class CombatResolver:
     """
     Handles resolution of Land and Air combat according to Rule 7 (DL_11).

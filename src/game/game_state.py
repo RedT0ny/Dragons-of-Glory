@@ -2,7 +2,7 @@ import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
-from src.game.combat import CombatResolver, LeaderEscapeRequest, NavalCombatResolver
+from src.game.combat import CombatResolver, LeaderEscapeRequest, NavalCombatResolver, apply_dragon_orb_precombat
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
@@ -371,6 +371,29 @@ class GameState:
                 deployment_area = None
                 country_deployment = True
 
+            initial_assets = setup_data.get("assets", None)
+            if initial_assets is None:
+                initial_assets = setup_data.get("artifacts", [])
+            if initial_assets is None:
+                initial_assets = []
+            if isinstance(initial_assets, str):
+                initial_assets = [initial_assets]
+            elif isinstance(initial_assets, dict):
+                expanded_assets = []
+                for asset_id, qty in initial_assets.items():
+                    if not asset_id:
+                        continue
+                    try:
+                        amount = int(qty) if qty is not None else 1
+                    except (TypeError, ValueError):
+                        amount = 1
+                    if amount <= 0:
+                        continue
+                    expanded_assets.extend([str(asset_id)] * amount)
+                initial_assets = expanded_assets
+            elif not isinstance(initial_assets, list):
+                initial_assets = list(initial_assets) if isinstance(initial_assets, tuple) else []
+
             # Create spec from dictionary (handling potential missing keys)
             spec = PlayerSpec(
                 allegiance=allegiance,
@@ -380,7 +403,7 @@ class GameState:
                 explicit_units=setup_data.get("explicit_units", []),
                 victory_conditions=setup_data.get("victory_conditions", {}) or self.scenario_spec.victory_conditions.get(allegiance, {}),
                 pre_req=setup_data.get("pre_req", []),
-                artifacts=setup_data.get("artifacts", []),
+                artifacts=initial_assets,
                 is_ai=False # Default to False, Controller will override
             )
 
@@ -393,6 +416,9 @@ class GameState:
             for cid in country_ids:
                 if cid in self.countries:
                     player.add_country(self.countries[cid])
+
+            for asset_id in spec.artifacts:
+                player.grant_asset(asset_id, self)
 
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
         return self.deployment_service.get_deployment_hexes(allegiance)
@@ -1168,6 +1194,7 @@ class GameState:
         """
         Initiates combat resolution for a specific hex.
         """
+        attackers = list(attackers)
         defenders = list(self.get_units_at(hex_position))
         terrain = self.map.get_terrain(hex_position)
         defender_allegiances = {
@@ -1187,6 +1214,41 @@ class GameState:
                 "combat_type": "naval",
                 "rounds": outcome.get("rounds", 0),
             }
+
+        orb_events = apply_dragon_orb_precombat(
+            attackers,
+            defenders,
+            consume_asset_fn=self._consume_asset,
+        )
+        if orb_events:
+            self._cleanup_destroyed_units(attackers + defenders)
+            attackers = [u for u in attackers if u.is_on_map]
+            defenders = list(self.get_units_at(hex_position))
+            for evt in orb_events:
+                print(evt)
+
+            if not any(self._is_combat_stack_unit(u) for u in defenders):
+                result = "-/-"
+                advance_available = self._can_advance_after_combat(
+                    attackers=attackers,
+                    target_hex=hex_position,
+                    defender_allegiances=defender_allegiances,
+                    attacker_had_to_retreat=False,
+                )
+                print(self._format_combat_log_entry(attackers, defenders, result))
+                return {
+                    "result": result,
+                    "leader_escape_requests": [],
+                    "advance_available": advance_available,
+                }
+            if not any(self._is_combat_stack_unit(u) for u in attackers):
+                result = "-/-"
+                print(self._format_combat_log_entry(attackers, defenders, result))
+                return {
+                    "result": result,
+                    "leader_escape_requests": [],
+                    "advance_available": False,
+                }
 
         # Cumulative pre-combat special retreats for wings/cavalry.
         special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
@@ -1240,6 +1302,26 @@ class GameState:
             "leader_escape_requests": leader_escape_requests or [],
             "advance_available": advance_available,
         }
+
+    def _consume_asset(self, asset, unit):
+        if hasattr(asset, "remove_from"):
+            asset.remove_from(unit)
+        else:
+            if hasattr(unit, "equipment") and asset in unit.equipment:
+                unit.equipment.remove(asset)
+            asset.assigned_to = None
+
+        if getattr(asset, "owner", None) and hasattr(asset.owner, "assets"):
+            asset.owner.assets.pop(asset.id, None)
+            return
+
+        for player in self.players.values():
+            if not hasattr(player, "assets"):
+                continue
+            candidate = player.assets.get(getattr(asset, "id", None))
+            if candidate is asset or (candidate and getattr(candidate, "id", None) == getattr(asset, "id", None)):
+                player.assets.pop(asset.id, None)
+                return
 
     def _is_naval_combat(self, attackers, defenders):
         atk_fleets = [u for u in attackers if u.unit_type == UnitType.FLEET and u.is_on_map]

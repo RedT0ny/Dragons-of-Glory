@@ -75,7 +75,7 @@ scenario:
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: ["verminaard"]
-      #artifacts: ["midnight"]
+      #assets: ["midnight"]
 
       victory_conditions:
         major: "Qualinesti conquered and Thorbardin is allied or conquered"
@@ -91,7 +91,8 @@ scenario:
         qualinesti: all
 
       explicit_units: ["laurana"]
-      artifacts: ["blue_crystal_staff"]
+      assets:
+        blue_crystal_staff: 1
 
       victory_conditions:
         major: "No highlord units further than 2 hexes from the sea"

@@ -92,9 +92,9 @@ dragon_orb:
     It contains the spirit of a mighty wyrm of evil, luring other dragons to their doom.
   picture: "dragon_orb.svg"
   effect: >
-    Can be used only vs dragons. Roll 1d6. If it's higher than the leader’s Tactical Rating, both the leader 
-    and the Orb are permanently removed from the game. If the roll is equal to or less, all dragons and draconians 
-    opposing that leader in the battle are eliminated. The Orb is also permanently eliminated.
+    Can be used vs dragon or draconian enemy forces. Roll 1d6. If it's higher than the leader’s Tactical Rating, both
+    the leader and the Orb are permanently removed from the game. If the roll is equal to or less, all dragons
+    opposing that leader in the battle are destroyed. The Orb is also permanently eliminated.
   requirements:
     - { type: "unit_type", value: "leader" }
   bonus: { other: "dragon_orb" }

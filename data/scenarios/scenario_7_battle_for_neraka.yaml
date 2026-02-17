@@ -40,7 +40,8 @@ scenario:
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: ["verminaard", "kitiara", "ladonna"]
-      artifacts: ["staff_of_magius"]
+      assets:
+        staff_of_magius: 1
 
       victory_conditions:
         major: "Description of victory"
@@ -58,7 +59,8 @@ scenario:
           units: all
 
       explicit_units: ["fizban", "laurana"]
-      artifacts: ["blue_crystal_staff"]
+      assets:
+        blue_crystal_staff: 1
 
       victory_conditions:
         major: "Protect the capital"

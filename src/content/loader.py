@@ -53,6 +53,51 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         "whitestone": setup_raw.get("whitestone", {})
     }
 
+    # Normalize optional per-player setup keys for starting asset catalog.
+    # Support both "assets" (current) and "artifacts" (legacy alias).
+    for side in (HL, WS):
+        side_cfg = setup.get(side)
+        if not isinstance(side_cfg, dict):
+            continue
+
+        assets_val = side_cfg.get("assets", None)
+        artifacts_val = side_cfg.get("artifacts", None)
+
+        if assets_val is None and artifacts_val is not None:
+            assets_val = artifacts_val
+        if artifacts_val is None and assets_val is not None:
+            artifacts_val = assets_val
+
+        def _normalize_asset_list(value):
+            if value is None:
+                return []
+            if isinstance(value, str):
+                return [value]
+            if isinstance(value, list):
+                return value
+            if isinstance(value, tuple):
+                return list(value)
+            if isinstance(value, dict):
+                normalized = []
+                for asset_id, qty in value.items():
+                    if not asset_id:
+                        continue
+                    if qty is None:
+                        amount = 1
+                    else:
+                        try:
+                            amount = int(qty)
+                        except (TypeError, ValueError):
+                            amount = 1
+                    if amount <= 0:
+                        continue
+                    normalized.extend([str(asset_id)] * amount)
+                return normalized
+            return []
+
+        side_cfg["assets"] = _normalize_asset_list(assets_val)
+        side_cfg["artifacts"] = _normalize_asset_list(artifacts_val)
+
     # Consolidated victory conditions from both players if defined at player level
     # or from a top-level victory_conditions key (like in the campaign)
     v_conds = data.get("victory_conditions", {})

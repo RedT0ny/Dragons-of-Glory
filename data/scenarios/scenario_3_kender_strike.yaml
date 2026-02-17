@@ -76,8 +76,6 @@ scenario:
 
       explicit_units: ["toede"]
 
-      artifacts: null
-
       victory_conditions:
         major: "Capture Hylo by turn 5"
 

@@ -106,7 +106,7 @@ scenario:
 
       explicit_units: [ "ariakas" ]
 
-      artifacts: null
+      assets: null
 
       victory_conditions:
         major: "Control more than 30 countries"
@@ -116,7 +116,7 @@ scenario:
       # Deployment area: If null, defaults to the union of all country territories below
       deployment_area: null
 
-      artifacts: null
+      assets: null
 
       victory_conditions:
         major: "Control more than 30 countries"

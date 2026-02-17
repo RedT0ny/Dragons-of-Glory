@@ -94,7 +94,7 @@ scenario:
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: [ "ariakas", "dracart" ]
-      artifacts: null
+      assets: null
 
       victory_conditions:
         major: "Control Caergoth, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
@@ -116,7 +116,7 @@ scenario:
           units: all
 
       explicit_units: ["justarius"]
-      artifacts: null
+      assets: null
 
       victory_conditions:
         major: "Prevent HL from controlling Caergoth, Lemish, Palanthas, Solanthus and Vingaard."

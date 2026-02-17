@@ -78,7 +78,7 @@ scenario:
 
       explicit_units: [ "ariakas","phair","topus","salahkhan"]
 
-      artifacts: None
+      assets: null
 
       victory_conditions:
         major: "Capture Silvanost before it is evacuated"
@@ -91,7 +91,8 @@ scenario:
         silvanesti:
           units: all
 
-      artifacts: ["dragon_orb"]
+      assets:
+        dragon_orb: 1
 
       victory_conditions:
         major: "Prevents Highlord from taking Silvanost without moving the capital"
