@@ -829,6 +829,8 @@ class GameState:
                 p.position = unit.position
                 p.is_transported = True
                 p.transport_host = unit
+                if self.phase == GamePhase.MOVEMENT and unit.unit_type == UnitType.CITADEL:
+                    p.carried_by_citadel_this_turn = True
 
         # Rule: Ground armies displace enemy fleets from the entered hex.
         if (
@@ -859,6 +861,7 @@ class GameState:
                 "moved_this_turn": getattr(unit, "moved_this_turn", False),
                 "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
                 "is_transported": getattr(unit, "is_transported", False),
+                "carried_by_citadel_this_turn": getattr(unit, "carried_by_citadel_this_turn", False),
                 "transport_host": getattr(unit, "transport_host", None),
                 "river_hexside": getattr(unit, "river_hexside", None),
                 "passengers": list(getattr(unit, "passengers", [])),
@@ -891,6 +894,7 @@ class GameState:
             unit.moved_this_turn = state["moved_this_turn"]
             unit.attacked_this_turn = state["attacked_this_turn"]
             unit.is_transported = state["is_transported"]
+            unit.carried_by_citadel_this_turn = state.get("carried_by_citadel_this_turn", False)
             unit.transport_host = state["transport_host"]
             if hasattr(unit, "river_hexside"):
                 unit.river_hexside = state["river_hexside"]
@@ -1201,6 +1205,24 @@ class GameState:
             u.allegiance for u in defenders
             if u.allegiance not in ("neutral", None)
         }
+
+        if self._combat_blocked_by_citadel_rule(attackers, defenders):
+            result = "-/-"
+            print(self._format_combat_log_entry(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": [],
+                "advance_available": False,
+            }
+        attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
+        if not attackers:
+            result = "-/-"
+            print(self._format_combat_log_entry(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": [],
+                "advance_available": False,
+            }
 
         if self._is_naval_combat(attackers, defenders):
             naval_resolver = NavalCombatResolver(self, attackers, defenders)
@@ -1623,8 +1645,33 @@ class GameState:
     def _is_combat_stack_unit(self, unit):
         return bool(
             (hasattr(unit, "is_army") and unit.is_army())
-            or unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING)
+            or unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING, UnitType.CITADEL)
         )
+
+    def _defenders_have_citadel(self, defenders):
+        return any(u.unit_type == UnitType.CITADEL and getattr(u, "is_on_map", False) for u in defenders)
+
+    def _is_ws_ground_combat_unit(self, unit):
+        if unit.allegiance != WS or not getattr(unit, "is_on_map", False):
+            return False
+        if not (hasattr(unit, "is_army") and unit.is_army()):
+            return False
+        return unit.unit_type not in (UnitType.WING, UnitType.FLEET)
+
+    def _is_ws_air_combat_unit(self, unit):
+        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.unit_type in (UnitType.WING, UnitType.CITADEL))
+
+    def _combat_blocked_by_citadel_rule(self, attackers, defenders):
+        if not self._defenders_have_citadel(defenders):
+            return False
+        has_ws_ground = any(self._is_ws_ground_combat_unit(u) for u in attackers)
+        has_ws_air = any(self._is_ws_air_combat_unit(u) for u in attackers)
+        return has_ws_ground and not has_ws_air
+
+    def _filter_ws_ground_attackers_vs_citadel(self, attackers, defenders):
+        if not self._defenders_have_citadel(defenders):
+            return list(attackers)
+        return [u for u in attackers if not self._is_ws_ground_combat_unit(u)]
 
     def _format_combat_log_entry(self, attackers, defenders, result):
         attacker_names = ", ".join(self._format_unit_for_log(u) for u in attackers)
@@ -1658,6 +1705,10 @@ class GameState:
         """
         # Rule: a Wing cannot move and then load a unit in the same turn.
         if carrier.unit_type == UnitType.WING and getattr(carrier, "moved_this_turn", False):
+            return False
+
+        # Rule: armies can board a flying citadel only if they have not moved this turn.
+        if carrier.unit_type == UnitType.CITADEL and getattr(unit, "moved_this_turn", False):
             return False
 
         if not carrier.can_carry(unit):
@@ -1695,6 +1746,9 @@ class GameState:
             dest_hex = Hex.offset_to_axial(*carrier.position)
 
         if dest_hex is None:
+            return False
+
+        if not self.map.can_unit_land_on_hex(unit, dest_hex):
             return False
 
         # Validate stacking limits

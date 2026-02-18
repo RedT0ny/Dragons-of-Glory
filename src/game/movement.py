@@ -21,6 +21,9 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if getattr(unit, "transport_host", None) is not None:
         return False, f"{unit.id} is transported and cannot move independently.", 0, None, []
 
+    if getattr(unit, "carried_by_citadel_this_turn", False):
+        return False, f"{unit.id} was carried by a citadel and cannot move independently this turn.", 0, None, []
+
     if unit.unit_type != UnitType.FLEET and not game_state.map.can_unit_land_on_hex(unit, target_hex):
         return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
 
@@ -299,7 +302,7 @@ class MovementService:
         stack_cost = 0
         for unit in units:
             # Check 2: Sea Barrier
-            if unit.unit_type != UnitType.WING:
+            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
                 hexside = board.get_effective_hexside(current_hex, next_hex)
                 if hexside in (HexsideType.SEA, HexsideType.SEA.value):
                     return None
@@ -483,8 +486,8 @@ class MovementService:
 
         messages = []
 
-        # Separate fleets, armies, leaders
-        fleets = [u for u in selected_units if u.unit_type == UnitType.FLEET or getattr(u, 'passengers', None) is not None]
+        # Separate carriers, armies, leaders
+        carriers = [u for u in selected_units if u.unit_type == UnitType.FLEET or getattr(u, 'passengers', None) is not None]
         armies = [u for u in selected_units if u.is_army()]
         leaders = [u for u in selected_units if u.is_leader()]
 
@@ -498,6 +501,10 @@ class MovementService:
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
                 if carrier.unit_type == UnitType.WING:
+                    if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
+                        messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
+                        continue
+                elif carrier.unit_type == UnitType.CITADEL:
                     if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
                         messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
                         continue
@@ -530,6 +537,15 @@ class MovementService:
                         if not ok:
                             messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
                     continue
+                if carrier.unit_type == UnitType.CITADEL:
+                    for p in carrier.passengers[:]:
+                        if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
+                            messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
+                            continue
+                        ok = self.game_state.unboard_unit(p)
+                        if not ok:
+                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+                    continue
                 is_coastal = self.game_state.map.is_coastal(carrier_hex)
                 loc = self.game_state.map.get_location(carrier_hex)
                 is_port = False
@@ -554,32 +570,31 @@ class MovementService:
             return BoardActionResult(handled=True, messages=messages, force_sync=True)
 
         # Otherwise attempt boarding
-        if not fleets:
-            messages.append("No fleet selected to board units into.")
+        if not carriers:
+            messages.append("No carrier selected to board units into.")
             return BoardActionResult(handled=True, messages=messages, force_sync=False)
 
-        # Algorithm: 1) Try to load every ground army into one selected fleet (one per fleet). Leaders load into same ships.
-        # If there are more armies than fleets, remaining armies are not boarded.
-        target_fleets = fleets[:]
-        fi = 0
+        # Algorithm: load each ground army into the first selected carrier that can accept it.
         for army in armies:
-            if fi >= len(target_fleets):
-                messages.append(f"No more fleets to board army {army.id}.")
-                break
-            fleet = target_fleets[fi]
-            if self.game_state.board_unit(fleet, army):
-                messages.append(f"Boarded army {army.id} onto {fleet.id}")
-            else:
-                messages.append(f"Failed to board army {army.id} onto {fleet.id}")
-            fi += 1
+            loaded = False
+            for carrier in carriers:
+                if self.game_state.board_unit(carrier, army):
+                    messages.append(f"Boarded army {army.id} onto {carrier.id}")
+                    loaded = True
+                    break
+            if not loaded:
+                messages.append(f"Failed to board army {army.id} onto selected carriers.")
 
-        # Load leaders into the first fleet selected (if any)
-        if leaders and fleets:
-            primary = fleets[0]
+        # Load leaders into the first selected carrier that can accept each leader.
+        if leaders and carriers:
             for l in leaders:
-                if self.game_state.board_unit(primary, l):
-                    messages.append(f"Boarded leader {l.id} onto {primary.id}")
-                else:
-                    messages.append(f"Failed to board leader {l.id} onto {primary.id}")
+                loaded = False
+                for carrier in carriers:
+                    if self.game_state.board_unit(carrier, l):
+                        messages.append(f"Boarded leader {l.id} onto {carrier.id}")
+                        loaded = True
+                        break
+                if not loaded:
+                    messages.append(f"Failed to board leader {l.id} onto selected carriers.")
 
         return BoardActionResult(handled=True, messages=messages, force_sync=True)

@@ -734,6 +734,10 @@ class Board:
 
             return is_coastal or is_port
 
+        # Flying Citadels ignore terrain restrictions.
+        if unit.unit_type == UnitType.CITADEL:
+            return True
+
         # Ground units (Army, Leader, etc.)
         if unit.is_army() or unit.is_leader():
             terrain = self.get_terrain(target_hex)
@@ -789,6 +793,8 @@ class Board:
 
         if unit.unit_type == UnitType.WING:
             return self._get_wing_movement_cost(unit, from_hex, to_hex)
+        if unit.unit_type == UnitType.CITADEL:
+            return self._get_citadel_movement_cost(unit, from_hex, to_hex)
         if unit.unit_type == UnitType.FLEET:
             # Pass unit to helper for enemy checks
             return self._get_fleet_movement_cost(unit, from_hex, to_hex)
@@ -839,6 +845,10 @@ class Board:
             return 1
 
         return float('inf')
+
+    def _get_citadel_movement_cost(self, unit, from_hex, to_hex):
+        # Rule: flying citadels move through all terrain and hexsides.
+        return 1
 
 
     def is_maelstrom(self, hex_obj):
@@ -934,7 +944,7 @@ class Board:
 
             # 2. Check for Sea Barriers (Rule 5)
             # If ground unit, check if the hexside between current and neighbor is 'sea'
-            if unit.unit_type != UnitType.WING:
+            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
                 hexside = self.get_effective_hexside(hex_coord, neighbor)
                 if self._hexside_is(hexside, HexsideType.SEA):  # Explicitly mark water-only boundaries in config
                     continue
@@ -1070,7 +1080,7 @@ class Board:
                     # Check 2: Sea Barrier (if not handled by cost)
                     # Note: get_movement_cost usually returns inf for ground vs sea,
                     # but explicit hexside check mimics get_neighbors behavior.
-                    if unit.unit_type != UnitType.WING:
+                    if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
                         hexside = self.get_effective_hexside(current_hex, next_hex)
                         if self._hexside_is(hexside, HexsideType.SEA):
                             possible = False

@@ -3,8 +3,10 @@ from dataclasses import dataclass
 from typing import List
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
-from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL
+from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, WS
 from src.content.loader import load_data
+
+
 @dataclass
 class LeaderEscapeRequest:
     leader: object
@@ -26,7 +28,7 @@ def apply_dragon_orb_precombat(attackers, defenders, consume_asset_fn, roll_d6_f
         ("attacker", attackers, defenders),
         ("defender", defenders, attackers),
     ):
-        if not any(_is_dragon_or_draconian(unit) for unit in opposing):
+        if not any(_is_draconid(unit) for unit in opposing):
             continue
 
         orb_users = []
@@ -89,7 +91,7 @@ def _is_draconian(unit) -> bool:
     return False
 
 
-def _is_dragon_or_draconian(unit) -> bool:
+def _is_draconid(unit) -> bool:
     return _is_dragon(unit) or _is_draconian(unit)
 
 class CombatResolver:
@@ -205,7 +207,7 @@ class CombatResolver:
     def calculate_total_drm(self):
         drm = 0
         defender_hex = self._get_defender_hex()
-        defender_terrain = self.terrain_type
+        defender_terrain = self._effective_defender_terrain()
         defender_location = self._get_defender_location()
         defender_loc_type = self._normalize_loc_type(defender_location)
 
@@ -305,12 +307,20 @@ class CombatResolver:
         return None
 
     def _get_defender_location(self):
+        if self._citadel_attack_strips_ws_defender_bonuses():
+            return None
+        if self._attacking_air_against_citadel():
+            return {"type": LocType.CITY.value}
+
         defender_hex = self._get_defender_hex()
         if not defender_hex or not self.game_state or not self.game_state.map:
             return None
         return self.game_state.map.get_location(defender_hex)
 
     def _get_defender_combat_multiplier(self):
+        if self._citadel_attack_strips_ws_defender_bonuses():
+            return 1
+
         loc = self._get_defender_location()
         loc_type = self._normalize_loc_type(loc)
         if loc_type == LocType.FORTRESS.value:
@@ -320,7 +330,38 @@ class CombatResolver:
         return 1
 
     def _defender_ignores_retreat(self):
+        if self._citadel_attack_strips_ws_defender_bonuses():
+            return False
         return bool(self._get_defender_location())
+
+    def _defenders_include_citadel(self):
+        return any(getattr(u, "unit_type", None) == UnitType.CITADEL and getattr(u, "is_on_map", False) for u in self.defenders)
+
+    def _attacking_air_against_citadel(self):
+        if not self._defenders_include_citadel():
+            return False
+        return any(self._is_flier(u) for u in self.attackers if getattr(u, "is_on_map", False))
+
+    def _citadel_attack_strips_ws_defender_bonuses(self):
+        attacker_has_citadel = any(
+            getattr(u, "unit_type", None) == UnitType.CITADEL and getattr(u, "is_on_map", False)
+            for u in self.attackers
+        )
+        if not attacker_has_citadel:
+            return False
+        return any(
+            getattr(u, "allegiance", None) == WS
+            and hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            and getattr(u, "is_on_map", False)
+            for u in self.defenders
+        )
+
+    def _effective_defender_terrain(self):
+        if self._citadel_attack_strips_ws_defender_bonuses():
+            return TerrainType.GRASSLAND
+        return self.terrain_type
 
     def _get_attacker_crossing_types(self, defender_hex):
         crossings = set()
@@ -406,7 +447,7 @@ class CombatResolver:
                 continue
             if not getattr(unit, "is_on_map", False):
                 continue
-            if unit.unit_type == UnitType.WING or (hasattr(unit, "is_army") and unit.is_army()):
+            if unit.unit_type in (UnitType.WING, UnitType.CITADEL) or (hasattr(unit, "is_army") and unit.is_army()):
                 affected.append(unit)
         return affected
 
@@ -424,13 +465,13 @@ class CombatResolver:
                 target.eliminate()
                 continue
 
-            wing_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type == UnitType.WING]
+            wing_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
             if wing_active:
                 target = min(wing_active, key=lambda u: u.combat_rating)
                 target.deplete()
                 continue
 
-            wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type == UnitType.WING]
+            wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
             if wing_depleted:
                 target = min(wing_depleted, key=lambda u: u.combat_rating)
                 target.eliminate()
@@ -874,7 +915,7 @@ class CombatClickHandler:
         for start_hex in attacker_hexes:
             for next_hex in start_hex.neighbors():
                 # Is there an enemy there?
-                if self.game_state.map.has_enemy_army(next_hex, self.game_state.active_player):
+                if self.game_state.map.has_enemy_army(next_hex, self.game_state.active_player) or self._has_enemy_citadel_target(next_hex, attackers):
                     # Validate "Move into" rule
                     if self.is_valid_attack_hex(attackers, start_hex, next_hex):
                         valid_target_offsets.add(next_hex.axial_to_offset())
@@ -939,6 +980,23 @@ class CombatClickHandler:
         if fleets and len(fleets) == len(attackers):
             return "naval"
         return "land"
+
+    def _has_enemy_citadel_target(self, target_hex, attackers):
+        active_player = self.game_state.active_player
+        enemy_citadel_present = any(
+            u.unit_type == UnitType.CITADEL
+            and u.allegiance != active_player
+            and u.allegiance != "neutral"
+            and self._is_unit_on_map(u)
+            for u in self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+        )
+        if not enemy_citadel_present:
+            return False
+
+        if active_player == WS:
+            has_air = any(u.unit_type in (UnitType.WING, UnitType.CITADEL) for u in attackers)
+            return has_air
+        return True
 
     def _ask_naval_withdraw(self, side_allegiance, round_number):
         from PySide6.QtWidgets import QMessageBox

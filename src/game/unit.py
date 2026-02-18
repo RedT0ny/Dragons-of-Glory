@@ -39,6 +39,8 @@ class Unit:
         self.is_transported = False
         # Reference to the carrier Unit (Fleet/Wing/Citadel) when transported
         self.transport_host: Optional[Unit] = None
+        # Set when a ground army is carried by a flying citadel this turn.
+        self.carried_by_citadel_this_turn = False
         self.attacked_this_turn = False
         self.moved_this_turn = False
 
@@ -243,6 +245,7 @@ class Unit:
             "position": list(self.position),
             "status": self.status.name,
             "is_transported": self.is_transported,
+            "carried_by_citadel_this_turn": self.carried_by_citadel_this_turn,
             # Transport host serialized as tuple (id, ordinal) if present
             "transport_host": (self.transport_host.id, self.transport_host.ordinal) if getattr(self, 'transport_host', None) else None,
             "attacked_this_turn": self.attacked_this_turn,
@@ -258,6 +261,7 @@ class Unit:
             self.status = UnitState[status_str]
 
         self.is_transported = state_data.get("is_transported", False)
+        self.carried_by_citadel_this_turn = state_data.get("carried_by_citadel_this_turn", False)
         # transport_host will be resolved post-load by GameState if needed
         self.transport_host = None
         self.attacked_this_turn = state_data.get("attacked_this_turn", False)
@@ -368,25 +372,23 @@ class FlyingCitadel(Unit):
         self.passengers = []
 
     def can_carry(self, unit: Unit) -> bool:
-        if unit.allegiance != HL: return False
-
-        # Check Armies (Infantry or Cavalry)
-        # Rule says "Up to three HL armies of any types"
-        if unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY):
-            count = sum(1 for p in self.passengers if p.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY))
-            return count < 3
-
+        if unit.allegiance != HL:
+            return False
         # Leaders usually travel free of capacity constraints in DL11 rules context
         # (they stack with armies), provided they are Highlord.
         if unit.is_leader():
             return True
-
-        return False
+        if not (hasattr(unit, "is_army") and unit.is_army()):
+            return False
+        # Rule says "Up to three HL armies of any types"
+        army_count = sum(1 for p in self.passengers if hasattr(p, "is_army") and p.is_army())
+        return army_count < 3
 
     def load_unit(self, unit: Unit):
         if self.can_carry(unit):
             self.passengers.append(unit)
             unit.is_transported = True
+            unit.transport_host = self
 
     def get_defense_modifier(self):
         """
