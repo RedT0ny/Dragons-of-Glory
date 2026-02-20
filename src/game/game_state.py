@@ -1,9 +1,11 @@
 import random
+import os
 from collections import defaultdict
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import (
     CombatResolver,
+    DragonDuelResolver,
     LeaderEscapeRequest,
     NavalCombatResolver,
     apply_dragon_orb_bonus,
@@ -1232,7 +1234,13 @@ class GameState:
     def resolve_event(self, event):
         pass
 
-    def resolve_combat(self, attackers, hex_position, naval_withdraw_decider=None):
+    def resolve_combat(
+        self,
+        attackers,
+        hex_position,
+        naval_withdraw_decider=None,
+        dragon_duel_withdraw_decider=None,
+    ):
         """
         Initiates combat resolution for a specific hex.
         """
@@ -1253,6 +1261,14 @@ class GameState:
                 "advance_available": False,
             }
         attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
+        if not self.can_units_attack_stack(attackers, defenders):
+            result = "-/-"
+            print(self._format_combat_log_entry(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": [],
+                "advance_available": False,
+            }
         if not attackers:
             result = "-/-"
             print(self._format_combat_log_entry(attackers, defenders, result))
@@ -1312,6 +1328,43 @@ class GameState:
                     "leader_escape_requests": [],
                     "advance_available": False,
                 }
+
+        attacker_dragons = [u for u in attackers if self._is_dragon_unit(u) and u.is_on_map]
+        defender_dragons = [u for u in defenders if self._is_dragon_unit(u) and u.is_on_map]
+        if attacker_dragons and defender_dragons:
+            duel = DragonDuelResolver(self, attacker_dragons, defender_dragons)
+            duel_outcome = duel.resolve(withdraw_decider=dragon_duel_withdraw_decider)
+            print(
+                f"Dragon duel after {duel_outcome.get('rounds', 0)} rounds: "
+                f"A={duel_outcome.get('attacker_survivors', 0)} D={duel_outcome.get('defender_survivors', 0)}"
+            )
+            self._cleanup_destroyed_units(attackers + defenders)
+            attackers = [u for u in attackers if u.is_on_map]
+            defenders = list(self.get_units_at(hex_position))
+            if not any(self._is_combat_stack_unit(u) for u in defenders):
+                result = "-/-"
+                advance_available = self._can_advance_after_combat(
+                    attackers=attackers,
+                    target_hex=hex_position,
+                    defender_allegiances=defender_allegiances,
+                    attacker_had_to_retreat=False,
+                )
+                print(self._format_combat_log_entry(attackers, defenders, result))
+                return {
+                    "result": result,
+                    "leader_escape_requests": [],
+                    "advance_available": advance_available,
+                }
+
+        attackers = self._filter_dragons_for_land_attack(attackers, defenders)
+        if not any(self._is_combat_stack_unit(u) for u in attackers):
+            result = "-/-"
+            print(self._format_combat_log_entry(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": [],
+                "advance_available": False,
+            }
 
         gnome_drm = 0
         gnome_effects, gnome_logs = apply_gnome_tech_bonus(
@@ -1456,6 +1509,136 @@ class GameState:
             if candidate is asset or (candidate and getattr(candidate, "id", None) == getattr(asset, "id", None)):
                 player.assets.pop(asset.id, None)
                 return
+
+    def can_units_attack_stack(self, attackers, defenders):
+        attackers = [u for u in attackers if getattr(u, "is_on_map", False)]
+        defenders = [u for u in defenders if getattr(u, "is_on_map", False)]
+        if not attackers or not defenders:
+            return False
+
+        defenders_have_dragons = any(self._is_dragon_unit(u) for u in defenders)
+        for unit in attackers:
+            if not self._is_combat_stack_unit(unit):
+                continue
+            if not self._is_dragon_unit(unit):
+                return True
+            if defenders_have_dragons:
+                return True
+            if self._dragon_can_make_ground_attack(unit, attackers):
+                return True
+        return False
+
+    def _filter_dragons_for_land_attack(self, attackers, defenders):
+        filtered = []
+        for unit in attackers:
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if self._dragon_can_participate_in_land_attack(unit, attackers, defenders):
+                filtered.append(unit)
+        return filtered
+
+    def _dragon_can_participate_in_land_attack(self, unit, attackers, defenders):
+        if not self._is_dragon_unit(unit):
+            return True
+        return self._dragon_can_make_ground_attack(unit, attackers)
+
+    def _dragon_can_make_ground_attack(self, dragon, attackers):
+        if not self._is_dragon_unit(dragon):
+            return True
+
+        if dragon.allegiance == HL and self._all_highlords_destroyed():
+            return False
+        if dragon.allegiance == WS and self._all_ws_dragon_commanders_destroyed():
+            return False
+
+        return self._dragon_has_local_attack_leader(dragon, attackers)
+
+    def _dragon_has_local_attack_leader(self, dragon, attackers):
+        local_leaders = []
+        for unit in attackers:
+            if not (hasattr(unit, "is_leader") and unit.is_leader()):
+                continue
+            if getattr(unit, "allegiance", None) != dragon.allegiance:
+                continue
+            if getattr(unit, "position", None) != getattr(dragon, "position", None):
+                continue
+            local_leaders.append(unit)
+
+        for p in list(getattr(dragon, "passengers", []) or []):
+            if hasattr(p, "is_leader") and p.is_leader() and getattr(p, "allegiance", None) == dragon.allegiance:
+                local_leaders.append(p)
+
+        if dragon.allegiance == HL:
+            return any(self._is_valid_hl_dragon_commander(leader, dragon) for leader in local_leaders)
+        if dragon.allegiance == WS:
+            return any(self._is_valid_ws_dragon_commander(leader) for leader in local_leaders)
+        return False
+
+    def _is_valid_hl_dragon_commander(self, leader, dragon):
+        if getattr(leader, "unit_type", None) == UnitType.EMPEROR:
+            return True
+        if getattr(leader, "unit_type", None) != UnitType.HIGHLORD:
+            return False
+        leader_flight = getattr(getattr(leader, "spec", None), "dragonflight", None)
+        dragon_flight = getattr(getattr(dragon, "spec", None), "dragonflight", None)
+        return bool(leader_flight and dragon_flight and leader_flight == dragon_flight)
+
+    def _is_valid_ws_dragon_commander(self, leader):
+        return getattr(leader, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
+
+    def _all_highlords_destroyed(self):
+        highlords = [u for u in self.units if getattr(u, "unit_type", None) == UnitType.HIGHLORD]
+        return bool(highlords) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in highlords)
+
+    def _all_ws_dragon_commanders_destroyed(self):
+        ws_commanders = [
+            u for u in self.units
+            if getattr(u, "allegiance", None) == WS
+            and hasattr(u, "is_leader")
+            and u.is_leader()
+            and getattr(u, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
+        ]
+        return bool(ws_commanders) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in ws_commanders)
+
+    def _is_dragon_unit(self, unit):
+        return bool(getattr(unit, "is_on_map", False) and getattr(unit, "race", None) == UnitRace.DRAGON)
+
+    def _maybe_promote_highlord_to_emperor(self):
+        living_emperors = [
+            u for u in self.units
+            if getattr(u, "unit_type", None) == UnitType.EMPEROR
+            and getattr(u, "status", None) != UnitState.DESTROYED
+        ]
+        if living_emperors:
+            return None
+
+        candidates = [
+            u for u in self.units
+            if getattr(u, "unit_type", None) == UnitType.HIGHLORD
+            and hasattr(u, "is_leader")
+            and u.is_leader()
+            and getattr(u, "status", None) != UnitState.DESTROYED
+        ]
+        if not candidates:
+            return None
+
+        promoted = random.choice(candidates)
+        promoted._unit_type_override = UnitType.EMPEROR
+        self._notify_emperor_promotion(promoted)
+        return promoted
+
+    def _notify_emperor_promotion(self, promoted):
+        msg = f"{promoted.id} has been promoted to Emperor."
+        print(msg)
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        try:
+            from PySide6.QtWidgets import QApplication, QMessageBox
+            app = QApplication.instance()
+            if app is not None:
+                QMessageBox.information(None, "Highlord Command", msg)
+        except Exception:
+            pass
 
     def _is_naval_combat(self, attackers, defenders):
         atk_fleets = [u for u in attackers if u.unit_type == UnitType.FLEET and u.is_on_map]
@@ -1806,9 +1989,16 @@ class GameState:
         return self.map
 
     def _cleanup_destroyed_units(self, units):
+        emperor_destroyed = any(
+            getattr(unit, "unit_type", None) == UnitType.EMPEROR
+            and getattr(unit, "status", None) == UnitState.DESTROYED
+            for unit in units
+        )
         for unit in units:
             if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
                 self.map.remove_unit_from_spatial_map(unit)
+        if emperor_destroyed:
+            self._maybe_promote_highlord_to_emperor()
 
     def board_unit(self, carrier, unit):
         """Boards `unit` onto `carrier` if allowed.

@@ -843,6 +843,171 @@ class NavalCombatResolver:
         return None
 
 
+class DragonDuelResolver:
+    """
+    Resolves dragon-vs-dragon air supremacy duels before land combat.
+
+    Each side rolls one d6 per current dragon combat point; 4+ scores one hit.
+    Hits are applied to opposing dragons similarly to naval losses:
+    ACTIVE -> DEPLETED -> DESTROYED.
+    """
+    def __init__(self, game_state, attacker_dragons, defender_dragons, roll_d6_fn=None):
+        self.game_state = game_state
+        self.attackers = [u for u in attacker_dragons if getattr(u, "is_on_map", False) and _is_dragon(u)]
+        self.defenders = [u for u in defender_dragons if getattr(u, "is_on_map", False) and _is_dragon(u)]
+        self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
+
+    def resolve(self, withdraw_decider=None):
+        rounds = 0
+        attacker_withdrew = False
+        defender_withdrew = False
+
+        while self.attackers and self.defenders:
+            rounds += 1
+            if rounds > 20:
+                break
+            atk_round = [u for u in self.attackers if getattr(u, "is_on_map", False)]
+            def_round = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+            if not atk_round or not def_round:
+                break
+
+            hits = {}
+            for dragon in atk_round:
+                target = self._select_target(def_round)
+                if target is None:
+                    continue
+                if self._roll_hits(dragon):
+                    hits[target] = hits.get(target, 0) + 1
+
+            for dragon in def_round:
+                target = self._select_target(atk_round)
+                if target is None:
+                    continue
+                if self._roll_hits(dragon):
+                    hits[target] = hits.get(target, 0) + 1
+
+            for target, amount in hits.items():
+                for _ in range(amount):
+                    if not getattr(target, "is_on_map", False):
+                        break
+                    self._apply_hit_to_dragon(target)
+
+            self._sync_combat_lists()
+            if not self.attackers or not self.defenders:
+                break
+
+            if withdraw_decider and withdraw_decider(self._attacker_side(), rounds):
+                self._withdraw_all(self.attackers)
+                attacker_withdrew = True
+                self._sync_combat_lists()
+            if withdraw_decider and self.defenders and withdraw_decider(self._defender_side(), rounds):
+                self._withdraw_all(self.defenders)
+                defender_withdrew = True
+                self._sync_combat_lists()
+            if attacker_withdrew or defender_withdrew:
+                break
+            if not hits and not withdraw_decider:
+                break
+
+        return {
+            "rounds": rounds,
+            "attacker_withdrew": attacker_withdrew,
+            "defender_withdrew": defender_withdrew,
+            "attacker_survivors": len([u for u in self.attackers if getattr(u, "is_on_map", False)]),
+            "defender_survivors": len([u for u in self.defenders if getattr(u, "is_on_map", False)]),
+        }
+
+    def _roll_hits(self, dragon):
+        points = max(0, int(getattr(dragon, "combat_rating", 0) or 0))
+        for _ in range(points):
+            if self._roll_d6() >= 4:
+                return True
+        return False
+
+    def _select_target(self, candidates):
+        live = [u for u in candidates if getattr(u, "is_on_map", False)]
+        if not live:
+            return None
+        live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
+        return live[0]
+
+    def _apply_hit_to_dragon(self, dragon):
+        if dragon.status.name == "ACTIVE":
+            dragon.deplete()
+            return
+        if dragon.status.name == "DEPLETED":
+            dragon.destroy()
+            if self.game_state and getattr(self.game_state, "map", None):
+                self.game_state.map.remove_unit_from_spatial_map(dragon)
+
+    def _withdraw_all(self, side_dragons):
+        for dragon in list(side_dragons):
+            if not getattr(dragon, "is_on_map", False):
+                continue
+            self._withdraw_dragon_random_distance(dragon)
+
+    def _withdraw_dragon_random_distance(self, dragon):
+        if not self.game_state or not getattr(self.game_state, "map", None):
+            return
+        if not getattr(dragon, "position", None) or dragon.position[0] is None or dragon.position[1] is None:
+            return
+        from src.game.map import Hex
+        start_hex = Hex.offset_to_axial(*dragon.position)
+        max_distance = random.randint(1, 16)
+
+        candidates = []
+        frontier = [start_hex]
+        visited = {start_hex}
+        distance = {start_hex: 0}
+
+        while frontier:
+            current = frontier.pop(0)
+            depth = distance[current]
+            if depth >= max_distance:
+                continue
+            for nxt in current.neighbors():
+                if nxt in visited:
+                    continue
+                visited.add(nxt)
+                distance[nxt] = depth + 1
+                frontier.append(nxt)
+
+                col, row = nxt.axial_to_offset()
+                if not self.game_state.is_hex_in_bounds(col, row):
+                    continue
+                if not self.game_state.map.can_unit_land_on_hex(dragon, nxt):
+                    continue
+                if self.game_state.map.has_enemy_army(nxt, dragon.allegiance):
+                    continue
+                if not self.game_state.map.can_stack_move_to([dragon], nxt):
+                    continue
+                if distance[nxt] >= 1:
+                    candidates.append((distance[nxt], nxt))
+
+        if not candidates:
+            return
+
+        candidates.sort(key=lambda item: item[0])
+        farthest_distance = candidates[-1][0]
+        pool = [h for d, h in candidates if d == farthest_distance]
+        retreat_hex = random.choice(pool)
+        self.game_state.move_unit(dragon, retreat_hex)
+
+    def _sync_combat_lists(self):
+        self.attackers = [u for u in self.attackers if getattr(u, "is_on_map", False)]
+        self.defenders = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+
+    def _attacker_side(self):
+        if self.attackers:
+            return self.attackers[0].allegiance
+        return None
+
+    def _defender_side(self):
+        if self.defenders:
+            return self.defenders[0].allegiance
+        return None
+
+
 class CombatClickHandler:
     def __init__(self, game_state, view):
         self.game_state = game_state
@@ -937,6 +1102,7 @@ class CombatClickHandler:
                     self.attackers,
                     target_hex,
                     naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
+                    dragon_duel_withdraw_decider=self._ask_dragon_duel_withdraw if not is_naval else None,
                 )
                 # Mark attackers
                 for u in self.attackers:
@@ -1032,11 +1198,20 @@ class CombatClickHandler:
         # 2. Check neighbors of all attacker positions
         for start_hex in attacker_hexes:
             for next_hex in start_hex.neighbors():
-                # Is there an enemy there?
-                if self.game_state.map.has_enemy_army(next_hex, self.game_state.active_player) or self._has_enemy_citadel_target(next_hex, attackers):
-                    # Validate "Move into" rule
-                    if self.is_valid_attack_hex(attackers, start_hex, next_hex):
-                        valid_target_offsets.add(next_hex.axial_to_offset())
+                enemy_units = [
+                    u for u in self.game_state.map.get_units_in_hex(next_hex.q, next_hex.r)
+                    if self._is_unit_on_map(u)
+                    and u.allegiance not in (self.game_state.active_player, "neutral", None)
+                ]
+                if not enemy_units:
+                    continue
+
+                if not self.game_state.can_units_attack_stack(attackers, enemy_units):
+                    continue
+
+                # Validate "Move into" rule
+                if self.is_valid_attack_hex(attackers, start_hex, next_hex):
+                    valid_target_offsets.add(next_hex.axial_to_offset())
 
         return list(valid_target_offsets)
 
@@ -1122,6 +1297,16 @@ class CombatClickHandler:
             None,
             "Naval Withdrawal",
             f"Round {round_number}: should {side_allegiance} withdraw all fleets and end naval combat?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        return answer == QMessageBox.Yes
+
+    def _ask_dragon_duel_withdraw(self, side_allegiance, round_number):
+        from PySide6.QtWidgets import QMessageBox
+        answer = QMessageBox.question(
+            None,
+            "Dragon Duel",
+            f"Dragon duel round {round_number}: should {side_allegiance} withdraw dragons?",
             QMessageBox.Yes | QMessageBox.No,
         )
         return answer == QMessageBox.Yes
