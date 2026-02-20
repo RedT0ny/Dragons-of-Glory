@@ -116,16 +116,43 @@ class Asset:
         if self.can_equip(unit, log_reason=True):
             if not hasattr(unit, 'equipment'):
                 unit.equipment = []
+            if self in unit.equipment:
+                return
             unit.equipment.append(self)
             self.assigned_to = unit
+            self._apply_runtime_effects(unit)
             print(f"'{unit.id}' equipped '{self.id}'!")
 
     def remove_from(self, unit):
         """Remove asset effects from a unit."""
         if hasattr(unit, 'equipment') and self in unit.equipment:
             unit.equipment.remove(self)
-
+        self._remove_runtime_effects(unit)
         self.assigned_to = None
+
+    def has_other_bonus(self, key: str) -> bool:
+        bonus = self.bonus if isinstance(self.bonus, dict) else {}
+        return bonus.get("other") == key
+
+    def has_bonus_key(self, key: str) -> bool:
+        return isinstance(self.bonus, dict) and key in self.bonus
+
+    def _apply_runtime_effects(self, unit):
+        if not isinstance(self.bonus, dict):
+            return
+        if self.bonus.get("other") == "emperor" and hasattr(unit, "is_leader") and unit.is_leader():
+            unit._unit_type_override = UnitType.EMPEROR
+
+    def _remove_runtime_effects(self, unit):
+        if not isinstance(self.bonus, dict):
+            return
+        if self.bonus.get("other") == "emperor":
+            other_emperor_artifacts = [
+                a for a in getattr(unit, "equipment", []) or []
+                if a is not self and isinstance(getattr(a, "bonus", None), dict) and a.bonus.get("other") == "emperor"
+            ]
+            if not other_emperor_artifacts:
+                unit._unit_type_override = None
 
     def use(self, game_state):
         """Use a consumable asset."""

@@ -1,3 +1,4 @@
+import re
 from typing import Optional, Tuple, List, Any
 from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
@@ -55,6 +56,9 @@ class Unit:
 
     @property
     def unit_type(self) -> Optional[UnitType]:
+        override = getattr(self, "_unit_type_override", None)
+        if override is not None:
+            return override
         return UnitType(self.spec.unit_type) if self.spec.unit_type else None
 
     @property
@@ -91,35 +95,38 @@ class Unit:
     @property
     def tactical_rating(self) -> int:
         if self._tactical_rating_override is not None:
-            return self._tactical_rating_override
+            base = self._tactical_rating_override
+        else:
+            base = self.spec.tactical_rating or 0
 
-        base = self.spec.tactical_rating or 0
-
-        # Add bonuses from equipped assets
-        bonus = 0
-        if hasattr(self, 'equipment'):
-            for item in self.equipment:
-                if hasattr(item, 'bonus') and isinstance(item.bonus, dict):
-                    bonus += item.bonus.get('tactical_rating', 0)
-
-        return base + bonus
+        for item in getattr(self, "equipment", []) or []:
+            bonus = getattr(item, "bonus", None)
+            if not isinstance(bonus, dict):
+                continue
+            if "tactical_rating" in bonus:
+                base = self._apply_numeric_bonus(base, bonus.get("tactical_rating"))
+        return int(base)
 
     @property
     def combat_rating(self) -> int:
         """Calculates total combat rating including equipment bonuses."""
         total = self.spec.combat_rating or 0
-        for item in self.equipment:
-            # item is an Artifact object with a 'bonus' attribute
-            if hasattr(item, 'bonus') and isinstance(item.bonus, int):
-                total += item.bonus
-            elif hasattr(item, 'bonus') and isinstance(item.bonus, dict):
-                # Handle dict bonus e.g. {'combat': 2}
-                total += item.bonus.get('combat', 0)
+        for item in getattr(self, "equipment", []) or []:
+            bonus = getattr(item, "bonus", None)
+            if isinstance(bonus, int):
+                total += bonus
+                continue
+            if not isinstance(bonus, dict):
+                continue
+            if "combat_rating" in bonus:
+                total = self._apply_numeric_bonus(total, bonus.get("combat_rating"))
+            elif "combat" in bonus:
+                total = self._apply_numeric_bonus(total, bonus.get("combat"))
         if self.status == UnitState.DEPLETED:
             if self.unit_type == UnitType.FLEET:
                 return max(0, total - 1)
             return max(0, total // 2)
-        return total
+        return int(total)
 
     @property
     def terrain_affinity(self) -> Optional[TerrainType]:
@@ -159,14 +166,36 @@ class Unit:
 
         # 2. Wizards move logic (Teleport essentially)
         if self.unit_type == UnitType.WIZARD:
-            return base
+            return int(base)
+
+        # 2b. Asset movement bonuses
+        for item in getattr(self, "equipment", []) or []:
+            bonus = getattr(item, "bonus", None)
+            if not isinstance(bonus, dict):
+                continue
+            if "movement" in bonus:
+                base = self._apply_numeric_bonus(base, bonus.get("movement"))
 
         # 3. Transport logic
         # Passenger movement reduction applies only to Wings.
         has_passengers = getattr(self, 'passengers', False)
         if has_passengers and self.unit_type == UnitType.WING:
-            return base // 2
+            return int(base // 2)
 
+        return int(base)
+
+    @staticmethod
+    def _apply_numeric_bonus(base: int, value):
+        if isinstance(value, (int, float)):
+            return base + value
+        if isinstance(value, str):
+            match = re.fullmatch(r"\s*x\s*(\d+)\s*", value.lower())
+            if match:
+                return base * int(match.group(1))
+            try:
+                return base + int(value.strip())
+            except Exception:
+                return base
         return base
 
     @movement.setter
@@ -374,10 +403,6 @@ class FlyingCitadel(Unit):
     def can_carry(self, unit: Unit) -> bool:
         if unit.allegiance != HL:
             return False
-        # Leaders usually travel free of capacity constraints in DL11 rules context
-        # (they stack with armies), provided they are Highlord.
-        if unit.is_leader():
-            return True
         if not (hasattr(unit, "is_army") and unit.is_army()):
             return False
         # Rule says "Up to three HL armies of any types"

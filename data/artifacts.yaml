@@ -39,7 +39,7 @@ disks_of_mishakal:
     edge of each disk, binding the disks together. Arcane glyphs engraved on both sides of the disk provide a treatise 
     on the rituals and worship of the true gods of Krynn.
   picture: "disks_of_mishakal.jpg"
-  effect: "The unit equipped with this artifact gains +1 Combat Rating and can heal itself from depleted to active, once per battle."
+  effect: "The unit equipped with this artifact gains +1 Combat Rating and can heal itself from depleted to active, once per battle turn."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
@@ -74,7 +74,7 @@ dragonlance:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
   bonus:
-    combat_rating: 1
+    combat_rating: "x2"
     other: "dragon_slayer"
 
 dragonmetal:

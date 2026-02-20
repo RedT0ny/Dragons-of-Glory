@@ -13,7 +13,7 @@ class LeaderEscapeRequest:
     options: List[object]
 
 
-def apply_dragon_orb_precombat(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
+def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
     """
     Resolves Dragon Orb usage before normal land combat.
 
@@ -66,9 +66,81 @@ def apply_dragon_orb_precombat(attackers, defenders, consume_asset_fn, roll_d6_f
     return logs
 
 
+def apply_gnome_tech_bonus(
+    attackers,
+    defenders,
+    consume_asset_fn,
+    decide_use_fn=None,
+    roll_d6_fn=None,
+):
+    """
+    Resolves gnome_tech usage before land combat.
+
+    Per side with at least one eligible equipped army:
+    - optional use (random by default)
+    - roll 2d6
+      - non-doubles: attacker +max(dice), defender -max(dice)
+      - doubles: attacker -6, defender +6 and tech is destroyed
+    """
+    roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
+    decide_use = decide_use_fn or (lambda _unit, _side: random.choice([True, False]))
+    drm_bonus = {"attacker": 0, "defender": 0}
+    logs = []
+
+    for side_name, friendly in (("attacker", attackers), ("defender", defenders)):
+        carrier = None
+        tech = None
+        for unit in friendly:
+            if not (hasattr(unit, "is_army") and unit.is_army() and getattr(unit, "is_on_map", False)):
+                continue
+            found = _get_equipped_asset_with_other(unit, "gnome_tech")
+            if found is None:
+                continue
+            carrier = unit
+            tech = found
+            break
+
+        if not carrier or not tech:
+            continue
+        if not decide_use(carrier, side_name):
+            logs.append(f"Gnome tech ({side_name}) not used by {carrier.id}.")
+            continue
+
+        d1 = roll_d6()
+        d2 = roll_d6()
+        doubles = d1 == d2
+        highest = max(d1, d2)
+
+        if side_name == "attacker":
+            delta = -6 if doubles else highest
+        else:
+            delta = 6 if doubles else -highest
+
+        drm_bonus[side_name] += delta
+        if doubles:
+            consume_asset_fn(tech, carrier)
+            logs.append(
+                f"Gnome tech ({side_name}) doubles {d1}/{d2}: DRM {delta:+d}; tech destroyed."
+            )
+        else:
+            logs.append(
+                f"Gnome tech ({side_name}) roll {d1}/{d2}: DRM {delta:+d}."
+            )
+
+    return drm_bonus, logs
+
+
 def _get_equipped_asset(unit, asset_id: str):
     for asset in getattr(unit, "equipment", []) or []:
         if getattr(asset, "id", None) == asset_id:
+            return asset
+    return None
+
+
+def _get_equipped_asset_with_other(unit, bonus_name: str):
+    for asset in getattr(unit, "equipment", []) or []:
+        bonus = getattr(asset, "bonus", None)
+        if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
             return asset
     return None
 
@@ -98,11 +170,21 @@ class CombatResolver:
     """
     Handles resolution of Land and Air combat according to Rule 7 (DL_11).
     """
-    def __init__(self, attackers, defenders, terrain_type, game_state=None):
+    def __init__(
+        self,
+        attackers,
+        defenders,
+        terrain_type,
+        game_state=None,
+        precombat_drm_bonus=0,
+        allow_consumable_other_bonus=False,
+    ):
         self.attackers = attackers
         self.defenders = defenders
         self.terrain_type = terrain_type
         self.game_state = game_state
+        self.precombat_drm_bonus = int(precombat_drm_bonus or 0)
+        self.allow_consumable_other_bonus = bool(allow_consumable_other_bonus)
         # Use the centralized loader
         self.crt_data = load_data(CRT_DATA) # csv or yaml?
 
@@ -224,16 +306,26 @@ class CombatResolver:
         drm -= def_leader
 
         # DRAGONS (Dragon wings only)
-        drm += sum(
+        attacker_dragon_bonus = sum(
             u.combat_rating
             for u in self.attackers
             if u.unit_type == UnitType.WING and self._is_dragon_race(u)
         )
+        if self._defender_has_other_bonus("dragon_slayer") and attacker_dragon_bonus:
+            attacker_dragon_bonus = 0
+            self._consume_other_bonus_if_needed(self.defenders, "dragon_slayer")
+        drm += attacker_dragon_bonus
+
         drm -= sum(
             u.combat_rating
             for u in self.defenders
             if u.unit_type == UnitType.WING and self._is_dragon_race(u)
         )
+
+        # ARMOR: defender stack forces attacker -1 DRM
+        if self._defender_has_other_bonus("armor"):
+            drm -= 1
+            self._consume_other_bonus_if_needed(self.defenders, "armor")
 
         # CAVALRY (+1 attacker only, not vs location/forest/jungle)
         cavalry_blocked = bool(defender_location) or defender_terrain in (TerrainType.FOREST, TerrainType.JUNGLE)
@@ -280,6 +372,7 @@ class CombatResolver:
             if active_player and any(getattr(u, "allegiance", None) == active_player for u in self.attackers):
                 drm += int(self.game_state.get_combat_bonus(active_player))
 
+        drm += self.precombat_drm_bonus
         return drm
 
     def _is_dragon_race(self, unit):
@@ -362,6 +455,31 @@ class CombatResolver:
         if self._citadel_attack_strips_ws_defender_bonuses():
             return TerrainType.GRASSLAND
         return self.terrain_type
+
+    def _unit_has_other_bonus(self, unit, bonus_name):
+        return _get_equipped_asset_with_other(unit, bonus_name) is not None
+
+    def _defender_has_other_bonus(self, bonus_name):
+        for unit in self.defenders:
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if self._unit_has_other_bonus(unit, bonus_name):
+                return True
+        return False
+
+    def _consume_other_bonus_if_needed(self, units, bonus_name):
+        if not self.allow_consumable_other_bonus:
+            return
+        if not self.game_state or not hasattr(self.game_state, "_consume_asset"):
+            return
+        for unit in units:
+            asset = _get_equipped_asset_with_other(unit, bonus_name)
+            if asset is None:
+                continue
+            if not getattr(asset, "is_consumable", False):
+                continue
+            self.game_state._consume_asset(asset, unit)
+            return
 
     def _get_attacker_crossing_types(self, defender_hex):
         crossings = set()

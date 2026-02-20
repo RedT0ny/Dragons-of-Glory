@@ -12,6 +12,7 @@ class ActivationAttempt:
     ws_rating: int
     hl_rating: int
     solamnic_bonus: int
+    country_activation_bonus: int
     event_activation_bonus: int
     target_rating: int
 
@@ -60,17 +61,22 @@ class DiplomacyActivationService:
         solamnic_bonus = 0
         if active_side == WS and self.game_state.is_solamnic_country_for_tower_rule(country.id):
             solamnic_bonus = self.game_state.get_ws_solamnic_activation_bonus()
+        country_activation_bonus = 0
+        if hasattr(self.game_state, "get_country_activation_bonus"):
+            country_activation_bonus = int(self.game_state.get_country_activation_bonus(active_side, country.id) or 0)
         event_bonus = 0
         if hasattr(self.game_state, "get_activation_bonus"):
             event_bonus = self.game_state.get_activation_bonus(active_side)
 
         target_rating = ws_rating + solamnic_bonus if active_side == WS else hl_rating
+        target_rating += country_activation_bonus
         return ActivationAttempt(
             country_id=country.id,
             active_side=active_side,
             ws_rating=ws_rating,
             hl_rating=hl_rating,
             solamnic_bonus=solamnic_bonus,
+            country_activation_bonus=country_activation_bonus,
             event_activation_bonus=event_bonus,
             target_rating=target_rating,
         )

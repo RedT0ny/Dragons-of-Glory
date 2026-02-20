@@ -86,6 +86,7 @@ class PhaseManager:
                 unit.movement_points = getattr(unit, "movement", 0)
                 unit.moved_this_turn = False
                 unit.carried_by_citadel_this_turn = False
+                unit._healed_this_combat_turn = False
             self.game_state.phase = GamePhase.COMBAT
 
         elif self.game_state.phase == GamePhase.COMBAT:
@@ -119,6 +120,7 @@ class PhaseManager:
             unit.attacked_this_turn = False
             unit.moved_this_turn = False
             unit.carried_by_citadel_this_turn = False
+            unit._healed_this_combat_turn = False
             # Handle status recovery/exhaustion here if needed
 
         # Check events

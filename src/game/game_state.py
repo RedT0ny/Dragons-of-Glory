@@ -2,7 +2,13 @@ import random
 from collections import defaultdict
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
-from src.game.combat import CombatResolver, LeaderEscapeRequest, NavalCombatResolver, apply_dragon_orb_precombat
+from src.game.combat import (
+    CombatResolver,
+    LeaderEscapeRequest,
+    NavalCombatResolver,
+    apply_dragon_orb_bonus,
+    apply_gnome_tech_bonus,
+)
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
@@ -706,6 +712,38 @@ class GameState:
     def get_activation_bonus(self, allegiance: str) -> int:
         return int(self.activation_bonuses.get(allegiance, 0))
 
+    def get_country_activation_bonus(self, allegiance: str, country_id: str) -> int:
+        """
+        Artifact diplomacy bonus:
+        +1 target activation rating per equipped artifact that lists `country_id`,
+        as long as both unit and artifact are not DESTROYED.
+        """
+        if not country_id:
+            return 0
+        total = 0
+        country_key = str(country_id).lower()
+        for unit in self.units:
+            if getattr(unit, "allegiance", None) != allegiance:
+                continue
+            if getattr(unit, "status", None) == UnitState.DESTROYED:
+                continue
+            for asset in getattr(unit, "equipment", []) or []:
+                if not isinstance(getattr(asset, "bonus", None), dict):
+                    continue
+                targets = asset.bonus.get("diplomacy")
+                if not isinstance(targets, list):
+                    continue
+                if not any(str(cid).lower() == country_key for cid in targets):
+                    continue
+                owner = getattr(asset, "owner", None)
+                if owner and hasattr(owner, "assets"):
+                    if getattr(asset, "id", None) not in owner.assets:
+                        continue
+                if getattr(asset, "assigned_to", None) is not unit:
+                    continue
+                total += 1
+        return total
+
     def clear_activation_bonuses(self):
         for key in list(self.activation_bonuses.keys()):
             self.activation_bonuses[key] = 0
@@ -1237,7 +1275,10 @@ class GameState:
                 "rounds": outcome.get("rounds", 0),
             }
 
-        orb_events = apply_dragon_orb_precombat(
+        for msg in self._apply_combat_healing(attackers + defenders):
+            print(msg)
+
+        orb_events = apply_dragon_orb_bonus(
             attackers,
             defenders,
             consume_asset_fn=self._consume_asset,
@@ -1272,6 +1313,17 @@ class GameState:
                     "advance_available": False,
                 }
 
+        gnome_drm = 0
+        gnome_effects, gnome_logs = apply_gnome_tech_bonus(
+            attackers,
+            defenders,
+            consume_asset_fn=self._consume_asset,
+        )
+        for msg in gnome_logs:
+            print(msg)
+        gnome_drm += int(gnome_effects.get("attacker", 0))
+        gnome_drm += int(gnome_effects.get("defender", 0))
+
         # Cumulative pre-combat special retreats for wings/cavalry.
         special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
         if special_retreat["applied"]:
@@ -1304,11 +1356,20 @@ class GameState:
                     for u in units_in_hex
                 )
 
-        resolver = CombatResolver(attackers, defenders, terrain, game_state=self)
+        resolver = CombatResolver(
+            attackers,
+            defenders,
+            terrain,
+            game_state=self,
+            precombat_drm_bonus=gnome_drm,
+            allow_consumable_other_bonus=True,
+        )
         result = resolver.resolve()
         print(self._format_combat_log_entry(attackers, defenders, result))
         self._cleanup_destroyed_units(attackers + defenders)
+        revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
+        leader_escape_requests = (revive_escape_requests or []) + (leader_escape_requests or [])
 
         attacker_result_code = result.split('/')[0] if '/' in result else result
         attacker_had_to_retreat = 'R' in attacker_result_code
@@ -1324,6 +1385,57 @@ class GameState:
             "leader_escape_requests": leader_escape_requests or [],
             "advance_available": advance_available,
         }
+
+    def _apply_combat_healing(self, units):
+        logs = []
+        for unit in units:
+            if getattr(unit, "status", None) != UnitState.DEPLETED:
+                continue
+            if getattr(unit, "_healed_this_combat_turn", False):
+                continue
+            healing_asset = self._get_equipped_other_bonus_asset(unit, "healing")
+            if healing_asset is None:
+                continue
+            unit.status = UnitState.ACTIVE
+            unit._healed_this_combat_turn = True
+            logs.append(f"Healing activated: {unit.id} restored to ACTIVE.")
+            if getattr(healing_asset, "is_consumable", False):
+                self._consume_asset(healing_asset, unit)
+                logs.append(f"Healing asset consumed: {healing_asset.id} on {unit.id}.")
+        return logs
+
+    def _get_equipped_other_bonus_asset(self, unit, bonus_name):
+        for asset in getattr(unit, "equipment", []) or []:
+            bonus = getattr(asset, "bonus", None)
+            if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
+                return asset
+        return None
+
+    def _resolve_leader_revives(self, units, leader_origins):
+        requests = []
+        for leader in units:
+            if not (hasattr(leader, "is_leader") and leader.is_leader()):
+                continue
+            if getattr(leader, "status", None) != UnitState.DESTROYED:
+                continue
+            revive_asset = self._get_equipped_other_bonus_asset(leader, "revive")
+            if revive_asset is None:
+                continue
+
+            origin_hex = leader_origins.get(leader)
+            if not origin_hex:
+                continue
+            options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
+            if not options:
+                continue
+
+            leader.status = UnitState.ACTIVE
+            leader.position = (None, None)
+            requests.append(LeaderEscapeRequest(leader=leader, options=options))
+            print(f"Revive activated: {leader.id} may escape to nearest friendly stack.")
+            if getattr(revive_asset, "is_consumable", False):
+                self._consume_asset(revive_asset, leader)
+        return requests
 
     def _consume_asset(self, asset, unit):
         if hasattr(asset, "remove_from"):
