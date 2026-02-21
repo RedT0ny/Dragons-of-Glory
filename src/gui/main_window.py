@@ -1,4 +1,5 @@
 import sys
+import os
 from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -7,7 +8,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
-from src.content.config import APP_NAME, DEBUG
+from src.content.config import APP_NAME, DEBUG, SAVEGAME_DIR
 from src.gui.map_view import AnsalonMapView
 from src.gui.status_tab import StatusTab
 from src.gui.assets_tab import AssetsTab
@@ -294,9 +295,13 @@ class MainWindow(QMainWindow):
             )
 
     def on_save_clicked(self):
+        if not os.path.exists(SAVEGAME_DIR):
+            os.makedirs(SAVEGAME_DIR, exist_ok=True)
         dialog = QFileDialog(self, "Save Game")
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setFileMode(QFileDialog.AnyFile)
+        dialog.setDirectory(SAVEGAME_DIR)
+        dialog.setDefaultSuffix("yaml")
         dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
         dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         if not dialog.exec():
@@ -305,6 +310,9 @@ class MainWindow(QMainWindow):
         if not files:
             return
         path = files[0]
+        root, ext = os.path.splitext(path)
+        if not ext:
+            path = f"{path}.yaml"
         try:
             self.game_state.save_state(path)
             self.append_log(f"Game saved to {path}\n")
@@ -312,9 +320,12 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Save Failed", str(exc))
 
     def on_load_clicked(self):
+        if not os.path.exists(SAVEGAME_DIR):
+            os.makedirs(SAVEGAME_DIR, exist_ok=True)
         dialog = QFileDialog(self, "Load Game")
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         dialog.setFileMode(QFileDialog.ExistingFile)
+        dialog.setDirectory(SAVEGAME_DIR)
         dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
         dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         if not dialog.exec():
