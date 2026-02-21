@@ -5,6 +5,7 @@ import os
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
+APP_VERSION = "0.20.0"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,7 +43,7 @@ X_OFFSET = 244
 Y_OFFSET = 198
 UNIT_SIZE = HEX_RADIUS * 0.45
 UNIT_ICON_SIZE = 60
-COVER_PICTURE = os.path.join(IMAGES_DIR, "cover.png")
+COVER_PICTURE = os.path.join(IMAGES_DIR, "scenario.jpg")
 INTRO_VIDEO = os.path.join(VIDEOS_DIR, "intro.gif")
 MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "map.jpg")
 LOCATION_SIZE = 60

@@ -4,7 +4,7 @@ from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox, QApplication,
-                               QAbstractButton)
+                               QAbstractButton, QDialog)
 from PySide6.QtGui import QAction, QCloseEvent
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
@@ -15,6 +15,7 @@ from src.gui.assets_tab import AssetsTab
 from src.gui.info_panel import InfoPanel
 from src.gui.unit_panel import UnitTable
 from src.gui.turn_panel import TurnPanel
+from src.gui.about import Ui_aboutDialog
 
 
 def _perf_print(message):
@@ -264,6 +265,7 @@ class MainWindow(QMainWindow):
         # --- Help Menu ---
         help_menu = menubar.addMenu("&Help")
         about_action = QAction("&About", self)
+        about_action.triggered.connect(self.on_about_clicked)
         help_menu.addAction(about_action)
 
     @Slot(str)
@@ -272,6 +274,12 @@ class MainWindow(QMainWindow):
         self.log_area.insertPlainText(text)
         # Scroll to the bottom automatically
         self.log_area.ensureCursorVisible()
+
+    def on_about_clicked(self):
+        dialog = QDialog(self)
+        ui = Ui_aboutDialog()
+        ui.setupUi(dialog)
+        dialog.exec()
 
     def set_controller(self, controller):
         """Connects UI signals to the controller."""
