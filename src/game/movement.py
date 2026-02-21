@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 import heapq
+import random
 from typing import List, Tuple
 
 from src.content.constants import HL, NEUTRAL
-from src.content.specs import HexsideType, LocType, UnitType
+from src.content.specs import GamePhase, HexsideType, LocType, UnitRace, UnitType
 from src.game.map import Hex
 
 
@@ -86,6 +87,8 @@ class NeutralEntryDecision:
 class MovementService:
     def __init__(self, game_state):
         self.game_state = game_state
+        self._interception_step_context = None
+        self._interception_attempted_units = set()
 
     def get_reachable_hexes(self, units):
         """
@@ -153,6 +156,9 @@ class MovementService:
                 moved.append(unit)
             return MoveUnitsResult(moved=moved, errors=[])
 
+        if self._should_check_interception(units):
+            return self._move_units_with_interception(units, target_hex)
+
         errors = []
         for unit in units:
             ok, reason = self._can_unit_reach_target(unit, target_hex)
@@ -167,6 +173,278 @@ class MovementService:
             self.game_state.move_unit(unit, target_hex)
             moved.append(unit)
         return MoveUnitsResult(moved=moved, errors=[])
+
+    def _should_check_interception(self, units):
+        if not units:
+            return False
+        if getattr(self.game_state, "phase", None) != GamePhase.MOVEMENT:
+            return False
+        self._ensure_interception_step_context()
+        return all(getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET) for u in units)
+
+    def _ensure_interception_step_context(self):
+        context = (
+            getattr(self.game_state, "turn", None),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+        )
+        if self._interception_step_context != context:
+            self._interception_step_context = context
+            self._interception_attempted_units = set()
+
+    def _move_units_with_interception(self, units, target_hex):
+        path = self._build_movement_hex_path(units, target_hex)
+        if path is None:
+            return MoveUnitsResult(moved=[], errors=["Selected stack has no valid path."])
+        if not path:
+            return MoveUnitsResult(moved=list(units), errors=[])
+
+        for step_hex in path:
+            for unit in list(units):
+                if not getattr(unit, "is_on_map", False):
+                    continue
+                self.game_state.move_unit(unit, step_hex)
+
+            movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
+            if not movers_alive:
+                return MoveUnitsResult(moved=[], errors=[])
+
+            intercepted = self._maybe_apply_interception(movers_alive, step_hex)
+            movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
+            if not movers_alive:
+                return MoveUnitsResult(moved=[], errors=[])
+
+            if intercepted:
+                print(f"Interception resolved at {step_hex.axial_to_offset()}.")
+
+        return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
+
+    def _build_movement_hex_path(self, units, target_hex):
+        lead = units[0]
+        if not getattr(lead, "position", None) or lead.position[0] is None or lead.position[1] is None:
+            return []
+        start_hex = Hex.offset_to_axial(*lead.position)
+        if start_hex == target_hex:
+            return []
+
+        if lead.unit_type == UnitType.FLEET:
+            ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, lead, target_hex)
+            if not ok:
+                return None
+            if not state_path:
+                return []
+            hex_path = []
+            prev_hex = state_path[0][0]
+            for curr_hex, _ in state_path[1:]:
+                if curr_hex != prev_hex:
+                    hex_path.append(curr_hex)
+                prev_hex = curr_hex
+            return hex_path
+
+        path = self.game_state.map.find_shortest_path(lead, start_hex, target_hex)
+        if not path and start_hex != target_hex:
+            return None
+        return path
+
+    def _maybe_apply_interception(self, moving_units, current_hex):
+        in_range_groups = self._find_interceptor_groups_in_range(moving_units, current_hex)
+        if not in_range_groups:
+            return False
+
+        # Interception attempts are stochastic and can happen on any in-range movement hex.
+        if random.random() >= 0.5:
+            return False
+
+        origin_offset, interceptors = random.choice(in_range_groups)
+        for unit in interceptors:
+            self._interception_attempted_units.add((unit.id, getattr(unit, "ordinal", 1)))
+
+        dist = self._hex_distance_from_offset(origin_offset, current_hex)
+        if dist <= 0:
+            return False
+        roll = random.randint(1, 6)
+        print(
+            f"Interception attempt by stack at {origin_offset}: roll {roll} vs distance {dist}."
+        )
+        if roll < dist:
+            return False
+
+        self._resolve_interception_attack(interceptors, moving_units, current_hex, origin_offset)
+        return True
+
+    def _find_interceptor_groups_in_range(self, moving_units, current_hex):
+        mover_side = moving_units[0].allegiance
+        by_hex = {}
+        for unit in self.game_state.units:
+            if unit.allegiance in (mover_side, NEUTRAL, None):
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            if unit.unit_type not in (UnitType.WING, UnitType.FLEET):
+                continue
+            if not unit.position or unit.position[0] is None or unit.position[1] is None:
+                continue
+            if (unit.id, getattr(unit, "ordinal", 1)) in self._interception_attempted_units:
+                continue
+            if not self._can_unit_intercept_target(unit, moving_units):
+                continue
+            if not self._dragon_interceptor_has_required_commander(unit):
+                continue
+            dist = self._hex_distance(unit, current_hex)
+            if 1 <= dist <= 6:
+                key = tuple(unit.position)
+                by_hex.setdefault(key, []).append(unit)
+
+        groups = []
+        for offset, stack in by_hex.items():
+            eligible = [
+                u for u in stack
+                if self._can_unit_intercept_target(u, moving_units)
+                and self._dragon_interceptor_has_required_commander(u)
+                and (u.id, getattr(u, "ordinal", 1)) not in self._interception_attempted_units
+            ]
+            if eligible:
+                groups.append((offset, eligible))
+        return groups
+
+    @staticmethod
+    def _hex_distance(unit, target_hex):
+        start = Hex.offset_to_axial(*unit.position)
+        return start.distance_to(target_hex)
+
+    @staticmethod
+    def _hex_distance_from_offset(offset, target_hex):
+        start = Hex.offset_to_axial(*offset)
+        return start.distance_to(target_hex)
+
+    def _resolve_interception_attack(self, interceptors, moving_units, moving_hex, origin_offset):
+        origin_hex = Hex.offset_to_axial(*origin_offset)
+        original_states = {}
+        for interceptor in interceptors:
+            original_states[interceptor] = {
+                "movement_points": getattr(interceptor, "movement_points", None),
+                "moved_this_turn": getattr(interceptor, "moved_this_turn", False),
+                "attacked_this_turn": getattr(interceptor, "attacked_this_turn", False),
+                "river_hexside": getattr(interceptor, "river_hexside", None),
+            }
+
+        adjacent_hex = self._find_interceptor_attack_hex_for_stack(interceptors, moving_hex, origin_hex)
+        if adjacent_hex is None:
+            print(f"Interception cancelled: no adjacent attack hex for stack at {origin_offset}.")
+            return
+
+        for interceptor in interceptors:
+            if getattr(interceptor, "is_on_map", False):
+                self._teleport_unit_no_cost(interceptor, adjacent_hex)
+
+        previous_active_player = self.game_state.active_player
+        self.game_state.active_player = interceptors[0].allegiance
+        try:
+            live_interceptors = [u for u in interceptors if getattr(u, "is_on_map", False)]
+            if live_interceptors:
+                self.game_state.resolve_combat(live_interceptors, moving_hex)
+        finally:
+            self.game_state.active_player = previous_active_player
+
+        for interceptor in interceptors:
+            if not getattr(interceptor, "is_on_map", False):
+                continue
+            self._teleport_unit_no_cost(interceptor, origin_hex)
+            state = original_states.get(interceptor, {})
+            if state.get("movement_points") is not None:
+                interceptor.movement_points = state["movement_points"]
+            interceptor.moved_this_turn = state.get("moved_this_turn", False)
+            interceptor.attacked_this_turn = state.get("attacked_this_turn", False)
+            if hasattr(interceptor, "river_hexside"):
+                interceptor.river_hexside = state.get("river_hexside", None)
+
+    def _find_interceptor_attack_hex_for_stack(self, interceptors, moving_hex, origin_hex):
+        candidates = []
+        if not interceptors:
+            return None
+        for neighbor in moving_hex.neighbors():
+            col, row = neighbor.axial_to_offset()
+            if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            if not self.game_state.map.can_stack_move_to(interceptors, neighbor):
+                continue
+
+            feasible = True
+            max_cost = 0
+            for interceptor in interceptors:
+                if not self.game_state.map.can_unit_land_on_hex(interceptor, neighbor):
+                    feasible = False
+                    break
+                if interceptor.unit_type == UnitType.FLEET:
+                    state_path, cost = self.game_state.map.find_fleet_route(interceptor, origin_hex, neighbor)
+                    if cost == float("inf") or (not state_path and origin_hex != neighbor):
+                        feasible = False
+                        break
+                else:
+                    path = self.game_state.map.find_shortest_path(interceptor, origin_hex, neighbor)
+                    if not path and origin_hex != neighbor:
+                        feasible = False
+                        break
+                    cost = len(path)
+                max_cost = max(max_cost, cost)
+            if not feasible:
+                continue
+            candidates.append((max_cost, neighbor))
+
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: item[0])
+        return candidates[0][1]
+
+    def _can_unit_intercept_target(self, interceptor, moving_units):
+        moving_types = {getattr(u, "unit_type", None) for u in moving_units if getattr(u, "is_on_map", False)}
+        if interceptor.unit_type == UnitType.FLEET:
+            return UnitType.FLEET in moving_types
+        if interceptor.unit_type == UnitType.WING:
+            return bool(moving_types & {UnitType.WING, UnitType.FLEET})
+        return False
+
+    def _dragon_interceptor_has_required_commander(self, interceptor):
+        if getattr(interceptor, "unit_type", None) != UnitType.WING:
+            return True
+        if getattr(interceptor, "race", None) != UnitRace.DRAGON:
+            return True
+
+        passengers = list(getattr(interceptor, "passengers", []) or [])
+        if interceptor.allegiance == HL:
+            dragonflight = getattr(getattr(interceptor, "spec", None), "dragonflight", None)
+            for p in passengers:
+                if not (hasattr(p, "is_leader") and p.is_leader()):
+                    continue
+                if getattr(p, "unit_type", None) == UnitType.EMPEROR:
+                    return True
+                if getattr(p, "unit_type", None) == UnitType.HIGHLORD:
+                    p_flight = getattr(getattr(p, "spec", None), "dragonflight", None)
+                    if dragonflight and p_flight == dragonflight:
+                        return True
+            return False
+        if interceptor.allegiance != HL:
+            for p in passengers:
+                if not (hasattr(p, "is_leader") and p.is_leader()):
+                    continue
+                p_race = getattr(p, "race", None)
+                if p_race in (UnitRace.ELF, UnitRace.SOLAMNIC):
+                    return True
+            return False
+        return True
+
+    def _teleport_unit_no_cost(self, unit, target_hex):
+        self.game_state.map.remove_unit_from_spatial_map(unit)
+        unit.position = target_hex.axial_to_offset()
+        self.game_state.map.add_unit_to_spatial_map(unit)
+        passengers = getattr(unit, "passengers", None)
+        if passengers:
+            for p in passengers:
+                p.position = unit.position
+                p.is_transported = True
+                p.transport_host = unit
 
     @staticmethod
     def _is_ground_army(unit):
