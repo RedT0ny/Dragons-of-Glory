@@ -126,7 +126,7 @@ fealthas;1;highlord;elf;white;highlord;forest;0;1;10;feal-thas.png
 toede;1;highlord;goblin;white;highlord;;0;1;10;toede.jpg
 ariakas;1;emperor;human;;highlord;;0;4;10;ariakas.png
 rashften;1;general;ogre;thank;neutral;mountain;0;1;10;rashften.jpg
-laurana;1;general;elf;;whitestone;forest;0;5;10;laurana.png
+laurana;1;general;elf;;whitestone;forest;0;5;10;laurana.jpg
 ;2;cav;human;taman;highlord;;4;0;8;dark_cav.jpg
 ;8;inf;human;taman;highlord;;6;0;4;dark_inf.jpg
 iolanthe;1;wizard;human;;highlord;;0;3;99;iolanthe.jpg
@@ -134,6 +134,6 @@ ladonna;1;wizard;human;;highlord;;0;3;99;ladonna.jpg
 dracart;1;wizard;human;;highlord;;0;3;99;dracart.png
 par_salian;1;wizard;human;;whitestone;;0;3;99;par_salian.jpg
 justarius;1;wizard;solamnic;;whitestone;;0;3;99;justarius.jpg
-fizban;1;wizard;human;;whitestone;;0;3;99;fizban.png
+fizban;1;wizard;human;;whitestone;;0;3;99;fizban.jpg
 ;3;citadel;magic;;highlord;;0;0;4;citadel.jpg
 ;2;inf;gnome;nevermind;neutral;;2;0;0;gnome_inf.jpg
