@@ -3,6 +3,7 @@ import math
 from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
 from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
+import shiboken6
 
 from src.content.constants import WS, UI_COLORS
 from src.content.specs import UnitState, GamePhase, UnitType
@@ -41,6 +42,8 @@ class AnsalonMapView(QGraphicsView):
 
         # Optimization: Track unit items to remove them individually
         self.unit_items = []
+        self.hex_items = []
+        self.hex_items_by_coords = {}
         self.map_rendered = False
         self.initial_fit_done = False
         self.zoom_on_show = 1.0
@@ -320,14 +323,12 @@ class AnsalonMapView(QGraphicsView):
         # Change cursor to indicate placement mode (overrides ScrollHandDrag)
         self.setCursor(Qt.PointingHandCursor)
 
-        # Highlight all valid coordinates - let controller handle validation
+        # Highlight all valid coordinates using indexed hex items.
+        # This avoids repeated scene spatial queries during rapid UI interaction.
         for col, row in valid_coords_list:
-            center = self.get_hex_center(col, row)
-            items = self.scene.items(center)
-            for item in items:
-                if isinstance(item, HexagonItem):
+            for item in self.hex_items_by_coords.get((col, row), []):
+                if shiboken6.isValid(item):
                     item.set_highlight(True)
-                    break
 
     def clear_highlights(self):
         self.deploying_unit = None
@@ -335,12 +336,14 @@ class AnsalonMapView(QGraphicsView):
         # Restore default cursor (returns to ScrollHandDrag "open hand")
         self.unsetCursor()
 
-        for item in self.scene.items():
-            if isinstance(item, HexagonItem):
+        for item in self.hex_items:
+            if shiboken6.isValid(item) and item.is_highlighted:
                 item.set_highlight(False)
 
     def draw_static_map(self):
         """Draws the static elements of the map based on GameState model."""
+        self.hex_items = []
+        self.hex_items_by_coords = {}
         self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
 
@@ -392,6 +395,8 @@ class AnsalonMapView(QGraphicsView):
                                        pass_directions=pass_directions)
                 hex_item.coords = (col, row)
                 self.scene.addItem(hex_item)
+                self.hex_items.append(hex_item)
+                self.hex_items_by_coords.setdefault((col, row), []).append(hex_item)
 
                 # 5. Draw Location if present
                 # loc_data = board.get_location(hex_obj)
@@ -432,6 +437,8 @@ class AnsalonMapView(QGraphicsView):
                                           country_id=country.id)
                 country_hex.coords = (col, row)  # Fix: Ensure overlay hexes also have coords
                 self.scene.addItem(country_hex)
+                self.hex_items.append(country_hex)
+                self.hex_items_by_coords.setdefault((col, row), []).append(country_hex)
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
@@ -485,6 +492,8 @@ class AnsalonMapView(QGraphicsView):
         self._sync_pending = False
         self._sync_in_progress = False
         self.unit_items.clear()
+        self.hex_items.clear()
+        self.hex_items_by_coords.clear()
         self.scene.clear()
         self.map_rendered = False
 

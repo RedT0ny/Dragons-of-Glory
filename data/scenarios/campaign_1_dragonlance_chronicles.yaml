@@ -62,6 +62,7 @@ scenario:
           units: all
           ready: 12
         estwilde: null
+        gaarlund: null
         kern: all
         khur: all
         lemish: all

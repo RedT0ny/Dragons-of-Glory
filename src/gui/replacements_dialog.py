@@ -382,6 +382,8 @@ class ReplacementsDialog(QDialog):
     def on_ready_unit_clicked(self, unit):
         """Minimize and show map targets."""
         #self.showMinimized()
+        if unit.status != UnitState.READY or getattr(unit, "is_on_map", False):
+            return
 
         # Prevent recursive calls by checking if we're already processing
         if hasattr(self, '_processing_deployment') and self._processing_deployment:

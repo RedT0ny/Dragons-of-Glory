@@ -5,7 +5,7 @@ from time import monotonic
 from src.content import loader
 from src.content.config import CALENDAR_DATA
 from src.content.constants import HL, WS
-from src.content.specs import GamePhase
+from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyActivationService
 from src.game.movement import MovementService
 
@@ -547,6 +547,8 @@ class GameController(QObject):
         
         # Sync the view on the next event loop tick to avoid scene re-entrancy
         def _deferred_sync():
+            if self.replacements_dialog and self.replacements_dialog.isVisible():
+                self.replacements_dialog.refresh()
             self.view.sync_with_model()
             self._refresh_info_panel()
         self._schedule_deferred(_deferred_sync)
@@ -620,10 +622,17 @@ class GameController(QObject):
             self.replacements_dialog.refresh()
 
     def on_ready_unit_clicked(self, unit, allow_territory_deploy):
+        # Ignore stale clicks from a dialog row that no longer represents a deployable unit.
+        if unit.status != UnitState.READY or getattr(unit, "is_on_map", False):
+            self.view.clear_highlights()
+            return
         valid_hexes = self.game_state.get_valid_deployment_hexes(
             unit,
             allow_territory_wide=allow_territory_deploy
         )
+        if not valid_hexes:
+            self.view.clear_highlights()
+            return
         self.view.highlight_deployment_targets(valid_hexes, unit)
 
     def on_finish_deployment_clicked(self):

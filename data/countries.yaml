@@ -361,6 +361,17 @@ estwilde:
     - [29, 29]
     - [30, 29]
 
+gaarlund:
+  territories:
+    - [27, 17]
+    - [27, 18]
+    - [28, 18]
+    - [29, 18]
+    - [30, 18]
+    - [27, 19]
+    - [28, 19]
+    - [28, 20]
+
 goodlund:
   capital_id: kendermore
   color: "#DAA520"

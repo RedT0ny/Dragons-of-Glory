@@ -150,6 +150,12 @@ class DeploymentService:
         invasion_deployment_country_id: str | None = None,
         highlord_allegiance: str = HL,
     ) -> UnitDeploymentResult:
+        # Deployment may only place READY units from off-map.
+        if unit.status != UnitState.READY:
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: unit is not READY.")
+        if getattr(unit, "is_on_map", False):
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: unit is already on map.")
+
         if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
             return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: invalid terrain.")
 
