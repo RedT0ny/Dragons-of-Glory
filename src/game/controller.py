@@ -45,6 +45,7 @@ class GameController(QObject):
         self._deferred_epoch = 0
         self._end_phase_transition_pending = False
         self._last_end_phase_request_at = 0.0
+        self._deployment_session_unit_ids = set()
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch
@@ -74,6 +75,67 @@ class GameController(QObject):
         if self.combat_click_handler:
             self.combat_click_handler.reset_selection()
         self.view.highlight_movement_range([])
+        self._end_deployment_session()
+
+    def _begin_deployment_session(self):
+        self._deployment_session_unit_ids = set()
+
+    def _end_deployment_session(self):
+        self._deployment_session_unit_ids.clear()
+
+    def _is_deployment_session_active(self):
+        return bool(self.replacements_dialog and self.replacements_dialog.isVisible())
+
+    def _can_redeploy_unit_now(self, unit):
+        if not self._is_deployment_session_active():
+            return False
+        if getattr(self.view, "deploying_unit", None) is not None:
+            return False
+        if unit.id not in self._deployment_session_unit_ids:
+            return False
+        if unit.allegiance != self.game_state.active_player:
+            return False
+        if unit.status != UnitState.ACTIVE or not getattr(unit, "is_on_map", False):
+            return False
+        return True
+
+    def on_map_units_clicked(self, clicked_units):
+        """Allow redeploying units placed during the current deployment session."""
+        if not clicked_units:
+            return
+        candidate = next((u for u in clicked_units if self._can_redeploy_unit_now(u)), None)
+        if not candidate:
+            return
+        self._return_unit_to_ready_for_redeployment(candidate)
+
+    def _return_unit_to_ready_for_redeployment(self, unit):
+        if getattr(unit, "is_on_map", False):
+            self.game_state.map.remove_unit_from_spatial_map(unit)
+        unit.position = (None, None)
+        unit.status = UnitState.READY
+        if hasattr(unit, "movement_points"):
+            unit.movement_points = unit.movement
+        if hasattr(unit, "moved_this_turn"):
+            unit.moved_this_turn = False
+        if hasattr(unit, "attacked_this_turn"):
+            unit.attacked_this_turn = False
+        if hasattr(unit, "is_transported"):
+            unit.is_transported = False
+        if hasattr(unit, "transport_host"):
+            unit.transport_host = None
+        if hasattr(unit, "river_hexside"):
+            unit.river_hexside = None
+
+        def _deferred_redeploy_sync():
+            if self.replacements_dialog and self.replacements_dialog.isVisible():
+                self.replacements_dialog.refresh()
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+            if self.replacements_dialog and self.replacements_dialog.isVisible():
+                self.on_ready_unit_clicked(unit, self.replacements_dialog.allow_territory_deploy)
+
+        self._schedule_deferred(_deferred_redeploy_sync)
+        print(f"Unit {unit.id} returned to READY for redeployment.")
 
     def _load_calendar(self):
         try:
@@ -132,6 +194,7 @@ class GameController(QObject):
                     self._connect_replacements_dialog_signals()
                     self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
                     self.replacements_dialog.show()
+                    self._begin_deployment_session()
             print(f"Step 0: Deployment Phase - {active_player}")
 
         # Handle "Automatic" or "System" phases (Dice rolls, cards)
@@ -148,6 +211,7 @@ class GameController(QObject):
                                                                   self.view)  # Parent to view
                     self._connect_replacements_dialog_signals()
                     self.replacements_dialog.show()
+                    self._begin_deployment_session()
                 # We do NOT advance phase automatically.
                 # User must click "End Phase" in main window (which calls on_end_phase_clicked)
             print(f"Step 1: Replacements Phase - {active_player}")
@@ -364,6 +428,7 @@ class GameController(QObject):
             if self.replacements_dialog:
                 self.replacements_dialog.close()
                 self.replacements_dialog = None
+            self._end_deployment_session()
             self._invasion_deployment_active = False
             self._invasion_deployment_country_id = None
             self._invasion_deployment_allegiance = None
@@ -384,6 +449,7 @@ class GameController(QObject):
         if self.replacements_dialog:
             self.replacements_dialog.close()
             self.replacements_dialog = None
+        self._end_deployment_session()
 
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
@@ -544,6 +610,7 @@ class GameController(QObject):
         if not result.success:
             print(result.error)
             return
+        self._deployment_session_unit_ids.add(unit.id)
         
         # Sync the view on the next event loop tick to avoid scene re-entrancy
         def _deferred_sync():
@@ -600,6 +667,7 @@ class GameController(QObject):
                                                       allow_territory_deploy=True)
         self._connect_replacements_dialog_signals()
         self.replacements_dialog.show()
+        self._begin_deployment_session()
 
         QMessageBox.information(
             self.replacements_dialog,
@@ -640,11 +708,13 @@ class GameController(QObject):
             if self.replacements_dialog:
                 self.replacements_dialog.close()
                 self.replacements_dialog = None
+            self._end_deployment_session()
             return
 
         if self.replacements_dialog:
             self.replacements_dialog.close()
             self.replacements_dialog = None
+        self._end_deployment_session()
         self._invasion_deployment_active = False
         self._invasion_deployment_country_id = None
         self._invasion_deployment_allegiance = None
@@ -698,6 +768,7 @@ class GameController(QObject):
         )
         self._connect_replacements_dialog_signals()
         self.replacements_dialog.show()
+        self._begin_deployment_session()
 
         message = (
             f"Deploy units for {country_id.title()}.\n"

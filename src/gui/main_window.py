@@ -291,6 +291,7 @@ class MainWindow(QMainWindow):
         if hasattr(self.info_panel, 'board_clicked'):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
+        self.map_view.units_clicked.connect(controller.on_map_units_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
 
     def update_turn_panel(self, active_player: str, turn: int, calendar_upper_label: str, phase_label: str):
