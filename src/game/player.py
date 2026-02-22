@@ -37,9 +37,9 @@ class Player:
             print(f"Warning: Asset ID {asset_id} not found in catalog.")
             return
 
-        # Create the live Asset instance
-        from src.game.event import Asset
-        new_asset = Asset(spec)
+        # Create the live Asset instance via factory so placeholders are materialized.
+        from src.content.factory import create_asset_from_spec
+        new_asset = create_asset_from_spec(spec)
         new_asset.owner = self
 
         self.assets[asset_id] = new_asset

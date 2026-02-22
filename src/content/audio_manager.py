@@ -201,6 +201,9 @@ class AudioManager(QObject):
             if name.lower() == "intro.mp3":
                 continue
             tracks.append(os.path.join(self.audio_dir, name))
+
+        import random
+        random.shuffle(tracks)
         return tracks
 
     def _resolve_audio_path(self, filename):

@@ -1,13 +1,18 @@
 from dataclasses import asdict
 from typing import Callable, Dict, List, Optional, Set, Tuple
+import random
+import re
 from . import loader
 from .specs import *
 from .config import UNITS_DATA, COUNTRIES_DATA, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, ARTIFACTS_DATA
 from src.content.constants import HL, WS
 from src.game.country import Country
-from src.game.event import Event
+from src.game.event import Event, Asset
 from src.game.map import Board
 from src.game.unit import Unit, Leader, Wing, Hero, Fleet, Wizard, Army, FlyingCitadel
+
+
+_RANDOM_PLACEHOLDER_RE = re.compile(r"\{random:([^{}]+)\}")
 
 def create_scenario_items(scenario_spec: ScenarioSpec) -> Tuple[List[Unit], Dict[str, Country]]:
     """
@@ -97,6 +102,45 @@ def create_units_from_specs(specs: List[UnitSpec], allegiance: Optional[str] = N
 
         created.append(new_unit)
     return created
+
+
+def create_asset_from_spec(spec: AssetSpec) -> Asset:
+    """
+    Creates a live Asset instance from an AssetSpec blueprint.
+    Supports dynamic placeholder materialization such as:
+    {random:option 1|option 2|...}
+    """
+    materialized_spec = _materialize_asset_spec_random_fields(spec)
+    return Asset(materialized_spec)
+
+
+def _materialize_asset_spec_random_fields(spec: AssetSpec) -> AssetSpec:
+    raw = asdict(spec)
+    processed = _materialize_random_placeholders(raw)
+    return AssetSpec(**processed)
+
+
+def _materialize_random_placeholders(value):
+    if isinstance(value, str):
+        return _replace_random_tokens(value)
+    if isinstance(value, list):
+        return [_materialize_random_placeholders(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_materialize_random_placeholders(v) for v in value)
+    if isinstance(value, dict):
+        return {k: _materialize_random_placeholders(v) for k, v in value.items()}
+    return value
+
+
+def _replace_random_tokens(text: str) -> str:
+    def _pick(match: re.Match) -> str:
+        options_raw = match.group(1).split("|")
+        options = [o.strip() for o in options_raw if o.strip()]
+        if not options:
+            return ""
+        return random.choice(options)
+
+    return _RANDOM_PLACEHOLDER_RE.sub(_pick, text)
 
 class UnitCatalog:
     def __init__(self, units_csv_path: str = UNITS_DATA, loader_func: Optional[Callable] = None):

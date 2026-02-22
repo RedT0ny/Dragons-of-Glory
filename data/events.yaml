@@ -123,6 +123,7 @@ medallion_of_faith:
   type: "artifact"
   description: "A medallion of faith from the true gods is discovered in an abandoned shrine."
   picture: "medallion_found.jpg"
+  allegiance: "whitestone"
   turn: 19
   effects: { grant_asset: "medallion_of_faith" }
   max_occurrences: 4
