@@ -109,8 +109,8 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control more than 30 countries"
-        marginal: "Countrol more than 20 countries"
+        major: "Control 30 countries"
+        minor: "Control 20 countries"
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
@@ -119,8 +119,8 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control more than 30 countries"
-        marginal: "Countrol more than 20 countries"
+        major: "Control 30 countries"
+        minor: "Control 20 countries"
 
   notes: >
     Whitestone starts without countries, they will join by diplomacy or as a result of the highlord's invasion.' 

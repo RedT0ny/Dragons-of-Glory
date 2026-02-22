@@ -7,23 +7,23 @@ scenario:
 
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
-  map_subset:
-    x_range: [35, 52]
-    y_range: [32, 47]
+  #map_subset:
+  #  x_range: [35, 52]
+  #  y_range: [32, 47]
 
   # Timeline and Turn Logic
-  start_turn: 1
+  start_turn: 25
   end_turn: 30
-  initiative_start: "highlord"  # highlord | whitestone | neutral
+  #initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  possible_events: ["E1", "E10", "E20"]
+  possible_events: all
 
   # Allegiance-based Setup
   initial_setup:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
-      countries: ["abanasinia", "khur", "solanthus"]
+      countries: null
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
@@ -39,31 +39,44 @@ scenario:
             dragon: 1
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
-      explicit_units: ["verminaard", "kitiara", "ladonna"]
+      explicit_units: ["verminaard", "kitiara", "iolanthe"]
+      units_by_type:
+        citadel: 2
       assets:
-        staff_of_magius: 1
+        dragon_orb: 1
 
       victory_conditions:
-        major: "Description of victory"
-        marginal: "Description of victory"
+        major: "Prevent Whitestone from conquering Neraka"
 
     whitestone:
       # Example of specific deployment region (subset of countries)
       deployment_area:
-        countries: ["qualinesti", "abanasinia"]
+        countries: ["estwilde"]
 
       countries:
         qualinesti:
           units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
-        abanasinia:
+        sancrist:
+          units: all
+        southlund:
+          units: all
+        gold:
+          units: all
+        silver:
+          units: all
+        bronze:
+          units: all
+        copper:
+          units: all
+        brass:
           units: all
 
       explicit_units: ["fizban", "laurana"]
       assets:
-        blue_crystal_staff: 1
+        dragonlance: 2
 
       victory_conditions:
-        major: "Protect the capital"
+        major: "Conquer Neraka by turn 30"
 
   notes: >
     Any additional special rules or setup instructions.

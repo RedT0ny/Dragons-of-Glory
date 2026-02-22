@@ -54,9 +54,9 @@ scenario:
     # Countries that are on the map but not yet controlled by either main player
     neutral:
       countries:
-        coastlund: all
         dargaard: all
         hinterlund: all
+        nergoth: all
         nevermind: all
         nightlund: all
         haltigoth: all
@@ -97,7 +97,7 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control Caergoth, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
+        major: "Control Southlund, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
 
     whitestone:
       deployment_area: country_based
@@ -108,7 +108,7 @@ scenario:
           units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
         tower:
           units: all
-        nergoth:
+        coastlund:
           units: all
         sancrist:
           units: all

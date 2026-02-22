@@ -257,6 +257,15 @@ class GameController(QObject):
 
         elif current_phase == GamePhase.ACTIVATION:
             print(f"Step 3: Activation - {active_player}")
+            if not self.game_state.has_neutral_countries():
+                print("No neutral countries remain. Skipping Activation phase.")
+                self.game_state.advance_phase()
+                self.view.sync_with_model()
+                self._refresh_info_panel()
+                self._refresh_turn_panel()
+                self.connect_map_view_signals()
+                self.check_active_player()
+                return
             if not is_ai:
                 from src.gui.diplomacy_dialog import DiplomacyDialog
                 from PySide6.QtWidgets import QDialog, QMessageBox

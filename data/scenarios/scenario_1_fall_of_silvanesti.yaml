@@ -81,8 +81,8 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Capture Silvanost before it is evacuated"
-        marginal: "Capture Silvanost before turn 9"
+        major: "Capture Silvanost by turn 8"
+        minor: "Capture Silvanost by turn 9"
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
@@ -95,8 +95,7 @@ scenario:
         dragon_orb: 1
 
       victory_conditions:
-        major: "Prevents Highlord from taking Silvanost without moving the capital"
-        marginal: "After moving the capital to Silvamori, prevents Silvanost from being taken before end of turn 9"
+        major: "Prevent Silvanost from being captured"
 
   notes: >
     Silvanesti Leader (Lorac) starts with a dragon orb.

@@ -104,7 +104,7 @@ scenario:
       explicit_units: ["fizban", "laurana"]
 
       victory_conditions:
-        major: "Defend Kalaman until the end of turn 30"
+        major: "Prevent Kalaman from being captured"
 
   notes: >
     Any additional special rules or setup instructions.

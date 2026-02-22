@@ -78,8 +78,8 @@ scenario:
       #assets: ["midnight"]
 
       victory_conditions:
-        major: "Qualinesti conquered and Thorbardin is allied or conquered"
-        minor: "Qualinesti conquered"
+        major: "Conquer Qualinesti and conquer or ally Thorbardin"
+        minor: "Conquer Qualinesti"
 
     whitestone:
       # Example of specific deployment region (subset of countries)
@@ -95,8 +95,8 @@ scenario:
         blue_crystal_staff: 1
 
       victory_conditions:
-        major: "No highlord units further than 2 hexes from the sea"
-        minor: "Qualinesti unconquered"
+        major: "Prevent Qualinesti from being conquered and ally Thorbardin"
+        minor: "Prevent Qualinesti from being conquered"
 
   notes: >
     Any additional special rules or setup instructions.

@@ -77,7 +77,7 @@ scenario:
       explicit_units: ["toede"]
 
       victory_conditions:
-        major: "Capture Hylo by turn 5"
+        major: "Capture Kenderhome by turn 5"
 
     whitestone:
       deployment_area: ["hylo"]
@@ -91,6 +91,7 @@ scenario:
 
       victory_conditions:
         major: "Destroy more than 50% of the highlord army"
+        minor: "Prevent Kenderhome from being captured"
 
   notes: >
     No Strategic Event counters or Activations are used in this scenario. 

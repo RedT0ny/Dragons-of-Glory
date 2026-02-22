@@ -28,8 +28,8 @@
 ;5;inf;dwarf;zhakar;neutral;mountain;5;0;3;daergar_inf.jpg
 ;4;wing;griffon;zhakar;neutral;;2;0;18;dwarf_griffon.jpg
 ;4;inf;goblin;sikket;neutral;;4;0;3;goblin_inf.jpg
-;1;fleet;goblin;sikket;neutral;;4;0;35;goflin_fleet.jpg
-;4;inf;goblin;thank;neutral;;4;0;3;goblin_inf.jpg
+;1;fleet;goblin;sikket;neutral;;4;0;35;goblin_fleet.jpg
+;4;inf;goblin;thank;neutral;;4;0;3;hobgoblin_inf.jpg
 ;4;inf;human;balifor;neutral;;4;0;4;nomad_inf.jpg
 ;2;fleet;human;balifor;neutral;;4;0;40;human_fleet.jpg
 ;3;inf;human;abanasinia;neutral;;4;0;4;tribal_inf.jpg
@@ -51,7 +51,7 @@
 ;2;inf;solamnic;sancrist;neutral;;8;0;5;solamnic_inf.jpg
 ;3;inf;human;sancrist;neutral;;4;0;5;human_inf.jpg
 ;2;cav;solamnic;sancrist;neutral;;8;0;8;solamnic_cav.jpg
-;1;fleet;human;sancrist;neutral;;4;0;40;solamnic_fleet.jpg
+;2;fleet;solamnic;sancrist;neutral;;4;0;40;solamnic_fleet.jpg
 ;3;inf;solamnic;southlund;neutral;;6;0;5;solamnic_inf.jpg
 ;2;cav;solamnic;southlund;neutral;;6;0;8;solamnic_cav.jpg
 ;5;inf;human;palanthas;neutral;;4;0;4;human_inf.jpg
@@ -137,3 +137,4 @@ justarius;1;wizard;solamnic;;whitestone;;0;3;99;justarius.jpg
 fizban;1;wizard;human;;whitestone;;0;3;99;fizban.jpg
 ;3;citadel;magic;;highlord;;0;0;4;citadel.jpg
 ;2;inf;gnome;nevermind;neutral;;2;0;0;gnome_inf.jpg
+;2;fleet;human;nergoth;neutral;;4;0;40;human_fleet.jpg

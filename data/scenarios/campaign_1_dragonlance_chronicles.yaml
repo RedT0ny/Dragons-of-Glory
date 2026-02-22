@@ -84,8 +84,8 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control more than 30 countries"
-        marginal: "Countrol more than 20 countries"
+        major: "Control 30 countries"
+        minor: "Control 20 countries"
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
@@ -163,8 +163,8 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control more than 30 countries"
-        marginal: "Countrol more than 20 countries"
+        major: "Control 30 countries"
+        minor: "Control 20 countries"
 
   notes: >
     The player with the most countries held consults the victory table.

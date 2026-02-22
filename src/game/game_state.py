@@ -706,6 +706,9 @@ class GameState:
         country = self.countries.get(country_id)
         return bool(country and country.allegiance == NEUTRAL)
 
+    def has_neutral_countries(self) -> bool:
+        return any(country.allegiance == NEUTRAL for country in self.countries.values())
+
     def add_activation_bonus(self, allegiance: str, amount: int):
         if allegiance not in self.activation_bonuses:
             return

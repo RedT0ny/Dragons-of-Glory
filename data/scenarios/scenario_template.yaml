@@ -45,7 +45,7 @@ scenario:
 
       victory_conditions:
         major: "Description of victory"
-        marginal: "Description of victory"
+        minor: "Description of victory"
 
     whitestone:
       # Example of specific deployment region (subset of countries)
