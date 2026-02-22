@@ -1,10 +1,4 @@
-import sys, locale, signal
-
-#Enable faulthandler to get better crash diagnostics, especially for native code issues in PySide6
-import faulthandler
-faulthandler.enable(all_threads=True)
-if hasattr(faulthandler, "register"):
-    faulthandler.register(signal.SIGABRT, all_threads=True, chain=True)
+import sys, locale
 
 from PySide6.QtWidgets import QApplication
 
@@ -12,19 +6,21 @@ from src.gui.main_window import MainWindow
 from src.gui.intro_window import IntroWindow
 from src.game.game_state import GameState
 from src.content.translator import Translator
+from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.game.controller import GameController
-
 
 
 class GameApp:
     def __init__(self):
+        self.runtime_diagnostics = RuntimeDiagnostics()
+        self.runtime_diagnostics.install()
         self.app = self.initialize_app()
-        self.translator = Translator(lang_code='en') # Or dynamic detection
-        
+        self.translator = Translator(lang_code='en')  # Or dynamic detection
+
         self.intro = IntroWindow(self.translator)
         self.intro.ready_to_start.connect(self.start_new_game)
         self.intro.ready_to_load.connect(self.load_existing_game)
-        
+
         self.model = None
         self.view = None
         self.controller = None
@@ -59,7 +55,7 @@ class GameApp:
         """Initializes a game from a save file."""
         self.model = GameState()
         self.model.load_state(file_path)
-        # For loaded games, we'll need a way to determine AI config, 
+        # For loaded games, we'll need a way to determine AI config,
         # for now defaulting to human vs human or reading from save
         player_config = {"highlord_ai": False, "whitestone_ai": False}
         self.launch_game_engine(player_config)
@@ -67,7 +63,7 @@ class GameApp:
     def launch_game_engine(self, player_config):
         """Common logic to show the main window and start the controller."""
         self.view = MainWindow(self.model)
-        
+
         self.controller = GameController(
             game_state=self.model,
             view=self.view.map_view,
@@ -85,9 +81,11 @@ class GameApp:
         self.intro.show()
         sys.exit(self.app.exec())
 
+
 def main():
     game_app = GameApp()
     game_app.run()
+
 
 if __name__ == "__main__":
     main()

@@ -5,11 +5,12 @@ import os
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "0.21.1"
+APP_VERSION = "0.21.2"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DATA_DIR = os.path.join(BASE_DIR, "data")
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LOCALE_DIR = os.path.join(DATA_DIR, "locale")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 AUDIO_DIR = os.path.join(ASSETS_DIR, "audio")
@@ -32,6 +33,7 @@ CALENDAR_DATA = os.path.join(DATA_DIR, "calendar.csv")
 LIBRA_FONT = os.path.join(FONTS_DIR, "Libra Regular.otf")
 LOGO_HL = os.path.join(ICONS_DIR, "logo_hl.png")
 LOGO_WS = os.path.join(ICONS_DIR, "logo_ws.png")
+LOG_FILE = os.path.join(LOGS_DIR, "qt_last20.log")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77

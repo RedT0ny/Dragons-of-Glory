@@ -456,7 +456,7 @@ class AnsalonMapView(QGraphicsView):
 
             # Clean up old unit items
             for item in self.unit_items:
-                if item.scene() == self.scene:
+                if shiboken6.isValid(item) and item.scene() == self.scene:
                     self.scene.removeItem(item)
             self.unit_items.clear()
 
