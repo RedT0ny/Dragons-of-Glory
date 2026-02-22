@@ -5,6 +5,7 @@ from dataclasses import asdict
 from collections import defaultdict
 from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP, HL, WS, NEUTRAL
 from src.content.specs import *
+from src.content.config import APP_NAME, APP_VERSION, ASSETS_DIR
 
 _UNITS_CATALOG_CACHE = None
 
@@ -33,6 +34,16 @@ def _string_to_enum(value: Optional[str], enum_class) -> Optional[any]:
         pass
 
     return None
+
+def render_html_template(template_name: str) -> str:
+    template_path = ASSETS_DIR / "html" / template_name
+    html = template_path.read_text(encoding="utf-8")
+
+    # Simple placeholder substitution
+    return html.format(
+        APP_NAME=APP_NAME,
+        APP_VERSION=APP_VERSION,
+    )
 
 def load_scenario_yaml(path: str) -> ScenarioSpec:
     """

@@ -209,6 +209,7 @@ class InfoPanel(QFrame):
         #layout.addStretch()
 
         self.current_units = []
+        self._passenger_unit_ids = set()
 
         # Sync minimap if game state is already populated
         if self.game_state and self.game_state.map:
@@ -358,7 +359,27 @@ class InfoPanel(QFrame):
     @Slot(list)
     def update_unit_table(self, units):
         """Populates the table with the provided list of units."""
-        self.current_units = units
+        display_units = []
+        seen = set()
+        passenger_ids = set()
+
+        for unit in units:
+            marker = id(unit)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            display_units.append(unit)
+
+            for passenger in getattr(unit, "passengers", []) or []:
+                p_marker = id(passenger)
+                if p_marker in seen:
+                    continue
+                seen.add(p_marker)
+                passenger_ids.add(p_marker)
+                display_units.append(passenger)
+
+        self.current_units = display_units
+        self._passenger_unit_ids = passenger_ids
         
         # Check for Movement Phase to auto-select
         from src.content.specs import GamePhase
@@ -366,7 +387,7 @@ class InfoPanel(QFrame):
         is_combat_phase = self.game_state and self.game_state.phase == GamePhase.COMBAT
 
         # Update table
-        self.units_table.set_units(units, self.game_state)
+        self.units_table.set_units(display_units, self.game_state)
 
         # Update checkboxes based on phase
         self.units_table.blockSignals(True)
@@ -378,7 +399,16 @@ class InfoPanel(QFrame):
         for row in range(self.units_table.rowCount()):
             item = self.units_table.item(row, 0)
             if item:
+                is_passenger_row = (
+                    row < len(self.current_units)
+                    and id(self.current_units[row]) in self._passenger_unit_ids
+                )
+                if is_passenger_row:
+                    item.setCheckState(Qt.Unchecked)
+                    item.setFlags(item.flags() & ~Qt.ItemIsEnabled)
+                    continue
                 item.setCheckState(Qt.Checked if is_movement_phase or is_combat_phase else Qt.Unchecked)
+                item.setFlags(item.flags() | Qt.ItemIsEnabled)
         self.units_table.blockSignals(False)
 
         # Immediately notify selection if we auto-selected units
@@ -404,6 +434,11 @@ class InfoPanel(QFrame):
         selected = []
         for row in range(self.units_table.rowCount()):
             item = self.units_table.item(row, 0)
-            if item.checkState() == Qt.Checked and row < len(self.current_units):
+            if (
+                item
+                and item.checkState() == Qt.Checked
+                and row < len(self.current_units)
+                and id(self.current_units[row]) not in self._passenger_unit_ids
+            ):
                 selected.append(self.current_units[row])
         self.selection_changed.emit(selected)

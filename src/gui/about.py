@@ -19,6 +19,87 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFrame, QLabel,
     QSizePolicy, QTextBrowser, QVBoxLayout, QWidget)
 from src.content.config import APP_NAME, APP_VERSION, COVER_PICTURE
 
+ABOUT_HTML = """
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: "Segoe UI", sans-serif; font-size: 9pt; color: #0f1115; }}
+    .mono {{ font-family: "Courier New", monospace; font-size: 10pt; }}
+    h3 {{ margin: 12px 0 6px; }}
+    p {{ margin: 6px 0; }}
+    ul {{ margin: 6px 0 6px 18px; padding: 0; }}
+    hr {{ border: none; border-top: 1px solid #0f1115; margin: 12px 0; }}
+    a {{ color: #14427c; text-decoration: underline; }}
+    .center {{ text-align: center; }}
+  </style>
+</head>
+<body>
+  <p>Version {app_version}</p>
+
+  <p class="mono">{app_name} is a fan-made, non-profit adaptation of the classic Dragonlance module
+     DL-11 “Dragons of Glory.”</p>
+
+  <hr>
+
+  <h3 class="mono">LEGAL &amp; COPYRIGHT INFORMATION</h3>
+
+  <p class="mono">
+    This game is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy.
+    It is not approved, endorsed, or sponsored by Wizards of the Coast LLC.
+  </p>
+
+  <p class="mono">Portions of the materials used are property of Wizards of the Coast LLC, including references to:</p>
+  <ul class="mono">
+    <li>Dragonlance®</li>
+    <li>DL-11 “Dragons of Glory”</li>
+    <li>TSR, Inc.</li>
+  </ul>
+
+  <p class="mono">
+    DL-11 “Dragons of Glory” was published by TSR, Inc. in 1985 as part of the Dragonlance series of
+    adventure modules. It featured a war game simulation of the War of the Lance in the Dragonlance
+    campaign setting. It was created by:
+  </p>
+  <ul class="mono">
+    <li>Douglas Niles</li>
+    <li>Tracy Hickman</li>
+    <li>Jeff Easley (cover artist)</li>
+  </ul>
+
+  <p class="mono">© Wizards of the Coast LLC. All Rights Reserved.</p>
+
+  <hr>
+
+  <h3 class="mono">Contact / Credits</h3>
+  <p class="mono"><b>Creator</b>: Tony J. Soler (<contact@example.com>)</p>
+
+  <hr>
+
+  <h3 class="mono">Licensing</h3>
+  <p class="mono">
+    This game's original code is free software: you can redistribute it and/or modify it under the terms of the
+    <a href="https://www.gnu.org/licenses/">GNU General Public License</a> as published by the Free Software Foundation,
+    either version 3 of the License, or (at your option) any later version.
+  </p>
+
+  <p class="mono">
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+    warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+    <a href="https://www.gnu.org/licenses/gpl-3.0.en.html">GNU General Public License v3.0</a> for more details.
+  </p>
+
+  <p class="mono center">--- <b>IMPORTANT NOTE</b> ---</p>
+
+  <p class="mono">
+    This license applies ONLY to the original code written by the game's author. The Dragonlance setting, DL-11 module
+    content, and all related Wizards of the Coast intellectual property are NOT covered by this license and remain the
+    exclusive property of Wizards of the Coast LLC.
+  </p>
+</body>
+</html>
+""".strip()
+
 class Ui_aboutDialog(object):
     def setupUi(self, aboutDialog):
         if not aboutDialog.objectName():
@@ -52,7 +133,6 @@ class Ui_aboutDialog(object):
 
         self.verticalLayout.addWidget(self.textBrowser)
 
-
         self.retranslateUi(aboutDialog)
 
         QMetaObject.connectSlotsByName(aboutDialog)
@@ -61,62 +141,7 @@ class Ui_aboutDialog(object):
     def retranslateUi(self, aboutDialog):
         aboutDialog.setWindowTitle(QCoreApplication.translate("aboutDialog", u"About", None))
         self.label.setText("")
-        self.textBrowser.setHtml(QCoreApplication.translate("aboutDialog", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"hr { height: 1px; border-width: 0; }\n"
-"li.unchecked::marker { content: \"\\2610\"; }\n"
-"li.checked::marker { content: \"\\2612\"; }\n"
-"</style></head><body style=\" font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Version "+APP_VERSION+"</p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">"+APP_NAME+" is a fan-m"
-                        "ade, non-profit adaptation of the classic Dragonlance module DL-11 &quot;Dragons of Glory.&quot;</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">==============================================================</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; font-weight:700; color:#0f1115;\">LEGAL &amp; COPYRIGHT INFORMATION</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier N"
-                        "ew'; font-size:13px; color:#0f1115;\">==============================================================</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">This game is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy. It is not approved, endorsed, or sponsored by Wizards of the Coast LLC.</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block"
-                        "-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">Portions of the materials used are property of Wizards of the Coast LLC, including references to:</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">- Dragonlance\u00ae</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">- DL-11 &quot;Dragons of Glory&quot;</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">- TSR, Inc.</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px"
-                        "; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">DL-11 &quot;Dragons of Glory&quot; was published by TSR, Inc. in 1985 as part of the Dragonlance series of adventure modules. It featured a war game simulation of the War of the Lance in the Dragonlance campaign setting. It was created by:</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#0f1115;\">- Douglas Niles</span></p>\n"
-"<p style=\" margin-top:0px; ma"
-                        "rgin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#0f1115;\">- Tracy Hickman</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#0f1115;\">- Jeff Easley (cover artist)</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#0f1115;\">\u00a9Wizards of the Coast LLC. All Rights Reserved.</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'"
-                        "; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">==============================================================</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; font-weight:700; color:#0f1115;\">Contact / Credits</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">==============================================================</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; font-weight:700; c"
-                        "olor:#0f1115;\">Creator</span><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">: Tony J. Soler (redtony@gmail.com)</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#0f1115;\">==============================================================</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-weight:700; color:#0f1115;\">Licensing</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; color:#"
-                        "0f1115;\">==============================================================</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">This game's original code is free software: you can redistribute it and/or modify it under the terms of the </span><a href=\"https://www.gnu.org/licenses/\"><span style=\" text-decoration: underline; color:#14427c;\">GNU General Public License</span></a><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\"> as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px"
-                        ";\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">            </span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See </span><a href=\"https://www.gnu.org/licenses/gpl-3.0.en.html\"><span style=\" text-decoration: underline; color:#14427c;\">GNU General Public License v3.0</span></a><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\"> for more details.</span></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">            </span></p>\n"
-"<p align=\"center\" style=\" margin-top"
-                        ":0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">--- </span><span style=\" font-family:'Courier New'; font-size:13px; font-weight:700; color:#0f1115;\">IMPORTANT NOTE</span><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\"> ---</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Courier New'; font-size:13px; color:#0f1115;\"><br /></p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Courier New'; font-size:13px; color:#0f1115;\">This license applies ONLY to the original code written by the game's author. The Dragonlance setting, DL-11 module content, and all related Wizards of the Coast intellectual property are NOT covered by this license an"
-                        "d remain the exclusive property of Wizards of the Coast LLC.</span></p></body></html>", None))
+        html = QCoreApplication.translate("aboutDialog", ABOUT_HTML.format(app_name=APP_NAME, app_version=APP_VERSION), None)
+        self.textBrowser.setHtml(html)
     # retranslateUi
 

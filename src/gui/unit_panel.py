@@ -108,7 +108,7 @@ class UnitTable(QTableWidget):
             if index.isValid() and UnitColumn.CHECKBOX in self.columns_config:
                 if index.column() != 0:
                     item = self._get_checkbox_item(index.row())
-                    if item:
+                    if item and (item.flags() & Qt.ItemIsEnabled):
                         new_state = Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
                         item.setCheckState(new_state)
         super().mousePressEvent(event)
@@ -120,11 +120,11 @@ class UnitTable(QTableWidget):
                 self.blockSignals(True)
                 for row in range(self.rowCount()):
                     item = self._get_checkbox_item(row)
-                    if item:
+                    if item and (item.flags() & Qt.ItemIsEnabled):
                         item.setCheckState(Qt.Checked if row == index.row() else Qt.Unchecked)
                 self.blockSignals(False)
                 first_item = self._get_checkbox_item(index.row())
-                if first_item:
+                if first_item and (first_item.flags() & Qt.ItemIsEnabled):
                     self.itemChanged.emit(first_item)
         super().mouseDoubleClickEvent(event)
 
@@ -335,13 +335,17 @@ class UnitTable(QTableWidget):
 
     def toggle_all_rows(self, checked):
         self.blockSignals(True)
+        first_enabled_item = None
         for row in range(self.rowCount()):
             item = self.item(row, 0)
-            if item:
+            if item and (item.flags() & Qt.ItemIsEnabled):
                 item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+                if first_enabled_item is None:
+                    first_enabled_item = item
         self.blockSignals(False)
         # Emit signal to notify caller to re-scan selection if needed
-        self.itemChanged.emit(self.item(0, 0)) # Hack to trigger notify
+        if first_enabled_item:
+            self.itemChanged.emit(first_enabled_item) # Hack to trigger notify
 
 class AllegiancePanel(QWidget):
     """
