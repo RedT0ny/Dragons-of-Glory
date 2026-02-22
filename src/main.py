@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication
 from src.gui.main_window import MainWindow
 from src.gui.intro_window import IntroWindow
 from src.game.game_state import GameState
+from src.content.audio_manager import AudioManager
 from src.content.translator import Translator
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.game.controller import GameController
@@ -16,10 +17,13 @@ class GameApp:
         self.runtime_diagnostics.install()
         self.app = self.initialize_app()
         self.translator = Translator(lang_code='en')  # Or dynamic detection
+        self.audio_manager = AudioManager()
+        self.app.audio_manager = self.audio_manager
 
         self.intro = IntroWindow(self.translator)
         self.intro.ready_to_start.connect(self.start_new_game)
         self.intro.ready_to_load.connect(self.load_existing_game)
+        self.audio_manager.play_intro_loop()
 
         self.model = None
         self.view = None
@@ -73,6 +77,7 @@ class GameApp:
 
         self.view.set_controller(self.controller)
 
+        self.audio_manager.play_game_playlist()
         self.intro.close()
         self.view.showMaximized()
         self.controller.start_game()

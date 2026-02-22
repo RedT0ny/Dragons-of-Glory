@@ -1,10 +1,8 @@
-import os
-
-from PySide6.QtCore import Qt, Signal, QTimer, QUrl
-from PySide6.QtMultimedia import QSoundEffect
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
-from src.content.config import AUDIO_DIR, MAX_TICKS
+from src.content.audio_manager import AudioManager
+from src.content.config import MAX_TICKS
 from src.game.diplomacy import DiplomacyActivationService
 from src.gui.map_view import AnsalonMapView
 
@@ -128,14 +126,12 @@ class DiplomacyDialog(QDialog):
             btn_cancel.setDisabled(True)
             self.map_view.setEnabled(False)
 
-            dice_sound = QSoundEffect(dlg)
-            dice_sound.setVolume(1)
-            try:
-                dice_sound.setSource(QUrl.fromLocalFile(os.path.join(AUDIO_DIR, "roll_1d10.wav")))
-            except Exception as e:
-                print(f"Error loading dice sound: {e}")
-            dice_sound.setLoopCount(1)
-            dice_sound.play()
+            audio_manager = AudioManager.from_app()
+            dice_sound = None
+            if audio_manager:
+                dice_sound = audio_manager.play_dice_roll(volume=1.0, parent=dlg)
+            else:
+                print("AudioManager not available; dice roll sound skipped.")
 
             self.roll_ticks = 0
             roll_result = self.diplomacy_service.roll_activation(
@@ -154,7 +150,8 @@ class DiplomacyDialog(QDialog):
                 else:
                     animation_timer.stop()
                     animation_timer.deleteLater()
-                    dice_sound.stop()
+                    if dice_sound:
+                        dice_sound.stop()
 
                     if roll_result.bonus_applied:
                         final_text = (

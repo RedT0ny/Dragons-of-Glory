@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>volumeDialog</class>
+ <widget class="QDialog" name="volumeDialog">
+  <property name="windowModality">
+   <enum>Qt::WindowModality::WindowModal</enum>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>400</width>
+    <height>122</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Audio Settings</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="0" column="0">
+    <widget class="QCheckBox" name="musicVolCbx">
+     <property name="font">
+      <font>
+       <family>Libra</family>
+       <pointsize>24</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Music</string>
+     </property>
+     <property name="iconSize">
+      <size>
+       <width>16</width>
+       <height>16</height>
+      </size>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QSlider" name="musicVolume">
+     <property name="maximum">
+      <number>100</number>
+     </property>
+     <property name="sliderPosition">
+      <number>100</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QCheckBox" name="sndVolCbx">
+     <property name="font">
+      <font>
+       <family>Libra</family>
+       <pointsize>24</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Sounds</string>
+     </property>
+     <property name="iconSize">
+      <size>
+       <width>16</width>
+       <height>16</height>
+      </size>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <widget class="QSlider" name="soundVolume">
+     <property name="maximum">
+      <number>100</number>
+     </property>
+     <property name="sliderPosition">
+      <number>100</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0" colspan="2">
+    <widget class="QDialogButtonBox" name="volButtonBox">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
+     </property>
+     <property name="centerButtons">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>volButtonBox</sender>
+   <signal>accepted()</signal>
+   <receiver>volumeDialog</receiver>
+   <slot>accept()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>248</x>
+     <y>254</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>157</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>volButtonBox</sender>
+   <signal>rejected()</signal>
+   <receiver>volumeDialog</receiver>
+   <slot>reject()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>316</x>
+     <y>260</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>286</x>
+     <y>274</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+</ui>

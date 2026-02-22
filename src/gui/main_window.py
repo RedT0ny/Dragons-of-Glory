@@ -16,6 +16,8 @@ from src.gui.info_panel import InfoPanel
 from src.gui.unit_panel import UnitTable
 from src.gui.turn_panel import TurnPanel
 from src.gui.about import Ui_aboutDialog
+from src.gui.volume_dialog import Ui_volumeDialog
+from src.content.audio_manager import AudioManager
 
 
 def _perf_print(message):
@@ -262,6 +264,12 @@ class MainWindow(QMainWindow):
         zoom_out_action.triggered.connect(lambda: self.map_view.scale(0.8, 0.8))
         view_menu.addAction(zoom_out_action)
 
+        # --- Settings Menu ---
+        settings_menu = menubar.addMenu("Se&ttings")
+        volume_action = QAction("Sound &volume", self)
+        volume_action.triggered.connect(self.on_volume_clicked)
+        settings_menu.addAction(volume_action)
+
         # --- Help Menu ---
         help_menu = menubar.addMenu("&Help")
         about_action = QAction("&About", self)
@@ -279,6 +287,49 @@ class MainWindow(QMainWindow):
         dialog = QDialog(self)
         ui = Ui_aboutDialog()
         ui.setupUi(dialog)
+        dialog.exec()
+
+    def on_volume_clicked(self):
+        dialog = QDialog(self)
+        ui = Ui_volumeDialog()
+        ui.setupUi(dialog)
+        audio_manager = AudioManager.from_app()
+        if not audio_manager:
+            dialog.exec()
+            return
+
+        initial_music_enabled = audio_manager.is_music_enabled()
+        initial_sfx_enabled = audio_manager.is_sfx_enabled()
+        initial_music_volume = audio_manager.get_music_volume_percent()
+        initial_sfx_volume = audio_manager.get_sfx_volume_percent()
+
+        ui.musicVolCbx.setChecked(initial_music_enabled)
+        ui.sndVolCbx.setChecked(initial_sfx_enabled)
+        ui.musicVolume.setValue(initial_music_volume)
+        ui.soundVolume.setValue(initial_sfx_volume)
+        ui.musicVolume.setEnabled(initial_music_enabled)
+        ui.soundVolume.setEnabled(initial_sfx_enabled)
+
+        def _on_music_toggle(checked):
+            ui.musicVolume.setEnabled(checked)
+            audio_manager.set_music_enabled(checked)
+
+        def _on_sfx_toggle(checked):
+            ui.soundVolume.setEnabled(checked)
+            audio_manager.set_sfx_enabled(checked)
+
+        ui.musicVolCbx.toggled.connect(_on_music_toggle)
+        ui.sndVolCbx.toggled.connect(_on_sfx_toggle)
+        ui.musicVolume.valueChanged.connect(audio_manager.set_music_volume_percent)
+        ui.soundVolume.valueChanged.connect(audio_manager.set_sfx_volume_percent)
+
+        def _restore_initial_audio():
+            audio_manager.set_music_volume_percent(initial_music_volume)
+            audio_manager.set_sfx_volume_percent(initial_sfx_volume)
+            audio_manager.set_music_enabled(initial_music_enabled)
+            audio_manager.set_sfx_enabled(initial_sfx_enabled)
+
+        dialog.rejected.connect(_restore_initial_audio)
         dialog.exec()
 
     def set_controller(self, controller):

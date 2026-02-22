@@ -6,8 +6,6 @@ Design overview:
 
 TODO:
 
-- Implement Dragon Orb mechanics (add a new "Use" button in the info_panel, unit_box or assets_tab?).
-- Implement Flying Citadels.
 - Add Dragon #170's Advanced Rules in "settings"
 - Check victory conditions
 - double-click on a unit in the status tab should show the map tab and zoom on the unit.

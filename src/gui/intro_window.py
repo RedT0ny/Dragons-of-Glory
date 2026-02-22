@@ -4,8 +4,10 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton,
 from PySide6.QtGui import QPixmap, QFont, QAction, QMovie
 from PySide6.QtCore import Qt, Signal
 from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
+from src.content.audio_manager import AudioManager
 from src.gui.new_game_dialog import NewGameDialog
 from src.gui.side_selection_dialog import SideSelectionDialog
+from src.gui.volume_dialog import Ui_volumeDialog
 
 
 class IntroWindow(QMainWindow):
@@ -148,7 +150,48 @@ class IntroWindow(QMainWindow):
                 self.ready_to_start.emit(spec, player_config)
 
     def on_settings(self):
-        pass
+        dialog = QDialog(self)
+        ui = Ui_volumeDialog()
+        ui.setupUi(dialog)
+
+        audio_manager = AudioManager.from_app()
+        if not audio_manager:
+            dialog.exec()
+            return
+
+        initial_music_enabled = audio_manager.is_music_enabled()
+        initial_sfx_enabled = audio_manager.is_sfx_enabled()
+        initial_music_volume = audio_manager.get_music_volume_percent()
+        initial_sfx_volume = audio_manager.get_sfx_volume_percent()
+
+        ui.musicVolCbx.setChecked(initial_music_enabled)
+        ui.sndVolCbx.setChecked(initial_sfx_enabled)
+        ui.musicVolume.setValue(initial_music_volume)
+        ui.soundVolume.setValue(initial_sfx_volume)
+        ui.musicVolume.setEnabled(initial_music_enabled)
+        ui.soundVolume.setEnabled(initial_sfx_enabled)
+
+        def _on_music_toggle(checked):
+            ui.musicVolume.setEnabled(checked)
+            audio_manager.set_music_enabled(checked)
+
+        def _on_sfx_toggle(checked):
+            ui.soundVolume.setEnabled(checked)
+            audio_manager.set_sfx_enabled(checked)
+
+        ui.musicVolCbx.toggled.connect(_on_music_toggle)
+        ui.sndVolCbx.toggled.connect(_on_sfx_toggle)
+        ui.musicVolume.valueChanged.connect(audio_manager.set_music_volume_percent)
+        ui.soundVolume.valueChanged.connect(audio_manager.set_sfx_volume_percent)
+
+        def _restore_initial_audio():
+            audio_manager.set_music_volume_percent(initial_music_volume)
+            audio_manager.set_sfx_volume_percent(initial_sfx_volume)
+            audio_manager.set_music_enabled(initial_music_enabled)
+            audio_manager.set_sfx_enabled(initial_sfx_enabled)
+
+        dialog.rejected.connect(_restore_initial_audio)
+        dialog.exec()
 
     def on_quit(self):
         self.close()
