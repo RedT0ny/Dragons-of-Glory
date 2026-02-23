@@ -8,6 +8,7 @@ from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyActivationService
 from src.game.movement import MovementService
+from src.game.ai_baseline import BaselineAIPlayer
 
 
 class GameController(QObject):
@@ -40,6 +41,7 @@ class GameController(QObject):
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
+        self.ai_baseline = BaselineAIPlayer(self.game_state, self.movement_service, self.diplomacy_service)
         self._movement_undo_context = None
         self._calendar_by_turn = self._load_calendar()
         self._deferred_epoch = 0
@@ -183,6 +185,7 @@ class GameController(QObject):
         # 4. GUI updates automatically via sync_with_model()
         current_phase = self.game_state.phase
         active_player = self.game_state.active_player
+        state_before = (current_phase, active_player)
 
         is_ai = False
         if self.game_state.current_player:
@@ -190,7 +193,8 @@ class GameController(QObject):
 
         if current_phase == GamePhase.DEPLOYMENT:
             if is_ai:
-                print("AI is handling deployment...")
+                deployed = self.ai_baseline.deploy_all_ready_units(active_player)
+                print(f"AI deployment complete. Deployed: {deployed}")
                 self.game_state.advance_phase()
             else:
                 # Open Replacements Dialog adapted for Deployment
@@ -206,8 +210,8 @@ class GameController(QObject):
         # Handle "Automatic" or "System" phases (Dice rolls, cards)
         if current_phase == GamePhase.REPLACEMENTS:
             if is_ai:
-                # TODO: AI logic for replacements
-                print("AI is handling replacements...")
+                deployed = self.ai_baseline.deploy_all_ready_units(active_player)
+                print(f"AI replacements complete. Deployed: {deployed}")
                 self.game_state.advance_phase()
             else:
                 # Human Player
@@ -265,6 +269,19 @@ class GameController(QObject):
             print(f"Step 3: Activation - {active_player}")
             if not self.game_state.has_neutral_countries():
                 print("No neutral countries remain. Skipping Activation phase.")
+                self.game_state.advance_phase()
+                self.view.sync_with_model()
+                self._refresh_info_panel()
+                self._refresh_turn_panel()
+                self.connect_map_view_signals()
+                self.check_active_player()
+                return
+            if is_ai:
+                success, country_id = self.ai_baseline.perform_activation(active_player)
+                if success:
+                    print(f"AI activated country {country_id}.")
+                else:
+                    print("AI activation failed or skipped.")
                 self.game_state.advance_phase()
                 self.view.sync_with_model()
                 self._refresh_info_panel()
@@ -344,8 +361,9 @@ class GameController(QObject):
         elif current_phase == GamePhase.COMBAT:
             print(f"Step 6: Combat phase - {active_player}")
             if is_ai:
-                # AI performs attacks
-                self.game_state.advance_phase()
+                fought = self.ai_baseline.execute_best_combat(active_player)
+                if not fought:
+                    self.game_state.advance_phase()
             else:
                 # Wait for human to resolve combat and click "End Phase"
                 pass
@@ -360,6 +378,12 @@ class GameController(QObject):
 
         # If the new phase is AI controlled or automatic, keep the timer running/trigger next step
         self.check_active_player()
+
+        # If AI/automatic logic changed state to a human interactive phase,
+        # process one more tick so required dialogs are opened immediately.
+        state_after = (self.game_state.phase, self.game_state.active_player)
+        if state_after != state_before and not self.game_state.phase_manager.should_auto_advance():
+            self._schedule_deferred(self.process_game_turn)
 
     def _announce_victory_if_needed(self):
         if not self.game_state.game_over or self._victory_announced:
@@ -501,8 +525,7 @@ class GameController(QObject):
         self._schedule_deferred(self.process_game_turn)
 
     def execute_simple_ai_logic(self, side):
-        # TODO: logic to call self.game_state relevant methods (move, attack...)
-        return False # Return True if more moves are possible
+        return self.ai_baseline.execute_best_movement(side)
 
     def on_unit_selection_changed(self, selected_units):
         """Called when user changes selection in the Unit Table."""
