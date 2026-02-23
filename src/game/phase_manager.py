@@ -31,6 +31,9 @@ class PhaseManager:
         The State Machine: Determines the next phase based on current state.
         This ensures the strict order of the Battle Turn.
         """
+        if getattr(self.game_state, "game_over", False):
+            return
+
         if self.game_state.phase == GamePhase.DEPLOYMENT:
             # If currently the non-initiative player, switch to initiative player
             # If currently the initiative player, deployment is done AND it counts as their Replacements.
@@ -106,8 +109,13 @@ class PhaseManager:
                 # End of Second Player's turn. Turn over (Step 8).
                 self.next_turn()
 
+        self.game_state.evaluate_victory_conditions()
+
     def next_turn(self):
         """Advances the game to the next turn (Step 8)."""
+        if getattr(self.game_state, "game_over", False):
+            return
+
         self.game_state.turn += 1
         self.game_state.phase = GamePhase.REPLACEMENTS
         # Change active_player to the one that lost initiative roll, so they go first in replacements
@@ -125,3 +133,4 @@ class PhaseManager:
 
         # Check events
         self.game_state.check_events()
+        self.game_state.evaluate_victory_conditions()

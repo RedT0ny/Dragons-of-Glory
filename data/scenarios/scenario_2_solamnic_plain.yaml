@@ -97,7 +97,19 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Control Southlund, Lemish, Palanthas, Solanthus and Vingaard by end of turn 25."
+        major:
+          all:
+            - type: ally_country
+              country: southlund
+            - type: ally_country
+              country: lemish
+            - type: ally_country
+              country: palanthas
+            - type: ally_country
+              country: solanthus
+            - type: ally_country
+              country: vingaard
+          by_turn: 25
 
     whitestone:
       deployment_area: country_based
@@ -119,7 +131,23 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Prevent HL from controlling Caergoth, Lemish, Palanthas, Solanthus and Vingaard."
+        major:
+          all:
+            - type: prevent_country_control
+              country: caergoth
+              enemy: highlord
+            - type: prevent_country_control
+              country: lemish
+              enemy: highlord
+            - type: prevent_country_control
+              country: palanthas
+              enemy: highlord
+            - type: prevent_country_control
+              country: solanthus
+              enemy: highlord
+            - type: prevent_country_control
+              country: vingaard
+              enemy: highlord
 
   notes: >
     Whitestone armies must be deployed in their home countries.

@@ -46,7 +46,9 @@ scenario:
         dragon_orb: 1
 
       victory_conditions:
-        major: "Prevent Whitestone from conquering Neraka"
+        major:
+          type: prevent_location_captured
+          location: neraka
 
     whitestone:
       # Example of specific deployment region (subset of countries)
@@ -76,7 +78,10 @@ scenario:
         dragonlance: 2
 
       victory_conditions:
-        major: "Conquer Neraka by turn 30"
+        major:
+          type: capture_location
+          location: neraka
+          by_turn: 30
 
   notes: >
     Any additional special rules or setup instructions.

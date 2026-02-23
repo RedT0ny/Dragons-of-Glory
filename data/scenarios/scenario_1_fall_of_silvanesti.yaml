@@ -81,8 +81,14 @@ scenario:
       assets: null
 
       victory_conditions:
-        major: "Capture Silvanost by turn 8"
-        minor: "Capture Silvanost by turn 9"
+        major:
+          type: capture_location
+          location: silvanost
+          by_turn: 8
+        minor:
+          type: capture_location
+          location: silvanost
+          by_turn: 9
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
@@ -95,7 +101,9 @@ scenario:
         dragon_orb: 1
 
       victory_conditions:
-        major: "Prevent Silvanost from being captured"
+        major:
+          type: prevent_location_captured
+          location: silvanost
 
   notes: >
     Silvanesti Leader (Lorac) starts with a dragon orb.

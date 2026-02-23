@@ -78,8 +78,18 @@ scenario:
       #assets: ["midnight"]
 
       victory_conditions:
-        major: "Conquer Qualinesti and conquer or ally Thorbardin"
-        minor: "Conquer Qualinesti"
+        major:
+          any:
+            - all:
+                - type: conquer_country
+                  country: qualinesti
+                - type: conquer_country
+                  country: thorbardin
+            - type: ally_country
+              country: thorbardin
+        minor:
+          type: conquer_country
+          country: qualinesti
 
     whitestone:
       # Example of specific deployment region (subset of countries)
@@ -95,8 +105,15 @@ scenario:
         blue_crystal_staff: 1
 
       victory_conditions:
-        major: "Prevent Qualinesti from being conquered and ally Thorbardin"
-        minor: "Prevent Qualinesti from being conquered"
+        major:
+          all:
+            - type: prevent_country_conquered
+              country: qualinesti
+            - type: ally_country
+              country: thorbardin
+        minor:
+          type: prevent_country_conquered
+          country: qualinesti
 
   notes: >
     Any additional special rules or setup instructions.

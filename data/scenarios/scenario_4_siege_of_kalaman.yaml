@@ -81,7 +81,10 @@ scenario:
       explicit_units: ["ariakas", "dracart"]
 
       victory_conditions:
-        major: "Capture Kalaman by turn 30"
+        major:
+          type: capture_location
+          location: kalaman
+          by_turn: 30
 
     whitestone:
       deployment_area:
@@ -104,7 +107,9 @@ scenario:
       explicit_units: ["fizban", "laurana"]
 
       victory_conditions:
-        major: "Prevent Kalaman from being captured"
+        major:
+          type: prevent_location_captured
+          location: kalaman
 
   notes: >
     Any additional special rules or setup instructions.

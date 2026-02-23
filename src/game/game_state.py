@@ -20,6 +20,7 @@ from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
 from src.game.movement import evaluate_unit_move, effective_movement_points
 from src.game.phase_manager import PhaseManager
+from src.game.victory import VictoryConditionEvaluator
 
 
 class GameState:
@@ -74,6 +75,11 @@ class GameState:
         self.tag_knight_countries = "knight_countries"
         self.tower_country_id = "tower"
         self._movement_undo_stack = []
+        self.victory_evaluator = None
+        self.game_over = False
+        self.winner = None
+        self.victory_reason = ""
+        self.victory_points = {HL: 0, WS: 0}
 
     @property
     def current_player(self):
@@ -203,6 +209,22 @@ class GameState:
         """
         builder = factory.ScenarioBuilder()
         builder.build(self, scenario_spec)
+        self.victory_evaluator = VictoryConditionEvaluator(self)
+        self.game_over = False
+        self.winner = None
+        self.victory_reason = ""
+        self.victory_points = {HL: 0, WS: 0}
+
+    def evaluate_victory_conditions(self):
+        if not self.victory_evaluator:
+            return None
+        status = self.victory_evaluator.evaluate()
+        self.victory_points = dict(status.minor_points)
+        if status.game_over and not self.game_over:
+            self.game_over = True
+            self.winner = status.winner
+            self.victory_reason = status.reason
+        return status
 
     def _find_scenario_spec_by_id(self, scenario_id: str):
         scenarios_dir = Path(SCENARIOS_DIR)

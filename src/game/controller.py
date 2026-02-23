@@ -46,6 +46,7 @@ class GameController(QObject):
         self._end_phase_transition_pending = False
         self._last_end_phase_request_at = 0.0
         self._deployment_session_unit_ids = set()
+        self._victory_announced = False
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch
@@ -164,6 +165,11 @@ class GameController(QObject):
         Central loop for processing the game flow.
         Handles all GamePhases
         """
+        if self.game_state.game_over:
+            self._announce_victory_if_needed()
+            self.ai_timer.stop()
+            return
+
         # A queued human "End Phase" request is consumed by this processing tick.
         self._end_phase_transition_pending = False
 
@@ -347,12 +353,28 @@ class GameController(QObject):
         self.view.sync_with_model()
         self._refresh_info_panel()
         self._refresh_turn_panel()
+        self._announce_victory_if_needed()
         
         # Connect map view signals if not already connected
         self.connect_map_view_signals()
 
         # If the new phase is AI controlled or automatic, keep the timer running/trigger next step
         self.check_active_player()
+
+    def _announce_victory_if_needed(self):
+        if not self.game_state.game_over or self._victory_announced:
+            return
+        self._victory_announced = True
+        winner = (self.game_state.winner or "draw").title()
+        reason = self.game_state.victory_reason or "victory_conditions"
+        points = getattr(self.game_state, "victory_points", {})
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self.view.window(),
+            "Game Over",
+            f"Winner: {winner}\nReason: {reason}\n"
+            f"Highlord points: {points.get(HL, 0)}\nWhitestone points: {points.get(WS, 0)}",
+        )
 
     def connect_map_view_signals(self):
         """Connect signals from map view to controller."""
