@@ -99,15 +99,15 @@ scenario:
       victory_conditions:
         major:
           all:
-            - type: ally_country
+            - type: conquer_country
               country: southlund
-            - type: ally_country
+            - type: conquer_country
               country: lemish
-            - type: ally_country
+            - type: conquer_country
               country: palanthas
-            - type: ally_country
+            - type: conquer_country
               country: solanthus
-            - type: ally_country
+            - type: conquer_country
               country: vingaard
           by_turn: 25
 
@@ -133,21 +133,16 @@ scenario:
       victory_conditions:
         major:
           all:
-            - type: prevent_country_control
+            - type: prevent_country_conquered
               country: caergoth
-              enemy: highlord
-            - type: prevent_country_control
+            - type: prevent_country_conquered
               country: lemish
-              enemy: highlord
-            - type: prevent_country_control
+            - type: prevent_country_conquered
               country: palanthas
-              enemy: highlord
-            - type: prevent_country_control
+            - type: prevent_country_conquered
               country: solanthus
-              enemy: highlord
-            - type: prevent_country_control
+            - type: prevent_country_conquered
               country: vingaard
-              enemy: highlord
 
   notes: >
     Whitestone armies must be deployed in their home countries.

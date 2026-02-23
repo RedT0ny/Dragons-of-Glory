@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
                                QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
 from src.content.config import SCENARIOS_DIR, IMAGES_DIR
 from src.content.loader import load_scenario_yaml
+from src.content.text_formatter import TextFormatter
 from src.gui.notes_dialog import NotesDialog
 import os
 
@@ -245,12 +246,14 @@ class NewGameDialog(QDialog):
     Handles logic for loading and displaying scenario information.
     """
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, translator=None):
         super().__init__(parent)
         self.ui = Ui_newGameDialog()
         self.ui.setupUi(self)
         
         self._current_scenario_spec = None
+        self.translator = translator or getattr(parent, "translator", None)
+        self.text_formatter = TextFormatter(self.translator) if self.translator else None
         
         # Connect signals
         self.ui.scListView.selectionModel().selectionChanged.connect(self._on_scenario_selected)
@@ -288,7 +291,11 @@ class NewGameDialog(QDialog):
     def _display_scenario_details(self, spec):
         """Display scenario details in the UI from the ScenarioSpec."""
         # Title (id)
-        self.ui.scTitle.setText(spec.id)
+        if self.translator:
+            translated_title = self.translator.get_text("scenarios", spec.id)
+            self.ui.scTitle.setText(translated_title)
+        else:
+            self.ui.scTitle.setText(spec.id)
         # Description
         self.ui.scDescription.setPlainText(spec.description)
 
@@ -327,20 +334,13 @@ class NewGameDialog(QDialog):
         vc = spec.victory_conditions
         hl_vc = vc.get("highlord", {})
         ws_vc = vc.get("whitestone", {})
-        
-        hl_text = ""
-        if "major" in hl_vc:
-            hl_text += f"Major: {hl_vc['major']}\n"
-        if "marginal" in hl_vc:
-            hl_text += f"Marginal: {hl_vc['marginal']}"
-        self.ui.hlVictory.setPlainText(hl_text.strip())
-        
-        ws_text = ""
-        if "major" in ws_vc:
-            ws_text += f"Major: {ws_vc['major']}\n"
-        if "marginal" in ws_vc:
-            ws_text += f"Marginal: {ws_vc['marginal']}"
-        self.ui.wsVictory.setPlainText(ws_text.strip())
+
+        if self.text_formatter:
+            self.ui.hlVictory.setPlainText(self.text_formatter.format_victory_conditions(hl_vc))
+            self.ui.wsVictory.setPlainText(self.text_formatter.format_victory_conditions(ws_vc))
+        else:
+            self.ui.hlVictory.setPlainText(str(hl_vc))
+            self.ui.wsVictory.setPlainText(str(ws_vc))
     
     def _clear_details(self):
         """Clear all detail fields."""

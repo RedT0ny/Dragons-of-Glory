@@ -7,7 +7,6 @@ Design overview:
 TODO:
 
 - Add Dragon #170's Advanced Rules in "settings"
-- Check victory conditions
 - double-click on a unit in the status tab should show the map tab and zoom on the unit.
 - Implement AI player
 - Review country colors and unit icons to make them more distinguishable.

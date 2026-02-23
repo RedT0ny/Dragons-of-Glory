@@ -18,15 +18,15 @@ countries:
   blodehelm:
     name: "Blodehelm"
     adjective: "Blodehelm"
-  southlund:
-    name: "Southlund"
-    adjective: "Southlund"
   daltigoth:
     name: "Daltigoth"
     adjective: "Daltigothian"
   dargaard:
     name: "Dargaard"
     adjective: "Dargaard"
+  dtemple:
+    name: "Dark Temple"
+    adjective: "Dark Temple"
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
@@ -39,15 +39,15 @@ countries:
   coastlund:
     name: "Coastlund"
     adjective: "Coastlund"
+  hinterlund:
+    name: "Hinterlund"
+    adjective: "Hinterlund"
   hylo:
     name: "Hylo"
     adjective: "Hylo"
   icereach:
     name: "Icereach"
     adjective: "Icereach"
-  nightlund:
-    name: "Nightlund"
-    adjective: "Nightlund"
   kaolyn:
     name: "Kaolyn"
     adjective: "Kaolyn"
@@ -66,9 +66,6 @@ countries:
   lemish:
     name: "Lemish"
     adjective: "Lemish"
-  hinterlund:
-    name: "Hinterlund"
-    adjective: "Hinterlund"
   maelstrom:
     name: "Maelstrom"
     adjective: "Maelstrom"
@@ -78,6 +75,9 @@ countries:
   nergoth:
     name: "N. Ergoth"
     adjective: "N. Ergothian"
+  nightlund:
+    name: "Nightlund"
+    adjective: "Nightlund"
   nordmaar:
     name: "Nordmaar"
     adjective: "Nordmaar"
@@ -99,6 +99,9 @@ countries:
   solanthus:
     name: "Solanthus"
     adjective: "Solanthus"
+  southlund:
+    name: "Southlund"
+    adjective: "Southlund"
   taman:
     name: "Taman Busuk"
     adjective: "Taman Busuk"
@@ -254,6 +257,32 @@ ui:
   neutral: "Neutral"
   whitestone: "Whitestone"
   highlord: "Highlord"
+victory:
+  labels:
+    major: "Major"
+    minor: "Minor"
+    points_to_win: "Points to win"
+    points: "points"
+    by_turn: "by turn {turn}"
+    country_filter: " from {country}"
+  operators:
+    all: "and"
+    any: "or"
+  unit_types:
+    units: "units"
+    fleets: "fleets"
+    leaders: "leaders"
+  types:
+    conquer_country: "Conquer {country}"
+    capture_location: "Capture {location}"
+    prevent_country_conquered: "Prevent {country} from being conquered"
+    prevent_location_captured: "Prevent {location} from being captured"
+    ally_country: "Ally {country}"
+    control_n_countries: "Control {count} countries"
+    prevent_country_control: "Prevent enemy control of {country}"
+    destroy_unit_score: "Destroy enemy {unit_types}{country_part} for at least {min_points} points"
+    survive_unit_score: "Survive with friendly {unit_types}{country_part} for at least {min_points} points"
+    escape_unit_score: "Escape to {hexes} with friendly {unit_types}{country_part} for at least {min_points} points"
 units:
   log_format_generic: "{ordinal} {land} {race} {type}"
   log_format_named: "{ordinal} {name}"

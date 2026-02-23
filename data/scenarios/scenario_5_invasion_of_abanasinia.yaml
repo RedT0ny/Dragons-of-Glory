@@ -79,14 +79,14 @@ scenario:
 
       victory_conditions:
         major:
-          any:
-            - all:
-                - type: conquer_country
-                  country: qualinesti
-                - type: conquer_country
-                  country: thorbardin
-            - type: ally_country
-              country: thorbardin
+          all:
+            - type: conquer_country
+              country: qualinesti
+            - any:
+              - type: conquer_country
+                country: thorbardin
+              - type: ally_country
+                country: thorbardin
         minor:
           type: conquer_country
           country: qualinesti

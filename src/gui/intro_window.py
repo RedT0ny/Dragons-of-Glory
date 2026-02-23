@@ -131,7 +131,7 @@ class IntroWindow(QMainWindow):
 
     def on_new_game(self):
         """Opens the Scenario Selection dialog."""
-        sc_dialog = NewGameDialog(self)
+        sc_dialog = NewGameDialog(self, translator=self.translator)
 
         if sc_dialog.exec():
             spec = sc_dialog.get_selected_scenario_spec()
