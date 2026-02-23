@@ -55,8 +55,16 @@ scenario:
       explicit_units: ["topus"]
 
       victory_conditions:
-        major: "Destroy 50% Silvanesti fleet"
-        minor: "Destroy 75% Silvanesti fleet"
+        major:
+          type: destroy_unit_score
+          country: silvanesti
+          unit_types: fleets
+          min_points: 6
+        minor:
+          type: destroy_unit_score
+          country: silvanesti
+          unit_types: fleets
+          min_points: 4
 
     whitestone:
       # Example of specific deployment region (subset of countries)
@@ -73,8 +81,26 @@ scenario:
       explicit_units: ["fizban"]
 
       victory_conditions:
-        major: "Escape with 75% Silvanesti fleet."
-        minor: "Escape with 50% Silvanesti fleet."
+        major:
+          type: escape_unit_score
+          country: silvanesti
+          unit_types: fleets
+          hexes:
+            - [44, 0]
+            - [44, 1]
+            - [44, 2]
+            - [44, 3]
+          min_points: 6
+        minor:
+          type: escape_unit_score
+          country: silvanesti
+          unit_types: fleets
+          hexes:
+            - [44, 0]
+            - [44, 1]
+            - [44, 2]
+            - [44, 3]
+          min_points: 4
 
   notes: >
     The scenario lasts until all Silvanesti ships have exited the Western edge of the scenario area, or have been sunk.

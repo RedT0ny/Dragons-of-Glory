@@ -35,6 +35,7 @@ class Unit:
 
         self.position: Tuple[Optional[int], Optional[int]] = (None, None)
         self.equipment: List[Any] = [] # List of Asset objects
+        self.escaped = False
 
         # Turn-based flags
         self.is_transported = False
@@ -204,7 +205,7 @@ class Unit:
 
     @property
     def is_on_map(self) -> bool:
-        return self.status in UnitState.on_map_states()
+        return (not self.escaped) and self.status in UnitState.on_map_states()
 
     def is_leader(self) -> bool:
         return False # Base unit is not a leader
@@ -273,6 +274,7 @@ class Unit:
             "ordinal": self.ordinal,
             "position": list(self.position),
             "status": self.status.name,
+            "escaped": bool(getattr(self, "escaped", False)),
             "is_transported": self.is_transported,
             "carried_by_citadel_this_turn": self.carried_by_citadel_this_turn,
             # Transport host serialized as tuple (id, ordinal) if present
@@ -289,6 +291,7 @@ class Unit:
         if status_str and hasattr(UnitState, status_str):
             self.status = UnitState[status_str]
 
+        self.escaped = bool(state_data.get("escaped", False))
         self.is_transported = state_data.get("is_transported", False)
         self.carried_by_citadel_this_turn = state_data.get("carried_by_citadel_this_turn", False)
         # transport_host will be resolved post-load by GameState if needed

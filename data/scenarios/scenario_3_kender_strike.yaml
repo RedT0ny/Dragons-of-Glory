@@ -77,7 +77,9 @@ scenario:
       explicit_units: ["toede"]
 
       victory_conditions:
-        minor: "Capture Kenderhome"
+        minor:
+          type: capture_location
+          location: kenderhome
 
     whitestone:
       deployment_area: ["hylo"]
@@ -90,7 +92,10 @@ scenario:
       explicit_units: ["kronin"]
 
       victory_conditions:
-        minor: "Destroy more than 50% of the highlord army"
+        minor:
+          type: destroy_unit_score
+          unit_types: units
+          min_points: 6
 
   notes: >
     No Strategic Event counters or Activations are used in this scenario. 

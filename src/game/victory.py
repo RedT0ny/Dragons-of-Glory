@@ -1,109 +1,14 @@
-import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 from src.content.constants import HL, WS
+from src.content.specs import UnitState, UnitType
+from src.game.map import Hex
 
 
 def _slugify(s: str) -> str:
+    import re
     return re.sub(r"[^a-z0-9]+", "_", str(s).lower()).strip("_")
-
-
-def _split_country_list(raw: str) -> List[str]:
-    text = raw.replace(".", " ")
-    text = re.sub(r"\band\b", ",", text, flags=re.IGNORECASE)
-    parts = [p.strip() for p in text.split(",")]
-    return [_slugify(p) for p in parts if p.strip()]
-
-
-def _extract_deadline(text: str, default_turn: int):
-    t = str(text).strip()
-    match = re.search(r"\bby(?:\s+end\s+of)?\s+turn\s+(\d+)\b", t, flags=re.IGNORECASE)
-    if match:
-        deadline = int(match.group(1))
-        t = (t[: match.start()] + t[match.end() :]).strip()
-        t = re.sub(r"\s+", " ", t)
-        return t, deadline
-    return t, default_turn
-
-
-def _parse_legacy_atom(atom: str, side: str, default_turn: int) -> Dict[str, Any]:
-    raw_atom = atom.strip().rstrip(".")
-    atom_text, deadline = _extract_deadline(raw_atom, default_turn)
-    low = atom_text.lower().strip()
-
-    m = re.match(r"^conquer\s+(.+)$", low)
-    if m:
-        return {"type": "conquer_country", "country": _slugify(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^capture\s+(.+)$", low)
-    if m:
-        return {"type": "capture_location", "location": _slugify(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^prevent\s+(.+)\s+from\s+being\s+conquered$", low)
-    if m:
-        return {"type": "prevent_country_conquered", "country": _slugify(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^prevent\s+(.+)\s+from\s+being\s+captured$", low)
-    if m:
-        return {"type": "prevent_location_captured", "location": _slugify(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^ally\s+(.+)$", low)
-    if m:
-        return {"type": "ally_country", "country": _slugify(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^control\s+(\d+)\s+countries$", low)
-    if m:
-        return {"type": "control_n_countries", "count": int(m.group(1)), "by_turn": deadline}
-
-    m = re.match(r"^control\s+(.+)$", low)
-    if m:
-        countries = _split_country_list(m.group(1))
-        return {
-            "all": [{"type": "ally_country", "country": c, "by_turn": deadline} for c in countries]
-        }
-
-    m = re.match(r"^prevent\s+(hl|highlord|ws|whitestone)\s+from\s+controlling\s+(.+)$", low)
-    if m:
-        enemy_key = m.group(1)
-        enemy = HL if enemy_key in ("hl", "highlord") else WS
-        countries = _split_country_list(m.group(2))
-        return {
-            "all": [
-                {
-                    "type": "prevent_country_control",
-                    "country": c,
-                    "enemy": enemy,
-                    "by_turn": deadline,
-                }
-                for c in countries
-            ]
-        }
-
-    return {"type": "unknown", "raw": raw_atom, "by_turn": deadline}
-
-
-def parse_legacy_expression(text: str, side: str, default_turn: int) -> Dict[str, Any]:
-    expr_text, deadline = _extract_deadline(text, default_turn)
-    or_terms = [t.strip() for t in re.split(r"\bor\b", expr_text, flags=re.IGNORECASE) if t.strip()]
-    if len(or_terms) > 1:
-        return {
-            "any": [parse_legacy_expression(t, side, deadline) for t in or_terms],
-            "by_turn": deadline,
-        }
-
-    direct = _parse_legacy_atom(expr_text, side, deadline)
-    if direct.get("type") != "unknown":
-        return direct
-
-    and_terms = [t.strip() for t in re.split(r"\band\b", expr_text, flags=re.IGNORECASE) if t.strip()]
-    if len(and_terms) > 1:
-        return {
-            "all": [_parse_legacy_atom(t, side, deadline) for t in and_terms],
-            "by_turn": deadline,
-        }
-
-    return direct
 
 
 @dataclass
@@ -117,12 +22,13 @@ class VictoryStatus:
 
 
 class VictoryConditionEvaluator:
+    """Structured victory evaluator (no legacy string parsing)."""
+
     def __init__(self, game_state):
         self.game_state = game_state
-        self._achieved = {HL: set(), WS: set()}
         self._normalized = {
-            HL: self._normalize_side_victory(self._side_victory_raw(HL), HL),
-            WS: self._normalize_side_victory(self._side_victory_raw(WS), WS),
+            HL: self._normalize_side_victory(self._side_victory_raw(HL)),
+            WS: self._normalize_side_victory(self._side_victory_raw(WS)),
         }
 
     def evaluate(self) -> VictoryStatus:
@@ -166,23 +72,22 @@ class VictoryConditionEvaluator:
         vc = getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}
         return vc.get(side, {})
 
-    def _normalize_side_victory(self, raw_side: Any, side: str) -> Dict[str, Any]:
-        end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 30) or 30)
+    def _normalize_side_victory(self, raw_side: Any) -> Dict[str, Any]:
         if not isinstance(raw_side, dict):
             return {}
 
         normalized = {}
         major = raw_side.get("major")
         if major is not None:
-            normalized["major"] = self._normalize_node(major, side, end_turn)
+            normalized["major"] = self._normalize_node(major)
 
         minor = raw_side.get("minor")
         if minor is None and "marginal" in raw_side:
             minor = raw_side.get("marginal")
-        normalized["minor"] = self._normalize_minor(minor, side, end_turn)
+        normalized["minor"] = self._normalize_minor(minor)
         return normalized
 
-    def _normalize_minor(self, minor_raw: Any, side: str, end_turn: int) -> Dict[str, Any]:
+    def _normalize_minor(self, minor_raw: Any) -> Dict[str, Any]:
         if minor_raw is None:
             return {"points_to_win": 1, "conditions": []}
 
@@ -192,34 +97,34 @@ class VictoryConditionEvaluator:
             for item in minor_raw.get("conditions", []) or []:
                 if isinstance(item, dict) and "when" in item:
                     points = int(item.get("points", 1) or 1)
-                    node = self._normalize_node(item.get("when"), side, end_turn)
+                    node = self._normalize_node(item.get("when"))
                 else:
                     points = 1
-                    node = self._normalize_node(item, side, end_turn)
+                    node = self._normalize_node(item)
                 conditions.append({"points": points, "node": node})
             return {"points_to_win": points_to_win, "conditions": conditions}
 
         if isinstance(minor_raw, list):
-            conditions = [{"points": 1, "node": self._normalize_node(item, side, end_turn)} for item in minor_raw]
+            conditions = [{"points": 1, "node": self._normalize_node(item)} for item in minor_raw]
             return {"points_to_win": max(1, len(conditions)), "conditions": conditions}
 
-        node = self._normalize_node(minor_raw, side, end_turn)
+        node = self._normalize_node(minor_raw)
         return {"points_to_win": 1, "conditions": [{"points": 1, "node": node}]}
 
-    def _normalize_node(self, node: Any, side: str, end_turn: int) -> Dict[str, Any]:
-        if isinstance(node, str):
-            return parse_legacy_expression(node, side, end_turn)
+    def _normalize_node(self, node: Any) -> Dict[str, Any]:
+        end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 30) or 30)
+
         if isinstance(node, dict):
             if "all" in node:
                 out = {
-                    "all": [self._normalize_node(child, side, end_turn) for child in node.get("all", []) or []]
+                    "all": [self._normalize_node(child) for child in node.get("all", []) or []]
                 }
                 if "by_turn" in node:
                     out["by_turn"] = int(node["by_turn"])
                 return out
             if "any" in node:
                 out = {
-                    "any": [self._normalize_node(child, side, end_turn) for child in node.get("any", []) or []]
+                    "any": [self._normalize_node(child) for child in node.get("any", []) or []]
                 }
                 if "by_turn" in node:
                     out["by_turn"] = int(node["by_turn"])
@@ -228,6 +133,8 @@ class VictoryConditionEvaluator:
             if "by_turn" not in out:
                 out["by_turn"] = end_turn
             return out
+
+        # Legacy strings were intentionally removed.
         return {"type": "unknown", "raw": str(node), "by_turn": end_turn}
 
     def _compute_minor_points(self, side: str, turn: int) -> int:
@@ -241,44 +148,40 @@ class VictoryConditionEvaluator:
                 total += points
         return total
 
-    def _node_key(self, node: Dict[str, Any]) -> str:
-        if "all" in node:
-            return "all(" + ",".join(self._node_key(c) for c in node.get("all", [])) + f")@{node.get('by_turn','')}"
-        if "any" in node:
-            return "any(" + ",".join(self._node_key(c) for c in node.get("any", [])) + f")@{node.get('by_turn','')}"
-        parts = [str(node.get("type", "unknown"))]
-        for k in sorted(k for k in node.keys() if k != "type"):
-            parts.append(f"{k}={node[k]}")
-        return "|".join(parts)
-
     def _is_node_satisfied(self, node: Dict[str, Any], side: str, turn: int) -> bool:
-        key = self._node_key(node)
-        if key in self._achieved[side]:
-            return True
-
         deadline = int(node.get("by_turn", getattr(self.game_state.scenario_spec, "end_turn", 30)))
+
+        # Generic cutoff: after deadline it cannot be newly satisfied.
         if turn > deadline:
             return False
 
         if "all" in node:
-            ok = all(self._is_node_satisfied(child, side, turn) for child in node.get("all", []))
-            if ok:
-                self._achieved[side].add(key)
-            return ok
+            return all(self._is_node_satisfied(child, side, turn) for child in node.get("all", []))
 
         if "any" in node:
-            ok = any(self._is_node_satisfied(child, side, turn) for child in node.get("any", []))
-            if ok:
-                self._achieved[side].add(key)
-            return ok
+            return any(self._is_node_satisfied(child, side, turn) for child in node.get("any", []))
 
-        ok = self._evaluate_leaf(node, side)
-        if ok:
-            self._achieved[side].add(key)
-        return ok
+        node_type = str(node.get("type", "unknown"))
+
+        # Deadline-checkpoint conditions must only be decided at/after deadline.
+        if self._requires_deadline_checkpoint(node_type) and turn < deadline:
+            return False
+
+        return self._evaluate_leaf(node, side)
+
+    @staticmethod
+    def _requires_deadline_checkpoint(node_type: str) -> bool:
+        return node_type in {
+            "prevent_country_conquered",
+            "prevent_location_captured",
+            "prevent_country_control",
+            "survive_unit_score",
+            "escape_unit_score",
+        }
 
     def _evaluate_leaf(self, node: Dict[str, Any], side: str) -> bool:
         node_type = str(node.get("type", "unknown"))
+
         if node_type == "conquer_country":
             country = self.game_state.countries.get(_slugify(node.get("country", "")))
             return bool(country and country.conquered)
@@ -314,17 +217,179 @@ class VictoryConditionEvaluator:
             enemy = node.get("enemy") or self.game_state.get_enemy_allegiance(side)
             return bool(country and country.allegiance != enemy)
 
-        if node_type == "unknown":
-            return False
+        if node_type == "destroy_unit_score":
+            return self._score_units(mode="destroy", side=side, node=node) >= int(node.get("min_points", 0) or 0)
+
+        if node_type == "survive_unit_score":
+            return self._score_units(mode="survive", side=side, node=node) >= int(node.get("min_points", 0) or 0)
+
+        if node_type == "escape_unit_score":
+            return self._score_units(mode="escape", side=side, node=node) >= int(node.get("min_points", 0) or 0)
 
         return False
+
+    def _score_units(self, mode: str, side: str, node: Dict[str, Any]) -> int:
+        candidates = list(self._iter_scored_units(mode, side, node))
+        score = 0
+
+        for unit in candidates:
+            status = getattr(unit, "status", None)
+            if mode == "destroy":
+                if status == UnitState.DESTROYED:
+                    score += 2
+                elif status == UnitState.DEPLETED:
+                    score += 1
+            elif mode in ("survive", "escape"):
+                if status == UnitState.ACTIVE:
+                    score += 2
+                elif status == UnitState.DEPLETED:
+                    score += 1
+
+        return score
+
+    def _iter_scored_units(self, mode: str, side: str, node: Dict[str, Any]) -> Iterable[Any]:
+        if mode == "destroy":
+            allegiance = self.game_state.get_enemy_allegiance(side)
+        else:
+            allegiance = side
+
+        unit_filter = self._normalize_unit_types(node.get("unit_types", "units"))
+        country_filter = _slugify(node.get("country", "")) if node.get("country") else None
+        for unit in self.game_state.units:
+            if getattr(unit, "allegiance", None) != allegiance:
+                continue
+            if not self._matches_country_or_dragonflight(unit, country_filter):
+                continue
+            if not self._matches_unit_types(unit, unit_filter):
+                continue
+            if mode == "escape" and not bool(getattr(unit, "escaped", False)):
+                continue
+            yield unit
+
+    @staticmethod
+    def _normalize_hexes(values: Any) -> set[Tuple[int, int]]:
+        out = set()
+        if not isinstance(values, list):
+            return out
+        for item in values:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                try:
+                    out.add((int(item[0]), int(item[1])))
+                except Exception:
+                    continue
+        return out
+
+    @staticmethod
+    def _normalize_unit_types(value: Any) -> set[str]:
+        if isinstance(value, str):
+            items = [value]
+        elif isinstance(value, list):
+            items = value
+        else:
+            items = ["units"]
+
+        normalized = set()
+        for v in items:
+            low = str(v).strip().lower()
+            if low in {"units", "unit"}:
+                normalized.add("units")
+            elif low in {"fleet", "fleets", "ship", "ships"}:
+                normalized.add("fleets")
+            elif low in {"leader", "leaders"}:
+                normalized.add("leaders")
+
+        if not normalized:
+            normalized.add("units")
+        return normalized
+
+    def _matches_unit_types(self, unit: Any, unit_filter: set[str]) -> bool:
+        if "units" in unit_filter:
+            is_army = hasattr(unit, "is_army") and unit.is_army()
+            is_wing = getattr(unit, "unit_type", None) == UnitType.WING
+            is_fleet = getattr(unit, "unit_type", None) == UnitType.FLEET
+            if is_army or is_wing or is_fleet:
+                return True
+
+        if "fleets" in unit_filter and getattr(unit, "unit_type", None) == UnitType.FLEET:
+            return True
+
+        if "leaders" in unit_filter and hasattr(unit, "is_leader") and unit.is_leader():
+            return True
+
+        return False
+
+    @staticmethod
+    def _matches_country_or_dragonflight(unit: Any, country_filter: str | None) -> bool:
+        if not country_filter:
+            return True
+        unit_country = _slugify(getattr(unit, "land", "") or "")
+        unit_df = _slugify(getattr(getattr(unit, "spec", None), "dragonflight", "") or "")
+        return country_filter in {unit_country, unit_df}
+
+    def get_escape_rules_for_side(self, side: str, turn: int | None = None) -> List[Dict[str, Any]]:
+        """
+        Returns normalized escape rules from major/minor trees for a side.
+        Used by movement flow to mark eligible units as escaped immediately.
+        """
+        current_turn = int(getattr(self.game_state, "turn", 0) if turn is None else turn)
+        collected: List[Dict[str, Any]] = []
+        side_block = self._normalized.get(side, {}) or {}
+
+        major = side_block.get("major")
+        if major:
+            self._collect_escape_rules(major, current_turn, collected)
+
+        minor = side_block.get("minor", {}) or {}
+        for item in minor.get("conditions", []) or []:
+            node = item.get("node")
+            if node:
+                self._collect_escape_rules(node, current_turn, collected)
+        return collected
+
+    def _collect_escape_rules(self, node: Dict[str, Any], turn: int, out: List[Dict[str, Any]]):
+        deadline = int(node.get("by_turn", getattr(self.game_state.scenario_spec, "end_turn", 30)))
+        if turn > deadline:
+            return
+
+        if "all" in node:
+            for child in node.get("all", []) or []:
+                self._collect_escape_rules(child, turn, out)
+            return
+
+        if "any" in node:
+            for child in node.get("any", []) or []:
+                self._collect_escape_rules(child, turn, out)
+            return
+
+        if str(node.get("type", "")) != "escape_unit_score":
+            return
+
+        out.append(
+            {
+                "country_filter": _slugify(node.get("country", "")) if node.get("country") else None,
+                "unit_filter": self._normalize_unit_types(node.get("unit_types", "units")),
+                "hexes": self._normalize_hexes(node.get("hexes") or node.get("escape_hexes") or []),
+            }
+        )
+
+    def unit_matches_escape_rule(self, unit: Any, target_offset: Tuple[int, int], rule: Dict[str, Any], side: str) -> bool:
+        if getattr(unit, "allegiance", None) != side:
+            return False
+        if bool(getattr(unit, "escaped", False)):
+            return False
+        if tuple(target_offset) not in (rule.get("hexes") or set()):
+            return False
+        if not self._matches_country_or_dragonflight(unit, rule.get("country_filter")):
+            return False
+        if not self._matches_unit_types(unit, rule.get("unit_filter") or {"units"}):
+            return False
+        return True
 
     def _is_location_controlled_by(self, location_id: str, allegiance: str) -> bool:
         if allegiance not in (HL, WS):
             return False
         if not location_id:
             return False
-        from src.game.map import Hex
 
         for country in self.game_state.countries.values():
             loc = country.locations.get(location_id)

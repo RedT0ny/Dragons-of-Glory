@@ -876,6 +876,7 @@ class GameState:
 
         # Update Unit's internal state (store as offset col, row for persistence/view)
         offset_coords = target_hex.axial_to_offset()
+        unit.escaped = False
         unit.position = offset_coords
 
         # Add to new position in spatial map
@@ -905,6 +906,44 @@ class GameState:
         ):
             self._displace_enemy_fleets_in_hex(unit, target_hex)
 
+        self._apply_escape_if_eligible(unit, offset_coords)
+
+    def _apply_escape_if_eligible(self, unit, target_offset):
+        if self.phase != GamePhase.MOVEMENT:
+            return
+        if not self.victory_evaluator:
+            return
+        side = getattr(unit, "allegiance", None)
+        if side not in (HL, WS):
+            return
+
+        rules = self.victory_evaluator.get_escape_rules_for_side(side, self.turn)
+        if not rules:
+            return
+        for rule in rules:
+            if self.victory_evaluator.unit_matches_escape_rule(unit, target_offset, rule, side):
+                self._mark_unit_escaped(unit)
+                break
+
+    def _mark_unit_escaped(self, unit):
+        self.map.remove_unit_from_spatial_map(unit)
+        unit.position = (None, None)
+        unit.escaped = True
+        unit.is_transported = False
+        unit.transport_host = None
+        if hasattr(unit, "river_hexside"):
+            unit.river_hexside = None
+
+        passengers = list(getattr(unit, "passengers", []) or [])
+        for passenger in passengers:
+            self.map.remove_unit_from_spatial_map(passenger)
+            passenger.position = (None, None)
+            passenger.escaped = True
+            passenger.is_transported = False
+            passenger.transport_host = None
+        if hasattr(unit, "passengers"):
+            unit.passengers = []
+
     def clear_movement_undo(self):
         self._movement_undo_stack.clear()
 
@@ -930,6 +969,7 @@ class GameState:
                 "transport_host": getattr(unit, "transport_host", None),
                 "river_hexside": getattr(unit, "river_hexside", None),
                 "passengers": list(getattr(unit, "passengers", [])),
+                "escaped": bool(getattr(unit, "escaped", False)),
             })
         self._movement_undo_stack.append({
             "turn": self.turn,
@@ -965,6 +1005,7 @@ class GameState:
                 unit.river_hexside = state["river_hexside"]
             if hasattr(unit, "passengers"):
                 unit.passengers = list(state["passengers"])
+            unit.escaped = bool(state.get("escaped", False))
 
         # Rebuild spatial map after restoring all unit states.
         self.map.unit_map = defaultdict(list)
