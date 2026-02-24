@@ -5,6 +5,7 @@ from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, WS
 from src.content.loader import load_data
+from src.game.combat_reporting import show_combat_result_popup
 
 
 @dataclass
@@ -1103,6 +1104,14 @@ class CombatClickHandler:
                     target_hex,
                     naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
                     dragon_duel_withdraw_decider=self._ask_dragon_duel_withdraw if not is_naval else None,
+                )
+                show_combat_result_popup(
+                    self.game_state,
+                    title="Combat Details",
+                    attackers=self.attackers,
+                    defenders=enemy_units,
+                    resolution=resolution,
+                    context="manual_combat",
                 )
                 # Mark attackers
                 for u in self.attackers:

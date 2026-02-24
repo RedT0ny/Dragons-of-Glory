@@ -5,8 +5,8 @@ from PySide6.QtGui import QPixmap, QFont, QAction, QMovie
 from PySide6.QtCore import Qt, Signal
 from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
 from src.content.audio_manager import AudioManager
+from src.gui.config_dialog import ConfigDialog
 from src.gui.new_game_dialog import NewGameDialog
-from src.gui.side_selection_dialog import SideSelectionDialog
 from src.gui.volume_dialog import Ui_volumeDialog
 
 
@@ -139,9 +139,17 @@ class IntroWindow(QMainWindow):
                 return
 
             # Chain to side selection
-            side_dialog = SideSelectionDialog(self)
+            side_dialog = ConfigDialog(self)
+            side_dialog.set_from_config(
+                {
+                    "highlord_ai": False,
+                    "whitestone_ai": False,
+                    "difficulty": "normal",
+                    "combat_details": "brief",
+                }
+            )
             if side_dialog.exec():
-                player_config = side_dialog.get_player_config()
+                player_config = side_dialog.get_config()
 
                 print(f"Starting {spec.id}...")
                 print(f"Config: {player_config}")

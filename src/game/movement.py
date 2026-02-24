@@ -6,6 +6,7 @@ from typing import List, Tuple
 from src.content.constants import HL, NEUTRAL
 from src.content.specs import GamePhase, HexsideType, LocType, UnitRace, UnitType
 from src.game.map import Hex
+from src.game.combat_reporting import show_combat_result_popup
 
 
 def effective_movement_points(unit):
@@ -344,7 +345,20 @@ class MovementService:
         try:
             live_interceptors = [u for u in interceptors if getattr(u, "is_on_map", False)]
             if live_interceptors:
-                self.game_state.resolve_combat(live_interceptors, moving_hex)
+                resolution = self.game_state.resolve_combat(live_interceptors, moving_hex)
+                defenders_after = [
+                    u for u in self.game_state.get_units_at(moving_hex)
+                    if getattr(u, "is_on_map", False)
+                    and getattr(u, "allegiance", None) != getattr(live_interceptors[0], "allegiance", None)
+                ]
+                show_combat_result_popup(
+                    self.game_state,
+                    title="Interception Details",
+                    attackers=live_interceptors,
+                    defenders=defenders_after,
+                    resolution=resolution,
+                    context="interception",
+                )
         finally:
             self.game_state.active_player = previous_active_player
 

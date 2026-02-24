@@ -72,7 +72,9 @@ class GameApp:
             game_state=self.model,
             view=self.view.map_view,
             highlord_ai=player_config.get("highlord_ai", False),
-            whitestone_ai=player_config.get("whitestone_ai", False)
+            whitestone_ai=player_config.get("whitestone_ai", False),
+            difficulty=player_config.get("difficulty", "normal"),
+            combat_details=player_config.get("combat_details", "brief"),
         )
 
         self.view.set_controller(self.controller)

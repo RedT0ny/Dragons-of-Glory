@@ -6,6 +6,7 @@ from typing import Any
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import UnitType, UnitState
 from src.game.map import Hex
+from src.game.combat_reporting import show_combat_result_popup
 
 
 class BaselineAIPlayer:
@@ -51,6 +52,63 @@ class BaselineAIPlayer:
             if result.success:
                 deployed += 1
         return deployed
+
+    # ---------- Replacements ----------
+    def process_replacements(self, side: str) -> tuple[int, int]:
+        """
+        AI replacements flow:
+        1. Conscript RESERVE pairs into READY/DESTROYED using existing game rules.
+        2. Deploy all READY units available for this side.
+        Returns: (conscriptions_applied, units_deployed)
+        """
+        conscriptions = self._apply_conscriptions(side)
+        deployed = self.deploy_all_ready_units(side)
+        return conscriptions, deployed
+
+    def _apply_conscriptions(self, side: str) -> int:
+        conscriptions = 0
+        while True:
+            reserve_units = [
+                u for u in self.game_state.units
+                if getattr(u, "allegiance", None) == side
+                and getattr(u, "status", None) == UnitState.RESERVE
+            ]
+            if len(reserve_units) < 2:
+                break
+
+            groups = defaultdict(list)
+            for unit in reserve_units:
+                key = self.game_state.get_replacement_group_key(unit)
+                groups[key].append(unit)
+
+            pair_found = False
+            for key in sorted(groups.keys(), key=lambda x: str(x)):
+                units = groups[key]
+                if len(units) < 2:
+                    continue
+                units = sorted(units, key=lambda u: self._conscription_sort_key(u), reverse=True)
+                kept_unit = units[0]
+                discarded_unit = units[1]
+                if not self.game_state.can_conscript_pair(kept_unit, discarded_unit):
+                    continue
+                self.game_state.apply_conscription(kept_unit, discarded_unit)
+                conscriptions += 1
+                pair_found = True
+                break
+
+            if not pair_found:
+                break
+        return conscriptions
+
+    @staticmethod
+    def _conscription_sort_key(unit):
+        return (
+            int(getattr(unit, "combat_rating", 0) or 0),
+            int(getattr(unit, "tactical_rating", 0) or 0),
+            int(getattr(unit, "movement", 0) or 0),
+            str(getattr(unit, "id", "")),
+            -int(getattr(unit, "ordinal", 1)),
+        )
 
     # ---------- Activation ----------
     def perform_activation(self, side: str) -> tuple[bool, str | None]:
@@ -145,7 +203,20 @@ class BaselineAIPlayer:
                 return False
             attackers = candidate["attackers"]
             target_hex = candidate["target_hex"]
+            defenders_before = [
+                u for u in self.game_state.get_units_at(target_hex)
+                if getattr(u, "is_on_map", False)
+                and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+            ]
             resolution = self.game_state.resolve_combat(attackers, target_hex)
+            show_combat_result_popup(
+                self.game_state,
+                title="Combat Details",
+                attackers=attackers,
+                defenders=defenders_before,
+                resolution=resolution,
+                context="ai_combat",
+            )
             for u in attackers:
                 u.attacked_this_turn = True
             self._resolve_ai_leader_escapes(resolution)

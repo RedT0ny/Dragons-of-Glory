@@ -1318,6 +1318,25 @@ class GameState:
             if u.allegiance not in ("neutral", None)
         }
 
+        # Leader-only defender stacks attacked by armies/wings do not resolve normal combat.
+        # Each defending leader performs leader-escape mechanics instead.
+        if self._is_leader_only_stack(defenders) and self._attack_triggers_leader_stack_escape(attackers):
+            leader_origins = {
+                u: Hex.offset_to_axial(*u.position)
+                for u in defenders
+                if hasattr(u, "is_leader") and u.is_leader() and u.position and u.position[0] is not None
+            }
+            # Force escape checks for each defending leader in the attacked leader-only stack.
+            leader_stack_has_army = {leader: True for leader in leader_origins.keys()}
+            leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
+            result = "-/-"
+            print(self._format_combat_log_entry(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": leader_escape_requests or [],
+                "advance_available": False,
+            }
+
         if self._combat_blocked_by_citadel_rule(attackers, defenders):
             result = "-/-"
             print(self._format_combat_log_entry(attackers, defenders, result))
@@ -2007,6 +2026,24 @@ class GameState:
         return bool(
             (hasattr(unit, "is_army") and unit.is_army())
             or unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING, UnitType.CITADEL)
+        )
+
+    @staticmethod
+    def _is_leader_only_stack(units):
+        live_units = [u for u in units if getattr(u, "is_on_map", False)]
+        if not live_units:
+            return False
+        return all(hasattr(u, "is_leader") and u.is_leader() for u in live_units)
+
+    @staticmethod
+    def _attack_triggers_leader_stack_escape(attackers):
+        return any(
+            (
+                (hasattr(u, "is_army") and u.is_army())
+                or getattr(u, "unit_type", None) == UnitType.WING
+            )
+            and getattr(u, "is_on_map", False)
+            for u in attackers
         )
 
     def _defenders_have_citadel(self, defenders):

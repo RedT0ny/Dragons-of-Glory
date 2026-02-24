@@ -16,6 +16,7 @@ from src.gui.info_panel import InfoPanel
 from src.gui.unit_panel import UnitTable
 from src.gui.turn_panel import TurnPanel
 from src.gui.about import Ui_aboutDialog
+from src.gui.config_dialog import ConfigDialog
 from src.gui.volume_dialog import Ui_volumeDialog
 from src.content.audio_manager import AudioManager
 
@@ -266,6 +267,11 @@ class MainWindow(QMainWindow):
 
         # --- Settings Menu ---
         settings_menu = menubar.addMenu("Se&ttings")
+
+        config_action = QAction("Game con&fig", self)
+        config_action.triggered.connect(self.on_config_clicked)
+        settings_menu.addAction(config_action)
+
         volume_action = QAction("Sound &volume", self)
         volume_action.triggered.connect(self.on_volume_clicked)
         settings_menu.addAction(volume_action)
@@ -288,6 +294,25 @@ class MainWindow(QMainWindow):
         ui = Ui_aboutDialog()
         ui.setupUi(dialog)
         dialog.exec()
+
+    def on_config_clicked(self):
+        if not self.controller:
+            return
+        current_player = getattr(self.game_state, "current_player", None)
+        if current_player and getattr(current_player, "is_ai", False):
+            QMessageBox.information(
+                self,
+                "Configuration",
+                "Player configuration can be changed only during a human player's turn.",
+            )
+            return
+
+        dialog = ConfigDialog(self)
+        dialog.set_from_config(self.controller.get_runtime_config())
+        if dialog.exec():
+            self.controller.apply_runtime_config(dialog.get_config())
+            # Re-evaluate timers/flow immediately after runtime role changes.
+            self.controller.check_active_player()
 
     def on_volume_clicked(self):
         dialog = QDialog(self)

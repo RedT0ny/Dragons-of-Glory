@@ -20,6 +20,7 @@ class AnsalonMapView(QGraphicsView):
     hex_hovered = Signal(str, int, int, str)
     unit_deployment_requested = Signal(object, object)  # unit, target_hex
     unit_movement_requested = Signal(object, object)    # unit, target_hex
+    depleted_merge_requested = Signal(object, object)   # unit1, unit2
 
     def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
@@ -167,6 +168,12 @@ class AnsalonMapView(QGraphicsView):
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""
+        current_player = getattr(self.game_state, "current_player", None)
+        if current_player is not None and getattr(current_player, "is_ai", False):
+            # Ignore map clicks while AI controls the active side.
+            super().mousePressEvent(event)
+            return
+
         # Scenario 1: Right-click Deselect
         if event.button() == Qt.RightButton:
             self.right_clicked.emit()
@@ -297,23 +304,10 @@ class AnsalonMapView(QGraphicsView):
 
         for _, units in by_group.items():
             if len(units) >= 2:
-                # Trigger Merge Dialog deferred to avoid scene clearing during event processing
-                QTimer.singleShot(0, lambda: self.show_merge_dialog(units[0], units[1]))
+                # Defer signal to avoid scene mutation during event processing.
+                u1, u2 = units[0], units[1]
+                QTimer.singleShot(0, lambda a=u1, b=u2: self.depleted_merge_requested.emit(a, b))
                 break # Handle one pair at a time
-
-    def show_merge_dialog(self, unit1, unit2):
-        from src.gui.replacements_dialog import UnitSelectionDialog
-        dlg = UnitSelectionDialog(unit1, unit2, self)
-        dlg.setWindowTitle("Reinforce Unit")
-        if dlg.exec():
-            # Selected becomes ACTIVE (Full)
-            dlg.selected_unit.status = UnitState.ACTIVE
-
-            # Discarded goes to RESERVE (Pool)
-            dlg.discarded_unit.status = UnitState.RESERVE
-            dlg.discarded_unit.position = (None, None) # Remove from map
-
-            self.sync_with_model()
 
     def highlight_deployment_targets(self, valid_coords_list, unit):
         """Highlights hexes where the 'ready' unit can be placed."""

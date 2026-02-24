@@ -12,11 +12,23 @@ from src.game.ai_baseline import BaselineAIPlayer
 
 
 class GameController(QObject):
-    def __init__(self, game_state, view, highlord_ai=False, whitestone_ai=False):
+    def __init__(
+        self,
+        game_state,
+        view,
+        highlord_ai=False,
+        whitestone_ai=False,
+        difficulty="normal",
+        combat_details="brief",
+    ):
         super().__init__()
         self.game_state = game_state
         self.view = view
         self.replacements_dialog = None
+        self.difficulty = str(difficulty).strip().lower()
+        self.combat_details = str(combat_details).strip().lower()
+        self.game_state.difficulty = self.difficulty
+        self.game_state.combat_details = self.combat_details
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -49,6 +61,27 @@ class GameController(QObject):
         self._last_end_phase_request_at = 0.0
         self._deployment_session_unit_ids = set()
         self._victory_announced = False
+
+    def get_runtime_config(self):
+        return {
+            "highlord_ai": bool(self.game_state.players.get(HL).is_ai) if HL in self.game_state.players else False,
+            "whitestone_ai": bool(self.game_state.players.get(WS).is_ai) if WS in self.game_state.players else False,
+            "difficulty": self.difficulty,
+            "combat_details": self.combat_details,
+        }
+
+    def apply_runtime_config(self, config: dict):
+        hl_ai = bool(config.get("highlord_ai", False))
+        ws_ai = bool(config.get("whitestone_ai", False))
+        self.difficulty = str(config.get("difficulty", self.difficulty)).strip().lower()
+        self.combat_details = str(config.get("combat_details", self.combat_details)).strip().lower()
+        self.game_state.difficulty = self.difficulty
+        self.game_state.combat_details = self.combat_details
+
+        if HL in self.game_state.players:
+            self.game_state.players[HL].set_ai(hl_ai)
+        if WS in self.game_state.players:
+            self.game_state.players[WS].set_ai(ws_ai)
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch
@@ -104,6 +137,8 @@ class GameController(QObject):
 
     def on_map_units_clicked(self, clicked_units):
         """Allow redeploying units placed during the current deployment session."""
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            return
         if not clicked_units:
             return
         candidate = next((u for u in clicked_units if self._can_redeploy_unit_now(u)), None)
@@ -210,8 +245,8 @@ class GameController(QObject):
         # Handle "Automatic" or "System" phases (Dice rolls, cards)
         if current_phase == GamePhase.REPLACEMENTS:
             if is_ai:
-                deployed = self.ai_baseline.deploy_all_ready_units(active_player)
-                print(f"AI replacements complete. Deployed: {deployed}")
+                conscriptions, deployed = self.ai_baseline.process_replacements(active_player)
+                print(f"AI replacements complete. Conscriptions: {conscriptions}, deployed: {deployed}")
                 self.game_state.advance_phase()
             else:
                 # Human Player
@@ -407,6 +442,8 @@ class GameController(QObject):
             
         if not self._map_view_signals_connected:
             self.view.unit_deployment_requested.connect(self.handle_unit_deployment)
+            if hasattr(self.view, "depleted_merge_requested"):
+                self.view.depleted_merge_requested.connect(self.on_depleted_merge_requested)
             self._map_view_signals_connected = True
             print("Map view signals connected to controller")
 
@@ -529,6 +566,11 @@ class GameController(QObject):
 
     def on_unit_selection_changed(self, selected_units):
         """Called when user changes selection in the Unit Table."""
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            self.selected_units_for_movement = []
+            self.neutral_warning_hexes = set()
+            self.view.highlight_movement_range([])
+            return
         if self.game_state.phase == GamePhase.COMBAT:
             # In combat, we manage selection manually via clicks,
             # but if the user interacts with the table directly, we respect it.
@@ -562,6 +604,8 @@ class GameController(QObject):
 
     def on_hex_clicked(self, hex_obj):
         """Called when user clicks a hex in Movement OR Combat phase."""
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            return
         if self.game_state.phase == GamePhase.MOVEMENT:
             if not self.selected_units_for_movement:
                 return
@@ -681,6 +725,8 @@ class GameController(QObject):
         Implements boarding algorithm: load armies into selected fleets and leaders into same ship.
         For unboarding: if selected units are transported, unboard them to the carrier hex.
         """
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            return
         # Only in Movement Phase
         if self.game_state.phase != GamePhase.MOVEMENT:
             print("(Un)Board action is only allowed during Movement phase.")
@@ -743,6 +789,30 @@ class GameController(QObject):
         if self.replacements_dialog:
             self.replacements_dialog.refresh()
 
+    def on_depleted_merge_requested(self, unit1, unit2):
+        """
+        Resolve depleted-stack merge decision in controller (MVC-safe):
+        chosen unit -> ACTIVE, other -> RESERVE off-map.
+        """
+        from src.gui.replacements_dialog import UnitSelectionDialog
+
+        dlg = UnitSelectionDialog(unit1, unit2, self.view.window())
+        dlg.setWindowTitle("Reinforce Unit")
+        if dlg.exec():
+            kept_unit = dlg.selected_unit
+            discarded_unit = dlg.discarded_unit
+
+            if kept_unit:
+                kept_unit.status = UnitState.ACTIVE
+            if discarded_unit:
+                if getattr(discarded_unit, "is_on_map", False):
+                    self.game_state.map.remove_unit_from_spatial_map(discarded_unit)
+                discarded_unit.status = UnitState.RESERVE
+                discarded_unit.position = (None, None)
+
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+
     def on_ready_unit_clicked(self, unit, allow_territory_deploy):
         # Ignore stale clicks from a dialog row that no longer represents a deployable unit.
         if unit.status != UnitState.READY or getattr(unit, "is_on_map", False):
@@ -790,6 +860,8 @@ class GameController(QObject):
             self._start_invasion_deployment(country_id, outcome.winner)
 
     def on_undo_clicked(self):
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            return
         if self.game_state.phase != GamePhase.MOVEMENT:
             return
         if not self.game_state.undo_last_movement():
