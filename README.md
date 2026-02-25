@@ -15,7 +15,6 @@ TODO:
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Fix units attacking single leader/leader-only stack should force leader(s) escape roll instead of triggering normal combat.
 - Fix being able to select only individual units in stacks for attack. When e.g. a unit that can cross mountain hexsides and a unit that can't are in the same stack, only the more restrictive unit's movement possibilities are shown. This is good for movement, but for attack it should be possible to select the more mobile unit and attack with it, even if the less mobile unit is in the same stack.
 
 Notes:

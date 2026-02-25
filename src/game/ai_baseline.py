@@ -151,6 +151,215 @@ class BaselineAIPlayer:
         print(f"AI activation success: {best.id}. Deployed units: {deployed}")
         return True, best.id
 
+    # ---------- Assets ----------
+    def assign_assets(self, side: str) -> int:
+        """
+        Equip AI-owned unassigned equippable assets on best candidate units.
+        Returns number of assignments made.
+        """
+        player = self.game_state.players.get(side)
+        if not player:
+            return 0
+
+        assets = [
+            a for a in getattr(player, "assets", {}).values()
+            if getattr(a, "is_equippable", False)
+            and getattr(a, "assigned_to", None) is None
+        ]
+        if not assets:
+            return 0
+
+        units = [
+            u for u in self.game_state.units
+            if getattr(u, "allegiance", None) == side
+            and getattr(u, "is_on_map", False)
+        ]
+        if not units:
+            return 0
+
+        assigned = 0
+        # Highest-impact artifacts first.
+        assets.sort(key=lambda a: self._asset_priority(a), reverse=True)
+
+        for asset in assets:
+            candidates = [u for u in units if asset.can_equip(u)]
+            if not candidates:
+                continue
+
+            if self._is_crown_of_power(asset):
+                best = max(candidates, key=lambda u: self._score_crown_target(u, side))
+            else:
+                best = max(candidates, key=lambda u: self._score_asset_target(asset, u, side))
+
+            asset.apply_to(best)
+            if getattr(asset, "assigned_to", None) is best:
+                assigned += 1
+
+        return assigned
+
+    @staticmethod
+    def _is_crown_of_power(asset) -> bool:
+        if getattr(asset, "id", None) == "crown_of_power":
+            return True
+        return bool(hasattr(asset, "has_other_bonus") and asset.has_other_bonus("emperor"))
+
+    def _asset_priority(self, asset) -> int:
+        if self._is_crown_of_power(asset):
+            return 100
+        if hasattr(asset, "has_other_bonus"):
+            if asset.has_other_bonus("dragon_orb"):
+                return 90
+            if asset.has_other_bonus("revive"):
+                return 85
+            if asset.has_other_bonus("dragon_slayer"):
+                return 80
+            if asset.has_other_bonus("gnome_tech"):
+                return 70
+            if asset.has_other_bonus("armor"):
+                return 65
+            if asset.has_other_bonus("healing"):
+                return 60
+        return 50
+
+    def _score_crown_target(self, unit, side: str) -> int:
+        score = 0
+        dragonflight = self._unit_dragonflight(unit)
+        if dragonflight:
+            dragons_alive = self._count_dragons_for_flight(side, dragonflight)
+            sibling_highlords = self._count_other_highlords_for_flight(side, dragonflight, exclude=unit)
+            if dragons_alive == 0:
+                score += 10000
+            elif dragons_alive == 1 and sibling_highlords > 0:
+                score += 9000
+            elif sibling_highlords > 0:
+                score += 8000
+            else:
+                score += 7000
+            score += max(0, 10 - dragons_alive) * 20
+            score += sibling_highlords * 120
+        else:
+            score += 6000
+
+        score += self._survival_score(unit)
+        score += self._frontline_score(unit, side)
+        score += int(getattr(unit, "tactical_rating", 0) or 0) * 10
+        return score
+
+    def _score_asset_target(self, asset, unit, side: str) -> int:
+        score = 0
+        if getattr(unit, "unit_type", None) in (UnitType.HIGHLORD, UnitType.GENERAL, UnitType.ADMIRAL, UnitType.WIZARD):
+            score += 160
+        elif hasattr(unit, "is_army") and unit.is_army():
+            score += 120
+        elif getattr(unit, "unit_type", None) == UnitType.WING:
+            score += 90
+        elif getattr(unit, "unit_type", None) == UnitType.FLEET:
+            score += 70
+
+        if hasattr(asset, "has_other_bonus"):
+            if asset.has_other_bonus("dragon_orb"):
+                score += 400 if getattr(unit, "is_leader", lambda: False)() else -500
+                score += self._nearby_enemy_dragons_or_draconians(unit, side) * 80
+            elif asset.has_other_bonus("dragon_slayer"):
+                score += self._nearby_enemy_dragons_or_draconians(unit, side) * 70
+                if hasattr(unit, "is_army") and unit.is_army():
+                    score += 150
+            elif asset.has_other_bonus("armor"):
+                score += self._frontline_score(unit, side) * 2
+                score += self._survival_score(unit) // 2
+            elif asset.has_other_bonus("healing"):
+                score += 180 if hasattr(unit, "is_army") and unit.is_army() else 60
+                if getattr(unit, "status", None) == UnitState.DEPLETED:
+                    score += 180
+            elif asset.has_other_bonus("revive"):
+                score += 220 if getattr(unit, "is_leader", lambda: False)() else 0
+                score += self._survival_score(unit)
+            elif asset.has_other_bonus("gnome_tech"):
+                score += 220 if hasattr(unit, "is_army") and unit.is_army() else 0
+                score += self._frontline_score(unit, side) * 2
+
+        bonus = getattr(asset, "bonus", {})
+        if isinstance(bonus, dict):
+            score += int(bonus.get("tactical_rating", 0) or 0) * 45
+            # Avoid overvaluing multiplicative strings, but keep some weight.
+            combat_bonus = bonus.get("combat_rating", bonus.get("combat", 0))
+            if isinstance(combat_bonus, (int, float)):
+                score += int(combat_bonus) * 40
+            elif isinstance(combat_bonus, str):
+                score += 35
+            if "diplomacy" in bonus and self.game_state.has_neutral_countries():
+                score += 60 if getattr(unit, "is_leader", lambda: False)() else 20
+
+        score += self._survival_score(unit)
+        score += self._frontline_score(unit, side)
+        return score
+
+    @staticmethod
+    def _unit_dragonflight(unit) -> str | None:
+        spec = getattr(unit, "spec", None)
+        value = getattr(spec, "dragonflight", None) if spec else None
+        if value:
+            return str(value).strip().lower()
+        return None
+
+    def _count_dragons_for_flight(self, side: str, dragonflight: str) -> int:
+        return sum(
+            1
+            for u in self.game_state.units
+            if getattr(u, "allegiance", None) == side
+            and getattr(u, "is_on_map", False)
+            and getattr(u, "unit_type", None) == UnitType.WING
+            and str(getattr(getattr(u, "spec", None), "dragonflight", "")).strip().lower() == dragonflight
+        )
+
+    def _count_other_highlords_for_flight(self, side: str, dragonflight: str, exclude) -> int:
+        return sum(
+            1
+            for u in self.game_state.units
+            if u is not exclude
+            and getattr(u, "allegiance", None) == side
+            and getattr(u, "is_on_map", False)
+            and getattr(u, "unit_type", None) == UnitType.HIGHLORD
+            and self._unit_dragonflight(u) == dragonflight
+        )
+
+    def _nearby_enemy_dragons_or_draconians(self, unit, side: str) -> int:
+        if not getattr(unit, "position", None) or unit.position[0] is None:
+            return 0
+        center = Hex.offset_to_axial(unit.position[0], unit.position[1])
+        count = 0
+        for hex_obj in [center] + list(center.neighbors()):
+            enemies = [
+                u for u in self.game_state.get_units_at(hex_obj)
+                if getattr(u, "is_on_map", False)
+                and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+            ]
+            for enemy in enemies:
+                if getattr(enemy, "unit_type", None) == UnitType.WING:
+                    count += 1
+                else:
+                    enemy_race = getattr(enemy, "race", None)
+                    race_value = getattr(enemy_race, "value", enemy_race)
+                    if str(race_value or "").strip().lower() == "draconian":
+                        count += 1
+        return count
+
+    def _survival_score(self, unit) -> int:
+        score = 0
+        if getattr(unit, "status", None) == UnitState.ACTIVE:
+            score += 80
+        elif getattr(unit, "status", None) == UnitState.DEPLETED:
+            score += 25
+        return score
+
+    def _frontline_score(self, unit, side: str) -> int:
+        if not getattr(unit, "position", None) or unit.position[0] is None:
+            return 0
+        hex_obj = Hex.offset_to_axial(unit.position[0], unit.position[1])
+        enemy_adj = self._adjacent_enemy_count(hex_obj, side)
+        friendly_adj = self._adjacent_friendly_count(hex_obj, side)
+        return enemy_adj * 30 + friendly_adj * 5
+
     # ---------- Movement ----------
     def execute_best_movement(self, side: str) -> bool:
         stacks = self._build_movable_stacks(side)

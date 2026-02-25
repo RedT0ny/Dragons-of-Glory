@@ -435,7 +435,7 @@ haltigoth:
 
 hylo:
   capital_id: kenderhome
-  color: "#F0E68C"
+  color: "#F2D610"
   allegiance: neutral
   alignment: [4, -2]
   strength: 24
@@ -1027,7 +1027,7 @@ palanthas:
 
 qualinesti:
   capital_id: qualinost
-  color: "#228B22"
+  color: "#809F3A"
   allegiance: neutral
   alignment: [6, -2]
   strength: 28
@@ -1056,7 +1056,7 @@ qualinesti:
 
 saifhum:
   capital_id: sea_reach
-  color: "#000080"
+  color: "#8A9DE9"
   allegiance: neutral
   alignment: [4, 4]
   strength: 32
@@ -1106,7 +1106,7 @@ sancrist:
 
 sanction:
   capital_id: port_sanction
-  color: "#4B0082"
+  color: "#9932CC"
   allegiance: neutral
   alignment: [0, 6]
   strength: 12

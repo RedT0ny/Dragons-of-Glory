@@ -369,6 +369,9 @@ class MainWindow(QMainWindow):
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.units_clicked.connect(controller.on_map_units_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
+        if hasattr(self, "assets_tab"):
+            self.assets_tab.asset_assign_requested.connect(controller.on_asset_assign_requested)
+            self.assets_tab.asset_remove_requested.connect(controller.on_asset_remove_requested)
 
     def update_turn_panel(self, active_player: str, turn: int, calendar_upper_label: str, phase_label: str):
         if hasattr(self, "turn_panel") and self.turn_panel:

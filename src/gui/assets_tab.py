@@ -4,7 +4,7 @@ from time import perf_counter
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QTreeWidget, QTreeWidgetItem, QFrame, QPushButton, QLineEdit, QTextEdit,
                                QTreeWidgetItemIterator)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
 from src.content.specs import AssetType, UnitColumn
@@ -157,6 +157,9 @@ class AssetDetails(QFrame):
                 self.btn_assign.setEnabled(True)
 
 class AssetsTab(QWidget):
+    asset_assign_requested = Signal(object, object)  # asset, unit
+    asset_remove_requested = Signal(object, object)  # asset, unit
+
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
@@ -362,18 +365,10 @@ class AssetsTab(QWidget):
         unit = self.details_panel.current_unit
         asset = self.details_panel.current_asset
         if unit and asset:
-            asset.apply_to(unit)
-            self.refresh() # Update table
-            # Reselect logic? Complex because widgets recreated. 
-            # We lose selection when refreshing completely.
-            # Ideally we should keep state or partial refresh, but full refresh is robust.
-            # We reset selection.
-            self.details_panel.update_buttons_state(None)
+            self.asset_assign_requested.emit(asset, unit)
 
     def on_remove_clicked(self):
         unit = self.details_panel.current_unit
         asset = self.details_panel.current_asset
         if unit and asset:
-            asset.remove_from(unit)
-            self.refresh()
-            self.details_panel.update_buttons_state(None)
+            self.asset_remove_requested.emit(asset, unit)

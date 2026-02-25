@@ -169,8 +169,21 @@ class AnsalonMapView(QGraphicsView):
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""
         current_player = getattr(self.game_state, "current_player", None)
-        if current_player is not None and getattr(current_player, "is_ai", False):
-            # Ignore map clicks while AI controls the active side.
+        is_human = bool(current_player and not getattr(current_player, "is_ai", False))
+        interactive_phase = self.game_state.phase in {
+            GamePhase.DEPLOYMENT,
+            GamePhase.REPLACEMENTS,
+            GamePhase.MOVEMENT,
+            GamePhase.COMBAT,
+        }
+        deployment_active = self.deploying_unit is not None
+        if not is_human:
+            super().mousePressEvent(event)
+            return
+        if not interactive_phase and not deployment_active:
+            # Ignore map clicks outside normal human-interactive phases,
+            # except when an explicit deployment selection is active
+            # (e.g. strategic event/activation triggered deployments).
             super().mousePressEvent(event)
             return
 
