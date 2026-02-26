@@ -863,6 +863,32 @@ class GameController(QObject):
         from PySide6.QtWidgets import QMessageBox
         from src.gui.replacements_dialog import ReplacementsDialog
 
+        winner_player = self.game_state.players.get(allegiance)
+        winner_is_ai = bool(winner_player and winner_player.is_ai)
+
+        # If the invasion winner is AI-controlled, auto-deploy immediately.
+        if winner_is_ai:
+            deployed = self.ai_baseline.deploy_all_ready_units(
+                allegiance,
+                allow_territory_wide=True,
+                country_filter=country_id,
+                invasion_deployment_active=True,
+                invasion_deployment_allegiance=allegiance,
+                invasion_deployment_country_id=country_id,
+            )
+            self._invasion_deployment_active = False
+            self._invasion_deployment_country_id = None
+            self._invasion_deployment_allegiance = None
+            self._end_deployment_session()
+            self.view.sync_with_model()
+            self._refresh_info_panel()
+            QMessageBox.information(
+                self.view.window(),
+                "Invasion Deployment",
+                f"{country_id.title()} is AI-controlled. Auto-deployed units: {deployed}.",
+            )
+            return
+
         self._invasion_deployment_active = True
         self._invasion_deployment_country_id = country_id
         self._invasion_deployment_allegiance = allegiance

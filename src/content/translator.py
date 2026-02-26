@@ -49,3 +49,21 @@ class Translator:
     def get_text(self, category: str, key: str) -> str:
         """Generic fetcher for UI strings like 'strength' or 'allegiance'."""
         return self.translations.get(category, {}).get(key, key)
+
+    def tr(self, key: str, default: str = "", **kwargs) -> str:
+        """
+        Dotted-path translation helper, e.g. tr("dialogs.diplomacy.title").
+        Falls back to `default` or the key itself when missing.
+        """
+        node = self.translations
+        for part in str(key).split("."):
+            if not isinstance(node, dict) or part not in node:
+                text = default or key
+                return text.format(**kwargs) if kwargs else text
+            node = node.get(part)
+
+        if not isinstance(node, str):
+            text = default or key
+            return text.format(**kwargs) if kwargs else text
+
+        return node.format(**kwargs) if kwargs else node

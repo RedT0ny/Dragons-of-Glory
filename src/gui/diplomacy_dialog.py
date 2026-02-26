@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLa
 
 from src.content.audio_manager import AudioManager
 from src.content.config import MAX_TICKS
+from src.content.translator import Translator
 from src.game.diplomacy import DiplomacyActivationService
 from src.gui.map_view import AnsalonMapView
 
@@ -41,7 +42,8 @@ class DiplomacyDialog(QDialog):
         super().__init__(parent)
         self.game_state = game_state
         self.diplomacy_service = DiplomacyActivationService(game_state)
-        self.setWindowTitle("Diplomacy Phase")
+        self.translator = Translator()
+        self.setWindowTitle(self.translator.tr("dialogs.diplomacy.title", "Diplomacy Phase"))
         self.resize(1200, 960)
         self.setModal(True)
 
@@ -49,7 +51,7 @@ class DiplomacyDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        lbl = QLabel("Select a Neutral Nation to Activate")
+        lbl = QLabel(self.translator.tr("dialogs.diplomacy.select_neutral", "Select a Neutral Nation to Activate"))
         lbl.setAlignment(Qt.AlignCenter)
         lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: white; background-color: #333; padding: 10px;")
         layout.addWidget(lbl)
@@ -61,7 +63,7 @@ class DiplomacyDialog(QDialog):
         self.map_view.country_clicked.connect(self.on_country_selected)
 
         btn_layout = QHBoxLayout()
-        btn_cancel = QPushButton("Pass / Cancel")
+        btn_cancel = QPushButton(self.translator.tr("dialogs.diplomacy.pass_cancel", "Pass / Cancel"))
         btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(btn_cancel)
         layout.addLayout(btn_layout)
@@ -87,22 +89,51 @@ class DiplomacyDialog(QDialog):
 
         color_style = get_color(attempt.target_rating)
 
+        country_name = self.translator.get_country_name(country.id)
+        side_name = self.translator.get_text("ui", attempt.active_side)
+
         dlg = QDialog(self)
-        dlg.setWindowTitle(f"Ally with {country.id.title()}?")
+        dlg.setWindowTitle(
+            self.translator.tr(
+                "dialogs.diplomacy.ally_title",
+                "Ally with {country}?",
+                country=country_name,
+            )
+        )
         dlg.setFixedSize(400, 250)
 
         dlg_layout = QVBoxLayout(dlg)
 
-        info_lbl = QLabel(f"Attempt to activate {country.id.title()} for {attempt.active_side}?")
+        info_lbl = QLabel(
+            self.translator.tr(
+                "dialogs.diplomacy.attempt_activate",
+                "Attempt to activate {country} for {side}?",
+                country=country_name,
+                side=side_name,
+            )
+        )
         info_lbl.setAlignment(Qt.AlignCenter)
         info_lbl.setStyleSheet("font-size: 14px;")
         dlg_layout.addWidget(info_lbl)
 
-        stats_text = f"Rating needed: {attempt.target_rating} or less"
+        stats_text = self.translator.tr(
+            "dialogs.diplomacy.rating_needed",
+            "Rating needed: {target} or less",
+            target=attempt.target_rating,
+        )
         if attempt.solamnic_bonus:
-            stats_text += f" (base {attempt.ws_rating} + {attempt.solamnic_bonus})"
+            stats_text += self.translator.tr(
+                "dialogs.diplomacy.rating_base_bonus",
+                " (base {base} + {bonus})",
+                base=attempt.ws_rating,
+                bonus=attempt.solamnic_bonus,
+            )
         if attempt.event_activation_bonus:
-            stats_text += f" | Event roll bonus: -{attempt.event_activation_bonus}"
+            stats_text += self.translator.tr(
+                "dialogs.diplomacy.event_bonus",
+                " | Event roll bonus: -{bonus}",
+                bonus=attempt.event_activation_bonus,
+            )
         stats_lbl = QLabel(stats_text)
         stats_lbl.setAlignment(Qt.AlignCenter)
         stats_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {color_style};")
@@ -114,8 +145,8 @@ class DiplomacyDialog(QDialog):
         dlg_layout.addWidget(res_lbl)
 
         btn_box = QHBoxLayout()
-        btn_ok = QPushButton("Attempt Roll")
-        btn_cancel = QPushButton("Cancel")
+        btn_ok = QPushButton(self.translator.tr("dialogs.diplomacy.attempt_roll", "Attempt Roll"))
+        btn_cancel = QPushButton(self.translator.tr("dialogs.diplomacy.cancel", "Cancel"))
 
         btn_box.addWidget(btn_ok)
         btn_box.addWidget(btn_cancel)
@@ -146,7 +177,13 @@ class DiplomacyDialog(QDialog):
 
                 if self.roll_ticks < MAX_TICKS:
                     fake_val = self.diplomacy_service.roll_activation(10).roll
-                    res_lbl.setText(f"Rolling... {fake_val}")
+                    res_lbl.setText(
+                        self.translator.tr(
+                            "dialogs.diplomacy.rolling",
+                            "Rolling... {roll}",
+                            roll=fake_val,
+                        )
+                    )
                 else:
                     animation_timer.stop()
                     animation_timer.deleteLater()
@@ -154,15 +191,24 @@ class DiplomacyDialog(QDialog):
                         dice_sound.stop()
 
                     if roll_result.bonus_applied:
-                        final_text = (
-                            f"Rolled: {roll_result.roll} "
-                            f"(effective {roll_result.effective_roll} after -{roll_result.bonus_applied})..."
+                        final_text = self.translator.tr(
+                            "dialogs.diplomacy.rolled_effective",
+                            "Rolled: {roll} (effective {effective} after -{bonus})...",
+                            roll=roll_result.roll,
+                            effective=roll_result.effective_roll,
+                            bonus=roll_result.bonus_applied,
                         )
                     else:
-                        final_text = f"Rolled: {roll_result.roll}..."
+                        final_text = self.translator.tr(
+                            "dialogs.diplomacy.rolled",
+                            "Rolled: {roll}...",
+                            roll=roll_result.roll,
+                        )
 
                     if roll_result.success:
-                        res_lbl.setText(f"{final_text} SUCCESS!")
+                        res_lbl.setText(
+                            f"{final_text} {self.translator.tr('dialogs.diplomacy.success', 'SUCCESS!')}"
+                        )
                         res_lbl.setStyleSheet(
                             "color: #27ae60; font-size: 18px; font-weight: bold; border: 2px solid #27ae60; padding: 5px;"
                         )
@@ -175,12 +221,14 @@ class DiplomacyDialog(QDialog):
                         QTimer.singleShot(1500, lambda: (dlg.accept(), self.accept()))
 
                     else:
-                        res_lbl.setText(f"{final_text} FAILURE")
+                        res_lbl.setText(
+                            f"{final_text} {self.translator.tr('dialogs.diplomacy.failure', 'FAILURE')}"
+                        )
                         res_lbl.setStyleSheet(
                             "color: #c0392b; font-size: 18px; font-weight: bold; border: 2px solid #c0392b; padding: 5px;"
                         )
 
-                        btn_cancel.setText("Close")
+                        btn_cancel.setText(self.translator.tr("dialogs.diplomacy.close", "Close"))
                         btn_cancel.setDisabled(False)
 
                         btn_cancel.clicked.disconnect()

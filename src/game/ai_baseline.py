@@ -22,7 +22,15 @@ class BaselineAIPlayer:
         self.diplomacy_service = diplomacy_service
 
     # ---------- Deployment ----------
-    def deploy_all_ready_units(self, side: str, allow_territory_wide: bool = False, country_filter: str | None = None) -> int:
+    def deploy_all_ready_units(
+        self,
+        side: str,
+        allow_territory_wide: bool = False,
+        country_filter: str | None = None,
+        invasion_deployment_active: bool = False,
+        invasion_deployment_allegiance: str | None = None,
+        invasion_deployment_country_id: str | None = None,
+    ) -> int:
         deployed = 0
         ready_units = [
             u for u in self.game_state.units
@@ -47,7 +55,9 @@ class BaselineAIPlayer:
             result = self.game_state.deployment_service.deploy_unit(
                 unit,
                 Hex.offset_to_axial(best[0], best[1]),
-                invasion_deployment_active=False,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
             )
             if result.success:
                 deployed += 1
@@ -425,6 +435,7 @@ class BaselineAIPlayer:
                 defenders=defenders_before,
                 resolution=resolution,
                 context="ai_combat",
+                target_hex=target_hex,
             )
             for u in attackers:
                 u.attacked_this_turn = True

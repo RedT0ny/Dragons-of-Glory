@@ -358,6 +358,7 @@ class MovementService:
                     defenders=defenders_after,
                     resolution=resolution,
                     context="interception",
+                    target_hex=moving_hex,
                 )
         finally:
             self.game_state.active_player = previous_active_player

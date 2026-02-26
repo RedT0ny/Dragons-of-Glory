@@ -7,8 +7,7 @@ Design overview:
 TODO:
 
 - Add Dragon #170's Advanced Rules in "settings"
-- double-click on a unit in the status tab should show the map tab and zoom on the unit.
-- Implement AI player
+- double-click on a unit in the status tab should show the map tab and center view on the unit.
 - Review country colors and unit icons to make them more distinguishable.
 - I18n
 

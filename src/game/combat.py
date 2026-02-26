@@ -1112,6 +1112,7 @@ class CombatClickHandler:
                     defenders=enemy_units,
                     resolution=resolution,
                     context="manual_combat",
+                    target_hex=target_hex,
                 )
                 # Mark attackers
                 for u in self.attackers:

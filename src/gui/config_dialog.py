@@ -18,6 +18,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QDialog,
     QDialogButtonBox, QGridLayout, QGroupBox, QLabel,
     QSizePolicy, QWidget)
+from src.content.translator import Translator
 
 class Ui_configDialog(object):
     def setupUi(self, configDialog):
@@ -142,23 +143,64 @@ class ConfigDialog(QDialog):
         super().__init__(parent)
         self.ui = Ui_configDialog()
         self.ui.setupUi(self)
+        self.translator = Translator()
+        self._apply_translations()
+
+    def _apply_translations(self):
+        tr = self.translator.tr
+        self.setWindowTitle(tr("dialogs.config.title", "Select sides"))
+        self.ui.gameOptions.setTitle(tr("dialogs.config.game_options", "Game options"))
+        self.ui.diffLabel.setText(tr("dialogs.config.difficulty", "Difficulty"))
+        self.ui.cdLabel.setText(tr("dialogs.config.combat_details", "Combat details"))
+        self.ui.playerConfig.setTitle(tr("dialogs.config.player_config", "Player config"))
+        self.ui.wsControlLabel.setText(tr("ui.whitestone", "Whitestone"))
+        self.ui.hlControlLabel.setText(tr("ui.highlord", "Highlord"))
+
+        self.ui.diffComboBox.clear()
+        self.ui.diffComboBox.addItem(tr("dialogs.config.difficulty_easy", "Easy"), "easy")
+        self.ui.diffComboBox.addItem(tr("dialogs.config.difficulty_normal", "Normal"), "normal")
+        self.ui.diffComboBox.addItem(tr("dialogs.config.difficulty_hard", "Hard"), "hard")
+
+        self.ui.cdComboBox.clear()
+        self.ui.cdComboBox.addItem(tr("dialogs.config.combat_brief", "Brief"), "brief")
+        self.ui.cdComboBox.addItem(tr("dialogs.config.combat_verbose", "Verbose"), "verbose")
+
+        self.ui.hlComboBox.clear()
+        self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
+        self.ui.hlComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
+
+        self.ui.wsComboBox.clear()
+        self.ui.wsComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
+        self.ui.wsComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
+
+        ok_btn = self.ui.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
+        cancel_btn = self.ui.buttonBox.button(QDialogButtonBox.StandardButton.Cancel)
+        if ok_btn:
+            ok_btn.setText(tr("dialogs.common.ok", "OK"))
+        if cancel_btn:
+            cancel_btn.setText(tr("dialogs.common.cancel", "Cancel"))
 
     def set_from_config(self, config: dict):
         difficulty = str(config.get("difficulty", "normal")).strip().lower()
         combat_details = str(config.get("combat_details", "brief")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
-
-        self.ui.diffComboBox.setCurrentText(
-            "Easy" if difficulty == "easy" else "Hard" if difficulty == "hard" else "Normal"
-        )
-        self.ui.cdComboBox.setCurrentText("Verbose" if combat_details == "verbose" else "Brief")
-        self.ui.hlComboBox.setCurrentText("AI" if hl_is_ai else "Human")
-        self.ui.wsComboBox.setCurrentText("AI" if ws_is_ai else "Human")
+        diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
+        if diff_idx >= 0:
+            self.ui.diffComboBox.setCurrentIndex(diff_idx)
+        cd_idx = self.ui.cdComboBox.findData("verbose" if combat_details == "verbose" else "brief")
+        if cd_idx >= 0:
+            self.ui.cdComboBox.setCurrentIndex(cd_idx)
+        hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
+        if hl_idx >= 0:
+            self.ui.hlComboBox.setCurrentIndex(hl_idx)
+        ws_idx = self.ui.wsComboBox.findData("ai" if ws_is_ai else "human")
+        if ws_idx >= 0:
+            self.ui.wsComboBox.setCurrentIndex(ws_idx)
 
     def get_config(self):
-        difficulty_text = self.ui.diffComboBox.currentText().strip().lower()
-        combat_details_text = self.ui.cdComboBox.currentText().strip().lower()
+        difficulty_text = str(self.ui.diffComboBox.currentData() or "normal")
+        combat_details_text = str(self.ui.cdComboBox.currentData() or "brief")
         player_config = self.get_player_config()
         player_config["difficulty"] = difficulty_text
         player_config["combat_details"] = combat_details_text
@@ -170,8 +212,8 @@ class ConfigDialog(QDialog):
         """
         # Logic depends on your UI layout, assuming QComboBox or QRadioButton
         # Example assuming 'hlTypeCombo' and 'wsTypeCombo' exist in your UI
-        hl_is_ai = self.ui.hlComboBox.currentText() == "AI"
-        ws_is_ai = self.ui.wsComboBox.currentText() == "AI"
+        hl_is_ai = str(self.ui.hlComboBox.currentData() or "human") == "ai"
+        ws_is_ai = str(self.ui.wsComboBox.currentData() or "human") == "ai"
 
         return {
             "highlord_ai": hl_is_ai,
@@ -182,8 +224,8 @@ class ConfigDialog(QDialog):
         """
         Returns a dictionary of selected game options, e.g. difficulty and combat details.
         """
-        difficulty = self.ui.diffComboBox.currentText()
-        combat_details = self.ui.cdComboBox.currentText()
+        difficulty = str(self.ui.diffComboBox.currentData() or "normal")
+        combat_details = str(self.ui.cdComboBox.currentData() or "brief")
 
         return {
             "difficulty": difficulty,

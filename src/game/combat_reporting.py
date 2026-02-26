@@ -21,7 +21,26 @@ def _format_units(units: Iterable[object]) -> str:
     return ", ".join(_unit_label(u) for u in units) if units else "-"
 
 
-def show_combat_result_popup(game_state, title: str, attackers, defenders, resolution, context: str | None = None):
+def _format_target_hex(target_hex) -> str:
+    if target_hex is None:
+        return "-"
+    if hasattr(target_hex, "axial_to_offset"):
+        col, row = target_hex.axial_to_offset()
+        return f"({col}, {row})"
+    if isinstance(target_hex, (tuple, list)) and len(target_hex) == 2:
+        return f"({target_hex[0]}, {target_hex[1]})"
+    return str(target_hex)
+
+
+def show_combat_result_popup(
+    game_state,
+    title: str,
+    attackers,
+    defenders,
+    resolution,
+    context: str | None = None,
+    target_hex=None,
+):
     """
     Shows combat details in a QMessageBox only when game_state.combat_details == 'verbose'.
     """
@@ -36,6 +55,7 @@ def show_combat_result_popup(game_state, title: str, attackers, defenders, resol
 
     lines = [
         f"Context: {context or 'combat'}",
+        f"Hex: {_format_target_hex(target_hex)}",
         f"Type: {combat_type}",
         f"Result: {result}",
         f"Attackers: {_format_units(attackers)}",

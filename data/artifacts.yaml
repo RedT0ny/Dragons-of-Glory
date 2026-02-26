@@ -90,7 +90,7 @@ dragon_orb:
   description: >
     A powerful artifact created by the alliance of wizards during the final desperate hours of the Third Dragon War. 
     It contains the spirit of a mighty wyrm of evil, luring other dragons to their doom.
-  picture: "dragon_orb.svg"
+  picture: "dragon_orb.jpg"
   effect: >
     Can be used vs dragon or draconian enemy forces. Roll 1d6. If it's higher than the leader’s Tactical Rating, both
     the leader and the Orb are permanently removed from the game. If the roll is equal to or less, all dragons

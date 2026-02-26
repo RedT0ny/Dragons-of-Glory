@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QDialogBu
     QWidget)
 
 from src.content.config import IMAGES_DIR
+from src.content.translator import Translator
 
 
 class Ui_event_dialog(object):
@@ -106,7 +107,20 @@ class EventDialog(QDialog, Ui_event_dialog):
         super().__init__(parent)
         self.setupUi(self)
         self.event = event
+        self.translator = Translator()
+        self._apply_translations()
         self.populate()
+
+    def _apply_translations(self):
+        tr = self.translator.tr
+        self.setWindowTitle(tr("dialogs.event.window_title", "Event"))
+        self.event_description.setPlaceholderText(tr("dialogs.event.description_placeholder", "Event description"))
+        self.event_picture.setText(tr("dialogs.event.picture_placeholder", "Event image"))
+        self.event_title.setText(tr("dialogs.event.title_placeholder", "Event Title"))
+
+        ok_btn = self.event_buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_btn:
+            ok_btn.setText(tr("dialogs.common.ok", "OK"))
 
     def populate(self):
         if not self.event:
@@ -114,7 +128,13 @@ class EventDialog(QDialog, Ui_event_dialog):
 
         # Title
         title = self.event.spec.id.replace("_", " ").title()
-        self.setWindowTitle(f"Strategic Event: {title}")
+        self.setWindowTitle(
+            self.translator.tr(
+                "dialogs.event.strategic_title",
+                "Strategic Event: {title}",
+                title=title,
+            )
+        )
         self.event_title.setText(title)
 
         # Description

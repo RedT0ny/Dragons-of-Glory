@@ -86,7 +86,7 @@ eleszar;1;general;solamnic;southlund;neutral;;0;2;10;eleszar.jpg
 stormogre;1;general;ogre;daltigoth;neutral;mountain;0;2;10;stormogre.jpg
 soth;1;general;undead;dargaard;neutral;;0;3;10;soth.jpg
 kronin;1;general;kender;goodlund;neutral;forest;0;1;8;kronin.jpg
-gunthar;1;general;solamnic;sancrist;neutral;;0;4;10;gunthar.png
+gunthar;1;general;solamnic;sancrist;neutral;;0;4;10;gunthar.jpg
 kurrin;1;general;human;haltigoth;neutral;;0;2;10;kurrin.jpg
 lord_hargoth;1;general;solamnic;coastlund;neutral;;0;2;10;lord_hargoth.jpg
 loraliee;1;general;kender;hylo;neutral;forest;0;2;8;loraliee.jpg
@@ -104,10 +104,10 @@ chot;1;admiral;minotaur;mithas;neutral;;0;3;10;chot.jpg
 mercadior;1;general;solamnic;nergoth;neutral;;0;3;10;mercadior.jpg
 huemac;1;general;human;nordmaar;neutral;;0;2;10;huemac.jpg
 amothus;1;general;human;palanthas;neutral;;0;2;10;amothus.jpg
-solostaran;1;general;elf;qualinesti;neutral;forest;0;3;12;solostaran.png
+solostaran;1;general;elf;qualinesti;neutral;forest;0;3;12;solostaran.jpg
 barenn;1;general;human;sanction;neutral;;0;1;10;barenn.jpg
 sunchaser;1;general;goblin;sikket;neutral;;0;1;8;sunchaser.jpg
-lorac;1;general;elf;silvanesti;neutral;forest;0;3;12;lorac.png
+lorac;1;general;elf;silvanesti;neutral;forest;0;3;12;lorac.jpg
 aurik;1;general;solamnic;solanthus;neutral;;0;2;10;aurik.jpg
 harkol;1;general;human;tarsis;neutral;;0;1;10;harkol.jpg
 hornfel;1;general;dwarf;thorbardin;neutral;mountain;0;3;8;hornfel.jpg
@@ -122,9 +122,9 @@ salah;1;highlord;human;green;highlord;;0;2;10;salah.jpg
 hullek;1;highlord;ogre;green;highlord;mountain;0;1;10;hullek.jpg
 lucien;1;highlord;ogre;black;highlord;mountain;0;2;10;lucien.jpg
 marcus;1;highlord;human;black;highlord;;0;2;10;marcus.jpg
-fealthas;1;highlord;elf;white;highlord;forest;0;1;10;feal-thas.png
+fealthas;1;highlord;elf;white;highlord;forest;0;1;10;fealthas.jpg
 toede;1;highlord;goblin;white;highlord;;0;1;10;toede.jpg
-ariakas;1;emperor;human;;highlord;;0;4;10;ariakas.png
+ariakas;1;emperor;human;;highlord;;0;4;10;ariakas.jpg
 rashften;1;general;ogre;thank;neutral;mountain;0;1;10;rashften.jpg
 laurana;1;general;elf;;whitestone;forest;0;5;10;laurana.jpg
 ;2;cav;human;taman;highlord;;4;0;8;dark_cav.jpg
