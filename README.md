@@ -12,13 +12,11 @@ TODO:
 
 TODO BUGFIX:
 
-- Fix Hammer of Kharas not providing diplomacy bonus for activating dwarven nations.
 - Fix AI not deploying draconians (move units out of the Dark Temple to leave room for draconians to be deployed).
 - Fix Highlord AI not invading countries.
 - Fix map subset not working correctly (use full map for now).
 - Fix being able to select only individual units in stacks for attack. When e.g. a unit that can cross mountain hexsides and a unit that can't are in the same stack, only the more restrictive unit's movement possibilities are shown. This is good for movement, but for attack it should be possible to select the more mobile unit and attack with it, even if the less mobile unit is in the same stack.
 - Check if replenished units are sent to the RESERVE. Refresh the replacements dialog afterwards.
-- Fix alignment rating for Knight's countries increased by (1,0) for each nation that has been conquered by, or is allied with, the HL player.
 
 Notes:
 

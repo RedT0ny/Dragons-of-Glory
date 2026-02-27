@@ -62,6 +62,7 @@ class GameController(QObject):
         self._deployment_session_unit_ids = set()
         self._victory_announced = False
         self._processing_turn_tick = False
+        self._replacements_refresh_queued = False
 
     def get_runtime_config(self):
         return {
@@ -148,6 +149,10 @@ class GameController(QObject):
     def on_map_units_clicked(self, clicked_units):
         """Allow redeploying units placed during the current deployment session."""
         if not self._is_human_interactive_turn():
+            return
+        # Ignore stack-click redeploy logic while the user is actively placing a unit.
+        # Deployment clicks on occupied hexes emit units_clicked before placement handling.
+        if getattr(self.view, "deploying_unit", None) is not None:
             return
         if not clicked_units:
             return
@@ -320,10 +325,20 @@ class GameController(QObject):
                     self.ai_timer.stop()
                     dlg = DiplomacyDialog(self.game_state, self.view.window())
                     dlg.country_activated.connect(self.handle_country_activation)
-                    if dlg.exec() == QDialog.Accepted and dlg.activated_country_id:
+                    dlg_result = dlg.exec()
+                    if dlg.activated_country_id:
                         country_id = dlg.activated_country_id
                         self._handle_deployment_from_event({"alliance": country_id, "alliance_already_activated": True}, active_player)
                         self._refresh_turn_panel()
+                        return
+                    if dlg_result != QDialog.Accepted:
+                        print("Activation attempt finished or skipped.")
+                        self.game_state.advance_phase()
+                        self.view.sync_with_model()
+                        self._refresh_info_panel()
+                        self._refresh_turn_panel()
+                        self.connect_map_view_signals()
+                        self.check_active_player()
                         return
                 print("Activation attempt finished or skipped.")
                 self.game_state.advance_phase()
@@ -672,15 +687,38 @@ class GameController(QObject):
             return
         self._deployment_session_unit_ids.add(unit.id)
         
-        # Sync the view on the next event loop tick to avoid scene re-entrancy
+        # Sync the map on next tick; defer heavy dialog rebuild slightly to avoid
+        # QWidget teardown/rebuild races right after deployment clicks.
         def _deferred_sync():
-            if self.replacements_dialog and self.replacements_dialog.isVisible():
-                self.replacements_dialog.refresh()
             self.view.sync_with_model()
-            self._refresh_info_panel()
+            self._queue_replacements_dialog_refresh()
+            # During deployment sessions, the minimap refresh is expensive and not required
+            # for immediate interaction correctness.
+            if not (self.replacements_dialog and self.replacements_dialog.isVisible()):
+                self._refresh_info_panel()
         self._schedule_deferred(_deferred_sync)
         
         print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
+
+    def _queue_replacements_dialog_refresh(self):
+        dlg = self.replacements_dialog
+        if not dlg or not dlg.isVisible():
+            return
+        if self._replacements_refresh_queued:
+            return
+        self._replacements_refresh_queued = True
+
+        def _do_refresh():
+            self._replacements_refresh_queued = False
+            current = self.replacements_dialog
+            if not current or not current.isVisible():
+                return
+            if getattr(self.view, "deploying_unit", None) is not None:
+                QTimer.singleShot(80, self._queue_replacements_dialog_refresh)
+                return
+            current.refresh()
+
+        QTimer.singleShot(120, _do_refresh)
 
     def on_board_button_clicked(self):
         """Handles the (Un)Board button during Movement phase.

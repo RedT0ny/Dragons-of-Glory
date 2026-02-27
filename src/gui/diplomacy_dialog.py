@@ -1,5 +1,6 @@
 from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
+import shiboken6
 
 from src.content.audio_manager import AudioManager
 from src.content.config import MAX_TICKS
@@ -218,7 +219,19 @@ class DiplomacyDialog(QDialog):
                         self.activated_country_id = country.id
                         self.country_activated.emit(country.id, attempt.active_side)
 
-                        QTimer.singleShot(1500, lambda: (dlg.accept(), self.accept()))
+                        # Keep result visible briefly, but use an object-owned timer
+                        # so callback cannot outlive the dialog.
+                        close_timer = QTimer(dlg)
+                        close_timer.setSingleShot(True)
+
+                        def _finish_success():
+                            if shiboken6.isValid(dlg):
+                                dlg.accept()
+                            if shiboken6.isValid(self):
+                                self.accept()
+
+                        close_timer.timeout.connect(_finish_success)
+                        close_timer.start(1500)
 
                     else:
                         res_lbl.setText(

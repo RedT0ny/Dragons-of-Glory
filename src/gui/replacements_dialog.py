@@ -150,6 +150,7 @@ class ReplacementsDialog(QDialog):
         self.selected_reserve_unit = None
         self.current_unit_labels = {} # Map unit_id -> UnitLabel
         self._processing_deployment = False  # Flag to prevent recursive calls
+        self._refresh_queued = False
 
         self.setup_ui()
         self.populate_table()
@@ -192,6 +193,7 @@ class ReplacementsDialog(QDialog):
 
     def populate_table(self):
         """Populates table with grouped, allegiance‑sorted country data"""
+        self.table.clearContents()
         self.table.setRowCount(0)
         self.current_unit_labels.clear()
 
@@ -395,4 +397,17 @@ class ReplacementsDialog(QDialog):
         finally:
             self._processing_deployment = False
     def refresh(self):
-        self.populate_table()
+        if self._refresh_queued:
+            return
+        self._refresh_queued = True
+
+        def _do_refresh():
+            self._refresh_queued = False
+            if not shiboken6.isValid(self):
+                return
+            if getattr(self, "_processing_deployment", False):
+                QTimer.singleShot(0, self.refresh)
+                return
+            self.populate_table()
+
+        QTimer.singleShot(0, _do_refresh)

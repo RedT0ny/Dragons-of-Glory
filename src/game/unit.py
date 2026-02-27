@@ -272,6 +272,7 @@ class Unit:
         return {
             "unit_id": self.id,
             "ordinal": self.ordinal,
+            "allegiance": self.allegiance,
             "position": list(self.position),
             "status": self.status.name,
             "escaped": bool(getattr(self, "escaped", False)),
@@ -286,6 +287,9 @@ class Unit:
     def load_state(self, state_data: dict):
         pos = state_data.get("position")
         self.position = tuple(pos) if pos else (None, None)
+
+        if "allegiance" in state_data:
+            self.allegiance = state_data.get("allegiance")
 
         status_str = state_data.get("status")
         if status_str and hasattr(UnitState, status_str):

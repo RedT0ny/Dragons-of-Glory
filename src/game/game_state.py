@@ -276,6 +276,12 @@ class GameState:
             if not unit:
                 continue
             unit.load_state(state)
+            # Backward compatibility for old saves that did not serialize unit allegiance:
+            # infer allegiance from the unit's country ("land") if available.
+            if "allegiance" not in state:
+                unit_land = getattr(unit, "land", None)
+                if unit_land in self.countries:
+                    unit.allegiance = self.countries[unit_land].allegiance
             runtime = (unit_runtime_state or {}).get(f"{unit.id}|{unit.ordinal}", {})
             if isinstance(runtime, dict):
                 mp = runtime.get("movement_points")
@@ -742,33 +748,36 @@ class GameState:
     def get_country_activation_bonus(self, allegiance: str, country_id: str) -> int:
         """
         Artifact diplomacy bonus:
-        +1 target activation rating per equipped artifact that lists `country_id`,
-        as long as both unit and artifact are not DESTROYED.
+        +1 target activation rating per owned asset in player.assets that lists `country_id`
+        under bonus["diplomacy"].
         """
         if not country_id:
             return 0
+        player = self.players.get(allegiance)
+        if not player or not hasattr(player, "assets"):
+            return 0
+
+        country_key = str(country_id).strip().lower()
         total = 0
-        country_key = str(country_id).lower()
-        for unit in self.units:
-            if getattr(unit, "allegiance", None) != allegiance:
+
+        for asset in (player.assets.values() or []):
+            bonus = getattr(asset, "bonus", None)
+            if not isinstance(bonus, dict):
                 continue
-            if getattr(unit, "status", None) == UnitState.DESTROYED:
+
+            targets = bonus.get("diplomacy")
+            if targets is None:
                 continue
-            for asset in getattr(unit, "equipment", []) or []:
-                if not isinstance(getattr(asset, "bonus", None), dict):
-                    continue
-                targets = asset.bonus.get("diplomacy")
-                if not isinstance(targets, list):
-                    continue
-                if not any(str(cid).lower() == country_key for cid in targets):
-                    continue
-                owner = getattr(asset, "owner", None)
-                if owner and hasattr(owner, "assets"):
-                    if getattr(asset, "id", None) not in owner.assets:
-                        continue
-                if getattr(asset, "assigned_to", None) is not unit:
-                    continue
+            if isinstance(targets, str):
+                target_list = [targets]
+            elif isinstance(targets, (list, tuple, set)):
+                target_list = list(targets)
+            else:
+                continue
+
+            if any(str(cid).strip().lower() == country_key for cid in target_list):
                 total += 1
+
         return total
 
     def clear_activation_bonuses(self):
@@ -1056,12 +1065,15 @@ class GameState:
         )
 
     def get_ws_solamnic_activation_bonus(self) -> int:
-        """+1 WS activation rating per linked Solamnic nation controlled by HL."""
+        """
+        +1 WS activation rating per nation controlled by HL or conquered (War is raging...)
+        First 7 countries are skipped (Dragonflights and Taman Busuk).
+        """
+        country_list = list(self.countries.values())
         return sum(
             1
-            for country in self._countries_with_tag(self.tag_knight_countries)
-            if country.id != self.tower_country_id
-            if country.allegiance == HL
+            for i, country in enumerate(country_list)
+            if i >= 7 and (country.allegiance == HL or country.conquered)
         )
 
     def _apply_solamnic_tower_activation(self, country_id: str, previous_allegiance: str):
