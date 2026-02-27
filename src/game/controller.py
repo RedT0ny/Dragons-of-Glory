@@ -703,6 +703,11 @@ class GameController(QObject):
         for message in result.messages:
             print(message)
         if result.force_sync:
+            # Selection can contain now-stale transport relationships after (Un)Board.
+            # Reset it before syncing to avoid acting on outdated references.
+            self.selected_units_for_movement = []
+            self.neutral_warning_hexes = set()
+            self.view.highlight_movement_range([])
             self._schedule_deferred(self.view.sync_with_model)
             self._schedule_deferred(self._refresh_info_panel)
 

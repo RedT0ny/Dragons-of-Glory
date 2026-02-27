@@ -2161,13 +2161,22 @@ class GameState:
         if not self.map.can_stack_move_to(moving_units, dest_hex):
             return False
 
-        # Perform unboard: remove from carrier.passengers, clear transport flags, add to spatial map
-        if unit in carrier.passengers:
-            carrier.passengers.remove(unit)
+        # Perform unboard: remove stale passenger refs, clear transport flags, add to spatial map
+        if hasattr(carrier, "passengers"):
+            while unit in carrier.passengers:
+                carrier.passengers.remove(unit)
+        for maybe_carrier in self.units:
+            if maybe_carrier is carrier:
+                continue
+            passengers = getattr(maybe_carrier, "passengers", None)
+            if passengers and unit in passengers:
+                while unit in passengers:
+                    passengers.remove(unit)
         unit.transport_host = None
         unit.is_transported = False
         # Place unit into dest offset coords
         offset_coords = dest_hex.axial_to_offset()
+        self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
         return True

@@ -194,7 +194,26 @@ class MovementService:
             self._interception_attempted_units = set()
 
     def _move_units_with_interception(self, units, target_hex):
-        path = self._build_movement_hex_path(units, target_hex)
+        plans = {}
+        for unit in units:
+            ok, reason, cost, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
+            if not ok:
+                return MoveUnitsResult(moved=[], errors=[reason or f"{unit.id} cannot move."])
+            final_hexside = getattr(unit, "river_hexside", None)
+            if unit.unit_type == UnitType.FLEET and state_path:
+                final_hexside = state_path[-1][1]
+            plans[unit] = {
+                "cost": cost,
+                "final_hexside": final_hexside,
+                "state_path": state_path,
+            }
+
+        lead = units[0]
+        path = self._build_movement_hex_path(
+            units,
+            target_hex,
+            precomputed_state_path=plans.get(lead, {}).get("state_path"),
+        )
         if path is None:
             return MoveUnitsResult(moved=[], errors=["Selected stack has no valid path."])
         if not path:
@@ -204,7 +223,7 @@ class MovementService:
             for unit in list(units):
                 if not getattr(unit, "is_on_map", False):
                     continue
-                self.game_state.move_unit(unit, step_hex)
+                self._relocate_unit_for_interception_step(unit, step_hex)
 
             movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
             if not movers_alive:
@@ -218,9 +237,17 @@ class MovementService:
             if intercepted:
                 print(f"Interception resolved at {step_hex.axial_to_offset()}.")
 
+        for unit in units:
+            if not getattr(unit, "is_on_map", False):
+                continue
+            plan = plans.get(unit)
+            if not plan:
+                continue
+            self._finalize_interception_move(unit, plan)
+
         return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
 
-    def _build_movement_hex_path(self, units, target_hex):
+    def _build_movement_hex_path(self, units, target_hex, precomputed_state_path=None):
         lead = units[0]
         if not getattr(lead, "position", None) or lead.position[0] is None or lead.position[1] is None:
             return []
@@ -229,9 +256,11 @@ class MovementService:
             return []
 
         if lead.unit_type == UnitType.FLEET:
-            ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, lead, target_hex)
-            if not ok:
-                return None
+            state_path = precomputed_state_path
+            if state_path is None:
+                ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, lead, target_hex)
+                if not ok:
+                    return None
             if not state_path:
                 return []
             hex_path = []
@@ -297,18 +326,36 @@ class MovementService:
             if 1 <= dist <= 6:
                 key = tuple(unit.position)
                 by_hex.setdefault(key, []).append(unit)
+        return list(by_hex.items())
 
-        groups = []
-        for offset, stack in by_hex.items():
-            eligible = [
-                u for u in stack
-                if self._can_unit_intercept_target(u, moving_units)
-                and self._dragon_interceptor_has_required_commander(u)
-                and (u.id, getattr(u, "ordinal", 1)) not in self._interception_attempted_units
-            ]
-            if eligible:
-                groups.append((offset, eligible))
-        return groups
+    def _relocate_unit_for_interception_step(self, unit, target_hex):
+        self.game_state.map.remove_unit_from_spatial_map(unit)
+        unit.position = target_hex.axial_to_offset()
+        unit.escaped = False
+        self.game_state.map.add_unit_to_spatial_map(unit)
+
+        passengers = getattr(unit, "passengers", None)
+        if passengers:
+            for p in passengers:
+                p.position = unit.position
+                p.is_transported = True
+                p.transport_host = unit
+
+        apply_escape = getattr(self.game_state, "_apply_escape_if_eligible", None)
+        if callable(apply_escape):
+            apply_escape(unit, unit.position)
+
+    def _finalize_interception_move(self, unit, plan):
+        if not hasattr(unit, "movement_points"):
+            unit.movement_points = unit.movement
+        cost = int(plan.get("cost", 0) or 0)
+        effective_mp = effective_movement_points(unit)
+        if cost > 0:
+            unit.movement_points = max(0, effective_mp - cost)
+        if getattr(self.game_state, "phase", None) == GamePhase.MOVEMENT:
+            unit.moved_this_turn = True
+            if unit.unit_type == UnitType.FLEET:
+                unit.river_hexside = plan.get("final_hexside", getattr(unit, "river_hexside", None))
 
     @staticmethod
     def _hex_distance(unit, target_hex):

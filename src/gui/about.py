@@ -72,7 +72,7 @@ ABOUT_HTML = """
   <hr>
 
   <h3 class="mono">Contact / Credits</h3>
-  <p class="mono"><b>Creator</b>: Tony J. Soler (<contact@example.com>)</p>
+  <p class="mono"><b>Creator</b>: <a href="mailto:redtony@gmail.com?subject=About DoG">Tony J. Soler</a></p>
 
   <hr>
 

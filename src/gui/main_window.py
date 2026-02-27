@@ -78,10 +78,12 @@ class MainWindow(QMainWindow):
 
         self.status_tab = StatusTab(self.game_state)
         self.tabs.addTab(self.status_tab, "Status")
+        self.status_tab.unit_double_clicked.connect(self.focus_unit_on_map)
 
         # NEW ASSETS TAB
         self.assets_tab = AssetsTab(self.game_state)
         self.tabs.addTab(self.assets_tab, "Assets")
+        self.assets_tab.unit_double_clicked.connect(self.focus_unit_on_map)
 
         # Placeholder (Heroes Registry)
         self.heroes_tab = QWidget()
@@ -220,6 +222,20 @@ class MainWindow(QMainWindow):
             f"icon_hits={hits_after - hits_before} icon_misses={misses_after - misses_before}"
         )
         QTimer.singleShot(0, lambda s=seq, n=tab_name: self._log_tab_switch_settled(s, n))
+
+    def focus_unit_on_map(self, unit):
+        if not unit:
+            return
+        if not getattr(unit, "is_on_map", False):
+            return
+        position = getattr(unit, "position", None)
+        if not position or position == (None, None):
+            return
+
+        col, row = position
+        center = self.map_view.get_hex_center(col, row)
+        self.tabs.setCurrentWidget(self.map_tab)
+        QTimer.singleShot(0, lambda p=center: self.map_view.centerOn(p))
 
     def _log_tab_switch_settled(self, seq, tab_name):
         t0 = self._tab_switch_started.pop(seq, None)

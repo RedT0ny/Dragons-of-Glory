@@ -353,6 +353,7 @@ class AllegiancePanel(QWidget):
     Used in StatusTab and AssetsTab.
     """
     unit_selected = Signal(object) # Emits the selected unit (or None)
+    unit_double_clicked = Signal(object) # Emits the double-clicked unit
 
     def __init__(self, game_state, allegiance, columns, parent=None, title=None):
         super().__init__(parent)
@@ -468,6 +469,7 @@ class AllegiancePanel(QWidget):
 
             table = UnitTable(self.columns)
             table.itemSelectionChanged.connect(lambda t=table: self.on_table_selection(t))
+            table.itemDoubleClicked.connect(self.on_table_item_double_clicked)
             table.set_units(units, self.game_state)
             self._adjust_table_height(table)
             self.container_layout.addWidget(table)
@@ -513,3 +515,12 @@ class AllegiancePanel(QWidget):
         if unit_item:
             unit = unit_item.data(Qt.UserRole)
             self.unit_selected.emit(unit)
+
+    def on_table_item_double_clicked(self, item):
+        if item is None:
+            return
+        unit_item = item.tableWidget().item(item.row(), 0)
+        if unit_item:
+            unit = unit_item.data(Qt.UserRole)
+            if unit is not None:
+                self.unit_double_clicked.emit(unit)

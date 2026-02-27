@@ -230,6 +230,8 @@ class Board:
         if key in self.unit_map:
             if unit in self.unit_map[key]:
                 self.unit_map[key].remove(unit)
+                if not self.unit_map[key]:
+                    del self.unit_map[key]
 
     def is_ship_bridge(self, from_hex, to_hex, alliance):
         """

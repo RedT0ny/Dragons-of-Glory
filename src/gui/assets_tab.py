@@ -159,6 +159,7 @@ class AssetDetails(QFrame):
 class AssetsTab(QWidget):
     asset_assign_requested = Signal(object, object)  # asset, unit
     asset_remove_requested = Signal(object, object)  # asset, unit
+    unit_double_clicked = Signal(object)
 
     def __init__(self, game_state):
         super().__init__()
@@ -276,6 +277,7 @@ class AssetsTab(QWidget):
             ]
             self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")
             self.unit_panel.unit_selected.connect(self.on_unit_selected)
+            self.unit_panel.unit_double_clicked.connect(self.unit_double_clicked.emit)
             self.panel_layout.addWidget(self.unit_panel)
             self.unit_panel_allegiance = player.allegiance
         else:

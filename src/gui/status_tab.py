@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import QWidget, QHBoxLayout
+from PySide6.QtCore import Signal
 from time import perf_counter
 from src.content.config import DEBUG
 from src.content.constants import WS, HL, NEUTRAL
@@ -6,6 +7,8 @@ from src.gui.unit_panel import AllegiancePanel
 from src.content.specs import UnitColumn
 
 class StatusTab(QWidget):
+    unit_double_clicked = Signal(object)
+
     def __init__(self, game_state):
         super().__init__()
         self.game_state = game_state
@@ -27,6 +30,8 @@ class StatusTab(QWidget):
             HL: AllegiancePanel(self.game_state, HL, self.columns, title=HL),
             NEUTRAL: AllegiancePanel(self.game_state, NEUTRAL, self.columns, title=NEUTRAL),
         }
+        for panel in self.panels.values():
+            panel.unit_double_clicked.connect(self.unit_double_clicked.emit)
         self.main_layout.addWidget(self.panels[WS])
         self.main_layout.addWidget(self.panels[HL])
         self.main_layout.addWidget(self.panels[NEUTRAL])
