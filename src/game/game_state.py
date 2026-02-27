@@ -2134,6 +2134,7 @@ class GameState:
         # clamp remaining movement immediately to avoid range/deduction mismatches.
         if hasattr(carrier, "movement_points"):
             carrier.movement_points = min(carrier.movement_points, carrier.movement)
+        self._normalize_transport_state()
         return True
 
     def unboard_unit(self, unit, target_hex=None):
@@ -2179,4 +2180,64 @@ class GameState:
         self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
+        self._normalize_transport_state()
         return True
+
+    def _normalize_transport_state(self):
+        """
+        Repairs carrier/passenger graph invariants after board/unboard operations:
+        - No duplicate passenger entries per carrier.
+        - A passenger belongs to at most one carrier list.
+        - passenger.transport_host <-> carrier.passengers stays bidirectionally consistent.
+        - Transported units are not present in the spatial map.
+        """
+        if not self.units:
+            return
+
+        carriers = [u for u in self.units if hasattr(u, "passengers")]
+        passenger_owner = {}
+
+        for carrier in carriers:
+            raw = list(getattr(carrier, "passengers", []) or [])
+            cleaned = []
+            seen = set()
+            for passenger in raw:
+                if passenger is None or passenger is carrier:
+                    continue
+                marker = id(passenger)
+                if marker in seen:
+                    continue
+                if marker in passenger_owner:
+                    continue
+                seen.add(marker)
+                passenger_owner[marker] = carrier
+                cleaned.append(passenger)
+            carrier.passengers = cleaned
+
+        for unit in self.units:
+            host = getattr(unit, "transport_host", None)
+            if host is None:
+                continue
+            if not hasattr(host, "passengers"):
+                unit.transport_host = None
+                unit.is_transported = False
+                continue
+            if unit not in host.passengers:
+                host.passengers.append(unit)
+            unit.is_transported = True
+            if host.position and host.position != (None, None):
+                unit.position = host.position
+            self.map.remove_unit_from_spatial_map(unit)
+
+        for carrier in carriers:
+            valid = []
+            seen = set()
+            for passenger in carrier.passengers:
+                if getattr(passenger, "transport_host", None) is not carrier:
+                    continue
+                marker = id(passenger)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                valid.append(passenger)
+            carrier.passengers = valid
