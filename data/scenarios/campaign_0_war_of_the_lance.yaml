@@ -93,16 +93,13 @@ scenario:
       # Deployment in Taman Busuk and Dark Temple
 
       countries:
-        dtemple:
-          units: all
-        taman:
-          units: all
-        green:
-          units: all
-        blue:
-          units: all
-        red:
-          units: all
+        dtemple: all
+        taman: all
+        black: all
+        blue: all
+        green: all
+        red: all
+        white: all
 
       explicit_units: [ "ariakas" ]
 

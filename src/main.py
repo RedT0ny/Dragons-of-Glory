@@ -1,6 +1,7 @@
 import sys, locale
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QTimer
 
 from src.gui.main_window import MainWindow
 from src.gui.intro_window import IntroWindow
@@ -80,9 +81,22 @@ class GameApp:
         self.view.set_controller(self.controller)
 
         self.audio_manager.play_game_playlist()
-        self.intro.close()
+        # Quiesce intro resources before processing gameplay phases.
+        # This avoids UI lifecycle races when loading directly from intro.
+        if self.intro is not None:
+            try:
+                if hasattr(self.intro, "movie") and self.intro.movie:
+                    self.intro.movie.stop()
+            except Exception:
+                pass
+            self.intro.hide()
+            self.intro.close()
+            self.intro.deleteLater()
+            self.intro = None
+
         self.view.showMaximized()
-        self.controller.start_game()
+        # Defer start one event-loop tick so window/layout/dialog parents are stable.
+        QTimer.singleShot(0, self.controller.start_game)
 
     def run(self):
         self.intro.show()
