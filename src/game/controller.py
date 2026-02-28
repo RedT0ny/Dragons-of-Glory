@@ -1,5 +1,5 @@
 ﻿# Conceptual example for game flow
-from PySide6.QtCore import QObject, QTimer
+from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
@@ -840,11 +840,7 @@ class GameController(QObject):
             (dlg.ready_unit_clicked, self.on_ready_unit_clicked),
             (dlg.finish_deployment_clicked, self.on_finish_deployment_clicked),
         ):
-            try:
-                sig.disconnect(slot)
-            except Exception:
-                pass
-            sig.connect(slot)
+            sig.connect(slot, Qt.UniqueConnection)
 
     def on_conscription_requested(self, kept_unit, discarded_unit):
         self.game_state.apply_conscription(kept_unit, discarded_unit)

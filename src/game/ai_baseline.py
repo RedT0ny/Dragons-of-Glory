@@ -132,34 +132,188 @@ class BaselineAIPlayer:
         best = None
         best_score = float("-inf")
         for country in neutrals[:10]:
-            attempt = self.diplomacy_service.build_activation_attempt(country.id)
-            if not attempt:
-                continue
-            unit_count = sum(1 for u in self.game_state.units if getattr(u, "land", None) == country.id)
-            score = (
-                int(getattr(attempt, "target_rating", 0) or 0) * 20
-                + unit_count * 12
-                + self._country_objective_relevance(side, country.id) * 50
-            )
+            # Evaluate both activation and invasion options
+            activation_score = self._score_activation_target(country.id, side)
+            invasion_score = self._score_invasion_target(country.id, side)
+            
+            # Choose the better approach
+            if activation_score > invasion_score:
+                score = activation_score
+                approach = "activation"
+            else:
+                score = invasion_score
+                approach = "invasion"
+            
             if score > best_score:
                 best_score = score
                 best = country
+                best_approach = approach
 
         if not best:
             return False, None
 
-        attempt = self.diplomacy_service.build_activation_attempt(best.id)
-        if not attempt:
-            return False, None
-        bonus = int(getattr(attempt, "event_activation_bonus", 0) or 0)
-        roll = self.diplomacy_service.roll_activation(attempt.target_rating, roll_bonus=bonus)
-        if not roll.success:
-            return False, best.id
+        if best_approach == "activation":
+            attempt = self.diplomacy_service.build_activation_attempt(best.id)
+            if not attempt:
+                return False, None
+            bonus = int(getattr(attempt, "event_activation_bonus", 0) or 0)
+            roll = self.diplomacy_service.roll_activation(attempt.target_rating, roll_bonus=bonus)
+            if not roll.success:
+                return False, best.id
 
-        self.diplomacy_service.activate_country(best.id, side)
-        deployed = self.deploy_all_ready_units(side, allow_territory_wide=True, country_filter=best.id)
-        print(f"AI activation success: {best.id}. Deployed units: {deployed}")
-        return True, best.id
+            self.diplomacy_service.activate_country(best.id, side)
+            deployed = self.deploy_all_ready_units(side, allow_territory_wide=True, country_filter=best.id)
+            print(f"AI activation success: {best.id}. Deployed units: {deployed}")
+            return True, best.id
+        
+        else:
+            # Execute invasion
+            return self._execute_invasion(best.id, side)
+
+    def _score_activation_target(self, country_id: str, side: str) -> int:
+        """Score country for diplomatic activation approach"""
+        attempt = self.diplomacy_service.build_activation_attempt(country_id)
+        if not attempt:
+            return -9999
+        
+        unit_count = sum(1 for u in self.game_state.units if getattr(u, "land", None) == country_id)
+        return (
+            int(getattr(attempt, "target_rating", 0) or 0) * 20
+            + unit_count * 12
+            + self._country_objective_relevance(side, country_id) * 50
+        )
+
+    def _score_invasion_target(self, country_id: str, side: str) -> int:
+        """
+        Score invasion target country for Highlord AI
+        Returns: score (higher = better target)
+        """
+        country = self.game_state.countries.get(country_id)
+        if not country or getattr(country, "allegiance", None) != NEUTRAL:
+            return -9999
+
+        # 1. Activation likelihood (primary factor)
+        activation_score = self._estimate_activation_likelihood(country_id, side) * 100
+
+        # 2. Military strength assessment
+        strength_score = self._assess_military_balance(country_id, side)
+
+        # 3. Strategic importance
+        strategic_score = self._country_objective_relevance(side, country_id) * 50
+
+        # 4. Current engagement load
+        engagement_penalty = self._current_engagement_penalty(side)
+
+        # 5. Border presence bonus
+        border_bonus = self._border_presence_bonus(country_id, side) * 30
+
+        return activation_score + strength_score + strategic_score - engagement_penalty + border_bonus
+
+    def _estimate_activation_likelihood(self, country_id: str, side: str) -> float:
+        """Estimate likelihood of country siding with Highlord (0.0-1.0)"""
+        attempt = self.diplomacy_service.build_activation_attempt(country_id)
+        if not attempt:
+            return 0.0
+
+        base_rating = float(getattr(attempt, "target_rating", 0) or 0)
+        # Normalize to 0-1 scale (assuming ratings are 0-100)
+        return min(1.0, base_rating / 100.0)
+
+    def _assess_military_balance(self, country_id: str, side: str) -> int:
+        """Assess military balance between Highlord and target country"""
+        country_units = sum(1 for u in self.game_state.units
+                           if getattr(u, "land", None) == country_id
+                           and getattr(u, "status", None) == UnitState.READY)
+
+        # Compare with Highlord's available forces
+        hl_units = sum(1 for u in self.game_state.units
+                      if getattr(u, "allegiance", None) == side
+                      and getattr(u, "status", None) in (UnitState.READY, UnitState.ACTIVE))
+
+        # Favor targets where we have 2:1 advantage or they have minimal forces
+        if hl_units >= country_units * 2:
+            return 80
+        elif hl_units >= country_units:
+            return 50
+        elif country_units <= 2:  # Very weak target
+            return 40
+        else:
+            return -30  # Avoid strong targets
+
+    def _current_engagement_penalty(self, side: str) -> int:
+        """Penalize if Highlord is already engaged in multiple conflicts"""
+        # Count active combat zones
+        combat_zones = len([u for u in self.game_state.units
+                           if getattr(u, "allegiance", None) == side
+                           and getattr(u, "attacked_this_turn", False)])
+
+        if combat_zones >= 3:
+            return 120  # Heavy penalty for 3+ engagements
+        elif combat_zones >= 2:
+            return 60
+        return 0
+
+    def _border_presence_bonus(self, country_id: str, side: str) -> int:
+        """Bonus for having units positioned at country borders"""
+        # Use the existing movement service to get invasion force data
+        invasion_data = self.movement_service.get_invasion_force(country_id)
+        
+        # Return number of border hexes with Highlord presence (capped at 3)
+        return min(3, len(invasion_data.get("border_hexes", set())))
+
+    def _execute_invasion(self, country_id: str, side: str) -> tuple[bool, str | None]:
+        """Execute invasion of target country"""
+        country = self.game_state.countries.get(country_id)
+        if not country:
+            return False, None
+
+        # Use existing movement service to get invasion force
+        invasion_data = self.movement_service.get_invasion_force(country_id)
+        
+        if not invasion_data.get("units"):
+            return False, country_id
+
+        # Find first border hex with enemy units for combat
+        target_hex = None
+        defenders = []
+        
+        for border_hex_coords in invasion_data.get("border_hexes", set()):
+            hex_obj = Hex.offset_to_axial(border_hex_coords[0], border_hex_coords[1])
+            potential_defenders = [u for u in self.game_state.get_units_at(hex_obj)
+                                 if getattr(u, "is_on_map", False)
+                                 and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)]
+            if potential_defenders:
+                target_hex = hex_obj
+                defenders = potential_defenders
+                break
+
+        if not target_hex:
+            return False, country_id
+
+        # Resolve combat with invasion forces
+        resolution = self.game_state.resolve_combat(invasion_data["units"], target_hex)
+        show_combat_result_popup(
+            self.game_state,
+            title="Invasion Combat",
+            attackers=invasion_data["units"],
+            defenders=defenders,
+            resolution=resolution,
+            context="ai_invasion",
+            target_hex=target_hex,
+        )
+
+        # Mark units as attacked
+        for u in invasion_data["units"]:
+            u.attacked_this_turn = True
+
+        if resolution and resolution.get("advance_available"):
+            try:
+                self.game_state.advance_after_combat(invasion_data["units"], target_hex)
+            except Exception:
+                pass
+
+        print(f"AI invasion executed against {country_id}")
+        return True, country_id
 
     # ---------- Assets ----------
     def assign_assets(self, side: str) -> int:
