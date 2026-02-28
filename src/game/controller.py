@@ -238,6 +238,12 @@ class GameController(QObject):
             return
         self._processing_turn_tick = True
         try:
+            if self._invasion_deployment_active and self._invasion_deployment_allegiance:
+                invasion_player = self.game_state.players.get(self._invasion_deployment_allegiance)
+                if invasion_player and not invasion_player.is_ai:
+                    print("AI paused for invasion deployment")
+                    self.ai_timer.stop()
+                    return
             if self.game_state.game_over:
                 self._announce_victory_if_needed()
                 self.ai_timer.stop()
@@ -567,7 +573,7 @@ class GameController(QObject):
         self._schedule_deferred(self.process_game_turn)
 
     def execute_simple_ai_logic(self, side):
-        return self.ai_baseline.execute_best_movement(side)
+        return self.ai_baseline.execute_best_movement(side, attempt_invasion=self._attempt_invasion)
 
     def on_unit_selection_changed(self, selected_units):
         """Called when user changes selection in the Unit Table."""
@@ -930,6 +936,11 @@ class GameController(QObject):
         self.view.highlight_movement_range([])
         self.view.sync_with_model()
         self._refresh_info_panel()
+        self._refresh_turn_panel()
+        self.connect_map_view_signals()
+        self.check_active_player()
+        if self.game_state.current_player and self.game_state.current_player.is_ai:
+            self._schedule_deferred(self.process_game_turn)
 
     def _attempt_invasion(self, country_id):
         from PySide6.QtWidgets import QMessageBox
@@ -988,6 +999,7 @@ class GameController(QObject):
         self._invasion_deployment_active = True
         self._invasion_deployment_country_id = country_id
         self._invasion_deployment_allegiance = allegiance
+        self.ai_timer.stop()
 
         if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()

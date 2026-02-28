@@ -93,7 +93,9 @@ scenario:
       # Deployment in Taman Busuk and Dark Temple
 
       countries:
-        dtemple: all
+        dtemple:
+          units: all
+          ready: 0
         taman: all
         black: all
         blue: all

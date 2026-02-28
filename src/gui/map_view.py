@@ -194,7 +194,7 @@ class AnsalonMapView(QGraphicsView):
                 deployment_session_active = bool(controller._is_deployment_session_active())
         except Exception:
             deployment_session_active = False
-        if not is_human:
+        if not is_human and not deployment_session_active:
             super().mousePressEvent(event)
             return
         if not interactive_phase and not deployment_active and not deployment_session_active:
