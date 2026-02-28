@@ -1,6 +1,7 @@
 ﻿# Conceptual example for game flow
 from PySide6.QtCore import QObject, QTimer
 from time import monotonic
+import shiboken6
 
 from src.content import loader
 from src.content.config import CALENDAR_DATA
@@ -9,6 +10,7 @@ from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyActivationService
 from src.game.movement import MovementService
 from src.game.ai_baseline import BaselineAIPlayer
+from src.content.runtime_diagnostics import RuntimeDiagnostics
 
 
 class GameController(QObject):
@@ -87,7 +89,8 @@ class GameController(QObject):
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch
-        QTimer.singleShot(0, lambda: self._run_deferred_if_current(epoch, callback))
+        callback_name = getattr(callback, "__name__", callback.__class__.__name__)
+        QTimer.singleShot(1, lambda: self._run_deferred_if_current(epoch, callback, callback_name))
 
     def _is_human_interactive_turn(self) -> bool:
         """
@@ -98,10 +101,17 @@ class GameController(QObject):
             return False
         return self.game_state.phase in {GamePhase.DEPLOYMENT, GamePhase.REPLACEMENTS, GamePhase.MOVEMENT, GamePhase.COMBAT}
 
-    def _run_deferred_if_current(self, epoch, callback):
+    def _run_deferred_if_current(self, epoch, callback, callback_name="callback"):
         if epoch != self._deferred_epoch:
+            RuntimeDiagnostics.record_event(
+                f"Deferred skipped (epoch mismatch): {callback_name}"
+            )
             return
-        callback()
+        RuntimeDiagnostics.record_event(f"Deferred start: {callback_name}")
+        try:
+            callback()
+        finally:
+            RuntimeDiagnostics.record_event(f"Deferred end: {callback_name}")
 
     def prepare_for_state_load(self):
         """
@@ -116,7 +126,7 @@ class GameController(QObject):
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
         self.game_state.clear_movement_undo()
-        if self.replacements_dialog:
+        if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
             self.replacements_dialog = None
         if self.combat_click_handler:
@@ -131,7 +141,11 @@ class GameController(QObject):
         self._deployment_session_unit_ids.clear()
 
     def _is_deployment_session_active(self):
-        return bool(self.replacements_dialog and self.replacements_dialog.isVisible())
+        return self._is_replacements_dialog_visible()
+
+    def _is_replacements_dialog_visible(self):
+        dlg = self.replacements_dialog
+        return bool(dlg and shiboken6.isValid(dlg) and dlg.isVisible())
 
     def _can_redeploy_unit_now(self, unit):
         if not self._is_deployment_session_active():
@@ -140,7 +154,10 @@ class GameController(QObject):
             return False
         if unit.id not in self._deployment_session_unit_ids:
             return False
-        if unit.allegiance != self.game_state.active_player:
+        expected_allegiance = self.game_state.active_player
+        if self._invasion_deployment_active and self._invasion_deployment_allegiance:
+            expected_allegiance = self._invasion_deployment_allegiance
+        if unit.allegiance != expected_allegiance:
             return False
         if unit.status != UnitState.ACTIVE or not getattr(unit, "is_on_map", False):
             return False
@@ -148,7 +165,7 @@ class GameController(QObject):
 
     def on_map_units_clicked(self, clicked_units):
         """Allow redeploying units placed during the current deployment session."""
-        if not self._is_human_interactive_turn():
+        if not self._is_human_interactive_turn() and not self._is_deployment_session_active():
             return
         # Ignore stack-click redeploy logic while the user is actively placing a unit.
         # Deployment clicks on occupied hexes emit units_clicked before placement handling.
@@ -180,11 +197,11 @@ class GameController(QObject):
             unit.river_hexside = None
 
         def _deferred_redeploy_sync():
-            if self.replacements_dialog and self.replacements_dialog.isVisible():
+            if self._is_replacements_dialog_visible():
                 self.replacements_dialog.refresh()
             self.view.sync_with_model()
             self._refresh_info_panel()
-            if self.replacements_dialog and self.replacements_dialog.isVisible():
+            if self._is_replacements_dialog_visible():
                 self.on_ready_unit_clicked(unit, self.replacements_dialog.allow_territory_deploy)
 
         self._schedule_deferred(_deferred_redeploy_sync)
@@ -245,9 +262,13 @@ class GameController(QObject):
                     print(f"AI deployment complete. Deployed: {deployed}")
                     self.game_state.advance_phase()
                 else:
-                    if not self.replacements_dialog or not self.replacements_dialog.isVisible():
+                    if not self._is_replacements_dialog_visible():
                         from src.gui.replacements_dialog import ReplacementsDialog
-                        self.replacements_dialog = ReplacementsDialog(self.game_state, self.view, self.view)
+                        self.replacements_dialog = ReplacementsDialog(
+                            self.game_state,
+                            self.view,
+                            parent=self.view.window(),
+                        )
                         self._connect_replacements_dialog_signals()
                         self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
                         self.replacements_dialog.show()
@@ -260,9 +281,13 @@ class GameController(QObject):
                     print(f"AI replacements complete. Conscriptions: {conscriptions}, deployed: {deployed}")
                     self.game_state.advance_phase()
                 else:
-                    if not self.replacements_dialog or not self.replacements_dialog.isVisible():
+                    if not self._is_replacements_dialog_visible():
                         from src.gui.replacements_dialog import ReplacementsDialog
-                        self.replacements_dialog = ReplacementsDialog(self.game_state, self.view, self.view)
+                        self.replacements_dialog = ReplacementsDialog(
+                            self.game_state,
+                            self.view,
+                            parent=self.view.window(),
+                        )
                         self._connect_replacements_dialog_signals()
                         self.replacements_dialog.show()
                         self._begin_deployment_session()
@@ -428,7 +453,10 @@ class GameController(QObject):
         """Helper to refresh side panel if accessible."""
         main_window = self.view.window()
         if hasattr(main_window, 'info_panel'):
-            main_window.info_panel.refresh()
+            # Stability guard: avoid frequent mini-map scene churn during high-frequency
+            # movement/combat updates.
+            if self.game_state.phase not in {GamePhase.MOVEMENT, GamePhase.COMBAT}:
+                main_window.info_panel.refresh()
             main_window.info_panel.set_undo_enabled(
                 self.game_state.phase == GamePhase.MOVEMENT and self.game_state.can_undo_movement()
             )
@@ -494,7 +522,7 @@ class GameController(QObject):
         self._last_end_phase_request_at = now
 
         if self._invasion_deployment_active:
-            if self.replacements_dialog:
+            if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
                 self.replacements_dialog.close()
                 self.replacements_dialog = None
             self._end_deployment_session()
@@ -515,7 +543,7 @@ class GameController(QObject):
         self._end_phase_transition_pending = True
 
         # Close replacement dialog if open
-        if self.replacements_dialog:
+        if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
             self.replacements_dialog = None
         self._end_deployment_session()
@@ -586,6 +614,14 @@ class GameController(QObject):
         if self.game_state.phase == GamePhase.MOVEMENT:
             if not self.selected_units_for_movement:
                 return
+            try:
+                target = hex_obj.axial_to_offset()
+                selected_ids = ", ".join(u.id for u in self.selected_units_for_movement)
+                RuntimeDiagnostics.record_event(
+                    f"Movement click: target={target} units=[{selected_ids}]"
+                )
+            except Exception:
+                pass
             col, row = hex_obj.axial_to_offset()
             if (col, row) in self.neutral_warning_hexes:
                 from PySide6.QtWidgets import QMessageBox
@@ -614,6 +650,9 @@ class GameController(QObject):
             self.game_state.push_movement_undo_snapshot()
             move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
             if move_result.errors:
+                RuntimeDiagnostics.record_event(
+                    f"Movement blocked: target={hex_obj.axial_to_offset()} errors={move_result.errors}"
+                )
                 self.game_state.discard_last_movement_snapshot()
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
@@ -622,6 +661,10 @@ class GameController(QObject):
                     move_result.errors[0]
                 )
                 return
+            RuntimeDiagnostics.record_event(
+                f"Movement applied: target={hex_obj.axial_to_offset()} "
+                f"moved={[u.id for u in move_result.moved]}"
+            )
 
             # Clear selection/highlights
             self.view.highlight_movement_range([])
@@ -683,9 +726,15 @@ class GameController(QObject):
             invasion_deployment_country_id=self._invasion_deployment_country_id,
         )
         if not result.success:
+            RuntimeDiagnostics.record_event(
+                f"Deployment blocked: unit={unit.id} target={target_hex.axial_to_offset()} error={result.error}"
+            )
             print(result.error)
             return
         self._deployment_session_unit_ids.add(unit.id)
+        RuntimeDiagnostics.record_event(
+            f"Deployment applied: unit={unit.id} target={target_hex.axial_to_offset()}"
+        )
         
         # Sync the map on next tick; defer heavy dialog rebuild slightly to avoid
         # QWidget teardown/rebuild races right after deployment clicks.
@@ -694,7 +743,7 @@ class GameController(QObject):
             self._queue_replacements_dialog_refresh()
             # During deployment sessions, the minimap refresh is expensive and not required
             # for immediate interaction correctness.
-            if not (self.replacements_dialog and self.replacements_dialog.isVisible()):
+            if not self._is_replacements_dialog_visible():
                 self._refresh_info_panel()
         self._schedule_deferred(_deferred_sync)
         
@@ -702,7 +751,7 @@ class GameController(QObject):
 
     def _queue_replacements_dialog_refresh(self):
         dlg = self.replacements_dialog
-        if not dlg or not dlg.isVisible():
+        if not (dlg and shiboken6.isValid(dlg) and dlg.isVisible()):
             return
         if self._replacements_refresh_queued:
             return
@@ -711,7 +760,7 @@ class GameController(QObject):
         def _do_refresh():
             self._replacements_refresh_queued = False
             current = self.replacements_dialog
-            if not current or not current.isVisible():
+            if not (current and shiboken6.isValid(current) and current.isVisible()):
                 return
             if getattr(self.view, "deploying_unit", None) is not None:
                 QTimer.singleShot(80, self._queue_replacements_dialog_refresh)
@@ -767,7 +816,7 @@ class GameController(QObject):
 
         # Open Deployment Window
         self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
-                                                      parent=self.view,
+                                                      parent=self.view.window(),
                                                       filter_country_id=deployment_plan.country_filter,
                                                       allow_territory_deploy=True)
         self._connect_replacements_dialog_signals()
@@ -783,15 +832,23 @@ class GameController(QObject):
         )
 
     def _connect_replacements_dialog_signals(self):
-        if not self.replacements_dialog:
+        dlg = self.replacements_dialog
+        if not (dlg and shiboken6.isValid(dlg)):
             return
-        self.replacements_dialog.conscription_requested.connect(self.on_conscription_requested)
-        self.replacements_dialog.ready_unit_clicked.connect(self.on_ready_unit_clicked)
-        self.replacements_dialog.finish_deployment_clicked.connect(self.on_finish_deployment_clicked)
+        for sig, slot in (
+            (dlg.conscription_requested, self.on_conscription_requested),
+            (dlg.ready_unit_clicked, self.on_ready_unit_clicked),
+            (dlg.finish_deployment_clicked, self.on_finish_deployment_clicked),
+        ):
+            try:
+                sig.disconnect(slot)
+            except Exception:
+                pass
+            sig.connect(slot)
 
     def on_conscription_requested(self, kept_unit, discarded_unit):
         self.game_state.apply_conscription(kept_unit, discarded_unit)
-        if self.replacements_dialog:
+        if self._is_replacements_dialog_visible():
             self.replacements_dialog.refresh()
 
     def on_depleted_merge_requested(self, unit1, unit2):
@@ -859,13 +916,13 @@ class GameController(QObject):
 
     def on_finish_deployment_clicked(self):
         if not self._invasion_deployment_active:
-            if self.replacements_dialog:
+            if self._is_replacements_dialog_visible():
                 self.replacements_dialog.close()
                 self.replacements_dialog = None
             self._end_deployment_session()
             return
 
-        if self.replacements_dialog:
+        if self._is_replacements_dialog_visible():
             self.replacements_dialog.close()
             self.replacements_dialog = None
         self._end_deployment_session()
@@ -936,14 +993,14 @@ class GameController(QObject):
         self._invasion_deployment_country_id = country_id
         self._invasion_deployment_allegiance = allegiance
 
-        if self.replacements_dialog:
+        if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
             self.replacements_dialog = None
 
         self.replacements_dialog = ReplacementsDialog(
             self.game_state,
             self.view,
-            parent=self.view,
+            parent=self.view.window(),
             filter_country_id=country_id,
             allow_territory_deploy=True,
             invasion_mode=True

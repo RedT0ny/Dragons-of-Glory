@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
 
 from src.content.constants import WS, UI_COLORS
+from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import UnitState, GamePhase, UnitType
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
@@ -96,9 +97,17 @@ class AnsalonMapView(QGraphicsView):
 
     def wheelEvent(self, event):
         """Zoom with Ctrl+Wheel."""
-        if event.modifiers() == Qt.ControlModifier:
+        if self._sync_in_progress:
+            event.accept()
+            return
+        if event.modifiers() & Qt.ControlModifier:
             zoom_factor = 1.25 if event.angleDelta().y() > 0 else 1 / 1.25
-            self.scale(zoom_factor, zoom_factor)
+            current_zoom = self.transform().m11()
+            min_zoom = 0.20
+            max_zoom = 6.0
+            proposed_zoom = current_zoom * zoom_factor
+            if min_zoom <= proposed_zoom <= max_zoom:
+                self.scale(zoom_factor, zoom_factor)
             event.accept()
         else:
             super().wheelEvent(event)
@@ -177,10 +186,18 @@ class AnsalonMapView(QGraphicsView):
             GamePhase.COMBAT,
         }
         deployment_active = self.deploying_unit is not None
+        deployment_session_active = False
+        try:
+            win = self.window()
+            controller = getattr(win, "controller", None)
+            if controller and hasattr(controller, "_is_deployment_session_active"):
+                deployment_session_active = bool(controller._is_deployment_session_active())
+        except Exception:
+            deployment_session_active = False
         if not is_human:
             super().mousePressEvent(event)
             return
-        if not interactive_phase and not deployment_active:
+        if not interactive_phase and not deployment_active and not deployment_session_active:
             # Ignore map clicks outside normal human-interactive phases,
             # except when an explicit deployment selection is active
             # (e.g. strategic event/activation triggered deployments).
@@ -451,10 +468,12 @@ class AnsalonMapView(QGraphicsView):
         """Redraws the map based on the current GameState model."""
         if self._sync_in_progress:
             self._sync_pending = True
+            RuntimeDiagnostics.record_event("Map sync skipped: sync already in progress")
             return
 
         self._sync_in_progress = True
         try:
+            RuntimeDiagnostics.record_event("Map sync start")
             self._sync_pending = False
             if not self.map_rendered:
                 self.scene.clear()
@@ -485,6 +504,7 @@ class AnsalonMapView(QGraphicsView):
                 # Draw each stack
                 for pos, stack in units_by_hex.items():
                     self.draw_stack(stack, pos[0], pos[1])
+            RuntimeDiagnostics.record_event("Map sync end")
         finally:
             self._sync_in_progress = False
             if self._sync_pending:

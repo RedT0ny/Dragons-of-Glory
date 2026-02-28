@@ -227,7 +227,12 @@ class InfoPanel(QFrame):
         def _do_refresh():
             self._minimap_refresh_queued = False
             if self.mini_map:
-                self.mini_map.sync_with_model()
+                # Avoid frequent full scene rebuilds after every action.
+                # Mini-map only needs static map + allegiance colors for most updates.
+                if not getattr(self.mini_map, "map_rendered", False):
+                    self.mini_map.sync_with_model()
+                else:
+                    self.mini_map.update_allegiance_colors()
 
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, _do_refresh)

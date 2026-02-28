@@ -1,12 +1,11 @@
 import math, os
 
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtSvgWidgets import QGraphicsSvgItem
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsColorizeEffect
+from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
 
-from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, HL
+from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS
 from src.content.specs import UnitType, UnitRace, UnitState
 from src.content.utils import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
@@ -223,12 +222,26 @@ class UnitCounter(QGraphicsItem):
     - Transported unit (.is_transported): small rounded rect at top-right with carrier.ordinal
     """
     _renderer = None
+    _renderer_light = None
 
     @classmethod
     def get_shared_renderer(cls):
         if cls._renderer is None:
             cls._renderer = QSvgRenderer(os.path.join(ICONS_DIR, "units.svg"))
         return cls._renderer
+
+    @classmethod
+    def get_light_renderer(cls):
+        if cls._renderer_light is not None:
+            return cls._renderer_light
+        try:
+            with open(os.path.join(ICONS_DIR, "units.svg"), "r", encoding="utf-8") as f:
+                svg_text = f.read()
+            light_text = svg_text.replace("#000000", "#ffffff").replace("#000", "#fff")
+            cls._renderer_light = QSvgRenderer(QByteArray(light_text.encode("utf-8")))
+        except Exception:
+            cls._renderer_light = cls.get_shared_renderer()
+        return cls._renderer_light
 
     def __init__(self, unit, color, parent=None):
         super().__init__(parent)
@@ -237,53 +250,10 @@ class UnitCounter(QGraphicsItem):
         size = UNIT_SIZE
         self.unit_rect = QRectF(-size, -size, size*2, size*2)
         self.renderer = self.get_shared_renderer()
-
-        # Create and attach icon
-        self.icon = self.create_unit_icon()
-        if self.icon:
-            self.icon.setParentItem(self)
-            self.center_icon()
-
-    def center_icon(self):
-        if not self.icon:
-            return
-        icon_rect = self.icon.boundingRect()
-        target = UNIT_SIZE * 0.9
-        sx = target / icon_rect.width() if icon_rect.width() else 1.0
-        sy = target / icon_rect.height() if icon_rect.height() else 1.0
-        s = min(sx, sy)
-        self.icon.setScale(s)
-        # center
-        icon_rect = self.icon.sceneBoundingRect()
-        self.icon.setPos(self.unit_rect.center() - icon_rect.center())
-
-    def create_unit_icon(self):
-        item = QGraphicsSvgItem()
-        item.setSharedRenderer(self.renderer)
-        # Determine element id once and reuse; be defensive to avoid raising inside paint
         try:
-            element_id = self._get_element_id()
+            self._element_id = self._get_element_id() or "noicon"
         except Exception:
-            element_id = None
-
-        try:
-            if element_id:
-                item.setElementId(element_id)
-            else:
-                item.setElementId("noicon")
-        except Exception:
-            try:
-                item.setElementId("noicon")
-            except Exception:
-                pass
-
-        try:
-            if element_id and not self._is_precolored_group(element_id):
-                self._apply_allegiance_colors(item)
-        except Exception:
-            # Don't let coloring failures crash paint
-            pass
-        return item
+            self._element_id = "noicon"
 
     def _get_element_id(self):
         # Be defensive: unit_type and race may be None during some flows (tests/mocks)
@@ -319,20 +289,38 @@ class UnitCounter(QGraphicsItem):
     def _is_precolored_group(self, element_id):
         return isinstance(element_id, str) and (element_id.startswith('full-') or element_id.startswith('loc-'))
 
-    def _apply_allegiance_colors(self, icon):
-        """Simple colorization based on allegiance."""
-        allegiance = getattr(self.unit, 'allegiance', WS)
+    def _get_icon_renderer(self):
+        element_id = self._element_id or "noicon"
+        if self._is_precolored_group(element_id):
+            return self.renderer
+        allegiance = getattr(self.unit, "allegiance", WS)
+        if allegiance == WS:
+            return self.get_light_renderer()
+        return self.renderer
 
-        effect = QGraphicsColorizeEffect()
+    def _draw_icon(self, painter):
+        element_id = self._element_id or "noicon"
+        renderer = self._get_icon_renderer()
+        if not renderer.elementExists(element_id):
+            element_id = "noicon"
+        if not renderer.elementExists(element_id):
+            return
+        target_size = max(14, int(round(UNIT_SIZE * 0.9)))
+        bounds = renderer.boundsOnElement(element_id)
+        if bounds.isNull() or bounds.width() <= 0 or bounds.height() <= 0:
+            bounds = QRectF(0, 0, 1, 1)
 
-        if allegiance == HL:
-            effect.setColor(Qt.black)
-        elif allegiance == WS:
-            effect.setColor(Qt.white)
-        else:  # NEUTRAL
-            effect.setColor(Qt.gray)  # Gray
+        aspect = bounds.width() / bounds.height() if bounds.height() else 1.0
+        if aspect >= 1.0:
+            draw_w = target_size
+            draw_h = max(1.0, target_size / aspect)
+        else:
+            draw_h = target_size
+            draw_w = max(1.0, target_size * aspect)
 
-        icon.setGraphicsEffect(effect)
+        x = self.unit_rect.center().x() - (draw_w / 2.0)
+        y = self.unit_rect.center().y() - (draw_h / 2.0)
+        renderer.render(painter, element_id, QRectF(x, y, draw_w, draw_h))
 
     def boundingRect(self):
         padding = 4
@@ -344,6 +332,7 @@ class UnitCounter(QGraphicsItem):
         painter.setBrush(QBrush(self.color))
         painter.setPen(QPen(QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0), 2))
         painter.drawRoundedRect(self.unit_rect, 5, 5)
+        self._draw_icon(painter)
 
         # ID
         id_color, rating_color, move_color, movement_display = self._get_text_colors_and_movement()

@@ -13,12 +13,18 @@ from src.content.config import LOG_FILE, LOGS_DIR
 
 class RuntimeDiagnostics:
     """Lightweight runtime diagnostics for Qt/PySide crashes."""
+    _ACTIVE = None
 
     def __init__(self, logs_dir=LOGS_DIR, tail_file=LOG_FILE, recent_limit=200):
         self.logs_dir = logs_dir
         self.tail_file = tail_file
         self.recent_messages = deque(maxlen=recent_limit)
+        self.recent_events = deque(maxlen=recent_limit)
         self.qt_log_file = None
+        self.fault_log_file = None
+        self.fault_log_path = None
+        self.events_log_file = None
+        self.events_log_path = None
         self.installed = False
 
     def install(self):
@@ -32,25 +38,40 @@ class RuntimeDiagnostics:
         self._ensure_logs_dir()
         self._install_fault_handler()
         self._install_qt_logging()
+        self._install_event_logging()
         self._install_signal_handlers()
         self._install_exception_handler()
         atexit.register(self._write_qt_tail, "exit")
+        RuntimeDiagnostics._ACTIVE = self
 
     def _ensure_logs_dir(self):
         os.makedirs(self.logs_dir, exist_ok=True)
 
     def _install_fault_handler(self):
-        faulthandler.enable(all_threads=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.fault_log_path = os.path.join(self.logs_dir, f"fault_runtime_{timestamp}.log")
+        self.fault_log_file = open(self.fault_log_path, "a", encoding="utf-8", buffering=1)
+        self.fault_log_file.write(
+            f"[{datetime.now().isoformat(timespec='milliseconds')}] "
+            "Faulthandler enabled.\n"
+        )
+        self.fault_log_file.flush()
+        faulthandler.enable(file=self.fault_log_file, all_threads=True)
         if hasattr(faulthandler, "register"):
             if hasattr(signal, "SIGABRT"):
-                faulthandler.register(signal.SIGABRT, all_threads=True, chain=True)
+                faulthandler.register(signal.SIGABRT, file=self.fault_log_file, all_threads=True, chain=True)
             if hasattr(signal, "SIGSEGV"):
-                faulthandler.register(signal.SIGSEGV, all_threads=True, chain=True)
+                faulthandler.register(signal.SIGSEGV, file=self.fault_log_file, all_threads=True, chain=True)
+            if hasattr(signal, "SIGILL"):
+                faulthandler.register(signal.SIGILL, file=self.fault_log_file, all_threads=True, chain=True)
+            if hasattr(signal, "SIGFPE"):
+                faulthandler.register(signal.SIGFPE, file=self.fault_log_file, all_threads=True, chain=True)
+        print(f"Fault logging enabled: {self.fault_log_path}")
 
     def _install_qt_logging(self):
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         log_path = os.path.join(self.logs_dir, f"qt_runtime_{timestamp}.log")
-        self.qt_log_file = open(log_path, "a", encoding="utf-8")
+        self.qt_log_file = open(log_path, "a", encoding="utf-8", buffering=1)
 
         def _qt_handler(mode, context, message):
             if mode in (QtMsgType.QtDebugMsg, QtMsgType.QtInfoMsg):
@@ -86,6 +107,33 @@ class RuntimeDiagnostics:
         qInstallMessageHandler(_qt_handler)
         print(f"Qt runtime logging enabled: {log_path}")
 
+    def _install_event_logging(self):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.events_log_path = os.path.join(self.logs_dir, f"runtime_events_{timestamp}.log")
+        self.events_log_file = open(self.events_log_path, "a", encoding="utf-8", buffering=1)
+        self.record("Runtime event logging enabled.")
+        print(f"Runtime event logging enabled: {self.events_log_path}")
+
+    def record(self, message):
+        text = f"[{datetime.now().isoformat(timespec='milliseconds')}] {message}"
+        self.recent_events.append(text)
+        try:
+            if self.events_log_file:
+                self.events_log_file.write(text + "\n")
+                self.events_log_file.flush()
+            if self.fault_log_file:
+                self.fault_log_file.write(text + "\n")
+                self.fault_log_file.flush()
+        except Exception:
+            pass
+
+    @classmethod
+    def record_event(cls, message):
+        active = cls._ACTIVE
+        if not active:
+            return
+        active.record(message)
+
     def _install_signal_handlers(self):
         for sig_name in ("SIGABRT", "SIGTERM", "SIGINT"):
             sig = getattr(signal, sig_name, None)
@@ -105,9 +153,21 @@ class RuntimeDiagnostics:
             with open(self.tail_file, "w", encoding="utf-8") as f:
                 f.write(f"Reason: {reason}\n")
                 f.write(f"Timestamp: {datetime.now().isoformat(timespec='seconds')}\n")
+                f.write("Last 20 runtime events:\n")
+                for line in list(self.recent_events)[-20:]:
+                    f.write(line + "\n")
                 f.write("Last 20 Qt messages:\n")
                 for line in lines:
                     f.write(line + "\n")
+        except Exception:
+            pass
+        try:
+            if self.fault_log_file:
+                self.fault_log_file.write(
+                    f"[{datetime.now().isoformat(timespec='milliseconds')}] "
+                    f"Tail write reason={reason}\n"
+                )
+                self.fault_log_file.flush()
         except Exception:
             pass
 
