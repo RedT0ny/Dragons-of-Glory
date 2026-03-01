@@ -2,6 +2,7 @@ import heapq
 from collections import defaultdict
 
 from src.content.specs import HexsideType, UnitType, UnitRace, LocType, TerrainType
+from src.content.constants import NEUTRAL
 from src.game.country import Location
 
 
@@ -124,6 +125,7 @@ class Board:
                 hex_obj = Hex.offset_to_axial(col, row)
                 loc_obj = Location(loc_spec, country_id=None)
                 loc_obj.is_capital = False
+                loc_obj.occupier = NEUTRAL
                 self.locations[(hex_obj.q, hex_obj.r)] = loc_obj
 
         # 2. Add country locations (Cities, Capitals) - Override if conflict?
@@ -137,6 +139,7 @@ class Board:
                     col, row = loc_obj.coords
                     hex_obj = Hex.offset_to_axial(col, row)
                     loc_obj.country_id = country.id
+                    loc_obj.occupier = country.allegiance
                     self.locations[(hex_obj.q, hex_obj.r)] = loc_obj
 
     def populate_hexsides(self, hexsides_data: dict):

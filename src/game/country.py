@@ -63,7 +63,9 @@ class Country:
 
         # Initialize locations from the Spec
         for loc_spec in spec.locations:
-            self.locations[loc_spec.id] = Location(loc_spec, country_id=self.id)
+            loc = Location(loc_spec, country_id=self.id)
+            loc.occupier = self.allegiance
+            self.locations[loc_spec.id] = loc
 
     # --- Property Proxies ---
 

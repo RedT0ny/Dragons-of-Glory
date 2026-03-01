@@ -343,6 +343,8 @@ class GameController(QObject):
                         print(f"AI activated country {country_id}.")
                     else:
                         print("AI activation failed or skipped.")
+                    self._refresh_info_panel()
+                    self._refresh_minimap_allegiance()
                     self.game_state.advance_phase()
                     self.view.sync_with_model()
                     self._refresh_info_panel()
@@ -424,6 +426,8 @@ class GameController(QObject):
             self.check_active_player()
 
             state_after = (self.game_state.phase, self.game_state.active_player)
+            if state_before[0] == GamePhase.COMBAT and self.game_state.phase != GamePhase.COMBAT:
+                self._refresh_minimap_allegiance()
             if state_after != state_before and not self.game_state.phase_manager.should_auto_advance():
                 self._schedule_deferred(self.process_game_turn)
         finally:
@@ -466,6 +470,17 @@ class GameController(QObject):
             main_window.info_panel.set_undo_enabled(
                 self.game_state.phase == GamePhase.MOVEMENT and self.game_state.can_undo_movement()
             )
+
+    def _refresh_minimap_allegiance(self):
+        main_window = self.view.window()
+        info_panel = getattr(main_window, "info_panel", None)
+        mini_map = getattr(info_panel, "mini_map", None) if info_panel else None
+        if not mini_map:
+            return
+        if not getattr(mini_map, "map_rendered", False):
+            mini_map.sync_with_model()
+        else:
+            mini_map.update_allegiance_colors()
 
     def _refresh_turn_panel(self):
         main_window = self.view.window()
@@ -713,6 +728,8 @@ class GameController(QObject):
         """
         if self.diplomacy_service.activate_country(country_id, allegiance):
             print(f"Country {country_id} activated for {allegiance} via controller")
+            self._refresh_info_panel()
+            self._refresh_minimap_allegiance()
         else:
             print(f"Country {country_id} not found for activation.")
 
@@ -816,6 +833,7 @@ class GameController(QObject):
         from PySide6.QtWidgets import QMessageBox
 
         deployment_plan = self.diplomacy_service.build_deployment_plan(effects, active_player)
+        self._refresh_minimap_allegiance()
 
         # Stop timer so loop waits for user
         self.ai_timer.stop()

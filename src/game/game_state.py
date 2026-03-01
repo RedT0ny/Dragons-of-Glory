@@ -257,7 +257,8 @@ class GameState:
                 if lid not in country.locations or not isinstance(loc_state, dict):
                     continue
                 loc = country.locations[lid]
-                loc.occupier = loc_state.get("occupier", loc.occupier)
+                occupier = loc_state.get("occupier", loc.occupier)
+                loc.occupier = occupier if occupier in (HL, WS, NEUTRAL) else NEUTRAL
                 if "is_capital" in loc_state:
                     loc.is_capital = bool(loc_state["is_capital"])
 
@@ -1052,6 +1053,16 @@ class GameState:
                 u.status = UnitState.READY
                 u.allegiance = allegiance
 
+        # Update location occupiers to match new allegiance
+        from src.game.map import Hex
+        for loc in country.locations.values():
+            loc.occupier = allegiance
+            if loc.coords and hasattr(self.map, "locations"):
+                hex_obj = Hex.offset_to_axial(*loc.coords)
+                map_loc = self.map.locations.get((hex_obj.q, hex_obj.r))
+                if map_loc and map_loc is not loc:
+                    map_loc.occupier = allegiance
+
         self._apply_solamnic_tower_activation(country_id, previous_allegiance)
 
         print(f"Country {country_id} activated for {allegiance}")
@@ -1073,7 +1084,7 @@ class GameState:
         return sum(
             1
             for i, country in enumerate(country_list)
-            if i >= 7 and (country.allegiance == HL or country.conquered)
+            if i >= 7 and (country.allegiance == HL)
         )
 
     def _apply_solamnic_tower_activation(self, country_id: str, previous_allegiance: str):
@@ -1130,17 +1141,14 @@ class GameState:
     def can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
         """
         Rule 9 deployment ownership:
-        - Original owner can deploy only while location is not enemy-occupied.
-        - Conqueror can deploy from locations they occupy.
+        - Only friendly-occupied locations are eligible.
         """
         if allegiance not in (HL, WS):
             return False
         if not location or not location.coords:
             return False
 
-        if location.occupier == allegiance:
-            return True
-        return country.allegiance == allegiance and location.occupier == NEUTRAL
+        return location.occupier == allegiance
 
     def get_solamnic_group_deployment_locations(self, allegiance: str):
         """
@@ -1170,7 +1178,6 @@ class GameState:
                     continue
 
                 enemy = self.get_enemy_allegiance(country.allegiance)
-                occupier = None
                 hex_obj = Hex.offset_to_axial(*loc.coords)
 
                 if enemy:
@@ -1186,14 +1193,12 @@ class GameState:
                         )
                     ]
                     if occupying_units:
-                        occupier = enemy
-
-                loc.occupier = occupier
+                        loc.occupier = enemy
                 if hasattr(self.map, "locations"):
                     key = (hex_obj.q, hex_obj.r)
                     map_loc = self.map.locations.get(key)
                     if map_loc and map_loc is not loc:
-                        map_loc.occupier = occupier
+                        map_loc.occupier = loc.occupier
 
     def _is_country_fully_occupied_by_enemy(self, country) -> bool:
         enemy = self.get_enemy_allegiance(country.allegiance)
@@ -1203,7 +1208,7 @@ class GameState:
             return False
         return all(loc.occupier == enemy for loc in country.locations.values())
 
-    def _destroy_country_upon_conquest(self, country):
+    def _destroy_country_upon_conquest(self, country, conqueror: str):
         """
         Rule 9 effects:
         - Armies, Wings and Leaders are permanently DESTROYED.
@@ -1234,8 +1239,17 @@ class GameState:
             self.map.remove_unit_from_spatial_map(unit)
             destroyed_count += 1
 
+        country.allegiance = conqueror
         country.conquered = True
         print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
+
+    def _apply_country_conquest_or_liberation(self, country, conqueror: str):
+        if country.conquered:
+            country.allegiance = conqueror
+            country.conquered = False
+            print(f"Country {country.id} liberated for {conqueror}.")
+            return
+        self._destroy_country_upon_conquest(country, conqueror)
 
     def _enforce_conquered_fleet_replacement_rule(self):
         """
@@ -1264,13 +1278,13 @@ class GameState:
         for country in self.countries.values():
             if country.allegiance not in (HL, WS):
                 continue
-            if country.conquered:
-                continue
-            if self._country_has_tag(country, self.tag_knight_countries):
+            if self._country_has_tag(country, self.tag_knight_countries) and country.allegiance == WS:
                 # Solamnic conquest is resolved as a pooled rule below.
                 continue
             if self._is_country_fully_occupied_by_enemy(country):
-                self._destroy_country_upon_conquest(country)
+                conqueror = self.get_enemy_allegiance(country.allegiance)
+                if conqueror:
+                    self._apply_country_conquest_or_liberation(country, conqueror)
 
     def _apply_solamnic_group_conquest(self):
         """
@@ -1287,8 +1301,9 @@ class GameState:
             return
 
         for country in group:
-            if not country.conquered:
-                self._destroy_country_upon_conquest(country)
+            conqueror = self.get_enemy_allegiance(country.allegiance)
+            if conqueror:
+                self._apply_country_conquest_or_liberation(country, conqueror)
 
     def resolve_end_of_combat_conquest(self):
         """

@@ -411,16 +411,6 @@ class VictoryConditionEvaluator:
     def _is_country_controlled_by_side(country: Any, side: str) -> bool:
         """
         Control includes:
-        - Allied unconquered countries (country.allegiance == side and not conquered)
-        - Enemy-origin conquered countries where all locations are occupied by side
+        - Countries whose allegiance matches the side
         """
-        if getattr(country, "allegiance", None) == side and not bool(getattr(country, "conquered", False)):
-            return True
-
-        if not bool(getattr(country, "conquered", False)):
-            return False
-
-        locations = list(getattr(country, "locations", {}).values())
-        if not locations:
-            return False
-        return all(getattr(loc, "occupier", None) == side for loc in locations)
+        return getattr(country, "allegiance", None) == side

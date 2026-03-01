@@ -91,12 +91,12 @@ class DeploymentService:
                         and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
                         and not country.conquered
                     ):
-                        candidates = list(self.game_state.get_solamnic_group_deployment_locations(unit.allegiance))
+                        candidates = list(self._get_solamnic_group_deployment_locations(unit.allegiance))
                     else:
                     # Rule 9: owner cannot deploy into enemy-occupied locations.
                     # Conqueror can deploy from occupied locations (handled for stateless below).
                         for loc in country.locations.values():
-                            if loc.coords and self.game_state.can_use_location_for_deployment(country, loc, unit.allegiance):
+                            if loc.coords and self._can_use_location_for_deployment(country, loc, unit.allegiance):
                                 candidates.append(loc.coords)
             else:
                 # Handle stateless units (units without land) during REPLACEMENTS phase
@@ -106,8 +106,17 @@ class DeploymentService:
                     # Rule 9: includes original friendly locations plus conquered occupied locations.
                     for country_obj in self.game_state.countries.values():
                         for loc in country_obj.locations.values():
-                            if loc.coords and self.game_state.can_use_location_for_deployment(country_obj, loc, unit.allegiance):
+                            if loc.coords and self._can_use_location_for_deployment(country_obj, loc, unit.allegiance):
                                 candidates.append(loc.coords)
+                    # Special locations (no country) controlled by allegiance.
+                    for loc in getattr(self.game_state.map, "locations", {}).values():
+                        if getattr(loc, "country_id", None) is not None:
+                            continue
+                        if not getattr(loc, "coords", None):
+                            continue
+                        if getattr(loc, "occupier", None) != unit.allegiance:
+                            continue
+                        candidates.append(loc.coords)
 
         # 2. Filter based on Unit Type & Terrain
         valid_hexes = []
@@ -140,6 +149,20 @@ class DeploymentService:
             return True
         loc = self.game_state.map.get_location(hex_obj)
         return bool(loc and loc.loc_type == LocType.PORT.value)
+
+    def _can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
+        """
+        Deployment rule gateway. Keep logic centralized in GameState,
+        but make DeploymentService the single caller.
+        """
+        return self.game_state.can_use_location_for_deployment(country, location, allegiance)
+
+    def _get_solamnic_group_deployment_locations(self, allegiance: str):
+        """
+        Deployment rule gateway. Keep logic centralized in GameState,
+        but make DeploymentService the single caller.
+        """
+        return self.game_state.get_solamnic_group_deployment_locations(allegiance)
 
     def deploy_unit(
         self,
