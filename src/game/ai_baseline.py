@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import UnitType, UnitState
+from src.content.specs import UnitType, UnitState, LocType, TerrainType
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
@@ -46,6 +46,8 @@ class BaselineAIPlayer:
         objective_hexes = self._objective_hexes_for_side(side)
         for unit in ready_units:
             valid = self.game_state.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide)
+            if valid:
+                valid = [c for c in valid if not self._is_trapped_mountain_deploy(unit, c)]
             if not valid:
                 continue
             best = max(
@@ -537,7 +539,8 @@ class BaselineAIPlayer:
         if enemy_adj >= 3:
             risk -= 80
 
-        return int(dist_gain * 20 + enemy_here * 60 + enemy_adj * 25 + friendly_adj * 8 + risk)
+        relief_bonus = self._stack_relief_bonus(stack, target_coords, side)
+        return int(dist_gain * 20 + enemy_here * 60 + enemy_adj * 25 + friendly_adj * 8 + risk + relief_bonus)
 
     def _score_deployment_hex(self, unit, coords: tuple[int, int], objective_hexes: set[tuple[int, int]]) -> int:
         target_hex = Hex.offset_to_axial(coords[0], coords[1])
@@ -546,6 +549,60 @@ class BaselineAIPlayer:
         friendly_adj = self._adjacent_friendly_count(target_hex, side)
         enemy_adj = self._adjacent_enemy_count(target_hex, side)
         return int((0 if dist >= 999 else -dist * 12) + friendly_adj * 10 - enemy_adj * 14)
+
+    def _is_trapped_mountain_deploy(self, unit, coords: tuple[int, int]) -> bool:
+        target_hex = Hex.offset_to_axial(coords[0], coords[1])
+        terrain = self.game_state.map.get_terrain(target_hex)
+        if terrain != TerrainType.MOUNTAIN:
+            return False
+        for neighbor in target_hex.neighbors():
+            col, row = neighbor.axial_to_offset()
+            if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            cost = self.game_state.map.get_movement_cost(unit, target_hex, neighbor)
+            if cost != float("inf"):
+                return False
+        return True
+
+    def _stack_relief_bonus(self, stack, target_coords: tuple[int, int], side: str) -> int:
+        if not stack:
+            return 0
+        if not any(getattr(u, "is_army", lambda: False)() for u in stack):
+            return 0
+        start_pos = getattr(stack[0], "position", None)
+        if not start_pos or start_pos[0] is None:
+            return 0
+        if (start_pos[0], start_pos[1]) == target_coords:
+            return 0
+
+        start_hex = Hex.offset_to_axial(start_pos[0], start_pos[1])
+        loc = self.game_state.map.get_location(start_hex)
+        if not loc:
+            return 0
+
+        country = self.game_state.get_country_by_hex(start_pos[0], start_pos[1])
+        if not country:
+            return 0
+        ready_exists = any(
+            getattr(u, "allegiance", None) == side
+            and getattr(u, "status", None) == UnitState.READY
+            and not getattr(u, "is_on_map", False)
+            and getattr(u, "land", None) == country.id
+            for u in self.game_state.units
+        )
+        if not ready_exists:
+            return 0
+
+        units_here = [
+            u
+            for u in self.game_state.get_units_at(start_hex)
+            if getattr(u, "is_on_map", False) and getattr(u, "allegiance", None) == side
+        ]
+        army_count = sum(1 for u in units_here if getattr(u, "is_army", lambda: False)())
+        if army_count < 3:
+            return 0
+
+        return 260
 
     def _combat_candidates(self, side: str):
         candidates = []
