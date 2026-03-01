@@ -172,7 +172,7 @@ coastlund:
   strength: 18
   tags: [knight_countries]
   locations:
-    hargoth: {loc_type: city, coords: [19, 16]}
+    hargoth: {loc_type: port, coords: [19, 16]}
   territories:
     - [19, 13]
     - [20, 13]
@@ -429,7 +429,7 @@ haltigoth:
   alignment: [4, 4]
   strength: 12
   locations:
-    haltigoth_city: {loc_type: city, coords: [31, 25]}
+    haltigoth_city: {loc_type: port, coords: [31, 25]}
   territories:
     - [31, 25]
 
@@ -440,7 +440,7 @@ hylo:
   alignment: [4, -2]
   strength: 24
   locations:
-    kenderhome: {loc_type: city, coords: [16, 19]}
+    kenderhome: {loc_type: port, coords: [16, 19]}
   territories:
     - [13, 15]
     - [14, 14]
@@ -1504,7 +1504,7 @@ thank:
   alignment: [2, 4]
   strength: 16
   locations:
-    than_khal: {loc_type: city, coords: [17, 48]}
+    than_khal: {loc_type: port, coords: [17, 48]}
   territories:
     - [15, 46]
     - [16, 46]

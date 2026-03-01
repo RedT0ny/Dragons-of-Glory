@@ -7,16 +7,15 @@ Design overview:
 TODO:
 
 - Add Dragon #170's Advanced Rules in "settings"
-- Review country colors and unit icons to make them more distinguishable.
+- Review country colors and unit icons to make them more distinguishable (Partially done).
 - I18n
 
 TODO BUGFIX:
 
-- Fix AI not deploying draconians (move units out of the Dark Temple to leave room for draconians to be deployed).
-- Fix Highlord AI not invading countries.
 - Fix map subset not working correctly (use full map for now).
 - Fix being able to select only individual units in stacks for attack. When e.g. a unit that can cross mountain hexsides and a unit that can't are in the same stack, only the more restrictive unit's movement possibilities are shown. This is good for movement, but for attack it should be possible to select the more mobile unit and attack with it, even if the less mobile unit is in the same stack.
-- Check if replenished units are sent to the RESERVE. Refresh the replacements dialog afterwards.
+- Fleets should not be able to enter the ports of NEUTRAL countries.
+- Fleets shall not be able to unboard in NEUTRAL ports or in coastal hexes of NEUTRAL countries.
 
 Notes:
 

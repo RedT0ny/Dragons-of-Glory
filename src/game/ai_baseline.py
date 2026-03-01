@@ -4,7 +4,7 @@ from collections import defaultdict
 from typing import Any
 
 from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import UnitType, UnitState, LocType, TerrainType
+from src.content.specs import UnitType, UnitState, LocType, TerrainType, UnitRace
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
@@ -374,6 +374,8 @@ class BaselineAIPlayer:
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
+        if self._execute_transport_actions(side):
+            return True
         stacks = self._build_movable_stacks(side)
         if not stacks:
             return False
@@ -443,6 +445,130 @@ class BaselineAIPlayer:
                 print(f"AI move score {score}: {len(result.moved)} unit(s) to {coords}")
                 return True
         return False
+
+    def _execute_transport_actions(self, side: str) -> bool:
+        # 1) Unboard armies from fleets/citadels that have reached land.
+        if self._attempt_unboard_passengers(side):
+            return True
+
+        # 2) Ensure dragon wings have valid commanders.
+        if self._attempt_board_dragon_commanders(side):
+            return True
+
+        # 3) Board armies/leaders onto fleets/citadels for transport.
+        if self._attempt_board_armies(side):
+            return True
+
+        return False
+
+    def _attempt_unboard_passengers(self, side: str) -> bool:
+        for unit in self.game_state.units:
+            if getattr(unit, "allegiance", None) != side:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "unit_type", None) not in (UnitType.FLEET, UnitType.CITADEL):
+                continue
+            passengers = list(getattr(unit, "passengers", []) or [])
+            if not passengers:
+                continue
+            if not getattr(unit, "position", None):
+                continue
+            carrier_hex = Hex.offset_to_axial(*unit.position)
+            terrain = self.game_state.map.get_terrain(carrier_hex)
+            if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+                continue
+            if not getattr(unit, "moved_this_turn", False) and getattr(unit, "movement_points", 0) > 0:
+                continue
+            unboarded = False
+            for p in passengers:
+                if hasattr(p, "is_leader") and p.is_leader():
+                    continue
+                if self.game_state.unboard_unit(p):
+                    unboarded = True
+            if unboarded:
+                print(f"AI unboarded passengers from {unit.id} at {carrier_hex.axial_to_offset()}.")
+                return True
+        return False
+
+    def _attempt_board_dragon_commanders(self, side: str) -> bool:
+        for wing in self.game_state.units:
+            if getattr(wing, "allegiance", None) != side:
+                continue
+            if not getattr(wing, "is_on_map", False):
+                continue
+            if getattr(wing, "unit_type", None) != UnitType.WING:
+                continue
+            if not getattr(wing, "position", None):
+                continue
+            if self.movement_service._dragon_interceptor_has_required_commander(wing):
+                continue
+            for leader in self._leaders_in_hex(wing):
+                if not self._leader_can_command_wing(leader, wing, side):
+                    continue
+                if self.game_state.board_unit(wing, leader):
+                    print(f"AI boarded {leader.id} onto {wing.id} for command.")
+                    return True
+        return False
+
+    def _attempt_board_armies(self, side: str) -> bool:
+        for carrier in self.game_state.units:
+            if getattr(carrier, "allegiance", None) != side:
+                continue
+            if not getattr(carrier, "is_on_map", False):
+                continue
+            if getattr(carrier, "unit_type", None) not in (UnitType.FLEET, UnitType.CITADEL):
+                continue
+            if not getattr(carrier, "position", None):
+                continue
+            for unit in self._units_in_hex(carrier):
+                if unit is carrier:
+                    continue
+                if getattr(unit, "transport_host", None) is not None:
+                    continue
+                if hasattr(unit, "is_army") and unit.is_army():
+                    if self.game_state.board_unit(carrier, unit):
+                        print(f"AI boarded {unit.id} onto {carrier.id}.")
+                        return True
+                if hasattr(unit, "is_leader") and unit.is_leader():
+                    if self.game_state.board_unit(carrier, unit):
+                        print(f"AI boarded {unit.id} onto {carrier.id}.")
+                        return True
+        return False
+
+    def _leaders_in_hex(self, unit):
+        if not getattr(unit, "position", None):
+            return []
+        hex_obj = Hex.offset_to_axial(*unit.position)
+        return [
+            u for u in self.game_state.get_units_at(hex_obj)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "transport_host", None) is None
+            and hasattr(u, "is_leader") and u.is_leader()
+        ]
+
+    def _units_in_hex(self, unit):
+        if not getattr(unit, "position", None):
+            return []
+        hex_obj = Hex.offset_to_axial(*unit.position)
+        return [
+            u for u in self.game_state.get_units_at(hex_obj)
+            if getattr(u, "is_on_map", False)
+        ]
+
+    def _leader_can_command_wing(self, leader, wing, side: str) -> bool:
+        if not hasattr(leader, "is_leader") or not leader.is_leader():
+            return False
+        if side == HL:
+            if leader.unit_type == UnitType.EMPEROR:
+                return True
+            if leader.unit_type == UnitType.HIGHLORD:
+                wing_flight = getattr(getattr(wing, "spec", None), "dragonflight", None)
+                leader_flight = getattr(getattr(leader, "spec", None), "dragonflight", None)
+                return bool(wing_flight and leader_flight and wing_flight == leader_flight)
+            return False
+        leader_race = getattr(leader, "race", None)
+        return leader_race in (UnitRace.ELF, UnitRace.SOLAMNIC)
 
     # ---------- Combat ----------
     def execute_best_combat(self, side: str) -> bool:
@@ -782,6 +908,9 @@ class BaselineAIPlayer:
         country = self.game_state.countries.get(country_id)
         if not country or getattr(country, "allegiance", None) != NEUTRAL:
             return -9999
+        invasion_data = self.movement_service.get_invasion_force(country_id)
+        if invasion_data.get("strength", 0) <= 0:
+            return -9999
 
         success_prob = self._estimate_invasion_success_likelihood(country_id, side)
         activation_score = success_prob * 150
@@ -800,6 +929,8 @@ class BaselineAIPlayer:
         
         invasion_data = self.movement_service.get_invasion_force(country_id)
         invader_sp = invasion_data.get("strength", 0)
+        if invader_sp <= 0:
+            return 0.0
         defender_sp = getattr(country, "strength", 0)
         
         modifier = 0

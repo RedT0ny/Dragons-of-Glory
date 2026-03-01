@@ -274,12 +274,10 @@ class InfoPanel(QFrame):
         else:
             self.lbl_rating.setText(f"{unit.combat_rating} (Combat)")
 
-        # 4. Movement: "Total (remaining)" -> Requirement: "Total (remaining)"
-        # Note: logic in prompt said "Total (remaining)".
-        # Usually it's Remaining / Total. Let's follow prompt exactly: "Total (remaining)"
+        # 4. Movement: "Remaining (total)"
         total = unit.movement
         remaining = getattr(unit, 'movement_points', total)
-        self.lbl_movement.setText(f"{total} ({remaining})")
+        self.lbl_movement.setText(f"{remaining} ({total})")
 
         # 5. Status
         self.lbl_status.setText(unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status))

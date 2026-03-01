@@ -13,7 +13,7 @@ from src.game.combat import (
 )
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
-from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType
+from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType
 from src.content import loader, factory
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
@@ -2136,12 +2136,8 @@ class GameState:
         Removes the unit from the spatial map, marks it transported and records transport_host.
         Returns True on success, False otherwise.
         """
-        # Rule: a Wing cannot move and then load a unit in the same turn.
-        if carrier.unit_type == UnitType.WING and getattr(carrier, "moved_this_turn", False):
-            return False
-
-        # Rule: armies can board a flying citadel only if they have not moved this turn.
-        if carrier.unit_type == UnitType.CITADEL and getattr(unit, "moved_this_turn", False):
+        # Rule: passengers and carrier should start the movement phase in the same hex.
+        if getattr(carrier, "moved_this_turn", False) or getattr(unit, "moved_this_turn", False):
             return False
 
         if not carrier.can_carry(unit):
@@ -2156,12 +2152,25 @@ class GameState:
         carrier.load_unit(unit)
         unit.position = carrier.position
         unit.is_transported = True
+        if hasattr(unit, "movement_points"):
+            unit.movement_points = 0
+        unit.moved_this_turn = True
         unit.transport_host = carrier
 
-        # If transport load changes carrier movement allowance (e.g. Wing with passengers),
-        # clamp remaining movement immediately to avoid range/deduction mismatches.
+        if carrier.unit_type == UnitType.FLEET:
+            in_port = False
+            if carrier.position:
+                hex_obj = Hex.offset_to_axial(*carrier.position)
+                loc = self.map.get_location(hex_obj)
+                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
+            if not in_port and hasattr(carrier, "movement_points"):
+                carrier.movement_points = min(
+                    carrier.movement_points,
+                    max(0, int(carrier.movement // 2)),
+                )
         if hasattr(carrier, "movement_points"):
             carrier.movement_points = min(carrier.movement_points, carrier.movement)
+
         self._normalize_transport_state()
         return True
 
@@ -2203,11 +2212,27 @@ class GameState:
                     passengers.remove(unit)
         unit.transport_host = None
         unit.is_transported = False
+        if hasattr(unit, "movement_points"):
+            unit.movement_points = 0
+        unit.moved_this_turn = True
         # Place unit into dest offset coords
         offset_coords = dest_hex.axial_to_offset()
         self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
+        if carrier.unit_type == UnitType.WING:
+            if hasattr(carrier, "movement_points"):
+                carrier.movement_points = 0
+            carrier.moved_this_turn = True
+        elif carrier.unit_type == UnitType.FLEET:
+            in_port = False
+            if carrier.position:
+                loc = self.map.get_location(Hex.offset_to_axial(*carrier.position))
+                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
+            if not in_port:
+                if hasattr(carrier, "movement_points"):
+                    carrier.movement_points = 0
+                carrier.moved_this_turn = True
         self._normalize_transport_state()
         return True
 
