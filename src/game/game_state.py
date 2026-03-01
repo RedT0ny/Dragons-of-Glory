@@ -1166,39 +1166,26 @@ class GameState:
                     coords.append(loc.coords)
         return coords
 
+
     def _update_location_occupiers(self):
         """
-        Rule 9: location conquest status is evaluated at end of combat phase.
+        Rule 9: end-of-combat conquest status updates for locations.
+        Simplified to compute occupier in a single pass with early-exits and clear logic.
         """
         from src.game.map import Hex
 
-        for country in self.countries.values():
-            for loc in country.locations.values():
-                if not loc.coords:
-                    continue
+        for map_loc in self.map.locations.values():
+            if not map_loc or not map_loc.coords:
+                continue
 
-                enemy = self.get_enemy_allegiance(country.allegiance)
-                hex_obj = Hex.offset_to_axial(*loc.coords)
+            hex_obj = Hex.offset_to_axial(*map_loc.coords)
 
-                if enemy:
-                    occupying_units = [
-                        u for u in self.map.get_units_in_hex(hex_obj.q, hex_obj.r)
-                        if (
-                            u.is_on_map
-                            and u.allegiance == enemy
-                            and (
-                                (hasattr(u, "is_army") and u.is_army())
-                                or u.unit_type == UnitType.WING
-                            )
-                        )
-                    ]
-                    if occupying_units:
-                        loc.occupier = enemy
-                if hasattr(self.map, "locations"):
-                    key = (hex_obj.q, hex_obj.r)
-                    map_loc = self.map.locations.get(key)
-                    if map_loc and map_loc is not loc:
-                        map_loc.occupier = loc.occupier
+            for unit in self.map.get_units_in_hex(hex_obj.q, hex_obj.r):
+                if (unit.is_on_map and
+                        unit.allegiance != map_loc.occupier and
+                        ((hasattr(unit, "is_army") and unit.is_army()) or unit.unit_type == UnitType.WING)):
+                    map_loc.occupier = unit.allegiance
+                    break
 
     def _is_country_fully_occupied_by_enemy(self, country) -> bool:
         enemy = self.get_enemy_allegiance(country.allegiance)
@@ -2190,6 +2177,21 @@ class GameState:
 
         if dest_hex is None:
             return False
+
+        # Rule: fleets cannot unboard into neutral-country territory (coastal or port).
+        # Exception: stateless neutral ports (country_id is None) remain valid.
+        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+            loc = self.map.get_location(dest_hex)
+            is_stateless_neutral_port = bool(
+                loc
+                and getattr(loc, "loc_type", None) == LocType.PORT.value
+                and getattr(loc, "country_id", None) is None
+                and getattr(loc, "occupier", None) == NEUTRAL
+            )
+            col, row = dest_hex.axial_to_offset()
+            country = self.get_country_by_hex(col, row)
+            if country and country.allegiance == NEUTRAL and not is_stateless_neutral_port:
+                return False
 
         if not self.map.can_unit_land_on_hex(unit, dest_hex):
             return False

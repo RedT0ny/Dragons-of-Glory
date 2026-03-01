@@ -849,9 +849,11 @@ class MovementService:
                         messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
                         continue
                 else:
-                    # Check carrier hex is coastal
-                    if not self.game_state.map.is_coastal(carrier_hex):
-                        messages.append(f"Cannot unboard {u.id}: carrier not in coastal hex")
+                    is_coastal = self.game_state.map.is_coastal(carrier_hex)
+                    loc = self.game_state.map.get_location(carrier_hex)
+                    is_port = bool(loc and loc.loc_type == LocType.PORT.value)
+                    if not (is_coastal or is_port):
+                        messages.append(f"Cannot unboard {u.id}: carrier not in coastal hex or port")
                         continue
                 success = self.game_state.unboard_unit(u)
                 if not success:

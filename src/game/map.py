@@ -387,6 +387,10 @@ class Board:
             return False
         loc = self.get_location(hex_obj)
         if loc and loc.loc_type == LocType.PORT.value:
+            # Rule: fleets cannot enter ports that belong to neutral countries.
+            # Stateless neutral ports (country_id is None) are still allowed.
+            if getattr(loc, "country_id", None) and getattr(loc, "occupier", None) == NEUTRAL:
+                return False
             return True
         terrain = self.get_terrain(hex_obj)
         return terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM) or self.is_coastal(hex_obj)
@@ -728,6 +732,12 @@ class Board:
             is_port = False
             if loc:
                 is_port = (loc.loc_type == LocType.PORT.value)
+                if (
+                    is_port
+                    and getattr(loc, "country_id", None)
+                    and getattr(loc, "occupier", None) == NEUTRAL
+                ):
+                    return False
 
             return is_coastal or is_port
 
@@ -833,6 +843,15 @@ class Board:
             return 1
 
         # 3. Standard Sea/Coastal/Maelstrom Movement
+        loc = self.get_location(to_hex)
+        if (
+            loc
+            and loc.loc_type == LocType.PORT.value
+            and getattr(loc, "country_id", None)
+            and getattr(loc, "occupier", None) == NEUTRAL
+        ):
+            return float('inf')
+
         terrain = self.get_terrain(to_hex)
         valid_sea_terrains = [
             TerrainType.OCEAN,
