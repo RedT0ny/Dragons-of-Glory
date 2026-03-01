@@ -889,8 +889,8 @@ class MovementService:
                 is_coastal = self.game_state.map.is_coastal(carrier_hex)
                 loc = self.game_state.map.get_location(carrier_hex)
                 is_port = False
-                if loc and isinstance(loc, dict):
-                    is_port = (loc.get('type') == LocType.PORT.value)
+                if loc:
+                    is_port = (loc.loc_type == LocType.PORT.value)
 
                 if not (is_coastal or is_port):
                     messages.append(f"Carrier {carrier.id} not in coastal hex or port, cannot unboard.")

@@ -522,9 +522,14 @@ class CombatResolver:
         return crossings
 
     def _normalize_loc_type(self, loc):
-        if not isinstance(loc, dict):
+        if not loc:
             return None
-        value = loc.get("type")
+        if hasattr(loc, "loc_type"):
+            value = loc.loc_type
+        elif isinstance(loc, dict):
+            value = loc.get("type")
+        else:
+            return None
         if isinstance(value, LocType):
             return value.value
         return value

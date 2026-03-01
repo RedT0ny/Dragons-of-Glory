@@ -139,7 +139,7 @@ class DeploymentService:
         if self.game_state.map.is_coastal(hex_obj):
             return True
         loc = self.game_state.map.get_location(hex_obj)
-        return bool(loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value)
+        return bool(loc and loc.loc_type == LocType.PORT.value)
 
     def deploy_unit(
         self,

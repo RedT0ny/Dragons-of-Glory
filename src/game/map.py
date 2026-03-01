@@ -2,6 +2,7 @@ import heapq
 from collections import defaultdict
 
 from src.content.specs import HexsideType, UnitType, UnitRace, LocType, TerrainType
+from src.game.country import Location
 
 
 class Hex:
@@ -94,7 +95,7 @@ class Board:
         # Add a way to quickly find which hexsides are rivers
         self.navigable_edges = set()
         self.unit_map = defaultdict(list)
-        self.locations = {} # (q, r) -> dict (location data)
+        self.locations = {} # (q, r) -> Location
 
     def populate_terrain(self, terrain_data: dict):
         """
@@ -121,31 +122,22 @@ class Board:
             if loc_spec.coords:
                 col, row = loc_spec.coords
                 hex_obj = Hex.offset_to_axial(col, row)
-                self.locations[(hex_obj.q, hex_obj.r)] = {
-                    'type': loc_spec.loc_type,
-                    'is_capital': False,
-                    'country_id': None,
-                    'location_id': loc_spec.id,
-                    'occupier': None,
-                }
+                loc_obj = Location(loc_spec, country_id=None)
+                loc_obj.is_capital = False
+                self.locations[(hex_obj.q, hex_obj.r)] = loc_obj
 
         # 2. Add country locations (Cities, Capitals) - Override if conflict?
         for country in countries.values():
             # Handle cases where locations is a dict (runtime object) vs list (spec)
             country_locations = country.locations.values() if isinstance(country.locations, dict) else country.locations
 
-            for loc_spec in country_locations:
-                if loc_spec.coords:
-                    col, row = loc_spec.coords
+            for loc_item in country_locations:
+                loc_obj = loc_item if isinstance(loc_item, Location) else Location(loc_item, country_id=country.id)
+                if loc_obj.coords:
+                    col, row = loc_obj.coords
                     hex_obj = Hex.offset_to_axial(col, row)
-                    # Merge or overwrite
-                self.locations[(hex_obj.q, hex_obj.r)] = {
-                    'type': loc_spec.loc_type,
-                    'is_capital': loc_spec.is_capital,
-                    'country_id': country.id,
-                    'location_id': loc_spec.id,
-                    'occupier': None,
-                }
+                    loc_obj.country_id = country.id
+                    self.locations[(hex_obj.q, hex_obj.r)] = loc_obj
 
     def populate_hexsides(self, hexsides_data: dict):
         """
@@ -391,7 +383,7 @@ class Board:
         if self._hex_has_enemy_unit_for_fleet(hex_obj, unit):
             return False
         loc = self.get_location(hex_obj)
-        if loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value:
+        if loc and loc.loc_type == LocType.PORT.value:
             return True
         terrain = self.get_terrain(hex_obj)
         return terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM) or self.is_coastal(hex_obj)
@@ -435,7 +427,7 @@ class Board:
             # Port special-case: a fleet in port may enter an adjacent deep-river
             # hexside formed by two neighboring hexes of the port.
             loc = self.get_location(current_hex)
-            if loc and isinstance(loc, dict) and loc.get("type") == LocType.PORT.value:
+            if loc and loc.loc_type == LocType.PORT.value:
                 adjacent = [h for h in current_hex.neighbors() if self._is_valid_local_hex(h)]
                 for i in range(len(adjacent)):
                     for j in range(i + 1, len(adjacent)):
@@ -615,7 +607,7 @@ class Board:
         return None
 
     def get_location(self, hex_coord):
-        """Returns location dict if one exists at this hex."""
+        """Returns Location if one exists at this hex."""
         return self.locations.get((hex_coord.q, hex_coord.r))
 
     def get_units_in_hex(self, q, r):
@@ -692,8 +684,8 @@ class Board:
         # Fortified bonus (City, Port, Fortress, or Capital) increases army limit to 3
         loc = self.get_location(target_hex)
         if loc:
-            is_fortified = (loc.get('is_capital') or
-                            loc.get('type') in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value])
+            is_fortified = (loc.is_capital or
+                            loc.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value])
             if is_fortified:
                 army_limit = 3
 
@@ -731,8 +723,8 @@ class Board:
             is_coastal = self.is_coastal(target_hex)
             loc = self.get_location(target_hex)
             is_port = False
-            if loc and isinstance(loc, dict):
-                is_port = (loc.get('type') == LocType.PORT.value)
+            if loc:
+                is_port = (loc.loc_type == LocType.PORT.value)
 
             return is_coastal or is_port
 

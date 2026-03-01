@@ -1140,7 +1140,7 @@ class GameState:
 
         if location.occupier == allegiance:
             return True
-        return country.allegiance == allegiance and location.occupier is None
+        return country.allegiance == allegiance and location.occupier == NEUTRAL
 
     def get_solamnic_group_deployment_locations(self, allegiance: str):
         """
@@ -1191,8 +1191,9 @@ class GameState:
                 loc.occupier = occupier
                 if hasattr(self.map, "locations"):
                     key = (hex_obj.q, hex_obj.r)
-                    if key in self.map.locations:
-                        self.map.locations[key]["occupier"] = occupier
+                    map_loc = self.map.locations.get(key)
+                    if map_loc and map_loc is not loc:
+                        map_loc.occupier = occupier
 
     def _is_country_fully_occupied_by_enemy(self, country) -> bool:
         enemy = self.get_enemy_allegiance(country.allegiance)

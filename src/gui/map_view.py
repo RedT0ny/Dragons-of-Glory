@@ -163,13 +163,7 @@ class AnsalonMapView(QGraphicsView):
 
                 loc_name = "-"
                 if loc_obj:
-                    if isinstance(loc_obj, dict):
-                        # Map data often stores locations as dicts with 'location_id' or 'id'
-                        loc_name = loc_obj.get('location_id') or loc_obj.get('id', 'Unknown')
-                    else:
-                        # If it's a Location object
-                        loc_name = getattr(loc_obj, 'id', 'Unknown')
-
+                    loc_name = getattr(loc_obj, 'id', 'Unknown')
                     loc_name = str(loc_name).replace("_", " ").title()
 
                 terrain_str = terrain.value.title() if terrain else "Unknown"

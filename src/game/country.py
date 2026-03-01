@@ -1,4 +1,4 @@
-from src.content.constants import HL, WS
+from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import CountrySpec, LocationSpec, UnitType
 
 
@@ -14,12 +14,13 @@ class Location:
         - 'temple': The Dark Temple of Takhisis, where draconians are created
     """
 
-    def __init__(self, spec: LocationSpec):
+    def __init__(self, spec: LocationSpec, country_id: str | None = None):
         self.spec = spec
         self.id = spec.id
+        self.country_id = country_id
 
         # Dynamic State
-        self.occupier = None  # 'highlord', 'whitestone', or None
+        self.occupier = NEUTRAL  # 'highlord', 'whitestone', or 'Neutral'
         self.is_capital = spec.is_capital  # Can change (Silvanesti/Qualinesti)
 
     @property
@@ -62,7 +63,7 @@ class Country:
 
         # Initialize locations from the Spec
         for loc_spec in spec.locations:
-            self.locations[loc_spec.id] = Location(loc_spec)
+            self.locations[loc_spec.id] = Location(loc_spec, country_id=self.id)
 
     # --- Property Proxies ---
 

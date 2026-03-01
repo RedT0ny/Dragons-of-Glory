@@ -565,6 +565,8 @@ class BaselineAIPlayer:
         return True
 
     def _stack_relief_bonus(self, stack, target_coords: tuple[int, int], side: str) -> int:
+        if side != HL:
+            return 0
         if not stack:
             return 0
         if not any(getattr(u, "is_army", lambda: False)() for u in stack):
@@ -578,6 +580,10 @@ class BaselineAIPlayer:
         start_hex = Hex.offset_to_axial(start_pos[0], start_pos[1])
         loc = self.game_state.map.get_location(start_hex)
         if not loc:
+            return 0
+        is_city = loc.loc_type == LocType.CITY.value
+        is_capital = bool(loc.is_capital)
+        if not (is_city or is_capital):
             return 0
 
         country = self.game_state.get_country_by_hex(start_pos[0], start_pos[1])
