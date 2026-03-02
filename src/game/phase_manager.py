@@ -106,13 +106,21 @@ class PhaseManager:
                 self.game_state.active_player = WS if self.game_state.active_player == HL else HL
                 self.game_state.second_player_has_acted = True
             else:
-                # End of Second Player's turn. Turn over (Step 8).
-                self.next_turn()
+                # End of Second Player's turn. Supply phase (Step 8).
+                supply_mode = str(getattr(self.game_state, "supply", "standard")).strip().lower()
+                if supply_mode == "advanced":
+                    self.game_state.phase = GamePhase.SUPPLY
+                else:
+                    self.next_turn()
+
+        elif self.game_state.phase == GamePhase.SUPPLY:
+            self.game_state.resolve_supply_phase()
+            self.next_turn()
 
         self.game_state.evaluate_victory_conditions()
 
     def next_turn(self):
-        """Advances the game to the next turn (Step 8)."""
+        """Advances the game to the next turn (Step 9)."""
         if getattr(self.game_state, "game_over", False):
             return
 

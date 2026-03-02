@@ -146,6 +146,7 @@ class IntroWindow(QMainWindow):
                     "whitestone_ai": False,
                     "difficulty": "normal",
                     "combat_details": "brief",
+                    "supply": "standard",
                 }
             )
             if side_dialog.exec():

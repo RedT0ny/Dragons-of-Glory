@@ -76,6 +76,7 @@ class GameApp:
             whitestone_ai=player_config.get("whitestone_ai", False),
             difficulty=player_config.get("difficulty", "normal"),
             combat_details=player_config.get("combat_details", "brief"),
+            supply=player_config.get("supply", "standard"),
         )
 
         self.view.set_controller(self.controller)

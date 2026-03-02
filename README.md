@@ -6,16 +6,14 @@ Design overview:
 
 TODO:
 
-- Add Dragon #170's Advanced Rules in "settings"
+- Add Dragon #170's Advanced Rules in "settings" - Intercept and supply done, winter turns missing.
 - Review country colors and unit icons to make them more distinguishable (Partially done).
-- I18n
+- I18n (Partially)
 
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
 - Fix being able to select only individual units in stacks for attack. When e.g. a unit that can cross mountain hexsides and a unit that can't are in the same stack, only the more restrictive unit's movement possibilities are shown. This is good for movement, but for attack it should be possible to select the more mobile unit and attack with it, even if the less mobile unit is in the same stack.
-- Fleets should not be able to enter the ports of NEUTRAL countries.
-- Fleets shall not be able to unboard in NEUTRAL ports or in coastal hexes of NEUTRAL countries.
 
 Notes:
 

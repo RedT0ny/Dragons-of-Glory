@@ -281,7 +281,8 @@ class GamePhase(Enum):
     INITIATIVE = auto()        # Step 4: Initiative roll
     MOVEMENT = auto()          # Step 5 & 7 (Movement portion)
     COMBAT = auto()            # Step 6 & 7 (Combat portion)
-    END_TURN = auto()          # Step 8: End of turn cleanup
+    SUPPLY = auto()            # Step 8: Supply check and attrition
+    END_TURN = auto()          # Step 9: End of turn cleanup
 
 class UnitType(Enum):
     INFANTRY = "inf"

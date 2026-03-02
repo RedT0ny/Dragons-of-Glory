@@ -7,13 +7,84 @@
     <x>0</x>
     <y>0</y>
     <width>330</width>
-    <height>330</height>
+    <height>318</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Select sides</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
+   <item row="3" column="0" alignment="Qt::AlignmentFlag::AlignHCenter">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Orientation::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QGroupBox" name="playerConfig">
+     <property name="title">
+      <string>Player config</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="0" column="0">
+       <widget class="QLabel" name="wsControlLabel">
+        <property name="font">
+         <font>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>Whitestone</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="wsComboBox">
+        <item>
+         <property name="text">
+          <string>Human</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>AI</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="hlControlLabel">
+        <property name="font">
+         <font>
+          <bold>true</bold>
+         </font>
+        </property>
+        <property name="text">
+         <string>Highlord</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="hlComboBox">
+        <item>
+         <property name="text">
+          <string>Human</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>AI</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
    <item row="0" column="0">
     <widget class="QGroupBox" name="gameOptions">
      <property name="title">
@@ -81,74 +152,38 @@
     </widget>
    </item>
    <item row="1" column="0">
-    <widget class="QGroupBox" name="playerConfig">
+    <widget class="QGroupBox" name="rulesConfig">
      <property name="title">
-      <string>Player config</string>
+      <string>Optional rules</string>
      </property>
-     <layout class="QGridLayout" name="gridLayout_2">
+     <layout class="QGridLayout" name="gridLayout_4">
       <item row="0" column="0">
-       <widget class="QLabel" name="wsControlLabel">
+       <widget class="QLabel" name="supLabel">
         <property name="font">
          <font>
           <bold>true</bold>
          </font>
         </property>
         <property name="text">
-         <string>Whitestone</string>
+         <string>Supply</string>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QComboBox" name="wsComboBox">
+       <widget class="QComboBox" name="supComboBox">
         <item>
          <property name="text">
-          <string>Human</string>
+          <string>Standard</string>
          </property>
         </item>
         <item>
          <property name="text">
-          <string>AI</string>
-         </property>
-        </item>
-       </widget>
-      </item>
-      <item row="1" column="0">
-       <widget class="QLabel" name="hlControlLabel">
-        <property name="font">
-         <font>
-          <bold>true</bold>
-         </font>
-        </property>
-        <property name="text">
-         <string>Highlord</string>
-        </property>
-       </widget>
-      </item>
-      <item row="1" column="1">
-       <widget class="QComboBox" name="hlComboBox">
-        <item>
-         <property name="text">
-          <string>Human</string>
-         </property>
-        </item>
-        <item>
-         <property name="text">
-          <string>AI</string>
+          <string>Advanced</string>
          </property>
         </item>
        </widget>
       </item>
      </layout>
-    </widget>
-   </item>
-   <item row="2" column="0" alignment="Qt::AlignmentFlag::AlignHCenter">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Orientation::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::StandardButton::Cancel|QDialogButtonBox::StandardButton::Ok</set>
-     </property>
     </widget>
    </item>
   </layout>

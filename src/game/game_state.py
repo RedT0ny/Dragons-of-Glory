@@ -1,6 +1,6 @@
 import random
 import os
-from collections import defaultdict
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import (
@@ -13,7 +13,7 @@ from src.game.combat import (
 )
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
-from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType
+from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
 from src.content import loader, factory
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
@@ -70,6 +70,7 @@ class GameState:
         self.draconian_ready_at_start = 0
         self.activation_bonuses = {HL: 0, WS: 0}
         self.combat_bonuses = {HL: 0, WS: 0}
+        self.supply = "standard"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -708,6 +709,125 @@ class GameState:
 
     def next_turn(self):
         return self.phase_manager.next_turn()
+
+    def resolve_supply_phase(self):
+        """
+        Rule 12 (advanced supply):
+        - Only stacked ground armies (>1 in a hex) must trace supply.
+        - If no legal path to any friendly location, one army in that stack goes to RESERVE.
+        """
+        supply_mode = str(getattr(self, "supply", "standard")).strip().lower()
+        if supply_mode != "advanced" or not self.map:
+            return []
+
+        active = self.active_player
+        friendly_locations = {
+            (q, r)
+            for (q, r), loc in getattr(self.map, "locations", {}).items()
+            if getattr(loc, "occupier", None) == active
+        }
+
+        losses = []
+        # Snapshot current hex occupancy because we may mutate unit_map as losses are applied.
+        for (q, r), units in list(self.map.unit_map.items()):
+            stack_armies = [
+                u for u in units
+                if getattr(u, "is_on_map", False)
+                and getattr(u, "allegiance", None) == active
+                and hasattr(u, "is_army")
+                and u.is_army()
+                and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            ]
+            if len(stack_armies) <= 1:
+                continue
+
+            stack_hex = Hex(q, r)
+            if self._can_trace_supply_line(stack_hex, active, stack_armies[0], friendly_locations):
+                continue
+
+            casualty = self._select_supply_attrition_unit(stack_armies)
+            if casualty is None:
+                continue
+            if getattr(casualty, "is_on_map", False):
+                self.map.remove_unit_from_spatial_map(casualty)
+            casualty.status = UnitState.RESERVE
+            casualty.position = (None, None)
+            losses.append(casualty)
+
+        return losses
+
+    def _can_trace_supply_line(self, start_hex, allegiance, sample_unit, friendly_locations):
+        if not friendly_locations:
+            return False
+
+        frontier = deque([start_hex])
+        visited = {(start_hex.q, start_hex.r)}
+
+        while frontier:
+            current = frontier.popleft()
+            if (current.q, current.r) in friendly_locations:
+                return True
+
+            for neighbor in current.neighbors():
+                nk = (neighbor.q, neighbor.r)
+                if nk in visited:
+                    continue
+                if not self._is_valid_supply_step(current, neighbor, allegiance, sample_unit):
+                    continue
+                visited.add(nk)
+                frontier.append(neighbor)
+
+        return False
+
+    def _is_valid_supply_step(self, from_hex, to_hex, allegiance, sample_unit):
+        col, row = to_hex.axial_to_offset()
+        if not (0 <= col < self.map.width and 0 <= row < self.map.height):
+            return False
+
+        terrain = self.map.get_terrain(to_hex)
+        if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+            return False
+
+        hexside = self.map.get_effective_hexside(from_hex, to_hex)
+        if self.map._hexside_is(hexside, HexsideType.MOUNTAIN) and not self.map._hexside_is(hexside, HexsideType.PASS):
+            return False
+
+        if self.map.has_enemy_army(to_hex, allegiance):
+            return False
+
+        # Enemy ZOC blocks trace unless the hex has a friendly counter.
+        if self.map.is_adjacent_to_enemy(to_hex, sample_unit) and not self._hex_has_friendly_counter(to_hex, allegiance):
+            return False
+
+        return True
+
+    def _hex_has_friendly_counter(self, hex_coord, allegiance):
+        for unit in self.map.get_units_in_hex(hex_coord.q, hex_coord.r):
+            if (
+                getattr(unit, "is_leader", False) == False
+                and getattr(unit, "allegiance", None) == allegiance
+                and getattr(unit, "is_on_map", True)
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _select_supply_attrition_unit(stack_armies):
+        depleted = [u for u in stack_armies if getattr(getattr(u, "status", None), "name", "") == "DEPLETED"]
+        if depleted:
+            return min(depleted, key=lambda u: (int(getattr(u, "combat_rating", 0) or 0), str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1) or 1)))
+        active = [u for u in stack_armies if getattr(getattr(u, "status", None), "name", "") == "ACTIVE"]
+        if active:
+            return min(active, key=lambda u: (int(getattr(u, "combat_rating", 0) or 0), str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1) or 1)))
+        return min(
+            stack_armies,
+            key=lambda u: (
+                0 if getattr(u, "is_on_map", False) else 1,
+                int(getattr(u, "combat_rating", 0) or 0),
+                str(getattr(u, "id", "")),
+                int(getattr(u, "ordinal", 1) or 1),
+            ),
+        ) if stack_armies else None
 
     def check_events(self):
         return self.event_system.check_events()

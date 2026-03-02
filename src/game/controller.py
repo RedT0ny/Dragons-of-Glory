@@ -22,6 +22,7 @@ class GameController(QObject):
         whitestone_ai=False,
         difficulty="normal",
         combat_details="brief",
+        supply="standard",
     ):
         super().__init__()
         self.game_state = game_state
@@ -29,8 +30,10 @@ class GameController(QObject):
         self.replacements_dialog = None
         self.difficulty = str(difficulty).strip().lower()
         self.combat_details = str(combat_details).strip().lower()
+        self.supply = str(supply).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
+        self.game_state.supply = self.supply
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -72,6 +75,7 @@ class GameController(QObject):
             "whitestone_ai": bool(self.game_state.players.get(WS).is_ai) if WS in self.game_state.players else False,
             "difficulty": self.difficulty,
             "combat_details": self.combat_details,
+            "supply": self.supply,
         }
 
     def apply_runtime_config(self, config: dict):
@@ -79,8 +83,10 @@ class GameController(QObject):
         ws_ai = bool(config.get("whitestone_ai", False))
         self.difficulty = str(config.get("difficulty", self.difficulty)).strip().lower()
         self.combat_details = str(config.get("combat_details", self.combat_details)).strip().lower()
+        self.supply = str(config.get("supply", self.supply)).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
+        self.game_state.supply = self.supply
 
         if HL in self.game_state.players:
             self.game_state.players[HL].set_ai(hl_ai)
