@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
 from src.content.config import APP_NAME, DEBUG, SAVEGAME_DIR
 from src.gui.map_view import AnsalonMapView
+from src.gui.new_game_dialog import NewGameDialog
 from src.gui.status_tab import StatusTab
 from src.gui.assets_tab import AssetsTab
 from src.gui.info_panel import InfoPanel
@@ -251,6 +252,11 @@ class MainWindow(QMainWindow):
         # --- Game Menu ---
         game_menu = menubar.addMenu("&Game")
 
+        new_game_action = QAction("&New Game", self)
+        new_game_action.setShortcut("Ctrl+N")
+        new_game_action.triggered.connect(self.on_new_game_clicked)
+        game_menu.addAction(new_game_action)
+
         save_action = QAction("&Save Game", self)
         save_action.setShortcut("Ctrl+S")
         save_action.triggered.connect(self.on_save_clicked)
@@ -390,6 +396,9 @@ class MainWindow(QMainWindow):
             self.assets_tab.asset_remove_requested.connect(controller.on_asset_remove_requested)
 
     def update_turn_panel(self, active_player: str, turn: int, calendar_upper_label: str, phase_label: str):
+        """
+        Updates the turn panel with the current game state.
+        """
         if hasattr(self, "turn_panel") and self.turn_panel:
             self.turn_panel.update_state(
                 active_player=active_player,
@@ -398,7 +407,41 @@ class MainWindow(QMainWindow):
                 phase_label=phase_label,
             )
 
+    def on_new_game_clicked(self):
+        """
+        Handles the action of starting a new game.
+        """
+        if not self.controller:
+            return
+        if getattr(self.game_state, "turn", 0) > 1:
+            confirm = QMessageBox.question(
+                self,
+                "Confirm New Game",
+                "Are you sure you want to start a new game? Unsaved progress will be lost.",
+                QMessageBox.Yes | QMessageBox.No,
+            )
+            if confirm != QMessageBox.Yes:
+                return
+        dialog = NewGameDialog(self)
+        if dialog.exec():
+            spec = dialog.get_selected_scenario_spec()
+            if not spec:
+                return
+
+            try:
+                # Prevent Enter from leaking from the file dialog into an immediate phase change.
+                self._suppress_end_phase_hotkey_until = monotonic() + 0.6
+                self.controller.start_new_game(spec)
+                self.append_log(f"New Game {spec.id}\n")
+            except Exception as exc:
+                QMessageBox.critical(self, "New Game Failed", str(exc))
+
     def on_save_clicked(self):
+        """
+        Handles the action of saving the current game state.
+        """
+        if not self.controller:
+            return
         if not os.path.exists(SAVEGAME_DIR):
             os.makedirs(SAVEGAME_DIR, exist_ok=True)
         dialog = QFileDialog(self, "Save Game")
@@ -418,12 +461,17 @@ class MainWindow(QMainWindow):
         if not ext:
             path = f"{path}.yaml"
         try:
-            self.game_state.save_state(path)
+            self.controller.save_game(path)
             self.append_log(f"Game saved to {path}\n")
         except Exception as exc:
             QMessageBox.critical(self, "Save Failed", str(exc))
 
     def on_load_clicked(self):
+        """
+        Handles the action of loading a saved game.
+        """
+        if not self.controller:
+            return
         if not os.path.exists(SAVEGAME_DIR):
             os.makedirs(SAVEGAME_DIR, exist_ok=True)
         dialog = QFileDialog(self, "Load Game")
@@ -441,17 +489,7 @@ class MainWindow(QMainWindow):
         try:
             # Prevent Enter from leaking from the file dialog into an immediate phase change.
             self._suppress_end_phase_hotkey_until = monotonic() + 0.6
-            if self.controller:
-                self.controller.prepare_for_state_load()
-            self.game_state.load_state(path)
-            self.map_view.reset_view_for_new_map()
-            self.map_view.sync_with_model()
-            self.info_panel.set_game_state(self.game_state)
-            self.info_panel.refresh()
-            self.status_tab.refresh()
-            self.assets_tab.refresh()
-            if self.controller:
-                QTimer.singleShot(0, self.controller.process_game_turn)
+            self.controller.load_game(path)
             self.append_log(f"Game loaded from {path}\n")
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", str(exc))

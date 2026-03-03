@@ -234,13 +234,10 @@ class ConfigDialog(QDialog):
             self.ui.wsComboBox.setCurrentIndex(ws_idx)
 
     def get_config(self):
-        difficulty_text = str(self.ui.diffComboBox.currentData() or "normal")
-        combat_details_text = str(self.ui.cdComboBox.currentData() or "brief")
-        supply_text = str(self.ui.supComboBox.currentData() or "standard")
+        """Returns a combined dictionary of player configuration and game options."""
         player_config = self.get_player_config()
-        player_config["difficulty"] = difficulty_text
-        player_config["combat_details"] = combat_details_text
-        player_config["supply"] = supply_text
+        game_options = self.get_game_options()
+        player_config.update(game_options)
         return player_config
 
     def get_player_config(self):

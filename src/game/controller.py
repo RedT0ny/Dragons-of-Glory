@@ -224,6 +224,44 @@ class GameController(QObject):
         """Initializes the loop and immediately processes the first phase."""
         self.process_game_turn()
 
+    def start_new_game(self, scenario_spec):
+        """
+        Start a new scenario using the existing runtime objects.
+        Preserves runtime configuration (AI flags and ruleset options).
+        """
+        runtime_config = self.get_runtime_config()
+        self.prepare_for_state_load()
+        self.game_state.load_scenario(scenario_spec)
+        self.apply_runtime_config(runtime_config)
+        self._after_state_reload()
+
+    def save_game(self, path: str):
+        """Persist current game state to disk."""
+        self.game_state.save_state(path)
+
+    def load_game(self, path: str):
+        """Load a saved game into the existing runtime objects."""
+        self.prepare_for_state_load()
+        self.game_state.load_state(path)
+        self._after_state_reload()
+
+    def _after_state_reload(self):
+        """Refresh view widgets after scenario/save load and resume turn processing."""
+        self._victory_announced = False
+        self.view.reset_view_for_new_map()
+        self.view.sync_with_model()
+
+        main_window = self.view.window()
+        if hasattr(main_window, "info_panel"):
+            main_window.info_panel.set_game_state(self.game_state)
+            main_window.info_panel.refresh()
+        if hasattr(main_window, "status_tab"):
+            main_window.status_tab.refresh()
+        if hasattr(main_window, "assets_tab"):
+            main_window.assets_tab.refresh()
+
+        self._schedule_deferred(self.process_game_turn)
+
     def check_active_player(self):
         """Checks if the loop should continue running automatically."""
         # Start timer if it's an AI turn OR if the phase is automatic
