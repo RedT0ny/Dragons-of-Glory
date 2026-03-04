@@ -18,7 +18,7 @@ class AnsalonMapView(QGraphicsView):
     units_clicked = Signal(list)
     hex_clicked = Signal(object)
     right_clicked = Signal()
-    hex_hovered = Signal(str, int, int, str)
+    hex_hovered = Signal(str, int, int, str, str)
     unit_deployment_requested = Signal(object, object)  # unit, target_hex
     unit_movement_requested = Signal(object, object)    # unit, target_hex
     depleted_merge_requested = Signal(object, object)   # unit1, unit2
@@ -162,12 +162,16 @@ class AnsalonMapView(QGraphicsView):
                 loc_obj = self.game_state.map.get_location(hex_obj)
 
                 loc_name = "-"
+                occupier_name = "-"
                 if loc_obj:
                     loc_name = getattr(loc_obj, 'id', 'Unknown')
                     loc_name = str(loc_name).replace("_", " ").title()
+                    occupier = getattr(loc_obj, "occupier", None)
+                    if occupier:
+                        occupier_name = str(occupier).replace("_", " ").title()
 
                 terrain_str = terrain.value.title() if terrain else "Unknown"
-                self.hex_hovered.emit(terrain_str, col, row, loc_name)
+                self.hex_hovered.emit(terrain_str, col, row, loc_name, occupier_name)
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""

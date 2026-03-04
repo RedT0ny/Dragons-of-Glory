@@ -347,10 +347,10 @@ class InfoPanel(QFrame):
                 font = QFont(families[0], 16)
                 self.lbl_unit_name.setFont(font)
 
-    @Slot(str, int, int, str)
-    def update_hex_info(self, terrain, col, row, location):
+    @Slot(str, int, int, str, str)
+    def update_hex_info(self, terrain, col, row, location, occupier):
         """Updates the selection label with hover info."""
-        text = f"{terrain} ({col}, {row})\n{location}"
+        text = f"{terrain} ({col}, {row})\n{location} ({occupier})"
         self.selection_label.setText(text)
 
     @Slot(bool)
