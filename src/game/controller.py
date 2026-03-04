@@ -476,6 +476,7 @@ class GameController(QObject):
                 self._schedule_deferred(self.process_game_turn)
         finally:
             self._processing_turn_tick = False
+
     def _announce_victory_if_needed(self):
         if not self.game_state.game_over or self._victory_announced:
             return
