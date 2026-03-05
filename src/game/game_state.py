@@ -1301,9 +1301,11 @@ class GameState:
             hex_obj = Hex.offset_to_axial(*map_loc.coords)
 
             for unit in self.map.get_units_in_hex(hex_obj.q, hex_obj.r):
-                if (unit.is_on_map and
-                        unit.allegiance != map_loc.occupier and
-                        ((hasattr(unit, "is_army") and unit.is_army()) or unit.unit_type == UnitType.WING)):
+                if (unit.is_on_map
+                        and unit.allegiance != map_loc.occupier
+                        and ((hasattr(unit, "is_army")
+                        and unit.is_army())
+                        or (unit.unit_type == UnitType.WING and map_loc.loc_type != LocType.UNDERCITY.value))):
                     map_loc.occupier = unit.allegiance
                     break
 

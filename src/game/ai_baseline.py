@@ -15,11 +15,16 @@ class BaselineAIPlayer:
     AI_MOVE_TOPK_PER_STACK = 8
     AI_MOVE_EXEC_THRESHOLD = 20
     AI_COMBAT_EXEC_THRESHOLD = 0
+    AI_BACKTRACK_PENALTY = 220
+    AI_REVISIT_PENALTY = 70
 
     def __init__(self, game_state, movement_service, diplomacy_service):
         self.game_state = game_state
         self.movement_service = movement_service
         self.diplomacy_service = diplomacy_service
+        self._movement_phase_key = None
+        self._unit_last_position = {}
+        self._unit_visit_counts = defaultdict(lambda: defaultdict(int))
 
     # ---------- Deployment ----------
     def deploy_all_ready_units(
@@ -116,7 +121,6 @@ class BaselineAIPlayer:
     def _conscription_sort_key(unit):
         return (
             int(getattr(unit, "combat_rating", 0) or 0),
-            int(getattr(unit, "tactical_rating", 0) or 0),
             int(getattr(unit, "movement", 0) or 0),
             str(getattr(unit, "id", "")),
             -int(getattr(unit, "ordinal", 1)),
@@ -374,6 +378,7 @@ class BaselineAIPlayer:
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
+        self._ensure_movement_phase_state(side)
         if self._execute_transport_actions(side):
             return True
         stacks = self._build_movable_stacks(side)
@@ -430,6 +435,14 @@ class BaselineAIPlayer:
             return False
 
         candidates.sort(key=lambda item: item[0], reverse=True)
+        has_non_backtrack_exec = any(
+            (
+                score >= self.AI_MOVE_EXEC_THRESHOLD
+                and not is_invasion
+                and not self._is_immediate_backtrack(stack, coords)
+            )
+            for score, stack, coords, country_id, is_invasion in candidates
+        )
         for score, stack, coords, country_id, is_invasion in candidates:
             if score < self.AI_MOVE_EXEC_THRESHOLD:
                 return False
@@ -439,12 +452,68 @@ class BaselineAIPlayer:
                     print(f"AI invasion score {score}: attempted invasion of {country_id}.")
                     return True
                 continue
+            if has_non_backtrack_exec and self._is_immediate_backtrack(stack, coords):
+                continue
+            before_positions = {
+                id(unit): tuple(unit.position)
+                for unit in stack
+                if getattr(unit, "position", None) and unit.position[0] is not None
+            }
             target_hex = Hex.offset_to_axial(coords[0], coords[1])
             result = self.movement_service.move_units_to_hex(stack, target_hex)
             if not result.errors and result.moved:
+                self._record_stack_move(result.moved, before_positions, coords)
                 print(f"AI move score {score}: {len(result.moved)} unit(s) to {coords}")
                 return True
         return False
+
+    def _ensure_movement_phase_state(self, side: str):
+        phase = getattr(self.game_state, "phase", None)
+        turn = getattr(self.game_state, "turn", None)
+        key = (turn, side, phase)
+        if self._movement_phase_key == key:
+            return
+        self._movement_phase_key = key
+        self._unit_last_position = {}
+        self._unit_visit_counts = defaultdict(lambda: defaultdict(int))
+        for unit in self.game_state.units:
+            if getattr(unit, "allegiance", None) != side:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None:
+                continue
+            marker = id(unit)
+            start = (int(pos[0]), int(pos[1]))
+            self._unit_last_position[marker] = start
+            self._unit_visit_counts[marker][start] += 1
+
+    def _record_stack_move(self, moved_units, before_positions: dict[int, tuple[int, int]], to_coords: tuple[int, int]):
+        to_xy = (int(to_coords[0]), int(to_coords[1]))
+        for unit in moved_units:
+            marker = id(unit)
+            previous = before_positions.get(marker)
+            if previous:
+                self._unit_last_position[marker] = previous
+            self._unit_visit_counts[marker][to_xy] += 1
+
+    def _is_immediate_backtrack(self, stack, target_coords: tuple[int, int]) -> bool:
+        if not stack:
+            return False
+        target_xy = (int(target_coords[0]), int(target_coords[1]))
+        backtrack_votes = 0
+        movable = 0
+        for unit in stack:
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None:
+                continue
+            movable += 1
+            marker = id(unit)
+            last = self._unit_last_position.get(marker)
+            if last and target_xy == last:
+                backtrack_votes += 1
+        return movable > 0 and backtrack_votes == movable
 
     def _execute_transport_actions(self, side: str) -> bool:
         # 1) Unboard armies from fleets/citadels that have reached land.
@@ -645,9 +714,17 @@ class BaselineAIPlayer:
         target_hex = Hex.offset_to_axial(target_coords[0], target_coords[1])
         start = stack[0].position if stack and getattr(stack[0], "position", None) else target_coords
 
+        # Progress momentum: reward sustained objective approach over this and prior move.
         start_dist = self._min_distance_to_objectives(start, objective_hexes)
         end_dist = self._min_distance_to_objectives(target_coords, objective_hexes)
         dist_gain = (start_dist - end_dist) if start_dist < 999 else 0
+        prev_dist_gain = 0
+        lead_marker = id(stack[0]) if stack else None
+        if lead_marker and start and start[0] is not None:
+            prev = self._unit_last_position.get(lead_marker)
+            if prev:
+                prev_dist = self._min_distance_to_objectives(prev, objective_hexes)
+                prev_dist_gain = (prev_dist - start_dist) if prev_dist < 999 else 0
 
         enemy_adj = self._adjacent_enemy_count(target_hex, side)
         friendly_adj = self._adjacent_friendly_count(target_hex, side)
@@ -665,8 +742,73 @@ class BaselineAIPlayer:
         if enemy_adj >= 3:
             risk -= 80
 
+        role_w = self._stack_role_weights(stack)
+        progress_score = int(prev_dist_gain * 12 + dist_gain * 20 * role_w["objective"])
+        contact_score = int(enemy_here * 60 + enemy_adj * 25 * role_w["threat"] + friendly_adj * 8 * role_w["cohesion"])
+
+        backtrack_penalty = 0
+        if self._is_immediate_backtrack(stack, target_coords):
+            backtrack_penalty -= self.AI_BACKTRACK_PENALTY
+
+        revisit_penalty = 0
+        for unit in stack:
+            marker = id(unit)
+            visits = self._unit_visit_counts[marker].get((int(target_coords[0]), int(target_coords[1])), 0)
+            if visits > 0:
+                revisit_penalty -= self.AI_REVISIT_PENALTY * visits
+
+        efficiency_bonus = 0
+        est_cost = self._estimate_stack_move_cost(stack, target_coords)
+        if est_cost > 0 and dist_gain > 0:
+            efficiency_bonus += int((dist_gain * 24) / est_cost)
+        elif est_cost > 0 and dist_gain <= 0:
+            efficiency_bonus -= int(10 * role_w["objective"])
+
+        frontier_bonus = 0
+        if end_dist < start_dist and (enemy_adj > 0 or enemy_here > 0 or target_coords in objective_hexes):
+            frontier_bonus += int(40 + 20 * min(enemy_adj + enemy_here, 4))
+
         relief_bonus = self._stack_relief_bonus(stack, target_coords, side)
-        return int(dist_gain * 20 + enemy_here * 60 + enemy_adj * 25 + friendly_adj * 8 + risk + relief_bonus)
+        return int(
+            progress_score
+            + contact_score
+            + risk
+            + backtrack_penalty
+            + revisit_penalty
+            + efficiency_bonus
+            + frontier_bonus
+            + relief_bonus
+        )
+
+    def _estimate_stack_move_cost(self, stack, target_coords: tuple[int, int]) -> float:
+        if not stack:
+            return 1.0
+        sample = stack[0]
+        start = getattr(sample, "position", None)
+        if not start or start[0] is None:
+            return 1.0
+        if (int(start[0]), int(start[1])) == (int(target_coords[0]), int(target_coords[1])):
+            return 0.0
+        start_hex = Hex.offset_to_axial(start[0], start[1])
+        target_hex = Hex.offset_to_axial(target_coords[0], target_coords[1])
+        distance = max(1, int(start_hex.distance_to(target_hex)))
+        try:
+            direct_cost = self.game_state.map.get_movement_cost(sample, start_hex, target_hex)
+            if isinstance(direct_cost, (int, float)) and direct_cost != float("inf") and direct_cost > 0:
+                return float(max(1.0, direct_cost))
+        except Exception:
+            pass
+        return float(distance)
+
+    def _stack_role_weights(self, stack) -> dict[str, float]:
+        has_fleet = any(getattr(u, "unit_type", None) == UnitType.FLEET for u in stack)
+        has_wing = any(getattr(u, "unit_type", None) == UnitType.WING for u in stack)
+        has_army = any(getattr(u, "is_army", lambda: False)() for u in stack)
+        if has_fleet and not has_army and not has_wing:
+            return {"objective": 1.0, "threat": 1.15, "cohesion": 0.9}
+        if has_wing and not has_army:
+            return {"objective": 0.9, "threat": 1.25, "cohesion": 0.8}
+        return {"objective": 1.2, "threat": 1.0, "cohesion": 1.1}
 
     def _score_deployment_hex(self, unit, coords: tuple[int, int], objective_hexes: set[tuple[int, int]]) -> int:
         target_hex = Hex.offset_to_axial(coords[0], coords[1])
