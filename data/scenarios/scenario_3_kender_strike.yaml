@@ -45,7 +45,7 @@ scenario:
 
   # Timeline and Turn Logic
   start_turn: 1
-  end_turn: 5
+  end_turn: 10
   initiative_start: "whitestone"
 
   # Global Events

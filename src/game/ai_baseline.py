@@ -14,9 +14,12 @@ class BaselineAIPlayer:
     AI_MAX_COMBAT_EVAL = 40
     AI_MOVE_TOPK_PER_STACK = 8
     AI_MOVE_EXEC_THRESHOLD = 20
-    AI_COMBAT_EXEC_THRESHOLD = 0
+    AI_LATE_GAME_MOVE_THRESHOLD = 30
+    AI_COMBAT_EXEC_THRESHOLD = 25
+    AI_LATE_GAME_COMBAT_EXEC_THRESHOLD = 35
     AI_BACKTRACK_PENALTY = 220
     AI_REVISIT_PENALTY = 70
+    AI_CAPITAL_GARRISON_VACATE_PENALTY = 280
 
     def __init__(self, game_state, movement_service, diplomacy_service):
         self.game_state = game_state
@@ -25,6 +28,7 @@ class BaselineAIPlayer:
         self._movement_phase_key = None
         self._unit_last_position = {}
         self._unit_visit_counts = defaultdict(lambda: defaultdict(int))
+        self._side_strategy_cache = {}
 
     # ---------- Deployment ----------
     def deploy_all_ready_units(
@@ -434,17 +438,18 @@ class BaselineAIPlayer:
         if not candidates:
             return False
 
+        exec_threshold = self._current_move_exec_threshold()
         candidates.sort(key=lambda item: item[0], reverse=True)
         has_non_backtrack_exec = any(
             (
-                score >= self.AI_MOVE_EXEC_THRESHOLD
+                score >= exec_threshold
                 and not is_invasion
                 and not self._is_immediate_backtrack(stack, coords)
             )
             for score, stack, coords, country_id, is_invasion in candidates
         )
         for score, stack, coords, country_id, is_invasion in candidates:
-            if score < self.AI_MOVE_EXEC_THRESHOLD:
+            if score < exec_threshold:
                 return False
             if is_invasion:
                 if callable(attempt_invasion) and country_id:
@@ -467,6 +472,11 @@ class BaselineAIPlayer:
                 return True
         return False
 
+    def _current_move_exec_threshold(self) -> int:
+        if self._is_late_game():
+            return self.AI_LATE_GAME_MOVE_THRESHOLD
+        return self.AI_MOVE_EXEC_THRESHOLD
+
     def _ensure_movement_phase_state(self, side: str):
         phase = getattr(self.game_state, "phase", None)
         turn = getattr(self.game_state, "turn", None)
@@ -474,6 +484,7 @@ class BaselineAIPlayer:
         if self._movement_phase_key == key:
             return
         self._movement_phase_key = key
+        self._side_strategy_cache = {}
         self._unit_last_position = {}
         self._unit_visit_counts = defaultdict(lambda: defaultdict(int))
         for unit in self.game_state.units:
@@ -645,9 +656,10 @@ class BaselineAIPlayer:
         if not candidates:
             return False
 
+        exec_threshold = self._current_combat_exec_threshold()
         candidates.sort(key=lambda item: item["score"], reverse=True)
         for candidate in candidates:
-            if candidate["score"] < self.AI_COMBAT_EXEC_THRESHOLD:
+            if candidate["score"] < exec_threshold:
                 return False
             attackers = candidate["attackers"]
             target_hex = candidate["target_hex"]
@@ -681,6 +693,9 @@ class BaselineAIPlayer:
             return True
         return False
 
+    def _current_combat_exec_threshold(self) -> int:
+        return self.AI_LATE_GAME_COMBAT_EXEC_THRESHOLD if self._is_late_game() else self.AI_COMBAT_EXEC_THRESHOLD
+
     # ---------- Evaluation helpers ----------
     def _build_movable_stacks(self, side: str):
         by_hex = defaultdict(list)
@@ -713,6 +728,9 @@ class BaselineAIPlayer:
     def _score_move_target(self, stack, target_coords, objective_hexes: set[tuple[int, int]], side: str) -> int:
         target_hex = Hex.offset_to_axial(target_coords[0], target_coords[1])
         start = stack[0].position if stack and getattr(stack[0], "position", None) else target_coords
+        urgency = self._objective_urgency_multiplier()
+        is_late = self._is_late_game()
+        profile = self._side_strategy_profile(side)
 
         # Progress momentum: reward sustained objective approach over this and prior move.
         start_dist = self._min_distance_to_objectives(start, objective_hexes)
@@ -743,7 +761,7 @@ class BaselineAIPlayer:
             risk -= 80
 
         role_w = self._stack_role_weights(stack)
-        progress_score = int(prev_dist_gain * 12 + dist_gain * 20 * role_w["objective"])
+        progress_score = int(prev_dist_gain * 12 + dist_gain * 20 * role_w["objective"] * urgency)
         contact_score = int(enemy_here * 60 + enemy_adj * 25 * role_w["threat"] + friendly_adj * 8 * role_w["cohesion"])
 
         backtrack_penalty = 0
@@ -751,11 +769,12 @@ class BaselineAIPlayer:
             backtrack_penalty -= self.AI_BACKTRACK_PENALTY
 
         revisit_penalty = 0
+        revisit_scale = 1.4 if self._is_late_game() else 1.0
         for unit in stack:
             marker = id(unit)
             visits = self._unit_visit_counts[marker].get((int(target_coords[0]), int(target_coords[1])), 0)
             if visits > 0:
-                revisit_penalty -= self.AI_REVISIT_PENALTY * visits
+                revisit_penalty -= int(self.AI_REVISIT_PENALTY * revisit_scale * visits)
 
         efficiency_bonus = 0
         est_cost = self._estimate_stack_move_cost(stack, target_coords)
@@ -766,7 +785,47 @@ class BaselineAIPlayer:
 
         frontier_bonus = 0
         if end_dist < start_dist and (enemy_adj > 0 or enemy_here > 0 or target_coords in objective_hexes):
-            frontier_bonus += int(40 + 20 * min(enemy_adj + enemy_here, 4))
+            frontier_bonus += int((40 + 20 * min(enemy_adj + enemy_here, 4)) * urgency)
+
+        objective_entry_bonus = 0
+        if target_coords in objective_hexes and tuple(start) != tuple(target_coords):
+            objective_entry_bonus += int(140 * urgency)
+            if enemy_here > 0:
+                # Conversion pressure: prioritize attacking into objective spaces.
+                objective_entry_bonus += int(110 * urgency)
+
+        low_value_penalty = 0
+        if (
+            dist_gain <= 0
+            and enemy_adj == 0
+            and enemy_here == 0
+            and target_coords not in objective_hexes
+            and friendly_adj <= 1
+        ):
+            low_value_penalty -= int(35 * urgency)
+
+        late_distance_penalty = 0
+        if is_late:
+            if end_dist >= 999:
+                late_distance_penalty -= int(260 * urgency)
+            else:
+                # End-game: moves that keep units far from objectives are expensive.
+                late_distance_penalty -= int(max(0, end_dist - 2) * 14 * urgency)
+            if dist_gain <= 0 and target_coords not in objective_hexes:
+                late_distance_penalty -= int(30 * urgency)
+
+        posture = profile.get("posture", "balanced")
+        posture_adjust = 0
+        if posture == "defensive":
+            posture_adjust += int(friendly_adj * 12)
+            posture_adjust -= int(enemy_here * 10)
+        elif posture == "offensive":
+            posture_adjust += int((enemy_adj * 10 + enemy_here * 18) * urgency)
+        elif posture == "escape":
+            # Escape posture: avoid unnecessary fights unless they advance objective movement.
+            posture_adjust -= int((enemy_adj * 10 + enemy_here * 20) * (1.2 if dist_gain <= 0 else 0.8))
+
+        capital_garrison_penalty = self._capital_garrison_vacate_penalty(stack, target_coords, side)
 
         relief_bonus = self._stack_relief_bonus(stack, target_coords, side)
         return int(
@@ -777,8 +836,29 @@ class BaselineAIPlayer:
             + revisit_penalty
             + efficiency_bonus
             + frontier_bonus
+            + objective_entry_bonus
+            + low_value_penalty
+            + late_distance_penalty
+            + posture_adjust
+            + capital_garrison_penalty
             + relief_bonus
         )
+
+    def _is_late_game(self) -> bool:
+        end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 30) or 30)
+        if end_turn <= 0:
+            end_turn = 30
+        current_turn = int(getattr(self.game_state, "turn", 1) or 1)
+        return current_turn >= max(20, int(end_turn * 0.67))
+
+    def _objective_urgency_multiplier(self) -> float:
+        end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 30) or 30)
+        if end_turn <= 0:
+            return 1.0
+        current_turn = int(getattr(self.game_state, "turn", 1) or 1)
+        ratio = max(0.0, min(1.0, current_turn / end_turn))
+        # Neutral most of the game, then steeply increases objective pressure near the end.
+        return 1.0 + max(0.0, ratio - 0.6) * 1.5
 
     def _estimate_stack_move_cost(self, stack, target_coords: tuple[int, int]) -> float:
         if not stack:
@@ -816,7 +896,36 @@ class BaselineAIPlayer:
         dist = self._min_distance_to_objectives(coords, objective_hexes)
         friendly_adj = self._adjacent_friendly_count(target_hex, side)
         enemy_adj = self._adjacent_enemy_count(target_hex, side)
-        return int((0 if dist >= 999 else -dist * 12) + friendly_adj * 10 - enemy_adj * 14)
+        profile = self._side_strategy_profile(side)
+        posture = profile.get("posture", "balanced")
+        base = int((0 if dist >= 999 else -dist * 12) + friendly_adj * 10 - enemy_adj * 14)
+
+        # Capital garrison priority: ensure at least one army in allied capitals.
+        cap_bonus = self._capital_deployment_need_bonus(unit, coords, side)
+        defense_bonus = self._hex_defense_value(coords)
+        border_pressure = enemy_adj * 18
+
+        if posture == "defensive":
+            base += int(defense_bonus * 20 + border_pressure * 0.7)
+            if enemy_adj == 0 and friendly_adj == 0:
+                base -= 18
+        elif posture == "offensive":
+            base += int(border_pressure * 1.2)
+            base += int(defense_bonus * 6)
+        elif posture == "escape":
+            # Keep deployments cohesive and safer in escape scenarios.
+            base += int(defense_bonus * 16 + friendly_adj * 8)
+            if enemy_adj >= 2:
+                base += 10
+
+        # HL can activate + invade in control-style scenarios, so favor forward pressure.
+        if side == HL and profile.get("control_focus", False):
+            base += int(border_pressure * 0.5)
+        if side == WS and profile.get("control_focus", False):
+            # WS typically benefits from sturdier deployment.
+            base += int(defense_bonus * 8)
+
+        return int(base + cap_bonus)
 
     def _is_trapped_mountain_deploy(self, unit, coords: tuple[int, int]) -> bool:
         target_hex = Hex.offset_to_axial(coords[0], coords[1])
@@ -932,14 +1041,190 @@ class BaselineAIPlayer:
     def _score_combat(self, attackers, defenders, target_hex: Hex, side: str) -> int:
         att = sum(int(getattr(u, "combat_rating", 0) or 0) for u in attackers)
         deff = sum(int(getattr(u, "combat_rating", 0) or 0) for u in defenders)
-        material = (att - deff) * 15
+        odds = att / max(1, deff)
+        material = (att - deff) * 12
+        # Expected-value style term: prefer favorable odds, avoid low-odds trades.
+        expected_trade = int((odds - 1.0) * 120)
+        if odds < 0.85:
+            expected_trade -= 120
+        elif odds < 1.0:
+            expected_trade -= 60
+
         objective_bonus = 0
-        if target_hex.axial_to_offset() in self._objective_hexes_for_side(side):
-            objective_bonus += 220
+        target_offset = target_hex.axial_to_offset()
+        urgency = self._objective_urgency_multiplier()
+        profile = self._side_strategy_profile(side)
+        if target_offset in self._objective_hexes_for_side(side):
+            objective_bonus += int(260 * urgency)
         enemy_side = self.game_state.get_enemy_allegiance(side)
-        if target_hex.axial_to_offset() in self._objective_hexes_for_side(enemy_side):
-            objective_bonus += 260
-        return material + objective_bonus
+        if target_offset in self._objective_hexes_for_side(enemy_side):
+            objective_bonus += int(300 * urgency)
+
+        posture_adjust = 0
+        posture = profile.get("posture", "balanced")
+        if posture == "defensive" and odds < 1.05:
+            posture_adjust -= 60
+        if posture == "offensive" and odds >= 1.0:
+            posture_adjust += 35
+        if posture == "escape" and odds < 1.2:
+            posture_adjust -= 90
+
+        return material + expected_trade + objective_bonus + posture_adjust
+
+    def _side_strategy_profile(self, side: str) -> dict[str, Any]:
+        cached = self._side_strategy_cache.get(side)
+        if cached is not None:
+            return cached
+
+        vc = getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}
+        side_vc = vc.get(side, {}) or {}
+        nodes = []
+        self._collect_victory_nodes(side_vc.get("major"), nodes)
+        minor = side_vc.get("minor")
+        if isinstance(minor, dict) and "conditions" in minor:
+            for item in minor.get("conditions", []) or []:
+                node = item.get("when") if isinstance(item, dict) and "when" in item else item
+                self._collect_victory_nodes(node, nodes)
+        else:
+            self._collect_victory_nodes(minor, nodes)
+
+        posture_score = {"offensive": 0, "defensive": 0, "escape": 0}
+        control_focus = False
+
+        for node in nodes:
+            ntype = str(node.get("type", "")).strip().lower()
+            if ntype in {"capture_location", "destroy_unit_score"}:
+                posture_score["offensive"] += 3 if ntype == "capture_location" else 2
+            elif ntype in {"prevent_location_captured", "prevent_country_conquered", "prevent_country_control", "survive_unit_score"}:
+                posture_score["defensive"] += 3
+            elif ntype == "escape_unit_score":
+                posture_score["escape"] += 5
+
+            if ntype in {"conquer_country", "control_n_countries", "ally_country", "prevent_country_control"}:
+                control_focus = True
+
+        if not any(posture_score.values()):
+            # Default posture for control/conquest style scenarios.
+            posture_score["offensive"] += 2 if side == HL else 0
+            posture_score["defensive"] += 2 if side == WS else 0
+
+        posture = max(posture_score.keys(), key=lambda k: posture_score[k])
+        profile = {
+            "posture": posture,
+            "control_focus": bool(control_focus),
+        }
+        self._side_strategy_cache[side] = profile
+        return profile
+
+    def _collect_victory_nodes(self, node: Any, out: list[dict[str, Any]]):
+        if node is None:
+            return
+        if isinstance(node, list):
+            for child in node:
+                self._collect_victory_nodes(child, out)
+            return
+        if not isinstance(node, dict):
+            return
+        if "all" in node:
+            for child in node.get("all", []) or []:
+                self._collect_victory_nodes(child, out)
+            return
+        if "any" in node:
+            for child in node.get("any", []) or []:
+                self._collect_victory_nodes(child, out)
+            return
+        if "type" in node:
+            out.append(node)
+
+    def _capital_deployment_need_bonus(self, unit, coords: tuple[int, int], side: str) -> int:
+        if not hasattr(unit, "is_army") or not unit.is_army():
+            return 0
+        for country in self.game_state.countries.values():
+            if getattr(country, "allegiance", None) != side:
+                continue
+            capital = getattr(country, "capital", None)
+            if not capital or not getattr(capital, "coords", None):
+                continue
+            cap_coords = tuple(capital.coords)
+            if cap_coords != tuple(coords):
+                continue
+            cap_hex = Hex.offset_to_axial(cap_coords[0], cap_coords[1])
+            armies = [
+                u
+                for u in self.game_state.get_units_at(cap_hex)
+                if getattr(u, "is_on_map", False)
+                and getattr(u, "allegiance", None) == side
+                and hasattr(u, "is_army")
+                and u.is_army()
+                and getattr(u, "transport_host", None) is None
+            ]
+            if not armies:
+                return 180
+            # Prefer keeping at least one weaker unit as garrison while stronger units move out.
+            weakest = min(int(getattr(u, "combat_rating", 0) or 0) for u in armies)
+            if int(getattr(unit, "combat_rating", 0) or 0) <= weakest:
+                return 80
+            return 20
+        return 0
+
+    def _hex_defense_value(self, coords: tuple[int, int]) -> float:
+        hex_obj = Hex.offset_to_axial(coords[0], coords[1])
+        score = 0.0
+        terrain = self.game_state.map.get_terrain(hex_obj)
+        if terrain in (TerrainType.FOREST, TerrainType.MOUNTAIN, TerrainType.SWAMP):
+            score += 1.0
+        loc = self.game_state.map.get_location(hex_obj)
+        if loc:
+            if loc.loc_type in (LocType.FORTRESS.value, LocType.UNDERCITY.value):
+                score += 2.0
+            elif loc.loc_type in (LocType.CITY.value, LocType.PORT.value):
+                score += 1.2
+        # Natural barriers: reward border tiles that are harder to cross.
+        for neighbor in hex_obj.neighbors():
+            hs = self.game_state.map.get_hexside(hex_obj, neighbor)
+            if hs in ("river", "deep_river", "mountain", "sea"):
+                score += 0.25
+        return score
+
+    def _capital_garrison_vacate_penalty(self, stack, target_coords: tuple[int, int], side: str) -> int:
+        if not stack:
+            return 0
+        start = getattr(stack[0], "position", None)
+        if not start or start[0] is None:
+            return 0
+        start_xy = (int(start[0]), int(start[1]))
+        target_xy = (int(target_coords[0]), int(target_coords[1]))
+        if start_xy == target_xy:
+            return 0
+        if not any(hasattr(u, "is_army") and u.is_army() for u in stack):
+            return 0
+
+        allied_capital = False
+        for country in self.game_state.countries.values():
+            if getattr(country, "allegiance", None) != side:
+                continue
+            cap = getattr(country, "capital", None)
+            if cap and getattr(cap, "coords", None) and tuple(cap.coords) == start_xy:
+                allied_capital = True
+                break
+        if not allied_capital:
+            return 0
+
+        start_hex = Hex.offset_to_axial(start_xy[0], start_xy[1])
+        armies_here = [
+            u
+            for u in self.game_state.get_units_at(start_hex)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) == side
+            and hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "transport_host", None) is None
+        ]
+        moving_armies = [u for u in stack if hasattr(u, "is_army") and u.is_army()]
+        remaining = max(0, len(armies_here) - len(moving_armies))
+        if remaining <= 0:
+            return -self.AI_CAPITAL_GARRISON_VACATE_PENALTY
+        return 0
 
     def _resolve_ai_leader_escapes(self, resolution: dict[str, Any] | None):
         if not resolution:

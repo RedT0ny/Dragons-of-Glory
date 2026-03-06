@@ -1262,7 +1262,7 @@ class CombatClickHandler:
         if hexside in (HexsideType.MOUNTAIN, HexsideType.MOUNTAIN.value):
             # Check if ALL attackers are capable
             for u in attackers:
-                can_cross = u.unit_type == 'wing' or u.unit_type in ['dwarves', 'ogres']
+                can_cross = u.unit_type == 'wing' or u.race in ['dwarf', 'ogre']
                 if not can_cross:
                     return False
         return True

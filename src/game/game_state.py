@@ -1606,6 +1606,7 @@ class GameState:
             defenders = list(self.get_units_at(hex_position))
             if not any(self._is_combat_stack_unit(u) for u in defenders):
                 result = special_retreat["result"]
+                leader_escape_requests = special_retreat.get("leader_escape_requests", []) or []
                 advance_available = self._can_advance_after_combat(
                     attackers=attackers,
                     target_hex=hex_position,
@@ -1615,7 +1616,7 @@ class GameState:
                 print(self._format_combat_log_entry(attackers, defenders, result))
                 return {
                     "result": result,
-                    "leader_escape_requests": [],
+                    "leader_escape_requests": leader_escape_requests,
                     "advance_available": advance_available,
                 }
 
@@ -1925,11 +1926,11 @@ class GameState:
             and self._is_combat_stack_unit(u)
         ]
         if not combat_defenders:
-            return {"applied": False, "result": None}
+            return {"applied": False, "result": None, "leader_escape_requests": []}
 
         # These rules do not apply while defending any location.
         if self.map.get_location(target_hex):
-            return {"applied": False, "result": None}
+            return {"applied": False, "result": None, "leader_escape_requests": []}
 
         combat_attackers = [
             u for u in attackers
@@ -1938,12 +1939,12 @@ class GameState:
             and self._is_combat_stack_unit(u)
         ]
         if not combat_attackers:
-            return {"applied": False, "result": None}
+            return {"applied": False, "result": None, "leader_escape_requests": []}
 
         # No partial retreats: if any non-wing/cavalry combat defender exists (e.g. infantry),
         # entire defending stack remains to fight.
         if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in combat_defenders):
-            return {"applied": False, "result": None}
+            return {"applied": False, "result": None, "leader_escape_requests": []}
 
         attacker_has_wing = any(u.unit_type == UnitType.WING for u in combat_attackers)
         attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in combat_attackers)
@@ -1951,29 +1952,130 @@ class GameState:
         wing_rule = not attacker_has_wing
         cavalry_rule = not attacker_has_wing and not attacker_has_cavalry
         if not (wing_rule or cavalry_rule):
-            return {"applied": False, "result": None}
+            return {"applied": False, "result": None, "leader_escape_requests": []}
 
+        leader_escape_requests = []
         for unit in combat_defenders:
-            self._retreat_single_unit(unit)
+            leader_escape_requests.extend(self._retreat_single_unit(unit) or [])
 
         # If cavalry rule applies at all, use the more restrictive marker.
         result = "-/SRC" if cavalry_rule else "-/SRW"
-        return {"applied": True, "result": result}
+        return {"applied": True, "result": result, "leader_escape_requests": leader_escape_requests}
 
     def _retreat_single_unit(self, unit):
         if not unit.position or unit.position[0] is None or unit.position[1] is None:
-            return
+            return []
         status_before = unit.status
         start_hex = Hex.offset_to_axial(*unit.position)
         valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
         if not valid_hexes:
             unit.eliminate()
-            return
+            return []
+
+        leaders_here = [
+            u for u in self.get_units_at(start_hex)
+            if getattr(u, "is_on_map", False)
+            and hasattr(u, "is_leader") and u.is_leader()
+            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
+            and getattr(u, "transport_host", None) is None
+        ]
+
         retreat_hex = random.choice(valid_hexes)
+
+        leader_escape_requests = []
+        boarded_leaders = set()
+
+        # Wing retreat special case: if a leader cannot legally occupy retreat hex,
+        # attempt to board the leader onto the wing before moving.
+        if unit.unit_type == UnitType.WING:
+            for leader in leaders_here:
+                can_land = (
+                    self.map.can_unit_land_on_hex(leader, retreat_hex)
+                    and self.map.can_stack_move_to([leader], retreat_hex)
+                    and not self.map.has_enemy_army(retreat_hex, leader.allegiance)
+                )
+                if can_land:
+                    continue
+                if self._force_board_leader_for_retreat(unit, leader):
+                    boarded_leaders.add(id(leader))
+                    continue
+                request = self._resolve_single_leader_escape_roll(leader, start_hex)
+                if request:
+                    leader_escape_requests.append(request)
+
         self.move_unit(unit, retreat_hex)
         # Special pre-combat retreat never applies damage/depletion.
         if unit.is_on_map:
             unit.status = status_before
+
+        # Move non-boarded leaders with the retreating unit when possible.
+        for leader in leaders_here:
+            if id(leader) in boarded_leaders:
+                continue
+            if getattr(leader, "status", None) == UnitState.DESTROYED:
+                continue
+            if getattr(leader, "transport_host", None) is not None:
+                continue
+
+            can_land = (
+                self.map.can_unit_land_on_hex(leader, retreat_hex)
+                and self.map.can_stack_move_to([leader], retreat_hex)
+                and not self.map.has_enemy_army(retreat_hex, leader.allegiance)
+            )
+            if can_land:
+                leader_status = leader.status
+                self.move_unit(leader, retreat_hex)
+                if leader.is_on_map:
+                    leader.status = leader_status
+                continue
+
+            request = self._resolve_single_leader_escape_roll(leader, start_hex)
+            if request:
+                leader_escape_requests.append(request)
+
+        return leader_escape_requests
+
+    def _force_board_leader_for_retreat(self, wing, leader):
+        if not wing or not leader:
+            return False
+        if getattr(wing, "unit_type", None) != UnitType.WING:
+            return False
+        if not (hasattr(leader, "is_leader") and leader.is_leader()):
+            return False
+        if not wing.position or not leader.position or wing.position != leader.position:
+            return False
+        if getattr(leader, "transport_host", None) is not None:
+            return True
+        if not hasattr(wing, "can_carry") or not wing.can_carry(leader):
+            return False
+
+        self.map.remove_unit_from_spatial_map(leader)
+        wing.load_unit(leader)
+        leader.position = wing.position
+        leader.is_transported = True
+        leader.transport_host = wing
+        self._normalize_transport_state()
+        return True
+
+    def _resolve_single_leader_escape_roll(self, leader, origin_hex):
+        if not leader or getattr(leader, "status", None) == UnitState.DESTROYED:
+            return None
+        roll = random.randint(1, 6)
+        if roll <= 3:
+            leader.destroy()
+            self._cleanup_destroyed_units([leader])
+            print(f"Leader {leader.id} eliminated after retreat (roll {roll}).")
+            return None
+
+        options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
+        if not options:
+            leader.destroy()
+            self._cleanup_destroyed_units([leader])
+            print(f"Leader {leader.id} eliminated after retreat (no friendly stacks).")
+            return None
+
+        print(f"Leader {leader.id} escapes after retreat (roll {roll}).")
+        return LeaderEscapeRequest(leader=leader, options=options)
 
     def _get_valid_retreat_hexes(self, unit, start_hex):
         valid = []
@@ -2072,7 +2174,11 @@ class GameState:
         for group in groups:
             pool = list(group)
             while pool:
-                legal = [u for u in pool if self.map.can_stack_move_to([u], target_hex)]
+                legal = [
+                    u for u in pool
+                    if self.map.can_stack_move_to([u], target_hex)
+                    and not self._would_leave_leaders_alone_after_advance(u)
+                ]
                 if not legal:
                     break
 
@@ -2089,6 +2195,29 @@ class GameState:
                 pool.remove(chosen)
 
         return moved
+
+    def _would_leave_leaders_alone_after_advance(self, unit):
+        """Returns True when advancing `unit` would strand allied leader(s) with no allied army/wing."""
+        if not unit.position or unit.position[0] is None or unit.position[1] is None:
+            return False
+        src_hex = Hex.offset_to_axial(*unit.position)
+        src_units = [
+            u for u in self.map.get_units_in_hex(src_hex.q, src_hex.r)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
+            and getattr(u, "transport_host", None) is None
+        ]
+        has_leader = any(hasattr(u, "is_leader") and u.is_leader() for u in src_units)
+        if not has_leader:
+            return False
+
+        escort_count = sum(
+            1
+            for u in src_units
+            if (hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING
+        )
+        # If exactly one escort is present and it advances, leaders would be left alone.
+        return escort_count <= 1
 
     def _advance_priority_key(self, unit, remaining_by_source, no_adjacent_enemy):
         src = tuple(unit.position)
