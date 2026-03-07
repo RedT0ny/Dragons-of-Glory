@@ -5,7 +5,7 @@ from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox, QApplication,
                                QAbstractButton, QDialog)
-from PySide6.QtGui import QAction, QCloseEvent
+from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
 from src.content.config import APP_NAME, DEBUG, SAVEGAME_DIR
@@ -111,6 +111,9 @@ class MainWindow(QMainWindow):
         self.log_area.setReadOnly(True)
         self.log_area.setFixedHeight(100)
         self.log_area.setFrameStyle(QFrame.Panel | QFrame.Sunken)
+        fm = QFontMetrics(self.log_area.font())
+        line_height = fm.lineSpacing()
+        self.log_area.verticalScrollBar().setSingleStep(line_height)
         left_layout.addWidget(self.log_area, stretch=0)
 
         body_layout.addWidget(self.left_column, stretch=1)

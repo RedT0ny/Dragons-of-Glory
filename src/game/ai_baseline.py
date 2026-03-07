@@ -29,6 +29,8 @@ class BaselineAIPlayer:
         self._unit_last_position = {}
         self._unit_visit_counts = defaultdict(lambda: defaultdict(int))
         self._side_strategy_cache = {}
+        self._combat_phase_key = None
+        self._failed_combat_targets = defaultdict(set)
 
     # ---------- Deployment ----------
     def deploy_all_ready_units(
@@ -53,7 +55,19 @@ class BaselineAIPlayer:
         ready_units.sort(key=lambda u: (str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1))))
 
         objective_hexes = self._objective_hexes_for_side(side)
+        if side == HL:
+            deployed += self._deploy_hl_dragon_pairs(
+                objective_hexes=objective_hexes,
+                allow_territory_wide=allow_territory_wide,
+                country_filter=country_filter,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+
         for unit in ready_units:
+            if getattr(unit, "is_on_map", False):
+                continue
             valid = self.game_state.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide)
             if valid:
                 valid = [c for c in valid if not self._is_trapped_mountain_deploy(unit, c)]
@@ -73,6 +87,123 @@ class BaselineAIPlayer:
             if result.success:
                 deployed += 1
         return deployed
+
+    def _deploy_hl_dragon_pairs(
+        self,
+        objective_hexes: set[tuple[int, int]],
+        allow_territory_wide: bool,
+        country_filter: str | None,
+        invasion_deployment_active: bool,
+        invasion_deployment_allegiance: str | None,
+        invasion_deployment_country_id: str | None,
+    ) -> int:
+        """Deploy HL dragon wings with commander in same hex: same-flight Highlord, fallback Emperor."""
+        deployed = 0
+        ready = [
+            u for u in self.game_state.units
+            if getattr(u, "allegiance", None) == HL
+            and getattr(u, "status", None) == UnitState.READY
+            and not getattr(u, "is_on_map", False)
+        ]
+        if country_filter:
+            ready = [u for u in ready if getattr(u, "land", None) == country_filter]
+
+        wings = [
+            u for u in ready
+            if getattr(u, "unit_type", None) == UnitType.WING
+            and bool(getattr(getattr(u, "spec", None), "dragonflight", None))
+        ]
+        if not wings:
+            return 0
+
+        leaders = [
+            u for u in ready
+            if getattr(u, "unit_type", None) in (UnitType.HIGHLORD, UnitType.EMPEROR)
+        ]
+
+        used_leader_ids = set()
+        wings.sort(key=lambda u: (str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1))))
+        for wing in wings:
+            if getattr(wing, "is_on_map", False):
+                continue
+            flight = str(getattr(getattr(wing, "spec", None), "dragonflight", "") or "").strip().lower()
+            if not flight:
+                continue
+
+            commander = self._pick_hl_dragon_commander_for_deploy(wing, leaders, used_leader_ids)
+            if not commander:
+                # Keep wing undeployed if no valid commander is ready.
+                continue
+
+            wing_valid = self.game_state.get_valid_deployment_hexes(
+                wing, allow_territory_wide=allow_territory_wide
+            )
+            commander_valid = self.game_state.get_valid_deployment_hexes(
+                commander, allow_territory_wide=allow_territory_wide
+            )
+            wing_valid = [c for c in wing_valid if not self._is_trapped_mountain_deploy(wing, c)]
+            commander_valid_set = set(commander_valid or [])
+            joint = [c for c in wing_valid if c in commander_valid_set]
+            if not joint:
+                continue
+
+            best = max(joint, key=lambda c: self._score_deployment_hex(wing, c, objective_hexes))
+            target_hex = Hex.offset_to_axial(best[0], best[1])
+            wing_result = self.game_state.deployment_service.deploy_unit(
+                wing,
+                target_hex,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if not wing_result.success:
+                continue
+
+            leader_result = self.game_state.deployment_service.deploy_unit(
+                commander,
+                target_hex,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if not leader_result.success:
+                # Roll back wing deployment to keep pair invariant.
+                try:
+                    wing.position = (None, None)
+                    wing.status = UnitState.READY
+                    wing.is_transported = False
+                    wing.transport_host = None
+                    self.game_state.map.remove_unit_from_spatial_map(wing)
+                except Exception:
+                    pass
+                continue
+
+            used_leader_ids.add(id(commander))
+            deployed += 2
+
+        return deployed
+
+    def _pick_hl_dragon_commander_for_deploy(self, wing, leaders, used_leader_ids):
+        flight = str(getattr(getattr(wing, "spec", None), "dragonflight", "") or "").strip().lower()
+        same_flight = [
+            l for l in leaders
+            if id(l) not in used_leader_ids
+            and not getattr(l, "is_on_map", False)
+            and getattr(l, "unit_type", None) == UnitType.HIGHLORD
+            and str(getattr(getattr(l, "spec", None), "dragonflight", "") or "").strip().lower() == flight
+        ]
+        if same_flight:
+            return sorted(same_flight, key=lambda u: (str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1))))[0]
+
+        emperors = [
+            l for l in leaders
+            if id(l) not in used_leader_ids
+            and not getattr(l, "is_on_map", False)
+            and getattr(l, "unit_type", None) == UnitType.EMPEROR
+        ]
+        if emperors:
+            return sorted(emperors, key=lambda u: (str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1))))[0]
+        return None
 
     # ---------- Replacements ----------
     def process_replacements(self, side: str) -> tuple[int, int]:
@@ -583,13 +714,33 @@ class BaselineAIPlayer:
                 continue
             if self.movement_service._dragon_interceptor_has_required_commander(wing):
                 continue
-            for leader in self._leaders_in_hex(wing):
+            leaders = [
+                leader for leader in self._leaders_in_hex(wing)
+                if self._leader_can_command_wing(leader, wing, side)
+            ]
+            leaders.sort(key=lambda l: self._dragon_commander_priority(l, wing, side), reverse=True)
+            for leader in leaders:
                 if not self._leader_can_command_wing(leader, wing, side):
                     continue
                 if self.game_state.board_unit(wing, leader):
                     print(f"AI boarded {leader.id} onto {wing.id} for command.")
                     return True
         return False
+
+    def _dragon_commander_priority(self, leader, wing, side: str) -> int:
+        if side == HL:
+            if getattr(leader, "unit_type", None) == UnitType.HIGHLORD:
+                wing_flight = str(getattr(getattr(wing, "spec", None), "dragonflight", "") or "").strip().lower()
+                leader_flight = str(getattr(getattr(leader, "spec", None), "dragonflight", "") or "").strip().lower()
+                if wing_flight and leader_flight and wing_flight == leader_flight:
+                    return 200
+                return 50
+            if getattr(leader, "unit_type", None) == UnitType.EMPEROR:
+                return 150
+            return 0
+        if getattr(leader, "race", None) in (UnitRace.ELF, UnitRace.SOLAMNIC):
+            return 100
+        return 0
 
     def _attempt_board_armies(self, side: str) -> bool:
         for carrier in self.game_state.units:
@@ -652,6 +803,7 @@ class BaselineAIPlayer:
 
     # ---------- Combat ----------
     def execute_best_combat(self, side: str) -> bool:
+        self._ensure_combat_phase_state(side)
         candidates = self._combat_candidates(side)
         if not candidates:
             return False
@@ -686,6 +838,7 @@ class BaselineAIPlayer:
                     self.game_state.advance_after_combat(attackers, target_hex)
                 except Exception:
                     pass
+            self._record_combat_outcome(side, target_hex, defenders_before, resolution)
             print(
                 f"AI combat score {candidate['score']}: "
                 f"{len(attackers)} attacker(s) vs {target_hex.axial_to_offset()}"
@@ -695,6 +848,34 @@ class BaselineAIPlayer:
 
     def _current_combat_exec_threshold(self) -> int:
         return self.AI_LATE_GAME_COMBAT_EXEC_THRESHOLD if self._is_late_game() else self.AI_COMBAT_EXEC_THRESHOLD
+
+    def _ensure_combat_phase_state(self, side: str):
+        phase = getattr(self.game_state, "phase", None)
+        turn = getattr(self.game_state, "turn", None)
+        key = (turn, side, phase)
+        if self._combat_phase_key == key:
+            return
+        self._combat_phase_key = key
+        self._failed_combat_targets = defaultdict(set)
+
+    def _record_combat_outcome(self, side: str, target_hex: Hex, defenders_before, resolution):
+        if not target_hex:
+            return
+        target = target_hex.axial_to_offset()
+        result = (resolution or {}).get("result", "-/-")
+        parts = result.split("/")
+        attacker_result = parts[0] if len(parts) > 0 else "-"
+        defender_result = parts[1] if len(parts) > 1 else "-"
+
+        defenders_after = [
+            u for u in self.game_state.get_units_at(target_hex)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+        ]
+        no_defender_reduction = len(defenders_after) >= len(defenders_before or [])
+        suicidal_fail = attacker_result == "E" and defender_result == "-"
+        if suicidal_fail or no_defender_reduction:
+            self._failed_combat_targets[side].add(target)
 
     # ---------- Evaluation helpers ----------
     def _build_movable_stacks(self, side: str):
@@ -1022,7 +1203,12 @@ class BaselineAIPlayer:
                     continue
 
                 if land_attackers:
-                    score = self._score_combat(land_attackers, defenders, target_hex, side)
+                    if not self._combat_passes_hard_gates(land_attackers, defenders, target_hex, side):
+                        score = -9999
+                    else:
+                        score = self._score_combat(land_attackers, defenders, target_hex, side, source_hex=source_hex)
+                        if target_hex.axial_to_offset() in self._failed_combat_targets.get(side, set()):
+                            score -= 700
                     candidates.append({"score": score, "attackers": list(land_attackers), "target_hex": target_hex})
                     evaluated += 1
                     if evaluated >= self.AI_MAX_COMBAT_EVAL:
@@ -1030,7 +1216,12 @@ class BaselineAIPlayer:
 
                 naval_ready = [f for f in fleet_attackers if self.game_state.can_fleet_attack_hex(f, target_hex)]
                 if naval_ready:
-                    score = self._score_combat(naval_ready, defenders, target_hex, side)
+                    if not self._combat_passes_hard_gates(naval_ready, defenders, target_hex, side):
+                        score = -9999
+                    else:
+                        score = self._score_combat(naval_ready, defenders, target_hex, side, source_hex=source_hex)
+                        if target_hex.axial_to_offset() in self._failed_combat_targets.get(side, set()):
+                            score -= 700
                     candidates.append({"score": score, "attackers": list(naval_ready), "target_hex": target_hex})
                     evaluated += 1
                     if evaluated >= self.AI_MAX_COMBAT_EVAL:
@@ -1038,9 +1229,10 @@ class BaselineAIPlayer:
 
         return candidates
 
-    def _score_combat(self, attackers, defenders, target_hex: Hex, side: str) -> int:
+    def _score_combat(self, attackers, defenders, target_hex: Hex, side: str, source_hex: Hex | None = None) -> int:
         att = sum(int(getattr(u, "combat_rating", 0) or 0) for u in attackers)
-        deff = sum(int(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+        deff_raw = sum(int(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+        deff = self._effective_defender_strength_for_ai(target_hex, deff_raw)
         odds = att / max(1, deff)
         material = (att - deff) * 12
         # Expected-value style term: prefer favorable odds, avoid low-odds trades.
@@ -1055,10 +1247,10 @@ class BaselineAIPlayer:
         urgency = self._objective_urgency_multiplier()
         profile = self._side_strategy_profile(side)
         if target_offset in self._objective_hexes_for_side(side):
-            objective_bonus += int(260 * urgency)
+            objective_bonus = max(objective_bonus, int(260 * urgency))
         enemy_side = self.game_state.get_enemy_allegiance(side)
         if target_offset in self._objective_hexes_for_side(enemy_side):
-            objective_bonus += int(300 * urgency)
+            objective_bonus = max(objective_bonus, int(300 * urgency))
 
         posture_adjust = 0
         posture = profile.get("posture", "balanced")
@@ -1069,7 +1261,75 @@ class BaselineAIPlayer:
         if posture == "escape" and odds < 1.2:
             posture_adjust -= 90
 
-        return material + expected_trade + objective_bonus + posture_adjust
+        drm_risk_penalty = int(abs(min(0, self._estimate_combat_drm_risk(attackers, defenders, target_hex, source_hex))) * 18)
+
+        return material + expected_trade + objective_bonus + posture_adjust - drm_risk_penalty
+
+    def _combat_passes_hard_gates(self, attackers, defenders, target_hex: Hex, side: str) -> bool:
+        att = sum(int(getattr(u, "combat_rating", 0) or 0) for u in attackers)
+        deff_raw = sum(int(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+        deff = self._effective_defender_strength_for_ai(target_hex, deff_raw)
+        odds = att / max(1, deff)
+        if odds >= 1.0:
+            return True
+        # Late-game objective pressure: allow some sub-1 odds only near critical objectives.
+        if odds < 0.85:
+            return False
+        if not self._is_late_game():
+            return False
+        target = target_hex.axial_to_offset()
+        enemy_side = self.game_state.get_enemy_allegiance(side)
+        return (
+            target in self._objective_hexes_for_side(side)
+            or target in self._objective_hexes_for_side(enemy_side)
+        )
+
+    def _effective_defender_strength_for_ai(self, target_hex: Hex, defender_cs: int) -> int:
+        loc = self.game_state.map.get_location(target_hex) if self.game_state and self.game_state.map else None
+        mult = 1
+        if loc:
+            loc_type = getattr(loc, "loc_type", None)
+            if loc_type == LocType.FORTRESS.value:
+                mult = 3
+            elif loc_type in (LocType.CITY.value, LocType.PORT.value):
+                mult = 2
+        return int(defender_cs * mult)
+
+    def _estimate_combat_drm_risk(self, attackers, defenders, target_hex: Hex, source_hex: Hex | None) -> int:
+        drm = 0
+        atk_leader = max(
+            [int(getattr(u, "tactical_rating", 0) or 0) for u in attackers if hasattr(u, "is_leader") and u.is_leader()],
+            default=0,
+        )
+        def_leader = max(
+            [int(getattr(u, "tactical_rating", 0) or 0) for u in defenders if hasattr(u, "is_leader") and u.is_leader()],
+            default=0,
+        )
+        drm += atk_leader - def_leader
+
+        loc = self.game_state.map.get_location(target_hex) if self.game_state and self.game_state.map else None
+        if loc:
+            loc_type = getattr(loc, "loc_type", None)
+            if loc_type == LocType.FORTRESS.value:
+                drm -= 4
+            elif loc_type in (LocType.CITY.value, LocType.PORT.value):
+                drm -= 2
+            elif loc_type == LocType.UNDERCITY.value:
+                drm -= 10
+
+        # If source is known and direct crossing exists, model harsh crossing penalties.
+        if source_hex and self.game_state and self.game_state.map:
+            hs = self.game_state.map.get_hexside(source_hex, target_hex)
+            if hs == "river":
+                drm -= 4
+            elif hs == "bridge":
+                drm -= 4
+            elif hs == "ford":
+                drm -= 3
+            elif hs == "pass":
+                drm -= 2
+
+        return int(drm)
 
     def _side_strategy_profile(self, side: str) -> dict[str, Any]:
         cached = self._side_strategy_cache.get(side)

@@ -1,3 +1,10 @@
+"""
+Movement module for Dragons of Glory.
+
+This module handles unit movement, interception, boarding/unboarding, and related game logic.
+It includes pathfinding, cost calculations, and special rules for fleets, wings, and armies.
+"""
+
 from dataclasses import dataclass
 import heapq
 import random
@@ -61,6 +68,7 @@ def evaluate_unit_move(game_state, unit, target_hex):
 
 @dataclass
 class BoardActionResult:
+    """Result of a boarding/unboarding action."""
     handled: bool
     messages: List[str]
     force_sync: bool
@@ -68,17 +76,20 @@ class BoardActionResult:
 
 @dataclass
 class MovementRangeResult:
+    """Result containing reachable hexes and neutral warnings for UI."""
     reachable_coords: List[Tuple[int, int]]
     neutral_warning_coords: List[Tuple[int, int]]
 
 @dataclass
 class MoveUnitsResult:
+    """Result of moving units to a hex."""
     moved: List[object]
     errors: List[str]
 
 
 @dataclass
 class NeutralEntryDecision:
+    """Decision on entering a neutral country."""
     is_neutral_entry: bool
     country_id: str | None = None
     blocked_message: str | None = None
@@ -86,6 +97,7 @@ class NeutralEntryDecision:
 
 
 class MovementService:
+    """Handles all movement-related logic, including pathfinding, interception, boarding, and neutral entry."""
     def __init__(self, game_state):
         self.game_state = game_state
         self._interception_step_context = None
@@ -877,7 +889,7 @@ class MovementService:
                             continue
                         ok = self.game_state.unboard_unit(p)
                         if not ok:
-                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
                     continue
                 if carrier.unit_type == UnitType.CITADEL:
                     for p in carrier.passengers[:]:
@@ -886,16 +898,16 @@ class MovementService:
                             continue
                         ok = self.game_state.unboard_unit(p)
                         if not ok:
-                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
                     continue
-                is_coastal = self.game_state.map.is_coastal(carrier_hex)
+                #is_coastal = self.game_state.map.is_coastal(carrier_hex)
                 loc = self.game_state.map.get_location(carrier_hex)
                 is_port = False
                 if loc:
                     is_port = (loc.loc_type == LocType.PORT.value)
 
-                if not (is_coastal or is_port):
-                    messages.append(f"Carrier {carrier.id} not in coastal hex or port, cannot unboard.")
+                if self.game_state.map.is_open_sea(carrier_hex):
+                    messages.append(f"Carrier {carrier.id} is in open sea, cannot unboard.")
                     continue
 
                 # Unboard all passengers (copy list since unboard_unit mutates passengers)
@@ -905,7 +917,7 @@ class MovementService:
                         messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
 
                 # Movement restriction: if carrier is in a coastal land hex (coastal but NOT port), it cannot move further this Turn
-                if is_coastal and not is_port:
+                if not is_port:
                     # Ensure movement_points exists
                     carrier.movement_points = 0
 

@@ -852,12 +852,7 @@ class Board:
         ):
             return float('inf')
 
-        terrain = self.get_terrain(to_hex)
-        valid_sea_terrains = [
-            TerrainType.OCEAN,
-            TerrainType.MAELSTROM
-        ]
-        if terrain in valid_sea_terrains or self.is_coastal(to_hex):
+        if self.is_open_sea(to_hex) or self.is_coastal(to_hex):
             return 1
 
         return float('inf')
@@ -890,6 +885,15 @@ class Board:
                 exits.append(neighbor)
 
         return exits
+
+    def is_open_sea(self, hex_obj):
+        """Checks if the hex is open sea (Ocean or Maelstrom)."""
+        terrain = self.get_terrain(hex_obj)
+        sea_terrains = [
+            TerrainType.OCEAN,
+            TerrainType.MAELSTROM
+        ]
+        return terrain in sea_terrains and not self.is_coastal(hex_obj)
 
     def _get_ground_movement_cost(self, unit, from_hex, to_hex):
         """Rule 5: Moving Ground troops. Restrictions and Hexside Barriers"""

@@ -222,7 +222,7 @@ class CombatResolver:
         odds_str = self.calculate_odds(attacker_cs, defender_cs)
         
         # 2. Determine DRMs (Leader Tactical Ratings, Terrain, etc.)
-        drm = self.calculate_total_drm()
+        drm, drm_parts = self.calculate_total_drm(return_breakdown=True)
 
         # 3. Roll 1d10
         roll = random.randint(1, 10)
@@ -232,6 +232,12 @@ class CombatResolver:
 
         # 4. Look up result from CRT data
         result = self.crt_data[final_roll][odds_str]
+        parts_text = ", ".join(f"{name}={value:+d}" for name, value in drm_parts if value)
+        if not parts_text:
+            parts_text = "none"
+        print(f"Combat odds: attacker_cs={attacker_cs} defender_cs={defender_cs} -> {odds_str}")
+        print(f"Combat DRM: total={drm:+d} [{parts_text}]")
+        print(f"Combat roll: d10={roll} + drm={drm:+d} -> final={final_roll} => result={result}")
 
         self.apply_results(result, self.attackers, True)
         self.apply_results(result, self.defenders, False)
@@ -287,8 +293,15 @@ class CombatResolver:
             error_msg = f"Invalid combat result: {result_code}"
             raise ValueError(error_msg)
 
-    def calculate_total_drm(self):
+    def calculate_total_drm(self, return_breakdown=False):
         drm = 0
+        breakdown = []
+        def add_part(label, value):
+            nonlocal drm
+            value = int(value or 0)
+            drm += value
+            breakdown.append((label, value))
+
         defender_hex = self._get_defender_hex()
         defender_terrain = self._effective_defender_terrain()
         defender_location = self._get_defender_location()
@@ -303,8 +316,8 @@ class CombatResolver:
             [u.tactical_rating for u in self.defenders if hasattr(u, "is_leader") and u.is_leader()],
             default=0,
         )
-        drm += atk_leader
-        drm -= def_leader
+        add_part("attacker_leader", atk_leader)
+        add_part("defender_leader", -def_leader)
 
         # DRAGONS (Dragon wings only)
         attacker_dragon_bonus = sum(
@@ -315,23 +328,24 @@ class CombatResolver:
         if self._defender_has_other_bonus("dragon_slayer") and attacker_dragon_bonus:
             attacker_dragon_bonus = 0
             self._consume_other_bonus_if_needed(self.defenders, "dragon_slayer")
-        drm += attacker_dragon_bonus
+        add_part("attacker_dragons", attacker_dragon_bonus)
 
-        drm -= sum(
+        defender_dragon_bonus = sum(
             u.combat_rating
             for u in self.defenders
             if u.unit_type == UnitType.WING and self._is_dragon_race(u)
         )
+        add_part("defender_dragons", -defender_dragon_bonus)
 
         # ARMOR: defender stack forces attacker -1 DRM
         if self._defender_has_other_bonus("armor"):
-            drm -= 1
+            add_part("defender_armor", -1)
             self._consume_other_bonus_if_needed(self.defenders, "armor")
 
         # CAVALRY (+1 attacker only, not vs location/forest/jungle)
         cavalry_blocked = bool(defender_location) or defender_terrain in (TerrainType.FOREST, TerrainType.JUNGLE)
         if not cavalry_blocked and any(u.unit_type == UnitType.CAVALRY for u in self.attackers):
-            drm += 1
+            add_part("attacker_cavalry", 1)
 
         # FLIGHT (+1 attacker if has fliers, -1 defender if has fliers)
         flight_blocked = (
@@ -340,40 +354,42 @@ class CombatResolver:
         )
         if not flight_blocked:
             if any(self._is_flier(u) for u in self.attackers):
-                drm += 1
+                add_part("attacker_fliers", 1)
             if any(self._is_flier(u) for u in self.defenders):
-                drm -= 1
+                add_part("defender_fliers", -1)
 
         # LOCATIONS (defender benefit only)
         if defender_loc_type == LocType.FORTRESS.value:
-            drm -= 4
+            add_part("location_fortress", -4)
         elif defender_loc_type in (LocType.CITY.value, LocType.PORT.value):
-            drm -= 2
+            add_part("location_city_port", -2)
         elif defender_loc_type == LocType.UNDERCITY.value:
-            drm -= 10
+            add_part("location_undercity", -10)
 
         # CROSSINGS (if any attacking army crosses these)
         crossings = self._get_attacker_crossing_types(defender_hex)
         if "river" in crossings:
-            drm -= 4
+            add_part("crossing_river", -4)
         if "bridge" in crossings:
-            drm -= 4
+            add_part("crossing_bridge", -4)
         if "ford" in crossings:
-            drm -= 3
+            add_part("crossing_ford", -3)
         if "pass" in crossings:
-            drm -= 2
+            add_part("crossing_pass", -2)
 
         # TERRAIN AFFINITY
-        drm += self._count_attacker_terrain_affinity_bonus()
-        drm -= self._count_defender_terrain_affinity_bonus(defender_hex)
+        add_part("attacker_terrain_affinity", self._count_attacker_terrain_affinity_bonus())
+        add_part("defender_terrain_affinity", -self._count_defender_terrain_affinity_bonus(defender_hex))
 
         # EVENT COMBAT BONUS (active player, current battle turn only)
         if self.game_state and hasattr(self.game_state, "get_combat_bonus"):
             active_player = getattr(self.game_state, "active_player", None)
             if active_player and any(getattr(u, "allegiance", None) == active_player for u in self.attackers):
-                drm += int(self.game_state.get_combat_bonus(active_player))
+                add_part("event_combat_bonus", int(self.game_state.get_combat_bonus(active_player)))
 
-        drm += self.precombat_drm_bonus
+        add_part("precombat_drm_bonus", self.precombat_drm_bonus)
+        if return_breakdown:
+            return drm, breakdown
         return drm
 
     def _is_dragon_race(self, unit):
@@ -1259,10 +1275,10 @@ class CombatClickHandler:
         """
         hexside = self.game_state.map.get_effective_hexside(start_hex, target_hex)
 
-        if hexside in (HexsideType.MOUNTAIN, HexsideType.MOUNTAIN.value):
+        if hexside == HexsideType.MOUNTAIN.value:
             # Check if ALL attackers are capable
             for u in attackers:
-                can_cross = u.unit_type == 'wing' or u.race in ['dwarf', 'ogre']
+                can_cross = u.unit_type == 'wing' or u.terrain_affinity == TerrainType.MOUNTAIN
                 if not can_cross:
                     return False
         return True
