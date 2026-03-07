@@ -115,14 +115,14 @@ blackmaw;1;general;goblin;throt;neutral;;0;1;8;blackmaw.jpg
 tankreed;1;general;human;vingaard;neutral;;0;1;10;tankreed.jpg
 zhak;1;general;dwarf;zhakar;neutral;mountain;0;2;8;zhak.jpg
 verminaard;1;highlord;human;red;highlord;;0;3;10;verminaard.jpg
-phair;1;highlord;human;red;highlord;;0;2;10;phair.jpg
+phair_caron;1;highlord;human;red;highlord;;0;2;10;phair.jpg
 kitiara;1;highlord;human;blue;highlord;;0;4;10;kitiara.jpg
 topus;1;highlord;human;blue;highlord;;0;2;10;topus.jpg
-salah;1;highlord;human;green;highlord;;0;2;10;salah.jpg
+salah_khan;1;highlord;human;green;highlord;;0;2;10;salah.jpg
 hullek;1;highlord;ogre;green;highlord;mountain;0;1;10;hullek.jpg
 lucien;1;highlord;ogre;black;highlord;mountain;0;2;10;lucien.jpg
 marcus;1;highlord;human;black;highlord;;0;2;10;marcus.jpg
-fealthas;1;highlord;elf;white;highlord;forest;0;1;10;fealthas.jpg
+feal-thas;1;highlord;elf;white;highlord;forest;0;1;10;fealthas.jpg
 toede;1;highlord;goblin;white;highlord;;0;1;10;toede.jpg
 ariakas;1;emperor;human;;highlord;;0;4;10;ariakas.jpg
 rashften;1;general;ogre;thank;neutral;mountain;0;1;10;rashften.jpg

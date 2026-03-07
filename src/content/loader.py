@@ -11,6 +11,11 @@ _UNITS_CATALOG_CACHE = None
 
 
 def _slugify(s: str) -> str:
+    """
+    Converts a string to a slug format suitable for filenames and URLs.
+    Replaces non-alphanumeric characters with underscores and ensures the result is lowercase.
+    Returns "item" if the input is empty or contains only non-alphanumeric characters.
+    """
     return re.sub(r"[^a-z0-9]+", "_", s.lower()).strip("_") or "item"
 
 def _string_to_enum(value: Optional[str], enum_class) -> Optional[any]:

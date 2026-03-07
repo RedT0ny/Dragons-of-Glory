@@ -76,7 +76,7 @@ scenario:
           units_by_type:
             dragon: 1
 
-      explicit_units: [ "ariakas","phair","topus","salah"]
+      explicit_units: [ "ariakas","phair_caron","topus","salah_khan"]
 
       assets: null
 

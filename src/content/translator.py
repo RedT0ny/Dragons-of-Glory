@@ -1,6 +1,6 @@
 import yaml
 import os
-from .utils import to_roman
+from .text_formatter import to_roman
 from .config import LOCALE_DIR, DEFAULT_LANG
 
 class Translator:

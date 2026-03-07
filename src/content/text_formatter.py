@@ -1,4 +1,53 @@
 from typing import Any
+from src.content.specs import UnitType
+
+
+def to_roman(n: int):
+    """Convert an integer to Roman numeral."""
+    if not n: return ""
+    roman_map = [(10, 'X'), (9, 'IX'), (5, 'V'), (4, 'IV'), (1, 'I')]
+    result = ""
+    for value, symbol in roman_map:
+        while n >= value:
+            result += symbol
+            n -= value
+    return result
+
+
+def caption_id(unit_id: str):
+    """Transform a unit ID string according to the specified rules.
+
+    Example: 'kern_ogre_inf_1' → '1 Kern'
+    Example: 'solamnia' → 'Solamnia'
+
+    Args:
+        unit_id: The original unit ID string
+
+    Returns:
+        Transformed string according to the rules
+    """
+    id_text = f"{unit_id}"
+
+    if '_' in id_text:
+        parts = id_text.split('_')
+        if parts[-1].isdigit():
+            if parts[0] == 'dtemple':
+                # If it's a Draconian
+                return f"{to_roman(int(parts[-1]))} {parts[1].capitalize()}"
+            elif parts[0] == 'taman':
+                return f"{to_roman(int(parts[-1]))} Neraka"
+            elif parts[0] == 'nergoth':
+                return f"{to_roman(int(parts[-1]))} N.Ergoth"
+            return f"{to_roman(int(parts[-1]))} {parts[0].capitalize()}"
+        elif len(parts) > 2:
+            # If more than 2 parts and no number at end, return first part capitalized
+            return parts[0].capitalize()
+        # If underscores but parts[-1] is not a digit, return first letter of parts[0]
+        # capitalized and followed by a dot, a space, and parts[1] capitalized
+        return f"{parts[0][0].capitalize()}. {parts[1].capitalize()}"
+
+    # No underscores: capitalize the whole thing
+    return id_text.capitalize()
 
 
 class TextFormatter:
@@ -9,6 +58,37 @@ class TextFormatter:
     def __init__(self, translator):
         self.translator = translator
         self._tdata = getattr(translator, "translations", {}) or {}
+
+    @staticmethod
+    def format_combat_log(attackers, defenders, result):
+        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers)
+        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders)
+        return f"Combat result {result}: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
+
+    @staticmethod
+    def format_naval_log(attackers, defenders, outcome):
+        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers if u.unit_type == UnitType.FLEET)
+        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders if u.unit_type == UnitType.FLEET)
+        rounds = outcome.get("rounds", 0)
+        result = outcome.get("result", "-/-")
+        return f"Naval combat {result} after {rounds} rounds: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
+
+    @staticmethod
+    def format_unit_log_string(unit):
+        ordinal = getattr(unit, "ordinal", None)
+        id_text = getattr(unit, "id", "Unknown")
+
+        if '_' in id_text:
+            parts = id_text.split('_')
+
+            if ordinal:
+                # If more than 2 parts and no number at end, return first part capitalized
+                return f"{to_roman(ordinal)} {' '.join(p.capitalize() for p in parts[0:3])}"
+            # If underscores but no ordinal, return the capitalized name
+            return " ".join(p.capitalize() for p in parts[0:])
+
+        # No underscores: capitalize the whole thing
+        return id_text.capitalize()
 
     def format_victory_conditions(self, victory_block: dict[str, Any] | None) -> str:
         if not isinstance(victory_block, dict):

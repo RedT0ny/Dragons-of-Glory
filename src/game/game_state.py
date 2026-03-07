@@ -15,6 +15,7 @@ from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
 from src.content import loader, factory
+from src.content.text_formatter import TextFormatter
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
@@ -1467,7 +1468,7 @@ class GameState:
             leader_stack_has_army = {leader: True for leader in leader_origins.keys()}
             leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
             result = "-/-"
-            print(self._format_combat_log_entry(attackers, defenders, result))
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": leader_escape_requests or [],
@@ -1476,7 +1477,7 @@ class GameState:
 
         if self._combat_blocked_by_citadel_rule(attackers, defenders):
             result = "-/-"
-            print(self._format_combat_log_entry(attackers, defenders, result))
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": [],
@@ -1485,7 +1486,7 @@ class GameState:
         attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
         if not self.can_units_attack_stack(attackers, defenders):
             result = "-/-"
-            print(self._format_combat_log_entry(attackers, defenders, result))
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": [],
@@ -1493,7 +1494,7 @@ class GameState:
             }
         if not attackers:
             result = "-/-"
-            print(self._format_combat_log_entry(attackers, defenders, result))
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": [],
@@ -1504,7 +1505,7 @@ class GameState:
             naval_resolver = NavalCombatResolver(self, attackers, defenders)
             outcome = naval_resolver.resolve(withdraw_decider=naval_withdraw_decider)
             self._cleanup_destroyed_units(attackers + defenders)
-            print(self._format_naval_log_entry(attackers, defenders, outcome))
+            print(TextFormatter.format_naval_log(attackers, defenders, outcome))
             return {
                 "result": outcome.get("result", "-/-"),
                 "leader_escape_requests": [],
@@ -1536,7 +1537,7 @@ class GameState:
                     defender_allegiances=defender_allegiances,
                     attacker_had_to_retreat=False,
                 )
-                print(self._format_combat_log_entry(attackers, defenders, result))
+                print(TextFormatter.format_combat_log(attackers, defenders, result))
                 return {
                     "result": result,
                     "leader_escape_requests": [],
@@ -1544,7 +1545,7 @@ class GameState:
                 }
             if not any(self._is_combat_stack_unit(u) for u in attackers):
                 result = "-/-"
-                print(self._format_combat_log_entry(attackers, defenders, result))
+                print(TextFormatter.format_combat_log(attackers, defenders, result))
                 return {
                     "result": result,
                     "leader_escape_requests": [],
@@ -1571,7 +1572,7 @@ class GameState:
                     defender_allegiances=defender_allegiances,
                     attacker_had_to_retreat=False,
                 )
-                print(self._format_combat_log_entry(attackers, defenders, result))
+                print(TextFormatter.format_combat_log(attackers, defenders, result))
                 return {
                     "result": result,
                     "leader_escape_requests": [],
@@ -1581,7 +1582,7 @@ class GameState:
         attackers = self._filter_dragons_for_land_attack(attackers, defenders)
         if not any(self._is_combat_stack_unit(u) for u in attackers):
             result = "-/-"
-            print(self._format_combat_log_entry(attackers, defenders, result))
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": [],
@@ -1613,7 +1614,7 @@ class GameState:
                     defender_allegiances=defender_allegiances,
                     attacker_had_to_retreat=False,
                 )
-                print(self._format_combat_log_entry(attackers, defenders, result))
+                print(TextFormatter.format_combat_log(attackers, defenders, result))
                 return {
                     "result": result,
                     "leader_escape_requests": leader_escape_requests,
@@ -1641,7 +1642,7 @@ class GameState:
             allow_consumable_other_bonus=True,
         )
         result = resolver.resolve()
-        print(self._format_combat_log_entry(attackers, defenders, result))
+        print(TextFormatter.format_combat_log(attackers, defenders, result))
         self._cleanup_destroyed_units(attackers + defenders)
         revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
@@ -1911,12 +1912,6 @@ class GameState:
             return False
         return any(self._fleets_are_adjacent_for_combat(fleet, d) for d in defenders)
 
-    def _format_naval_log_entry(self, attackers, defenders, outcome):
-        attacker_names = ", ".join(self._format_unit_for_log(u) for u in attackers if u.unit_type == UnitType.FLEET)
-        defender_names = ", ".join(self._format_unit_for_log(u) for u in defenders if u.unit_type == UnitType.FLEET)
-        rounds = outcome.get("rounds", 0)
-        result = outcome.get("result", "-/-")
-        return f"Naval combat {result} after {rounds} rounds: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
 
     def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
         combat_defenders = [
@@ -2337,16 +2332,6 @@ class GameState:
             return list(attackers)
         return [u for u in attackers if not self._is_ws_ground_combat_unit(u)]
 
-    def _format_combat_log_entry(self, attackers, defenders, result):
-        attacker_names = ", ".join(self._format_unit_for_log(u) for u in attackers)
-        defender_names = ", ".join(self._format_unit_for_log(u) for u in defenders)
-        return f"Combat result {result}: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
-
-    def _format_unit_for_log(self, unit):
-        ordinal = getattr(unit, "ordinal", None)
-        if ordinal is None:
-            return str(unit.id)
-        return f"{unit.id}#{ordinal}"
 
     def clear_leader_tactical_overrides(self):
         for unit in self.units:

@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
 
 from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS
 from src.content.specs import UnitType, UnitRace, UnitState
-from src.content.utils import caption_id
+from src.content.text_formatter import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 
@@ -339,7 +339,7 @@ class UnitCounter(QGraphicsItem):
 
         painter.setPen(QPen(id_color))
         f = painter.font()
-        f.setPointSize(8)
+        f.setPointSize(7)
         f.setBold(True)
         painter.setFont(f)
         painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, caption_id(self.unit.id))
