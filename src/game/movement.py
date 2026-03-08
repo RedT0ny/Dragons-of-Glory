@@ -94,6 +94,224 @@ class NeutralEntryDecision:
     country_id: str | None = None
     blocked_message: str | None = None
     confirmation_prompt: str | None = None
+    invasion_units: List[object] | None = None
+
+
+class InvasionHandler:
+    """Reusable invasion and neutral-entry logic for movement and unboarding flows."""
+    def __init__(self, movement_service):
+        self.movement_service = movement_service
+        self.game_state = movement_service.game_state
+
+    def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
+        col, row = target_hex.axial_to_offset()
+        country = self.game_state.get_country_by_hex(col, row)
+        if not country or country.allegiance != NEUTRAL:
+            return NeutralEntryDecision(is_neutral_entry=False)
+
+        country_id = country.id
+        if self.game_state.active_player != HL:
+            return NeutralEntryDecision(
+                is_neutral_entry=True,
+                country_id=country_id,
+                blocked_message="Whitestone player cannot invade neutral countries.",
+            )
+
+        return NeutralEntryDecision(
+            is_neutral_entry=True,
+            country_id=country_id,
+            confirmation_prompt=f"Invade {country_id}?",
+        )
+
+    def get_invasion_force(self, country_id, extra_units=None):
+        svc = self.movement_service
+        country = self.game_state.countries.get(country_id)
+        if not country or country.allegiance != NEUTRAL:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "Country is not neutral."
+            }
+
+        target_hexes = set(country.territories)
+        if not target_hexes:
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "Country has no territory."
+            }
+
+        extra_eligible = self._merge_extra_invasion_units([], extra_units, target_hexes)
+        stacks_by_hex = svc._get_hl_stacks_with_passengers()
+        if not stacks_by_hex:
+            if extra_eligible:
+                return {
+                    "strength": sum(u.combat_rating for u in extra_eligible),
+                    "units": extra_eligible,
+                    "border_hexes": set(),
+                    "connected_hexes": set(),
+                    "reason": None,
+                }
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "No Highlord stacks available."
+            }
+
+        border_hexes = set()
+        for hex_obj, stack_units in stacks_by_hex.items():
+            if svc._hex_adjacent_to_country(hex_obj, target_hexes):
+                if svc._stack_can_enter_country(hex_obj, stack_units, target_hexes):
+                    border_hexes.add(hex_obj)
+
+        if not border_hexes:
+            if extra_eligible:
+                return {
+                    "strength": sum(u.combat_rating for u in extra_eligible),
+                    "units": extra_eligible,
+                    "border_hexes": set(),
+                    "connected_hexes": set(),
+                    "reason": None,
+                }
+            return {
+                "strength": 0,
+                "units": [],
+                "border_hexes": set(),
+                "connected_hexes": set(),
+                "reason": "No eligible Highlord stacks adjacent to the border."
+            }
+
+        connected_hexes = svc._collect_connected_stack_hexes(border_hexes, stacks_by_hex.keys())
+        eligible_units = svc._collect_invasion_units(connected_hexes, stacks_by_hex, target_hexes)
+        eligible_units = self._merge_distinct_units(eligible_units, extra_eligible)
+        strength = sum(u.combat_rating for u in eligible_units)
+
+        return {
+            "strength": strength,
+            "units": eligible_units,
+            "border_hexes": border_hexes,
+            "connected_hexes": connected_hexes,
+            "reason": None
+        }
+
+    def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:
+        landing = self._collect_unboard_landing_units(selected_units)
+        if not landing:
+            return NeutralEntryDecision(is_neutral_entry=False)
+
+        country_ids = set()
+        invasion_units = []
+        for country_id, units in landing.items():
+            if not country_id:
+                continue
+            country = self.game_state.countries.get(country_id)
+            if not country or country.allegiance != NEUTRAL:
+                continue
+            country_ids.add(country_id)
+            invasion_units.extend(units)
+
+        if not country_ids:
+            return NeutralEntryDecision(is_neutral_entry=False)
+        if len(country_ids) > 1:
+            return NeutralEntryDecision(
+                is_neutral_entry=True,
+                blocked_message="Cannot unboard into multiple neutral countries in one action.",
+            )
+
+        country_id = next(iter(country_ids))
+        if self.game_state.active_player != HL:
+            return NeutralEntryDecision(
+                is_neutral_entry=True,
+                country_id=country_id,
+                blocked_message="Whitestone player cannot invade neutral countries.",
+                invasion_units=invasion_units,
+            )
+
+        return NeutralEntryDecision(
+            is_neutral_entry=True,
+            country_id=country_id,
+            confirmation_prompt=f"Invade {country_id}?",
+            invasion_units=invasion_units,
+        )
+
+    def _merge_extra_invasion_units(self, base_units, extra_units, target_hexes):
+        merged = list(base_units or [])
+        seen = {id(u) for u in merged}
+        for unit in list(extra_units or []):
+            if unit is None or id(unit) in seen:
+                continue
+            if getattr(unit, "allegiance", None) != HL:
+                continue
+            if getattr(unit, "unit_type", None) == UnitType.FLEET:
+                continue
+            if not self._can_extra_unit_invade_target(unit, target_hexes):
+                continue
+            merged.append(unit)
+            seen.add(id(unit))
+        return merged
+
+    @staticmethod
+    def _merge_distinct_units(base_units, extra_units):
+        merged = list(base_units or [])
+        seen = {id(u) for u in merged}
+        for unit in list(extra_units or []):
+            if unit is None or id(unit) in seen:
+                continue
+            merged.append(unit)
+            seen.add(id(unit))
+        return merged
+
+    def _can_extra_unit_invade_target(self, unit, target_hexes):
+        carrier = getattr(unit, "transport_host", None)
+        if carrier is None:
+            if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:
+                return False
+            pos = tuple(unit.position)
+            if pos in target_hexes:
+                return True
+            start_hex = Hex.offset_to_axial(pos[0], pos[1])
+            return self.movement_service._unit_can_reach_country(unit, start_hex, target_hexes)
+        if not getattr(carrier, "position", None) or carrier.position[0] is None or carrier.position[1] is None:
+            return False
+        landing_hex = Hex.offset_to_axial(*carrier.position)
+        if landing_hex.axial_to_offset() not in target_hexes:
+            return False
+        if not self.game_state.map.can_unit_land_on_hex(unit, landing_hex):
+            return False
+        return self.game_state.map.can_stack_move_to([unit], landing_hex)
+
+    def _collect_unboard_landing_units(self, selected_units):
+        landing = {}
+        for unit in selected_units or []:
+            carrier = getattr(unit, "transport_host", None)
+            if carrier is None:
+                passengers = list(getattr(unit, "passengers", []) or [])
+                if not passengers:
+                    continue
+                for passenger in passengers:
+                    self._append_landing_unit(landing, passenger, unit)
+                continue
+            self._append_landing_unit(landing, unit, carrier)
+        return landing
+
+    def _append_landing_unit(self, landing, passenger, carrier):
+        if not carrier or not getattr(carrier, "position", None):
+            return
+        if getattr(passenger, "allegiance", None) != self.game_state.active_player:
+            return
+        if getattr(passenger, "unit_type", None) == UnitType.FLEET:
+            return
+        carrier_hex = Hex.offset_to_axial(*carrier.position)
+        col, row = carrier_hex.axial_to_offset()
+        country = self.game_state.get_country_by_hex(col, row)
+        country_id = country.id if country else None
+        landing.setdefault(country_id, []).append(passenger)
 
 
 class MovementService:
@@ -102,6 +320,7 @@ class MovementService:
         self.game_state = game_state
         self._interception_step_context = None
         self._interception_attempted_units = set()
+        self.invasion_handler = InvasionHandler(self)
 
     def get_reachable_hexes(self, units):
         """
@@ -577,29 +796,10 @@ class MovementService:
         return False, "Selected stack has no valid path."
 
     def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
-        """
-        Evaluates whether a neutral country can be invaded by the current player, considering allegiance and player restrictions.
-        Returns a NeutralEntryDecision indicating if it's a neutral entry, the country ID, and any relevant messages or prompts.
-        For example, if invader is HL, it can trigger an invasion. But if invader is WS, they will only receive a warning.
-        """
-        col, row = target_hex.axial_to_offset()
-        country = self.game_state.get_country_by_hex(col, row)
-        if not country or country.allegiance != NEUTRAL:
-            return NeutralEntryDecision(is_neutral_entry=False)
+        return self.invasion_handler.evaluate_neutral_entry(target_hex)
 
-        country_id = country.id
-        if self.game_state.active_player != HL:
-            return NeutralEntryDecision(
-                is_neutral_entry=True,
-                country_id=country_id,
-                blocked_message="Whitestone player cannot invade neutral countries.",
-            )
-
-        return NeutralEntryDecision(
-            is_neutral_entry=True,
-            country_id=country_id,
-            confirmation_prompt=f"Invade {country_id}?",
-        )
+    def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:
+        return self.invasion_handler.evaluate_unboard_neutral_entry(selected_units)
 
     def _get_stack_start_and_min_mp(self, units):
         start_hex = None
@@ -714,63 +914,8 @@ class MovementService:
             stack_cost = max(stack_cost, cost)
         return stack_cost
 
-    def get_invasion_force(self, country_id):
-        country = self.game_state.countries.get(country_id)
-        if not country or country.allegiance != NEUTRAL:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "Country is not neutral."
-            }
-
-        target_hexes = set(country.territories)
-        if not target_hexes:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "Country has no territory."
-            }
-
-        stacks_by_hex = self._get_hl_stacks_with_passengers()
-        if not stacks_by_hex:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "No Highlord stacks available."
-            }
-
-        border_hexes = set()
-        for hex_obj, stack_units in stacks_by_hex.items():
-            if self._hex_adjacent_to_country(hex_obj, target_hexes):
-                if self._stack_can_enter_country(hex_obj, stack_units, target_hexes):
-                    border_hexes.add(hex_obj)
-
-        if not border_hexes:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "No eligible Highlord stacks adjacent to the border."
-            }
-
-        connected_hexes = self._collect_connected_stack_hexes(border_hexes, stacks_by_hex.keys())
-        eligible_units = self._collect_invasion_units(connected_hexes, stacks_by_hex, target_hexes)
-        strength = sum(u.combat_rating for u in eligible_units)
-
-        return {
-            "strength": strength,
-            "units": eligible_units,
-            "border_hexes": border_hexes,
-            "connected_hexes": connected_hexes,
-            "reason": None
-        }
+    def get_invasion_force(self, country_id, extra_units=None):
+        return self.invasion_handler.get_invasion_force(country_id, extra_units=extra_units)
 
     def _get_hl_stacks_with_passengers(self):
         stacks = {}

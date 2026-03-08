@@ -852,6 +852,31 @@ class GameController(QObject):
         selected = self.selected_units_for_movement
         if not selected:
             return
+        from PySide6.QtWidgets import QMessageBox
+        decision = self.movement_service.evaluate_unboard_neutral_entry(selected)
+        if decision.is_neutral_entry:
+            if decision.blocked_message:
+                QMessageBox.information(
+                    self.view.window(),
+                    "Neutral Territory",
+                    decision.blocked_message,
+                )
+                return
+            if decision.confirmation_prompt:
+                reply = QMessageBox.question(
+                    self.view.window(),
+                    "Neutral Territory",
+                    decision.confirmation_prompt,
+                    QMessageBox.Ok | QMessageBox.Cancel
+                )
+                if reply != QMessageBox.Ok:
+                    return
+                outcome = self._attempt_invasion(
+                    decision.country_id or "unknown",
+                    invasion_units=decision.invasion_units or [],
+                )
+                if not (outcome and outcome.success and outcome.winner == self.game_state.active_player):
+                    return
         result = self.movement_service.handle_board_action(selected)
         if not result.handled:
             return
@@ -1005,16 +1030,17 @@ class GameController(QObject):
         if self.game_state.current_player and self.game_state.current_player.is_ai:
             self._schedule_deferred(self.process_game_turn)
 
-    def _attempt_invasion(self, country_id):
+    def _attempt_invasion(self, country_id, invasion_units=None):
         from PySide6.QtWidgets import QMessageBox
 
-        invasion_data = self.movement_service.get_invasion_force(country_id)
+        invasion_data = self.movement_service.get_invasion_force(country_id, extra_units=invasion_units)
         outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
         QMessageBox.information(self.view.window(), outcome.title, outcome.message)
         if outcome.success and outcome.winner:
             # Invasion creates a new checkpoint: previous movement undo is no longer allowed.
             self.game_state.clear_movement_undo()
             self._start_invasion_deployment(country_id, outcome.winner)
+        return outcome
 
     def on_undo_clicked(self):
         if not self._is_human_interactive_turn():
