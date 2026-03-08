@@ -1,17 +1,10 @@
 import random
-from dataclasses import dataclass
-from typing import List
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, WS
 from src.content.loader import load_data
 from src.game.combat_reporting import show_combat_result_popup
-
-
-@dataclass
-class LeaderEscapeRequest:
-    leader: object
-    options: List[object]
+from src.game.leader_escape_handler import LeaderEscapeCheck, LeaderEscapeHandler
 
 
 def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
@@ -673,6 +666,7 @@ class NavalCombatResolver:
         self.defenders = [u for u in defenders if getattr(u, "unit_type", None) == UnitType.FLEET and getattr(u, "is_on_map", False)]
         self._roll_d10 = roll_d10_fn or (lambda: random.randint(1, 10))
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
+        self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
 
     def resolve(self, withdraw_decider=None):
         rounds = 0
@@ -776,54 +770,26 @@ class NavalCombatResolver:
             passenger.position = (None, None)
 
             if hasattr(passenger, "is_leader") and passenger.is_leader():
-                self._resolve_sunk_leader(passenger, origin_hex)
+                allow_fleet = passenger.unit_type == UnitType.WIZARD
+                self._leader_escape_handler.handle_leader_escapes(
+                    [
+                        LeaderEscapeCheck(
+                            leader=passenger,
+                            origin_hex=origin_hex,
+                            allow_fleet_destinations=allow_fleet,
+                            roll_required=not allow_fleet,
+                            skip_if_allied_combat_present=False,
+                            auto_place_on_success=True,
+                            require_leader_on_map=False,
+                        )
+                    ],
+                    auto_resolve_ai=True,
+                )
                 continue
 
             if hasattr(passenger, "eliminate"):
                 passenger.eliminate()
                 self.game_state.map.remove_unit_from_spatial_map(passenger)
-
-    def _resolve_sunk_leader(self, leader, origin_hex):
-        if leader.unit_type == UnitType.WIZARD:
-            if self._place_leader_with_nearest_friendly(leader, origin_hex, allow_fleet=True):
-                return
-            leader.destroy()
-            return
-
-        roll = self._roll_d6()
-        if roll <= 3:
-            leader.destroy()
-            return
-        if self._place_leader_with_nearest_friendly(leader, origin_hex, allow_fleet=False):
-            return
-        leader.destroy()
-
-    def _place_leader_with_nearest_friendly(self, leader, origin_hex, allow_fleet):
-        candidates = []
-        for (q, r), units in self.game_state.map.unit_map.items():
-            for unit in units:
-                if unit.allegiance != leader.allegiance:
-                    continue
-                if not getattr(unit, "is_on_map", False):
-                    continue
-                if allow_fleet and unit.unit_type == UnitType.FLEET:
-                    candidates.append((q, r))
-                    break
-                if hasattr(unit, "is_army") and unit.is_army():
-                    candidates.append((q, r))
-                    break
-
-        if not candidates:
-            return False
-
-        from src.game.map import Hex
-        hexes = [Hex(q, r) for q, r in candidates]
-        target = min(hexes, key=lambda h: origin_hex.distance_to(h))
-        if leader.status not in UnitState.on_map_states():
-            leader.status = UnitState.ACTIVE
-        leader.position = target.axial_to_offset()
-        self.game_state.map.add_unit_to_spatial_map(leader)
-        return True
 
     def _withdraw_all(self, side_fleets):
         for fleet in list(side_fleets):
@@ -1355,6 +1321,20 @@ class CombatClickHandler:
             return
 
         self.active_leader_escape = self.leader_escape_queue.pop(0)
+        leader = getattr(self.active_leader_escape, "leader", None)
+        options = list(getattr(self.active_leader_escape, "options", []) or [])
+        player = self.game_state.get_player(getattr(leader, "allegiance", None)) if leader else None
+        if leader and options and player and player.is_ai:
+            destination = self.game_state._get_leader_escape_handler().choose_escape_destination(leader, options)
+            if destination:
+                self.game_state.move_unit(leader, destination)
+                print(f"Leader {leader.id} escaped to {destination.axial_to_offset()} (AI).")
+            self.active_leader_escape = None
+            self.escape_hexes = set()
+            self.view.sync_with_model()
+            self._activate_next_leader_escape()
+            return
+
         self.escape_hexes = {h.axial_to_offset() for h in self.active_leader_escape.options}
         self.view.highlight_movement_range(list(self.escape_hexes))
         from PySide6.QtWidgets import QMessageBox

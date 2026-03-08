@@ -1495,7 +1495,12 @@ class BaselineAIPlayer:
             options = getattr(req, "options", None) or []
             if not leader or not options:
                 continue
-            destination = options[0]
+            player = self.game_state.get_player(getattr(leader, "allegiance", None))
+            if not (player and player.is_ai):
+                continue
+            destination = self.game_state._get_leader_escape_handler().choose_escape_destination(leader, options)
+            if destination is None:
+                continue
             try:
                 self.game_state.move_unit(leader, destination)
             except Exception:

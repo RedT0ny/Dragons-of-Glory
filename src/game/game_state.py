@@ -6,11 +6,11 @@ from typing import Set, Tuple, List, Dict, Optional
 from src.game.combat import (
     CombatResolver,
     DragonDuelResolver,
-    LeaderEscapeRequest,
     NavalCombatResolver,
     apply_dragon_orb_bonus,
     apply_gnome_tech_bonus,
 )
+from src.game.leader_escape_handler import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
@@ -82,6 +82,7 @@ class GameState:
         self.winner = None
         self.victory_reason = ""
         self.victory_points = {HL: 0, WS: 0}
+        self._leader_escape_handler = None
 
     @property
     def current_player(self):
@@ -90,6 +91,11 @@ class GameState:
 
     def get_player(self, allegiance: str):
         return self.players.get(allegiance)
+
+    def _get_leader_escape_handler(self):
+        if self._leader_escape_handler is None:
+            self._leader_escape_handler = LeaderEscapeHandler(self)
+        return self._leader_escape_handler
 
     def end_game(self):
         pass
@@ -2053,24 +2059,21 @@ class GameState:
         return True
 
     def _resolve_single_leader_escape_roll(self, leader, origin_hex):
-        if not leader or getattr(leader, "status", None) == UnitState.DESTROYED:
-            return None
-        roll = random.randint(1, 6)
-        if roll <= 3:
-            leader.destroy()
-            self._cleanup_destroyed_units([leader])
-            print(f"Leader {leader.id} eliminated after retreat (roll {roll}).")
-            return None
-
-        options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
-        if not options:
-            leader.destroy()
-            self._cleanup_destroyed_units([leader])
-            print(f"Leader {leader.id} eliminated after retreat (no friendly stacks).")
-            return None
-
-        print(f"Leader {leader.id} escapes after retreat (roll {roll}).")
-        return LeaderEscapeRequest(leader=leader, options=options)
+        requests = self._get_leader_escape_handler().handle_leader_escapes(
+            [
+                LeaderEscapeCheck(
+                    leader=leader,
+                    origin_hex=origin_hex,
+                    allow_fleet_destinations=False,
+                    roll_required=True,
+                    require_prior_combat_stack=False,
+                    skip_if_allied_combat_present=False,
+                    auto_place_on_success=False,
+                )
+            ],
+            auto_resolve_ai=True,
+        )
+        return requests[0] if requests else None
 
     def _get_valid_retreat_hexes(self, unit, start_hex):
         valid = []
@@ -2224,44 +2227,20 @@ class GameState:
         )
 
     def _resolve_leader_escapes(self, leader_origins, leader_stack_has_army):
-        requests = []
-        leaders_to_cleanup = []
-
-        for leader, origin_hex in leader_origins.items():
-            if not leader_stack_has_army.get(leader):
-                continue
-            if not leader.is_on_map or not leader.position:
-                continue
-
-            units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
-            has_allied_army = any(
-                u.allegiance == leader.allegiance and self._is_combat_stack_unit(u)
-                for u in units_in_hex
+        checks = [
+            LeaderEscapeCheck(
+                leader=leader,
+                origin_hex=origin_hex,
+                allow_fleet_destinations=False,
+                roll_required=True,
+                require_prior_combat_stack=True,
+                prior_had_combat_stack=bool(leader_stack_has_army.get(leader)),
+                skip_if_allied_combat_present=True,
+                auto_place_on_success=False,
             )
-            if has_allied_army:
-                continue
-
-            roll = random.randint(1, 6)
-            if roll <= 3:
-                leader.destroy()
-                leaders_to_cleanup.append(leader)
-                print(f"Leader {leader.id} eliminated after battle (roll {roll}).")
-                continue
-
-            options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
-            if not options:
-                leader.destroy()
-                leaders_to_cleanup.append(leader)
-                print(f"Leader {leader.id} eliminated (no friendly stacks to escape).")
-                continue
-
-            print(f"Leader {leader.id} escapes (roll {roll}).")
-            requests.append(LeaderEscapeRequest(leader=leader, options=options))
-
-        if leaders_to_cleanup:
-            self._cleanup_destroyed_units(leaders_to_cleanup)
-
-        return requests
+            for leader, origin_hex in leader_origins.items()
+        ]
+        return self._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
 
     def _get_nearest_friendly_combat_stacks(self, leader, origin_hex):
         candidates = []
