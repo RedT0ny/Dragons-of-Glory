@@ -10,7 +10,7 @@ import heapq
 import random
 from typing import List, Tuple
 
-from src.content.constants import HL, NEUTRAL
+from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, HexsideType, LocType, UnitRace, UnitType
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
@@ -260,6 +260,10 @@ class MovementService:
         return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
 
     def _build_movement_hex_path(self, units, target_hex, precomputed_state_path=None):
+        """
+        Builds a hex path for a group of units to move to a target hex.
+        Returns a list of hex coordinates or None if the path cannot be computed.
+        """
         lead = units[0]
         if not getattr(lead, "position", None) or lead.position[0] is None or lead.position[1] is None:
             return []
@@ -289,18 +293,28 @@ class MovementService:
         return path
 
     def _maybe_apply_interception(self, moving_units, current_hex):
+        """
+        Checks if an interception attempt should occur against the moving units at their current hex.
+        """
+        # Checks if any interceptor units are in range of the moving units' current hex
         in_range_groups = self._find_interceptor_groups_in_range(moving_units, current_hex)
         if not in_range_groups:
             return False
 
-        # Interception attempts are stochastic and can happen on any in-range movement hex.
-        if random.random() >= 0.5:
+        # 20% possibilities that the moving stack is spotted by interceptors.
+        if random.random() >= 0.2:
             return False
 
+        # Randomly selects one of the eligible interceptor groups to make the attempt
         origin_offset, interceptors = random.choice(in_range_groups)
         for unit in interceptors:
             self._interception_attempted_units.add((unit.id, getattr(unit, "ordinal", 1)))
 
+        # Calculates how many hexes away the interceptors are
+        # Rolls a 6-sided die
+        # If the roll is less than the distance, interception fails
+        # Example: Distance = 3 hexes, need to roll 3+ to succeed
+        # This makes longer-range intercepts harder
         dist = self._hex_distance_from_offset(origin_offset, current_hex)
         if dist <= 0:
             return False
@@ -314,7 +328,11 @@ class MovementService:
         self._resolve_interception_attack(interceptors, moving_units, current_hex, origin_offset)
         return True
 
-    def _find_interceptor_groups_in_range(self, moving_units, current_hex):
+    def _find_interceptor_groups_in_range(self, moving_units, current_hex) -> List[Tuple[Tuple[int, int], List[object]]]:
+        """
+        Finds interceptor groups that are in range of the moving units' current hex.
+        Returns a dictionary mapping hex coordinates to lists of interceptor units.
+        """
         mover_side = moving_units[0].allegiance
         by_hex = {}
         for unit in self.game_state.units:
@@ -341,6 +359,7 @@ class MovementService:
         return list(by_hex.items())
 
     def _relocate_unit_for_interception_step(self, unit, target_hex):
+        """Temporarily moves a unit to a new hex for interception resolution, without applying movement costs or rules."""
         self.game_state.map.remove_unit_from_spatial_map(unit)
         unit.position = target_hex.axial_to_offset()
         unit.escaped = False
@@ -358,6 +377,7 @@ class MovementService:
             apply_escape(unit, unit.position)
 
     def _finalize_interception_move(self, unit, plan):
+        """After interception steps are resolved, applies the final movement costs and state changes to the unit."""
         if not hasattr(unit, "movement_points"):
             unit.movement_points = unit.movement
         cost = int(plan.get("cost", 0) or 0)
@@ -473,6 +493,15 @@ class MovementService:
         return candidates[0][1]
 
     def _can_unit_intercept_target(self, interceptor, moving_units):
+        """
+        Determines if the interceptor unit can attempt to intercept the moving units based on their types.
+            - Fleets can only intercept if the moving stack includes at least one Fleet.
+            - Wings can intercept if the moving stack includes at least one Wing or Fleet.
+            - Other unit types cannot intercept.
+            - Interceptors must be on the map to be eligible.
+            - Interceptors must not have already attempted interception this turn.
+            - Interceptors must meet special commander requirements (e.g. Dragon Wings).
+        """
         moving_types = {getattr(u, "unit_type", None) for u in moving_units if getattr(u, "is_on_map", False)}
         if interceptor.unit_type == UnitType.FLEET:
             return UnitType.FLEET in moving_types
@@ -481,6 +510,12 @@ class MovementService:
         return False
 
     def _dragon_interceptor_has_required_commander(self, interceptor):
+        """
+        Checks if a Dragon Wing interceptor has the required commander to intercept.
+        - HL Dragon Wings can only intercept if they have a Dragon Emperor or Dragon Highlord of its flight on board.
+        - WS Dragon Wings can only intercept if they have an Elf/Solamnic commander on board.
+        - Other units do not have commander requirements.
+        """
         if getattr(interceptor, "unit_type", None) != UnitType.WING:
             return True
         if getattr(interceptor, "race", None) != UnitRace.DRAGON:
@@ -499,7 +534,7 @@ class MovementService:
                     if dragonflight and p_flight == dragonflight:
                         return True
             return False
-        if interceptor.allegiance != HL:
+        elif interceptor.allegiance == WS:
             for p in passengers:
                 if not (hasattr(p, "is_leader") and p.is_leader()):
                     continue
@@ -510,6 +545,7 @@ class MovementService:
         return True
 
     def _teleport_unit_no_cost(self, unit, target_hex):
+        """Temporarily moves a unit to a new hex without applying movement costs or rules, used for interception resolution."""
         self.game_state.map.remove_unit_from_spatial_map(unit)
         unit.position = target_hex.axial_to_offset()
         self.game_state.map.add_unit_to_spatial_map(unit)
@@ -529,6 +565,7 @@ class MovementService:
         )
 
     def _can_stack_reach_target(self, units, target_hex):
+        """Checks if a stack of units can reach a target hex, considering movement points and terrain."""
         start_hex, _ = self._get_stack_start_and_min_mp(units)
         if not start_hex:
             return False, "Selected units are not in the same hex."
@@ -540,6 +577,11 @@ class MovementService:
         return False, "Selected stack has no valid path."
 
     def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
+        """
+        Evaluates whether a neutral country can be invaded by the current player, considering allegiance and player restrictions.
+        Returns a NeutralEntryDecision indicating if it's a neutral entry, the country ID, and any relevant messages or prompts.
+        For example, if invader is HL, it can trigger an invasion. But if invader is WS, they will only receive a warning.
+        """
         col, row = target_hex.axial_to_offset()
         country = self.game_state.get_country_by_hex(col, row)
         if not country or country.allegiance != NEUTRAL:
