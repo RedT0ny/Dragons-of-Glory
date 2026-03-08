@@ -5,7 +5,7 @@ import os
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "Alpha 0.28.4"
+APP_VERSION = "Alpha 0.28.5"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -30,6 +30,7 @@ UNITS_DATA = os.path.join(DATA_DIR, "units.csv")
 EVENTS_DATA = os.path.join(DATA_DIR, "events.yaml")
 ARTIFACTS_DATA = os.path.join(DATA_DIR, "artifacts.yaml")
 CALENDAR_DATA = os.path.join(DATA_DIR, "calendar.csv")
+AI_STANCE_DATA = os.path.join(DATA_DIR, "ai_stance.csv")
 LIBRA_FONT = os.path.join(FONTS_DIR, "Libra Regular.otf")
 LOGO_HL = os.path.join(ICONS_DIR, "logo_hl.png")
 LOGO_WS = os.path.join(ICONS_DIR, "logo_ws.png")

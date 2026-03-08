@@ -628,6 +628,17 @@ class Board:
             for u in moving_units
         )
 
+    def _stack_has_ground_or_wing(self, moving_units):
+        return any(
+            (
+                hasattr(u, "is_army")
+                and u.is_army()
+                and u.unit_type not in (UnitType.FLEET,)
+            )
+            or getattr(u, "unit_type", None) == UnitType.WING
+            for u in moving_units
+        )
+
     def has_enemy_unit(self, hex_coord, alliance):
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
         for u in units:
@@ -639,17 +650,36 @@ class Board:
                 return True
         return False
 
+    def has_enemy_ground_wing_or_citadel(self, hex_coord, alliance):
+        units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
+        for u in units:
+            if u.allegiance in (alliance, "neutral"):
+                continue
+            if not getattr(u, "is_on_map", True):
+                continue
+            if (
+                (
+                    hasattr(u, "is_army")
+                    and u.is_army()
+                    and getattr(u, "unit_type", None) != UnitType.FLEET
+                )
+                or getattr(u, "unit_type", None) in (UnitType.WING, UnitType.CITADEL)
+            ):
+                return True
+        return False
+
     def can_stack_enter_enemy_occupied_hex(self, moving_units, target_hex):
         """
         Occupancy rule:
-        - Stacks containing a ground Army may enter enemy Fleet hexes (fleets are displaced).
-        - Stacks with no ground Army cannot enter any enemy-occupied hex.
+        - Stacks containing a ground Army or Wing may enter enemy Fleet/Leader-only hexes.
+        - They may NOT enter enemy Ground/Wing/Citadel-occupied hexes.
+        - Stacks with no ground Army/Wing cannot enter any enemy-occupied hex.
         """
         if not moving_units:
             return True
         alliance = moving_units[0].allegiance
-        if self._stack_has_ground_army(moving_units):
-            return not self.has_enemy_army(target_hex, alliance)
+        if self._stack_has_ground_or_wing(moving_units):
+            return not self.has_enemy_ground_wing_or_citadel(target_hex, alliance)
         return not self.has_enemy_unit(target_hex, alliance)
 
     def can_stack_move_to(self, moving_units, target_hex):

@@ -453,6 +453,41 @@ def load_calendar_csv(
 
     return calendar
 
+
+def load_ai_stance_csv(path: str) -> Dict[str, Dict[str, str]]:
+    """
+    Reads ai_stance.csv and returns:
+      {hl_victory_type: {ws_victory_type: offensive_side_or_dash}}
+    """
+    matrix: Dict[str, Dict[str, str]] = {}
+    if not os.path.exists(path):
+        return matrix
+
+    with open(path, newline="", encoding="utf-8-sig") as fh:
+        reader = csv.reader(fh, delimiter=";")
+        rows = [row for row in reader if row]
+    if not rows:
+        return matrix
+
+    header = [str(col or "").strip().lower() for col in rows[0]]
+    ws_categories = header[1:]
+    for raw in rows[1:]:
+        if not raw:
+            continue
+        row_key = str(raw[0] or "").strip().lower()
+        if not row_key:
+            continue
+        row_map: Dict[str, str] = {}
+        for idx, ws_key in enumerate(ws_categories, start=1):
+            if idx >= len(raw):
+                continue
+            val = str(raw[idx] or "").strip().upper()
+            if val not in {"HL", "WS", "-"}:
+                continue
+            row_map[ws_key] = val
+        matrix[row_key] = row_map
+    return matrix
+
 def load_countries_yaml(path: str) -> Dict[str, CountrySpec]:
     """
     Returns a dictionary of country raw data specs,

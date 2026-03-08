@@ -967,6 +967,45 @@ class GameState:
                 continue
             self._force_move_fleet_to_state(fleet, retreat_state)
 
+    def _force_enemy_leader_escapes_in_hex(self, invading_unit, target_hex):
+        leaders = [
+            u for u in list(self.map.get_units_in_hex(target_hex.q, target_hex.r))
+            if (
+                u is not invading_unit
+                and getattr(u, "allegiance", None) not in (getattr(invading_unit, "allegiance", None), NEUTRAL, None)
+                and getattr(u, "is_on_map", False)
+                and hasattr(u, "is_leader")
+                and u.is_leader()
+            )
+        ]
+        if not leaders:
+            return
+
+        checks = [
+            LeaderEscapeCheck(
+                leader=leader,
+                origin_hex=target_hex,
+                roll_required=False,
+                require_prior_combat_stack=False,
+                skip_if_allied_combat_present=False,
+                auto_place_on_success=True,
+            )
+            for leader in leaders
+        ]
+        self._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
+
+    @staticmethod
+    def _unit_can_force_fleet_displacement(unit):
+        if unit is None:
+            return False
+        if getattr(unit, "unit_type", None) == UnitType.WING:
+            return True
+        return bool(
+            hasattr(unit, "is_army")
+            and unit.is_army()
+            and getattr(unit, "unit_type", None) != UnitType.FLEET
+        )
+
     def move_unit(self, unit, target_hex):
         """
         Centralizes the move: updates unit.position AND the spatial map.
@@ -1035,13 +1074,10 @@ class GameState:
                 if self.phase == GamePhase.MOVEMENT and unit.unit_type == UnitType.CITADEL:
                     p.carried_by_citadel_this_turn = True
 
-        # Rule: Ground armies displace enemy fleets from the entered hex.
-        if (
-            hasattr(unit, "is_army")
-            and unit.is_army()
-            and unit.unit_type not in (UnitType.FLEET, UnitType.WING)
-        ):
+        # Rule: Ground armies and wings displace enemy fleets from entered hexes.
+        if self._unit_can_force_fleet_displacement(unit):
             self._displace_enemy_fleets_in_hex(unit, target_hex)
+            self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
         self._apply_escape_if_eligible(unit, offset_coords)
 
