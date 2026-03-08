@@ -1,0 +1,8 @@
+HL\WS;capture;conquer;control;destroy;prevent;escape;survive
+capture;HL;HL;HL;HL;HL;HL;HL
+conquer;HL;HL;HL;HL;HL;HL;HL
+control;WS;WS;HL;HL;HL;HL;HL
+destroy;WS;WS;HL;HL;HL;HL;HL
+prevent;WS;WS;WS;WS;-;-;-
+escape;WS;WS;WS;WS;-;-;-
+survive;WS;WS;WS;WS;-;-;-

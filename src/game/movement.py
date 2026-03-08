@@ -796,6 +796,9 @@ class MovementService:
         return False, "Selected stack has no valid path."
 
     def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
+        """Evaluates whether a neutral entry can be made at the target hex.
+
+        Returns a NeutralEntryDecision object indicating the decision result."""
         return self.invasion_handler.evaluate_neutral_entry(target_hex)
 
     def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:

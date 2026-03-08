@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Iterable
 from src.content.specs import UnitType
 
 
@@ -60,9 +60,13 @@ class TextFormatter:
         self._tdata = getattr(translator, "translations", {}) or {}
 
     @staticmethod
+    def format_units(units: Iterable[object]) -> str:
+        return ", ".join(TextFormatter.format_unit_log_string(u) for u in units) if units else "-"
+
+    @staticmethod
     def format_combat_log(attackers, defenders, result):
-        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers)
-        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders)
+        attacker_names = TextFormatter.format_units(attackers)
+        defender_names = TextFormatter.format_units(defenders)
         return f"Combat result {result}: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
 
     @staticmethod
@@ -89,6 +93,17 @@ class TextFormatter:
 
         # No underscores: capitalize the whole thing
         return id_text.capitalize()
+
+    @staticmethod
+    def format_target_hex(target_hex) -> str:
+        if target_hex is None:
+            return "-"
+        if hasattr(target_hex, "axial_to_offset"):
+            col, row = target_hex.axial_to_offset()
+            return f"({col}, {row})"
+        if isinstance(target_hex, (tuple, list)) and len(target_hex) == 2:
+            return f"({target_hex[0]}, {target_hex[1]})"
+        return str(target_hex)
 
     def format_victory_conditions(self, victory_block: dict[str, Any] | None) -> str:
         if not isinstance(victory_block, dict):
