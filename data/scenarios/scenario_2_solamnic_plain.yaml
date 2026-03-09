@@ -48,6 +48,9 @@ scenario:
   active_events:
     hl_wizard: 1
     ws_wizard: 1
+    dragon_orb: 1
+    dragonarmor: 2
+    plate_of_solamnus: 2
 
   # Allegiance-based Setup
   initial_setup:
@@ -94,7 +97,8 @@ scenario:
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: [ "ariakas", "dracart" ]
-      assets: null
+      assets:
+        dragonarmor: 2
 
       victory_conditions:
         major:
@@ -128,7 +132,8 @@ scenario:
           units: all
 
       explicit_units: ["justarius"]
-      assets: null
+      assets:
+        plate_of_solamnus: 2
 
       victory_conditions:
         major:

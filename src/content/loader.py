@@ -70,19 +70,12 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
     }
 
     # Normalize optional per-player setup keys for starting asset catalog.
-    # Support both "assets" (current) and "artifacts" (legacy alias).
     for side in (HL, WS):
         side_cfg = setup.get(side)
         if not isinstance(side_cfg, dict):
             continue
 
         assets_val = side_cfg.get("assets", None)
-        artifacts_val = side_cfg.get("artifacts", None)
-
-        if assets_val is None and artifacts_val is not None:
-            assets_val = artifacts_val
-        if artifacts_val is None and assets_val is not None:
-            artifacts_val = assets_val
 
         def _normalize_asset_list(value):
             if value is None:
@@ -112,7 +105,6 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
             return []
 
         side_cfg["assets"] = _normalize_asset_list(assets_val)
-        side_cfg["artifacts"] = _normalize_asset_list(artifacts_val)
 
     # Consolidated victory conditions from both players if defined at player level
     # or from a top-level victory_conditions key (like in the campaign)

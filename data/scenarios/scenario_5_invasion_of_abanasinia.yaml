@@ -46,6 +46,8 @@ scenario:
   active_events:
     blue_crystal_staff: all
     golden_general: all
+    soths_legions: all
+    dragon_orb: 1
 
   # Allegiance-based Setup
   initial_setup:
@@ -75,7 +77,8 @@ scenario:
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: ["verminaard"]
-      #assets: ["midnight"]
+      assets:
+        nightbringer: 1
 
       victory_conditions:
         major:

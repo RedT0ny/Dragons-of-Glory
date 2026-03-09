@@ -164,7 +164,9 @@ scenario:
         tower:
           units: all
 
-      assets: null
+      assets:
+        dragonmetal: 1
+        blue_crystal_staff: 1
 
       victory_conditions:
         major:

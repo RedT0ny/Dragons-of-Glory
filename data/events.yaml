@@ -139,9 +139,9 @@ plate_of_solamnus:
     A Plate of Solamnus is recovered from the catacombs of the Solamnic Keeps and presented to the Whitestone.
   picture: "solamnic_arms.jpg"
   allegiance: "whitestone"
-  trigger:
-    turn: 1
-    other: "knights_at_war"
+  turn: 5
+  requirements:
+    - { type: "country_active", id: "tower" }
   effects: { grant_asset: "plate_of_solamnus" }
   max_occurrences: 4
 

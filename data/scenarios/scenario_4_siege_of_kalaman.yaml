@@ -40,7 +40,12 @@ scenario:
 
   # Global Events
   active_events:
+    dragonlance_forged: 1
     golden_general: all
+    good_dragons: all
+    dragonmetal: all
+    flying_citadel: 1
+    dragon_orb: 2
 
   #possible_events: ["E10", "E20"]
 
@@ -105,6 +110,9 @@ scenario:
           units: all
 
       explicit_units: ["fizban", "laurana"]
+
+      assets:
+        dragonlance: 1
 
       victory_conditions:
         major:

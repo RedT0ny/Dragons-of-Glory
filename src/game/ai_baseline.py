@@ -22,6 +22,8 @@ class BaselineAIPlayer:
     AI_BACKTRACK_PENALTY = 220
     AI_REVISIT_PENALTY = 70
     AI_CAPITAL_GARRISON_VACATE_PENALTY = 280
+    AI_AIR_TETHER_MAX_OFFENSIVE = 3
+    AI_AIR_TETHER_MAX_DEFENSIVE = 2
 
     def __init__(self, game_state, movement_service, diplomacy_service):
         self.game_state = game_state
@@ -67,6 +69,16 @@ class BaselineAIPlayer:
                 invasion_deployment_allegiance=invasion_deployment_allegiance,
                 invasion_deployment_country_id=invasion_deployment_country_id,
             )
+        if self._transport_campaign_mode_active(side):
+            deployed += self._deploy_transport_campaign_pairs(
+                side=side,
+                objective_hexes=objective_hexes,
+                allow_territory_wide=allow_territory_wide,
+                country_filter=country_filter,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
 
         for unit in ready_units:
             if getattr(unit, "is_on_map", False):
@@ -89,6 +101,85 @@ class BaselineAIPlayer:
             )
             if result.success:
                 deployed += 1
+        return deployed
+
+    def _deploy_transport_campaign_pairs(
+        self,
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+        allow_territory_wide: bool,
+        country_filter: str | None,
+        invasion_deployment_active: bool,
+        invasion_deployment_allegiance: str | None,
+        invasion_deployment_country_id: str | None,
+    ) -> int:
+        deployed = 0
+        while True:
+            ready = [
+                u for u in self.game_state.units
+                if getattr(u, "allegiance", None) == side
+                and getattr(u, "status", None) == UnitState.READY
+                and not getattr(u, "is_on_map", False)
+            ]
+            if country_filter:
+                ready = [u for u in ready if getattr(u, "land", None) == country_filter]
+            fleets = [u for u in ready if getattr(u, "unit_type", None) == UnitType.FLEET]
+            armies = [
+                u for u in ready
+                if hasattr(u, "is_army")
+                and u.is_army()
+                and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            ]
+            if not fleets or not armies:
+                break
+
+            best = None
+            best_score = float("-inf")
+            for fleet in fleets:
+                fleet_valid = self.game_state.get_valid_deployment_hexes(fleet, allow_territory_wide=allow_territory_wide) or []
+                if not fleet_valid:
+                    continue
+                fleet_valid_set = set((int(c[0]), int(c[1])) for c in fleet_valid)
+                for army in armies:
+                    army_valid = self.game_state.get_valid_deployment_hexes(army, allow_territory_wide=allow_territory_wide) or []
+                    army_valid = [c for c in army_valid if not self._is_trapped_mountain_deploy(army, c)]
+                    if not army_valid:
+                        continue
+                    joint = [c for c in army_valid if (int(c[0]), int(c[1])) in fleet_valid_set]
+                    for c in joint:
+                        coords = (int(c[0]), int(c[1]))
+                        score = self._score_deployment_hex(fleet, coords, objective_hexes)
+                        score += self._score_deployment_hex(army, coords, objective_hexes)
+                        score += 240
+                        if score > best_score:
+                            best_score = score
+                            best = (fleet, army, coords)
+            if best is None:
+                break
+
+            fleet, army, coords = best
+            target_hex = Hex.offset_to_axial(coords[0], coords[1])
+            fleet_result = self.game_state.deployment_service.deploy_unit(
+                fleet,
+                target_hex,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if not fleet_result.success:
+                break
+            army_result = self.game_state.deployment_service.deploy_unit(
+                army,
+                target_hex,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if not army_result.success:
+                # Keep fleet deployment if rollback is not guaranteed-safe in all states.
+                deployed += 1
+                continue
+            deployed += 2
         return deployed
 
     def _deploy_hl_dragon_pairs(
@@ -590,6 +681,8 @@ class BaselineAIPlayer:
             for coords in range_result.reachable_coords:
                 if eval_count >= self.AI_MAX_MOVE_EVAL:
                     break
+                if not self._is_move_candidate_allowed(stack, coords, side, objective_hexes):
+                    continue
                 eval_count += 1
                 score = self._score_move_target(stack, coords, objective_hexes, side)
                 scored.append((score, stack, coords, None, False))
@@ -600,6 +693,8 @@ class BaselineAIPlayer:
                 for coords in range_result.neutral_warning_coords:
                     if eval_count >= self.AI_MAX_MOVE_EVAL:
                         break
+                    if not self._is_move_candidate_allowed(stack, coords, side, objective_hexes):
+                        continue
                     eval_count += 1
                     
                     # Identify target country
@@ -658,6 +753,38 @@ class BaselineAIPlayer:
                 print(f"AI move score {score}: {len(result.moved)} unit(s) to {coords}")
                 return True
         return False
+
+    def _is_move_candidate_allowed(
+        self,
+        stack,
+        target_coords: tuple[int, int],
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+    ) -> bool:
+        if not stack:
+            return False
+        start = getattr(stack[0], "position", None)
+        if not start or start[0] is None:
+            return False
+        start_xy = (int(start[0]), int(start[1]))
+        target_xy = (int(target_coords[0]), int(target_coords[1]))
+
+        if start_xy != target_xy and self._would_leave_capital_undefended_after_departure(start_xy, stack, side):
+            return False
+
+        if self._is_empty_fleet_stack(stack):
+            if not self._fleet_escape_only_objective_active(side):
+                if not self._empty_fleet_move_is_transport_relevant(stack, start_xy, target_xy, side, objective_hexes):
+                    return False
+        elif self._is_loaded_fleet_stack(stack):
+            if self._transport_campaign_mode_active(side) and not self._fleet_escape_only_objective_active(side):
+                if not self._loaded_fleet_move_is_objective_relevant(stack, start_xy, target_xy, objective_hexes):
+                    return False
+
+        if self._violates_air_support_tether(stack, start_xy, target_xy, side, objective_hexes):
+            return False
+
+        return True
 
     def _current_move_exec_threshold(self) -> int:
         if self._is_late_game():
@@ -729,6 +856,8 @@ class BaselineAIPlayer:
         return False
 
     def _attempt_unboard_passengers(self, side: str) -> bool:
+        objective_hexes = self._objective_hexes_for_side(side)
+        profile = self._side_strategy_profile(side)
         for unit in self.game_state.units:
             if getattr(unit, "allegiance", None) != side:
                 continue
@@ -747,12 +876,22 @@ class BaselineAIPlayer:
                 continue
             if not getattr(unit, "moved_this_turn", False) and getattr(unit, "movement_points", 0) > 0:
                 continue
+            if not self._should_attempt_unboard_at_hex(carrier_hex, side, objective_hexes, profile):
+                continue
+            need = self._required_ground_unboard_garrison(carrier_hex, side, objective_hexes, profile)
+            on_hex_ground = self._friendly_ground_count_at_hex(carrier_hex, side)
             unboarded = False
+            unboarded_count = 0
             for p in passengers:
                 if hasattr(p, "is_leader") and p.is_leader():
                     continue
+                if not (hasattr(p, "is_army") and p.is_army()):
+                    continue
+                if on_hex_ground + unboarded_count >= need:
+                    break
                 if self.game_state.unboard_unit(p):
                     unboarded = True
+                    unboarded_count += 1
             if unboarded:
                 print(f"AI unboarded passengers from {unit.id} at {carrier_hex.axial_to_offset()}.")
                 return True
@@ -823,7 +962,9 @@ class BaselineAIPlayer:
                     continue
                 if not ((hasattr(unit, "is_army") and unit.is_army()) or (hasattr(unit, "is_leader") and unit.is_leader())):
                     continue
-                if self._would_leave_capital_without_defender_after_board(unit, side):
+                pos = getattr(unit, "position", None)
+                origin = (int(pos[0]), int(pos[1])) if pos and pos[0] is not None else None
+                if origin and self._would_leave_capital_undefended_after_departure(origin, [unit], side):
                     continue
                 score = self._score_boarding_action(unit, carrier, side, objective_hexes, profile)
                 if score > best_score:
@@ -844,7 +985,8 @@ class BaselineAIPlayer:
             return -9999
         start = (int(unit.position[0]), int(unit.position[1]))
         start_dist = self._min_distance_to_objectives(start, objective_hexes)
-        if start_dist >= 999:
+        island_redeploy = self._is_islanded_hex(start) and self._friendly_ground_count_at_coords(start, side) > 1
+        if start_dist >= 999 and not island_redeploy:
             return -9999
 
         candidate_hexes = self._carrier_transport_destinations(carrier, unit)
@@ -852,10 +994,12 @@ class BaselineAIPlayer:
             return -9999
         end_dist = min(self._min_distance_to_objectives(c, objective_hexes) for c in candidate_hexes)
         dist_gain = start_dist - end_dist
-        if dist_gain <= 0:
+        if dist_gain <= 0 and not island_redeploy:
             return -9999
 
-        score = dist_gain * 55
+        score = max(0, dist_gain) * 55
+        if island_redeploy:
+            score += 220
         if profile.get("is_offensive", False):
             score += 40
         if profile.get("is_defensive", False):
@@ -899,22 +1043,11 @@ class BaselineAIPlayer:
         return out
 
     def _would_leave_capital_without_defender_after_board(self, unit, side: str) -> bool:
-        if not self._is_capital_defender_unit(unit):
-            return False
         pos = getattr(unit, "position", None)
         if not pos or pos[0] is None:
             return False
-        cap_country = self._capital_country_at_coords((int(pos[0]), int(pos[1])), side)
-        if cap_country is None:
-            return False
-        cap_hex = Hex.offset_to_axial(int(pos[0]), int(pos[1]))
-        defenders_here = [
-            u
-            for u in self.game_state.get_units_at(cap_hex)
-            if self._is_capital_defender_unit(u) and getattr(u, "allegiance", None) == side
-        ]
-        remaining = len(defenders_here) - 1
-        return remaining < 1
+        origin = (int(pos[0]), int(pos[1]))
+        return self._would_leave_capital_undefended_after_departure(origin, [unit], side)
 
     @staticmethod
     def _is_capital_defender_unit(unit) -> bool:
@@ -936,6 +1069,35 @@ class BaselineAIPlayer:
             if tuple(capital.coords) == tuple(coords):
                 return country
         return None
+
+    def _would_leave_capital_undefended_after_departure(
+        self,
+        origin_coords: tuple[int, int],
+        departing_units,
+        side: str,
+    ) -> bool:
+        if not origin_coords:
+            return False
+        if self._capital_country_at_coords(origin_coords, side) is None:
+            return False
+        origin_hex = Hex.offset_to_axial(origin_coords[0], origin_coords[1])
+        defenders_here = [
+            u
+            for u in self.game_state.get_units_at(origin_hex)
+            if self._is_capital_defender_unit(u) and getattr(u, "allegiance", None) == side
+        ]
+        if not defenders_here:
+            return False
+        leaving_ids = {
+            id(u)
+            for u in (departing_units or [])
+            if self._is_capital_defender_unit(u)
+            and getattr(u, "allegiance", None) == side
+            and getattr(u, "position", None)
+            and (int(u.position[0]), int(u.position[1])) == tuple(origin_coords)
+        }
+        remaining = len([u for u in defenders_here if id(u) not in leaving_ids])
+        return remaining < 1
 
     def _leaders_in_hex(self, unit):
         if not getattr(unit, "position", None):
@@ -1081,7 +1243,12 @@ class BaselineAIPlayer:
             if air:
                 stacks.append(sorted(air, key=lambda u: (u.id, int(getattr(u, "ordinal", 1)))))
             if fleet:
-                stacks.append(sorted(fleet, key=lambda u: (u.id, int(getattr(u, "ordinal", 1)))))
+                loaded_fleet = [f for f in fleet if self._fleet_has_ground_or_leader_passengers(f)]
+                empty_fleet = [f for f in fleet if not self._fleet_has_ground_or_leader_passengers(f)]
+                if loaded_fleet:
+                    stacks.append(sorted(loaded_fleet, key=lambda u: (u.id, int(getattr(u, "ordinal", 1)))))
+                if empty_fleet:
+                    stacks.append(sorted(empty_fleet, key=lambda u: (u.id, int(getattr(u, "ordinal", 1)))))
         return stacks
 
     def _score_move_target(self, stack, target_coords, objective_hexes: set[tuple[int, int]], side: str) -> int:
@@ -1090,6 +1257,7 @@ class BaselineAIPlayer:
         urgency = self._objective_urgency_multiplier()
         is_late = self._is_late_game()
         profile = self._side_strategy_profile(side)
+        major_objective_hexes = self._major_objective_hexes_for_side(side)
 
         # Progress momentum: reward sustained objective approach over this and prior move.
         start_dist = self._min_distance_to_objectives(start, objective_hexes)
@@ -1200,6 +1368,11 @@ class BaselineAIPlayer:
         elif posture == "escape":
             # Escape posture: avoid unnecessary fights unless they advance objective movement.
             posture_adjust -= int((enemy_adj * 10 + enemy_here * 20) * (1.2 if dist_gain <= 0 else 0.8))
+        if self._is_fleet_only_stack(stack) and self._fleet_escape_only_objective_active(side):
+            if target_coords in objective_hexes and dist_gain > 0:
+                posture_adjust += 80
+            posture_adjust += friendly_adj * 22
+            posture_adjust -= enemy_adj * 28
 
         air_posture_adjust = 0
         if has_air_only and profile.get("victory_category") != "escape":
@@ -1217,6 +1390,31 @@ class BaselineAIPlayer:
             objective_hexes=objective_hexes,
             has_air_only=has_air_only,
         )
+        transport_coordination_bonus = self._transport_coordination_bonus(
+            stack=stack,
+            side=side,
+            start_coords=(int(start[0]), int(start[1])) if start else target_coords,
+            target_coords=(int(target_coords[0]), int(target_coords[1])),
+            objective_hexes=objective_hexes,
+        )
+        major_push_bonus = self._major_objective_push_bonus(
+            stack=stack,
+            side=side,
+            start_coords=(int(start[0]), int(start[1])) if start else target_coords,
+            target_coords=(int(target_coords[0]), int(target_coords[1])),
+            major_objective_hexes=major_objective_hexes,
+        )
+        reinforcement_mobilization_bonus = self._reinforcement_mobilization_bonus(
+            stack=stack,
+            side=side,
+            start_coords=(int(start[0]), int(start[1])) if start else target_coords,
+            target_coords=(int(target_coords[0]), int(target_coords[1])),
+        )
+        island_exit_bonus = 0
+        start_xy = (int(start[0]), int(start[1])) if start else (int(target_coords[0]), int(target_coords[1]))
+        if has_ground and self._is_islanded_hex(start_xy):
+            if self._friendly_ground_count_at_coords(start_xy, side) > 1 and tuple(start_xy) != tuple(target_coords):
+                island_exit_bonus += 180
 
         capital_garrison_penalty = self._capital_garrison_vacate_penalty(stack, target_coords, side)
 
@@ -1235,6 +1433,10 @@ class BaselineAIPlayer:
             + posture_adjust
             + air_posture_adjust
             + air_support_bonus
+            + transport_coordination_bonus
+            + major_push_bonus
+            + reinforcement_mobilization_bonus
+            + island_exit_bonus
             + capital_garrison_penalty
             + relief_bonus
         )
@@ -1349,6 +1551,417 @@ class BaselineAIPlayer:
                 best = d
         return int(best)
 
+    def _transport_coordination_bonus(
+        self,
+        stack,
+        side: str,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+        objective_hexes: set[tuple[int, int]],
+    ) -> int:
+        if not stack:
+            return 0
+        bonus = 0
+        has_fleet_only = self._is_fleet_only_stack(stack)
+        has_ground = any(
+            hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            for u in stack
+        )
+        if has_ground and not has_fleet_only:
+            start_dist = self._nearest_friendly_transport_distance(start_coords, side)
+            target_dist = self._nearest_friendly_transport_distance(target_coords, side)
+            if target_dist < start_dist:
+                bonus += (start_dist - target_dist) * 75
+
+        if self._is_empty_fleet_stack(stack):
+            fleet = stack[0]
+            pickup_hexes = self._friendly_transport_pickup_hexes(side, fleet)
+            if pickup_hexes:
+                start_pick = self._min_distance_to_points(start_coords, pickup_hexes)
+                target_pick = self._min_distance_to_points(target_coords, pickup_hexes)
+                if target_pick < start_pick:
+                    bonus += (start_pick - target_pick) * 130
+
+        if self._is_fleet_only_stack(stack) and any(self._fleet_has_ground_or_leader_passengers(f) for f in stack):
+            fleet = stack[0]
+            coast = self._objective_coast_hexes_for_fleet(fleet, objective_hexes)
+            if coast:
+                start_coast = self._min_distance_to_points(start_coords, coast)
+                target_coast = self._min_distance_to_points(target_coords, coast)
+                if target_coast < start_coast:
+                    bonus += (start_coast - target_coast) * 85
+        return int(bonus)
+
+    def _nearest_friendly_transport_distance(self, coords: tuple[int, int], side: str) -> int:
+        src = Hex.offset_to_axial(coords[0], coords[1])
+        best = 999
+        for unit in self.game_state.units:
+            if getattr(unit, "allegiance", None) != side:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "unit_type", None) not in (UnitType.FLEET, UnitType.CITADEL):
+                continue
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None:
+                continue
+            d = src.distance_to(Hex.offset_to_axial(pos[0], pos[1]))
+            if d < best:
+                best = d
+        return int(best)
+
+    def _is_fleet_only_stack(self, stack) -> bool:
+        return bool(stack) and all(getattr(u, "unit_type", None) == UnitType.FLEET for u in stack)
+
+    def _is_empty_fleet_stack(self, stack) -> bool:
+        if not self._is_fleet_only_stack(stack):
+            return False
+        return not any(self._fleet_has_ground_or_leader_passengers(f) for f in stack)
+
+    def _is_loaded_fleet_stack(self, stack) -> bool:
+        if not self._is_fleet_only_stack(stack):
+            return False
+        return any(self._fleet_has_ground_or_leader_passengers(f) for f in stack)
+
+    @staticmethod
+    def _fleet_has_ground_or_leader_passengers(fleet) -> bool:
+        passengers = list(getattr(fleet, "passengers", []) or [])
+        return any(
+            (hasattr(p, "is_army") and p.is_army())
+            or (hasattr(p, "is_leader") and p.is_leader())
+            for p in passengers
+        )
+
+    def _fleet_escape_only_objective_active(self, side: str) -> bool:
+        for node in self._victory_nodes_for_side(side):
+            ntype = str(node.get("type", "")).strip().lower()
+            if ntype != "escape_unit_score":
+                continue
+            unit_type_raw = node.get("unit_type")
+            if unit_type_raw is None:
+                unit_type_raw = node.get("unit_types")
+            if unit_type_raw is None:
+                continue
+            values = unit_type_raw if isinstance(unit_type_raw, (list, tuple, set)) else [unit_type_raw]
+            normalized = {str(getattr(v, "value", v)).strip().lower() for v in values}
+            if UnitType.FLEET.value in normalized or "fleet" in normalized:
+                return True
+        return False
+
+    def _empty_fleet_move_is_transport_relevant(
+        self,
+        stack,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+    ) -> bool:
+        if not stack:
+            return False
+        fleet = stack[0]
+        pickup_hexes = self._friendly_transport_pickup_hexes(side, fleet)
+        if not pickup_hexes:
+            # Empty fleets without realistic pickup opportunities should hold position.
+            return False
+        start_pick = self._min_distance_to_points(start_coords, pickup_hexes)
+        target_pick = self._min_distance_to_points(target_coords, pickup_hexes)
+        return target_pick < start_pick and target_pick <= 4
+
+    def _loaded_fleet_move_is_objective_relevant(
+        self,
+        stack,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+        objective_hexes: set[tuple[int, int]],
+    ) -> bool:
+        if not stack:
+            return False
+        fleet = stack[0]
+        coast = self._objective_coast_hexes_for_fleet(fleet, objective_hexes)
+        if not coast:
+            return True
+        start_dist = self._min_distance_to_points(start_coords, coast)
+        target_dist = self._min_distance_to_points(target_coords, coast)
+        return target_dist <= start_dist
+
+    def _friendly_transport_pickup_hexes(self, side: str, fleet) -> set[tuple[int, int]]:
+        out = set()
+        for unit in self.game_state.units:
+            if getattr(unit, "allegiance", None) != side:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            if not (hasattr(unit, "is_army") and unit.is_army()):
+                continue
+            if getattr(unit, "unit_type", None) in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL):
+                continue
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None:
+                continue
+            hex_obj = Hex.offset_to_axial(pos[0], pos[1])
+            try:
+                if self.game_state.map.can_stack_move_to([fleet], hex_obj):
+                    out.add((int(pos[0]), int(pos[1])))
+            except Exception:
+                continue
+        return out
+
+    def _objective_coast_hexes_for_fleet(self, fleet, objective_hexes: set[tuple[int, int]]) -> set[tuple[int, int]]:
+        out = set()
+        for coords in objective_hexes:
+            center = Hex.offset_to_axial(coords[0], coords[1])
+            candidates = [center] + list(center.neighbors())
+            for hx in candidates:
+                try:
+                    if self.game_state.map.can_stack_move_to([fleet], hx):
+                        out.add(tuple(hx.axial_to_offset()))
+                except Exception:
+                    continue
+        return out
+
+    def _min_distance_to_points(self, src: tuple[int, int], points: set[tuple[int, int]]) -> int:
+        if not points:
+            return 999
+        return min(self._distance(src, p) for p in points)
+
+    def _major_objective_push_bonus(
+        self,
+        stack,
+        side: str,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+        major_objective_hexes: set[tuple[int, int]],
+    ) -> int:
+        profile = self._side_strategy_profile(side)
+        if not profile.get("is_offensive", False):
+            return 0
+        if not major_objective_hexes:
+            return 0
+        start_dist = self._min_distance_to_objectives(start_coords, major_objective_hexes)
+        target_dist = self._min_distance_to_objectives(target_coords, major_objective_hexes)
+        if start_dist >= 999 or target_dist >= 999:
+            return 0
+        bonus = max(0, start_dist - target_dist) * 52
+        if target_coords in major_objective_hexes and target_dist < start_dist:
+            bonus += 140
+        has_ground = any(
+            hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            for u in stack
+        )
+        if has_ground and target_dist <= 3:
+            bonus += 40
+        return int(bonus)
+
+    def _reinforcement_mobilization_bonus(
+        self,
+        stack,
+        side: str,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+    ) -> int:
+        profile = self._side_strategy_profile(side)
+        if not profile.get("is_offensive", False):
+            return 0
+        has_ground = any(
+            hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            for u in stack
+        )
+        if not has_ground:
+            return 0
+        start_hex = Hex.offset_to_axial(start_coords[0], start_coords[1])
+        enemy_adj_start = self._adjacent_enemy_count(start_hex, side)
+        if enemy_adj_start > 0:
+            return 0
+        start_enemy_dist = self._nearest_enemy_distance(start_coords, side)
+        target_enemy_dist = self._nearest_enemy_distance(target_coords, side)
+        if start_enemy_dist < 4:
+            return 0
+        if target_enemy_dist < start_enemy_dist:
+            return int((start_enemy_dist - target_enemy_dist) * 65)
+        return 0
+
+    def _nearest_enemy_distance(self, coords: tuple[int, int], side: str) -> int:
+        src = Hex.offset_to_axial(coords[0], coords[1])
+        best = 999
+        for unit in self.game_state.units:
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "allegiance", None) in (side, NEUTRAL, None):
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None:
+                continue
+            d = src.distance_to(Hex.offset_to_axial(pos[0], pos[1]))
+            if d < best:
+                best = d
+        return int(best)
+
+    def _friendly_ground_count_at_hex(self, hex_obj: Hex, side: str) -> int:
+        return sum(
+            1
+            for u in self.game_state.get_units_at(hex_obj)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) == side
+            and hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            and getattr(u, "transport_host", None) is None
+        )
+
+    def _friendly_ground_count_at_coords(self, coords: tuple[int, int], side: str) -> int:
+        return self._friendly_ground_count_at_hex(Hex.offset_to_axial(coords[0], coords[1]), side)
+
+    def _is_islanded_hex(self, coords: tuple[int, int]) -> bool:
+        center = Hex.offset_to_axial(coords[0], coords[1])
+        for n in center.neighbors():
+            col, row = n.axial_to_offset()
+            if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            terrain = self.game_state.map.get_terrain(n)
+            if terrain not in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+                return False
+        return True
+
+    def _should_attempt_unboard_at_hex(
+        self,
+        hex_obj: Hex,
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+        profile: dict[str, Any],
+    ) -> bool:
+        coords = tuple(hex_obj.axial_to_offset())
+        target_in_objective = coords in objective_hexes
+        enemy_here = any(
+            getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+            for u in self.game_state.get_units_at(hex_obj)
+        )
+        enemy_adj = self._adjacent_enemy_count(hex_obj, side)
+        loc = self.game_state.map.get_location(hex_obj)
+        enemy_location = bool(loc and getattr(loc, "occupier", None) not in (None, side, NEUTRAL))
+        if target_in_objective or enemy_here or enemy_adj > 0 or enemy_location:
+            return True
+        if self._is_islanded_hex(coords):
+            return True
+        if profile.get("transport_campaign", False):
+            # Allow stepping-stone unboards only near objective coast.
+            return self._min_distance_to_objectives(coords, objective_hexes) <= 2
+        return False
+
+    def _required_ground_unboard_garrison(
+        self,
+        hex_obj: Hex,
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+        _profile: dict[str, Any],
+    ) -> int:
+        coords = tuple(hex_obj.axial_to_offset())
+        if self._is_islanded_hex(coords):
+            return 1
+        enemy_adj = self._adjacent_enemy_count(hex_obj, side)
+        need = 1
+        if coords in objective_hexes and enemy_adj > 0:
+            need = 2
+        elif enemy_adj >= 2:
+            need = 2
+        return need
+
+    def _violates_air_support_tether(
+        self,
+        stack,
+        start_coords: tuple[int, int],
+        target_coords: tuple[int, int],
+        side: str,
+        objective_hexes: set[tuple[int, int]],
+    ) -> bool:
+        if not stack:
+            return False
+        has_ground = any(getattr(u, "is_army", lambda: False)() for u in stack)
+        has_air = any(getattr(u, "unit_type", None) in (UnitType.WING, UnitType.CITADEL) for u in stack)
+        if not has_air or has_ground:
+            return False
+        profile = self._side_strategy_profile(side)
+        if profile.get("victory_category") == "escape":
+            return False
+        carrying_escort = any(
+            any(
+                getattr(p, "is_on_map", False)
+                and (
+                    (hasattr(p, "is_army") and p.is_army())
+                    or (hasattr(p, "is_leader") and p.is_leader())
+                )
+                for p in list(getattr(u, "passengers", []) or [])
+            )
+            for u in stack
+        )
+        if carrying_escort:
+            return False
+
+        start_ground = self._nearest_friendly_ground_distance(start_coords, side)
+        target_ground = self._nearest_friendly_ground_distance(target_coords, side)
+        if target_ground >= 999:
+            return False
+        target_hex = Hex.offset_to_axial(target_coords[0], target_coords[1])
+        friendly_ground_adj = 0
+        for n in target_hex.neighbors():
+            for u in self.game_state.get_units_at(n):
+                if getattr(u, "is_on_map", False) and getattr(u, "allegiance", None) == side:
+                    if hasattr(u, "is_army") and u.is_army() and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL):
+                        friendly_ground_adj += 1
+        enemy_adj = self._adjacent_enemy_count(target_hex, side)
+        # Hard rule: air-only stacks do not end adjacent to enemies without adjacent ground support.
+        if enemy_adj > 0 and friendly_ground_adj <= 0:
+            return True
+        if target_coords in objective_hexes:
+            enemy_here = any(
+                getattr(u, "is_on_map", False)
+                and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+                for u in self.game_state.get_units_at(target_hex)
+            )
+            if not enemy_here:
+                return False
+        max_dist = self.AI_AIR_TETHER_MAX_OFFENSIVE if profile.get("is_offensive", False) else self.AI_AIR_TETHER_MAX_DEFENSIVE
+        if target_ground > max_dist and target_ground >= start_ground:
+            return True
+
+        enemies = [
+            u
+            for u in self.game_state.get_units_at(target_hex)
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) not in (side, NEUTRAL, None)
+        ]
+        if not enemies:
+            return False
+
+        # Hard attack gate for unsupported air-only stacks.
+        if friendly_ground_adj <= 0 and target_ground > 2:
+            return True
+        if enemy_adj > 0 and friendly_ground_adj <= 0 and target_ground > 1:
+            return True
+
+        atk_cs = sum(int(getattr(u, "combat_rating", 0) or 0) for u in stack)
+        def_cs = sum(int(getattr(u, "combat_rating", 0) or 0) for u in enemies)
+        if atk_cs <= 0:
+            return True
+        odds = atk_cs / max(1, def_cs)
+        if odds < 1.15 and target_ground > 1:
+            return True
+        if friendly_ground_adj <= 0 and odds < 1.35:
+            return True
+        if friendly_ground_adj > 0 and odds < 1.3:
+            return True
+        return False
+
     def _score_deployment_hex(self, unit, coords: tuple[int, int], objective_hexes: set[tuple[int, int]]) -> int:
         target_hex = Hex.offset_to_axial(coords[0], coords[1])
         side = getattr(unit, "allegiance", None)
@@ -1357,6 +1970,7 @@ class BaselineAIPlayer:
         enemy_adj = self._adjacent_enemy_count(target_hex, side)
         profile = self._side_strategy_profile(side)
         posture = profile.get("posture", "balanced")
+        transport_campaign = bool(profile.get("transport_campaign", False))
         base = int((0 if dist >= 999 else -dist * 12) + friendly_adj * 10 - enemy_adj * 14)
 
         # Capital garrison priority: ensure at least one army in allied capitals.
@@ -1385,6 +1999,34 @@ class BaselineAIPlayer:
         if side == WS and profile.get("control_focus", False):
             # WS typically benefits from sturdier deployment.
             base += int(defense_bonus * 8)
+
+        if getattr(unit, "unit_type", None) == UnitType.FLEET:
+            target_hex_units = [
+                u for u in self.game_state.get_units_at(target_hex)
+                if getattr(u, "is_on_map", False) and getattr(u, "allegiance", None) == side
+            ]
+            fleets_here = sum(1 for u in target_hex_units if getattr(u, "unit_type", None) == UnitType.FLEET)
+            ground_here = sum(
+                1
+                for u in target_hex_units
+                if hasattr(u, "is_army")
+                and u.is_army()
+                and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            )
+            # Spread fleets by default; clustering is only good when coordinating immediate embarkation.
+            base -= fleets_here * 220
+            if transport_campaign:
+                base += min(ground_here, 2) * 140
+                coast = self._objective_coast_hexes_for_fleet(unit, objective_hexes)
+                if coast:
+                    sea_dist = self._min_distance_to_points(coords, coast)
+                    if sea_dist < 999:
+                        base += max(0, 70 - sea_dist * 10)
+
+        if transport_campaign and hasattr(unit, "is_army") and unit.is_army() and getattr(unit, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL):
+            nearest_transport = self._nearest_friendly_transport_distance(coords, side)
+            if nearest_transport < 999:
+                base += max(0, 95 - nearest_transport * 18)
 
         return int(base + cap_bonus + capital_overstack_penalty)
 
@@ -1526,8 +2168,11 @@ class BaselineAIPlayer:
         target_offset = target_hex.axial_to_offset()
         urgency = self._objective_urgency_multiplier()
         profile = self._side_strategy_profile(side)
+        major_objectives = self._major_objective_hexes_for_side(side)
         if target_offset in self._objective_hexes_for_side(side):
             objective_bonus = max(objective_bonus, int(260 * urgency))
+        if target_offset in major_objectives:
+            objective_bonus = max(objective_bonus, int(360 * urgency))
         enemy_side = self.game_state.get_enemy_allegiance(side)
         if target_offset in self._objective_hexes_for_side(enemy_side):
             objective_bonus = max(objective_bonus, int(300 * urgency))
@@ -1560,8 +2205,27 @@ class BaselineAIPlayer:
         elif posture == "escape":
             min_odds = 1.25
 
+        air_only_attack = bool(attackers) and all(
+            getattr(u, "unit_type", None) in (UnitType.WING, UnitType.CITADEL)
+            for u in attackers
+        )
+        if air_only_attack:
+            src_pos = getattr(attackers[0], "position", None)
+            src_coords = (int(src_pos[0]), int(src_pos[1])) if src_pos and src_pos[0] is not None else None
+            support_dist = self._nearest_friendly_ground_distance(src_coords, side) if src_coords else 999
+            target_obj = target_hex.axial_to_offset() in self._objective_hexes_for_side(side)
+            if support_dist > 2:
+                return False
+            if support_dist > 1 and odds < 1.5:
+                return False
+            if not target_obj and odds < 1.35:
+                return False
+
         if odds >= min_odds:
             return True
+        if profile.get("is_offensive", False):
+            if target_hex.axial_to_offset() in self._major_objective_hexes_for_side(side) and odds >= 0.9:
+                return True
         # Critical late-turn push: allow sub-threshold attacks near key objectives.
         if odds < 0.85:
             return False
@@ -1650,6 +2314,7 @@ class BaselineAIPlayer:
             for node in nodes
         )
         target_countries = self._target_country_ids_for_side(side)
+        transport_campaign = self._compute_transport_campaign_mode(side, posture, category, target_countries)
         profile = {
             "posture": posture,
             "is_offensive": posture == "offensive",
@@ -1659,9 +2324,56 @@ class BaselineAIPlayer:
             "offensive_side": offensive_side,
             "control_focus": bool(control_focus),
             "target_countries": target_countries,
+            "transport_campaign": bool(transport_campaign),
         }
         self._side_strategy_cache[side] = profile
         return profile
+
+    def _compute_transport_campaign_mode(
+        self,
+        side: str,
+        posture: str,
+        category: str,
+        target_countries: set[str],
+    ) -> bool:
+        if posture != "offensive":
+            return False
+        if category not in {"conquer", "capture"}:
+            return False
+        if not target_countries:
+            return False
+        has_fleet = any(
+            getattr(u, "allegiance", None) == side
+            and getattr(u, "unit_type", None) == UnitType.FLEET
+            and getattr(u, "status", None) in (UnitState.READY, UnitState.ACTIVE, UnitState.DEPLETED)
+            for u in self.game_state.units
+        )
+        if not has_fleet:
+            return False
+        has_ground = any(
+            getattr(u, "allegiance", None) == side
+            and hasattr(u, "is_army")
+            and u.is_army()
+            and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL)
+            and getattr(u, "status", None) in (UnitState.READY, UnitState.ACTIVE, UnitState.DEPLETED)
+            for u in self.game_state.units
+        )
+        if not has_ground:
+            return False
+        objective_hexes = self._objective_hexes_for_side(side)
+        if not objective_hexes:
+            return False
+        # Maritime campaign hint: objective area has at least one fleet-accessible objective/coastal hex.
+        for u in self.game_state.units:
+            if getattr(u, "allegiance", None) != side or getattr(u, "unit_type", None) != UnitType.FLEET:
+                continue
+            coast = self._objective_coast_hexes_for_fleet(u, objective_hexes)
+            if coast:
+                return True
+        return False
+
+    def _transport_campaign_mode_active(self, side: str) -> bool:
+        return bool(self._side_strategy_profile(side).get("transport_campaign", False))
 
     def _victory_nodes_for_side(self, side: str) -> list[dict[str, Any]]:
         vc = getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}
@@ -1876,33 +2588,7 @@ class BaselineAIPlayer:
         target_xy = (int(target_coords[0]), int(target_coords[1]))
         if start_xy == target_xy:
             return 0
-        if not any(hasattr(u, "is_army") and u.is_army() for u in stack):
-            return 0
-
-        allied_capital = False
-        for country in self.game_state.countries.values():
-            if getattr(country, "allegiance", None) != side:
-                continue
-            cap = getattr(country, "capital", None)
-            if cap and getattr(cap, "coords", None) and tuple(cap.coords) == start_xy:
-                allied_capital = True
-                break
-        if not allied_capital:
-            return 0
-
-        start_hex = Hex.offset_to_axial(start_xy[0], start_xy[1])
-        armies_here = [
-            u
-            for u in self.game_state.get_units_at(start_hex)
-            if getattr(u, "is_on_map", False)
-            and getattr(u, "allegiance", None) == side
-            and hasattr(u, "is_army")
-            and u.is_army()
-            and getattr(u, "transport_host", None) is None
-        ]
-        moving_armies = [u for u in stack if hasattr(u, "is_army") and u.is_army()]
-        remaining = max(0, len(armies_here) - len(moving_armies))
-        if remaining <= 0:
+        if self._would_leave_capital_undefended_after_departure(start_xy, stack, side):
             return -self.AI_CAPITAL_GARRISON_VACATE_PENALTY
         return 0
 
@@ -1938,6 +2624,13 @@ class BaselineAIPlayer:
                 self._collect_objective_hexes(node, out)
         else:
             self._collect_objective_hexes(minor, out)
+        return out
+
+    def _major_objective_hexes_for_side(self, side: str) -> set[tuple[int, int]]:
+        out = set()
+        vc = getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}
+        side_vc = vc.get(side, {}) or {}
+        self._collect_objective_hexes(side_vc.get("major"), out)
         return out
 
     def _target_country_ids_for_side(self, side: str) -> set[str]:

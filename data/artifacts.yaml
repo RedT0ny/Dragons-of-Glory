@@ -150,6 +150,18 @@ medallion_of_faith:
   bonus: { other: "healing" }
   is_consumable: true
 
+nightbringer:
+  type: "artifact"
+  description: >
+    Said to have been forged in the Tower of High Sorcery in Ergoth by Black Robe wizards, Nightbringer is a large, 
+    heavy mace with a black oaken handle and the head of solid, blackened steel. The mace emanates evil, even when 
+    it is not being wielded.
+  picture: "nightbringer.jpg"
+  effect: "+2 Tactical Rating. Highlords only."
+  requirements:
+    - { type: "unit_type", value: "highlord" }
+  bonus: { tactical_rating: 2 }
+
 plate_of_solamnus:
   type: "artifact"
   description: >

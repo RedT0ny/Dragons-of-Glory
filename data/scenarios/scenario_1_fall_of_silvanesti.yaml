@@ -41,6 +41,11 @@ scenario:
 
   # Global Events
   active_events:
+    hl_minor_diplomacy: all
+    hl_diplomacy: all
+    ws_minor_diplomacy: all
+    ws_diplomacy: all
+    whitestone_council: all
     dragon_orb: 1
 
   # Allegiance-based Setup
