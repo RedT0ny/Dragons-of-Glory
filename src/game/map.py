@@ -967,7 +967,7 @@ class Board:
             return float('inf')
 
         if self._hexside_is(hexside_type, HexsideType.RIVER):
-            cost += 2
+            cost += 1
 
         if self._hexside_is(hexside_type, HexsideType.MOUNTAIN):
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
