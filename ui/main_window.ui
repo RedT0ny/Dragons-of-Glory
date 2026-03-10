@@ -14,234 +14,240 @@
    <string>Ansalon Game</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <layout class="QVBoxLayout" name="mainLayout">
-    <item>
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="1">
+     <widget class="QFrame" name="info_panel">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>350</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="frameShape">
+       <enum>QFrame::Shape::StyledPanel</enum>
+      </property>
+      <property name="frameShadow">
+       <enum>QFrame::Shadow::Sunken</enum>
+      </property>
+      <layout class="QVBoxLayout" name="infoLayout">
+       <item>
+        <widget class="QLabel" name="mini_map">
+         <property name="minimumSize">
+          <size>
+           <width>320</width>
+           <height>240</height>
+          </size>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">background-color: #333; color: white;</string>
+         </property>
+         <property name="text">
+          <string>Mini-map Area</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignmentFlag::AlignCenter</set>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QGridLayout" name="btn_grid">
+         <item row="0" column="0">
+          <widget class="QPushButton" name="btnMove">
+           <property name="text">
+            <string>Move</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QPushButton" name="btnAttack">
+           <property name="text">
+            <string>Attack</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="2">
+          <widget class="QPushButton" name="btnActivate">
+           <property name="text">
+            <string>Activate</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QPushButton" name="btnPrev">
+           <property name="text">
+            <string>Prev</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QPushButton" name="btnUndo">
+           <property name="text">
+            <string>Undo</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="2">
+          <widget class="QPushButton" name="btnCombine">
+           <property name="text">
+            <string>Combine</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="0">
+          <widget class="QPushButton" name="btnNext">
+           <property name="text">
+            <string>Next</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="1">
+          <widget class="QPushButton" name="btnRedo">
+           <property name="text">
+            <string>Redo</string>
+           </property>
+          </widget>
+         </item>
+         <item row="2" column="2">
+          <widget class="QPushButton" name="btnEndPhase">
+           <property name="text">
+            <string>End Phase</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="selection_label">
+         <property name="styleSheet">
+          <string notr="true">font-weight: bold; font-size: 14px;</string>
+         </property>
+         <property name="text">
+          <string>Terrain (col, row)
+Location (if any)</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QFrame" name="unit_box">
+         <property name="frameShape">
+          <enum>QFrame::Shape::Box</enum>
+         </property>
+         <layout class="QVBoxLayout" name="unitBoxLayout">
+          <item>
+           <widget class="QLabel" name="lblUnitName">
+            <property name="text">
+             <string>Unit Name</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="unit_img">
+            <property name="minimumSize">
+             <size>
+              <width>150</width>
+              <height>150</height>
+             </size>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">border: 1px solid black;</string>
+            </property>
+            <property name="text">
+             <string>Unit Picture</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignmentFlag::AlignCenter</set>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblUnitStats">
+            <property name="text">
+             <string>Rating: X
+Mov: remaining (total)
+country_name
+unit_status</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lblStack">
+         <property name="text">
+          <string>Selected Units Stack:</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="units_table">
+         <column>
+          <property name="text">
+           <string/>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Icon</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Name</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Rating</string>
+          </property>
+         </column>
+         <column>
+          <property name="text">
+           <string>Mov</string>
+          </property>
+         </column>
+        </widget>
+       </item>
+       <item>
+        <spacer name="infoSpacer">
+         <property name="orientation">
+          <enum>Qt::Orientation::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>0</width>
+           <height>0</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="0" column="0">
      <widget class="QTabWidget" name="tabs">
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="map_tab">
        <attribute name="title">
         <string>Map</string>
        </attribute>
-       <layout class="QHBoxLayout" name="mapTabLayout" stretch="4,1">
+       <layout class="QHBoxLayout" name="mapTabLayout" stretch="4">
         <item>
          <widget class="QGraphicsView" name="map_view">
           <property name="styleSheet">
            <string notr="true">background-color: #222;</string>
           </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QFrame" name="info_panel">
-          <property name="minimumSize">
-           <size>
-            <width>350</width>
-            <height>0</height>
-           </size>
-          </property>
-          <property name="frameShape">
-           <enum>QFrame::Shape::StyledPanel</enum>
-          </property>
-          <property name="frameShadow">
-           <enum>QFrame::Shadow::Sunken</enum>
-          </property>
-          <layout class="QVBoxLayout" name="infoLayout">
-           <item>
-            <widget class="QLabel" name="mini_map">
-             <property name="minimumSize">
-              <size>
-               <width>320</width>
-               <height>240</height>
-              </size>
-             </property>
-             <property name="styleSheet">
-              <string notr="true">background-color: #333; color: white;</string>
-             </property>
-             <property name="text">
-              <string>Mini-map Area</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QGridLayout" name="btn_grid">
-             <item row="0" column="0">
-              <widget class="QPushButton" name="btnMove">
-               <property name="text">
-                <string>Move</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="1">
-              <widget class="QPushButton" name="btnAttack">
-               <property name="text">
-                <string>Attack</string>
-               </property>
-              </widget>
-             </item>
-             <item row="0" column="2">
-              <widget class="QPushButton" name="btnActivate">
-               <property name="text">
-                <string>Activate</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="0">
-              <widget class="QPushButton" name="btnPrev">
-               <property name="text">
-                <string>Prev</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="1">
-              <widget class="QPushButton" name="btnUndo">
-               <property name="text">
-                <string>Undo</string>
-               </property>
-              </widget>
-             </item>
-             <item row="1" column="2">
-              <widget class="QPushButton" name="btnCombine">
-               <property name="text">
-                <string>Combine</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="0">
-              <widget class="QPushButton" name="btnNext">
-               <property name="text">
-                <string>Next</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="1">
-              <widget class="QPushButton" name="btnRedo">
-               <property name="text">
-                <string>Redo</string>
-               </property>
-              </widget>
-             </item>
-             <item row="2" column="2">
-              <widget class="QPushButton" name="btnEndPhase">
-               <property name="text">
-                <string>End Phase</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item>
-            <widget class="QLabel" name="selection_label">
-             <property name="styleSheet">
-              <string notr="true">font-weight: bold; font-size: 14px;</string>
-             </property>
-             <property name="text">
-              <string>Terrain (col, row)
-Location (if any)</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QFrame" name="unit_box">
-             <property name="frameShape">
-              <enum>QFrame::Shape::Box</enum>
-             </property>
-             <layout class="QVBoxLayout" name="unitBoxLayout">
-              <item>
-               <widget class="QLabel" name="lblUnitName">
-                <property name="text">
-                 <string>Unit Name</string>
-                </property>
-                <property name="alignment">
-                 <set>Qt::AlignmentFlag::AlignCenter</set>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QLabel" name="unit_img">
-                <property name="minimumSize">
-                 <size>
-                  <width>150</width>
-                  <height>150</height>
-                 </size>
-                </property>
-                <property name="styleSheet">
-                 <string notr="true">border: 1px solid black;</string>
-                </property>
-                <property name="text">
-                 <string>Unit Picture</string>
-                </property>
-                <property name="alignment">
-                 <set>Qt::AlignmentFlag::AlignCenter</set>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <widget class="QLabel" name="lblUnitStats">
-                <property name="text">
-                 <string>Rating: X
-Mov: remaining (total)
-country_name
-unit_status</string>
-                </property>
-               </widget>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="lblStack">
-             <property name="text">
-              <string>Selected Units Stack:</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QTableWidget" name="units_table">
-             <column>
-              <property name="text">
-               <string/>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Icon</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Name</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Rating</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>Mov</string>
-              </property>
-             </column>
-            </widget>
-           </item>
-           <item>
-            <spacer name="infoSpacer">
-             <property name="orientation">
-              <enum>Qt::Orientation::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>0</width>
-               <height>0</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
          </widget>
         </item>
        </layout>
@@ -580,7 +586,7 @@ unit_status</string>
       </widget>
      </widget>
     </item>
-    <item>
+    <item row="2" column="0" colspan="2">
      <widget class="QTextEdit" name="log_area">
       <property name="maximumSize">
        <size>
