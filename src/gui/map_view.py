@@ -503,9 +503,9 @@ class AnsalonMapView(QGraphicsView):
         base_center = self.get_hex_center(col, row)
 
         # Sort stack for consistent rendering (e.g., Army bottom, Leader top)
-        # Order: Fleet -> Wing -> Army -> Leader/Hero/Wizard
+        # Order: Fleet -> Army -> Wing -> Leader/Hero/Wizard
         def sort_key(u):
-            order = {'fleet': 0, 'wing': 1, 'inf': 2, 'cav': 2, 'dragon': 1}
+            order = {'fleet': 0, 'inf': 1, 'cav': 1, 'wing': 2, 'dragon': 2}
             return order.get(u.unit_type, 3) # Default to 3 (top)
 
         stack.sort(key=sort_key)

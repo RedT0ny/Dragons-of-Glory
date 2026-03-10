@@ -79,14 +79,14 @@ class HexagonItem(QGraphicsItem):
             painter.setPen(Qt.NoPen)
             painter.drawPath(self.path)
 
-        # Layer 3: Coastal Wedges (if this is a coastal hex)
         if DEBUG:
+            # Layer 3: Coastal Wedges (if this is a coastal hex)
             if self.coastal_directions:
                 self.draw_coastal_wedges(painter)
 
-        # Layer 4: Mountain Passes (if this is a mountain hex)
-        if self.pass_directions:
-            self.draw_mountain_passes(painter)
+            # Layer 4: Mountain Passes (if this is a mountain hex)
+            if self.pass_directions:
+                self.draw_mountain_passes(painter)
 
         # Layer 6: Highlight if selected/reachable
         if self.is_highlighted:
