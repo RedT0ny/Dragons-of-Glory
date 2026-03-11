@@ -59,6 +59,8 @@ scenario:
       countries:
         dargaard: all
         hinterlund: all
+        hylo: all
+        sikket: all
         nergoth: all
         nevermind: all
         nightlund: all
@@ -82,18 +84,12 @@ scenario:
             inf: 3
             fleet: 3
             admiral: 1
-        taman:
-          units: all
-        throt:
-          units: all
-        sanction:
-          units: all
-        red:
-          units: all
-        green:
-          units: all
-        blue:
-          units: all
+        taman: all
+        throt: all
+        sanction: all
+        red: all
+        green: all
+        blue: all
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
       explicit_units: [ "ariakas", "dracart" ]
@@ -120,16 +116,12 @@ scenario:
       #country_deployment: true
 
       countries:
-        southlund:
-          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
-        tower:
-          units: all
-        coastlund:
-          units: all
-        sancrist:
-          units: all
-        solanthus:
-          units: all
+        gaarlund: null
+        southlund: all
+        tower: all
+        coastlund: all
+        sancrist: all
+        solanthus: all
 
       explicit_units: ["justarius"]
       assets:
@@ -139,7 +131,7 @@ scenario:
         major:
           all:
             - type: prevent_country_conquered
-              country: caergoth
+              country: southlund
             - type: prevent_country_conquered
               country: lemish
             - type: prevent_country_conquered
