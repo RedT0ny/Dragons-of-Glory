@@ -299,12 +299,11 @@ class MainWindow(QMainWindow):
         overlay_actions = [
             ("Political", "political"),
             ("Control", "control"),
+            ("Territory", "territory"),
             ("Supply", "supply"),
             ("WS Power", "ws_power"),
             ("HL Power", "hl_power"),
             ("Threat", "threat"),
-            ("Odds", "odds"),
-            ("Enemy Power", "enemy_power"),
         ]
 
         for label, mode in overlay_actions:

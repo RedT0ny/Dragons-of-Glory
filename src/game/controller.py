@@ -93,7 +93,7 @@ class GameController(QObject):
         if WS in self.game_state.players:
             self.game_state.players[WS].set_ai(ws_ai)
         if hasattr(self.game_state, "invalidate_overlays"):
-            self.game_state.invalidate_overlays({"control", "supply", "ws_power", "hl_power", "threat", "odds", "enemy_power"})
+            self.game_state.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
     def _schedule_deferred(self, callback):
         epoch = self._deferred_epoch

@@ -604,6 +604,8 @@ class AnsalonMapView(QGraphicsView):
                 return QColor(0, 0, 255, self.overlay_alpha)
             if value == HL:
                 return QColor(255, 0, 0, self.overlay_alpha)
+            if value == "contested":
+                return QColor(128, 0, 128, self.overlay_alpha)
             return QColor(0, 0, 0, 0)
 
         if kind == "scalar":
@@ -617,13 +619,6 @@ class AnsalonMapView(QGraphicsView):
                 return QColor(0, 0, 255, int(self.overlay_alpha * intensity))
             if self.overlay_mode == "hl_power":
                 return QColor(255, 0, 0, int(self.overlay_alpha * intensity))
-            if self.overlay_mode == "enemy_power":
-                return QColor(200, 0, 0, int(self.overlay_alpha * intensity))
-            if self.overlay_mode == "odds":
-                ratio = float(value or 0.0)
-                if ratio >= 1.0:
-                    return QColor(0, 0, 255, int(self.overlay_alpha * min(1.0, ratio / 6.0)))
-                return QColor(255, 0, 0, int(self.overlay_alpha * min(1.0, (1.0 - ratio))))
             if self.overlay_mode == "threat":
                 return QColor(255, 80, 0, int(self.overlay_alpha * intensity))
             return QColor(0, 0, 0, 0)

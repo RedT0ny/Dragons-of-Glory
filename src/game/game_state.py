@@ -25,11 +25,10 @@ from src.game.victory import VictoryConditionEvaluator
 from src.game.overlay_maps import (
     PoliticalMap,
     ControlMap,
+    TerritoryMap,
     SupplyMap,
     InfluenceMap,
     ThreatMap,
-    OddsMap,
-    EnemyPowerMap,
 )
 
 
@@ -108,12 +107,11 @@ class GameState:
         self._overlays = {
             "political": PoliticalMap(),
             "control": ControlMap(),
+            "territory": TerritoryMap(),
             "supply": SupplyMap(),
             "ws_power": InfluenceMap(WS),
             "hl_power": InfluenceMap(HL),
             "threat": ThreatMap(),
-            "odds": OddsMap(),
-            "enemy_power": EnemyPowerMap(),
         }
         self._overlay_cache = {}
         self._overlay_dirty = set(self._overlays.keys())
@@ -824,7 +822,7 @@ class GameState:
             casualty.position = (None, None)
             losses.append(casualty)
 
-        self.invalidate_overlays({"control", "supply", "ws_power", "hl_power", "threat", "odds", "enemy_power"})
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return losses
 
     def _can_trace_supply_line(self, start_hex, allegiance, sample_unit, friendly_locations):
@@ -1143,7 +1141,7 @@ class GameState:
             self._displace_enemy_fleets_in_hex(unit, target_hex)
             self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
-        self.invalidate_overlays({"control", "supply", "ws_power", "hl_power", "threat", "odds", "enemy_power"})
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
         self._apply_escape_if_eligible(unit, offset_coords)
 
@@ -1258,7 +1256,7 @@ class GameState:
                 continue
             self.map.add_unit_to_spatial_map(unit)
 
-        self.invalidate_overlays({"control", "supply", "ws_power", "hl_power", "threat", "odds", "enemy_power"})
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return True
 
     def check_event_trigger_conditions(self, conditions) -> bool:
@@ -1296,7 +1294,7 @@ class GameState:
         self._apply_solamnic_tower_activation(country_id, previous_allegiance)
 
         print(f"Country {country_id} activated for {allegiance}")
-        self.invalidate_overlays({"control", "supply"})
+        self.invalidate_overlays({"control", "territory", "supply"})
 
     def is_solamnic_country_for_tower_rule(self, country_id: str) -> bool:
         country = self.countries.get(country_id)
@@ -1535,7 +1533,7 @@ class GameState:
         self._apply_standard_country_conquests()
         self._apply_solamnic_group_conquest()
         self._enforce_conquered_fleet_replacement_rule()
-        self.invalidate_overlays({"control", "supply"})
+        self.invalidate_overlays({"control", "territory", "supply"})
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
         self.event_system._resolve_add_units(unit_key, allegiance)
@@ -2437,7 +2435,7 @@ class GameState:
                 self.map.remove_unit_from_spatial_map(unit)
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
-        self.invalidate_overlays({"control", "supply", "ws_power", "hl_power", "threat", "odds", "enemy_power"})
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
     def board_unit(self, carrier, unit):
         """Boards `unit` onto `carrier` if allowed.

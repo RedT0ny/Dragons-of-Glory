@@ -118,7 +118,7 @@ class PhaseManager:
             self.next_turn()
 
         try:
-            self.game_state.invalidate_overlays({"threat", "odds", "enemy_power"})
+            self.game_state.invalidate_overlays({"threat"})
         except Exception:
             pass
         self.game_state.evaluate_victory_conditions()

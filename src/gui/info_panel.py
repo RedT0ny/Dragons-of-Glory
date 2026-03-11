@@ -26,7 +26,7 @@ class MiniMapView(AnsalonMapView):
         self.setDragMode(QGraphicsView.NoDrag)
         self.setInteractive(True) # Need to catch clicks
         self.zoom_on_show = 1.0 # Ensure it fits fully
-        self.overlay_mode = "control"
+        self.overlay_mode = "territory"
 
     def wheelEvent(self, event):
         pass # Disable zooming
@@ -52,7 +52,7 @@ class MiniMapView(AnsalonMapView):
 
     def draw_static_map(self):
         super().draw_static_map()
-        self.set_overlay("control")
+        self.set_overlay("territory")
 
     def update_allegiance_colors(self):
         """Updates the colors of hexes based on current country allegiance."""
@@ -81,7 +81,7 @@ class MiniMapView(AnsalonMapView):
     def sync_with_model(self):
         """Refreshes the view from the game state."""
         super().sync_with_model()
-        self.set_overlay("control")
+        self.set_overlay("territory")
 
 
 class InfoPanel(QFrame):
@@ -233,7 +233,7 @@ class InfoPanel(QFrame):
                 if not getattr(self.mini_map, "map_rendered", False):
                     self.mini_map.sync_with_model()
                 else:
-                    self.mini_map.set_overlay("control")
+                    self.mini_map.set_overlay("territory")
 
         from PySide6.QtCore import QTimer
         QTimer.singleShot(0, _do_refresh)
