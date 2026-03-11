@@ -169,6 +169,44 @@ class HexsideItem(QGraphicsItem):
         painter.drawLine(self.start_pt, self.end_pt)
 
 
+class HexOverlayItem(QGraphicsItem):
+    def __init__(self, center, radius, color=None, parent=None):
+        super().__init__(parent)
+        self.center = center
+        self.radius = radius
+        self.color = color if color is not None else QColor(0, 0, 0, 0)
+        self.points = []
+        self.path = QPainterPath()
+        for i in range(6):
+            angle_rad = math.radians(60 * i - 30)
+            x = self.center.x() + self.radius * math.cos(angle_rad)
+            y = self.center.y() + self.radius * math.sin(angle_rad)
+            pt = QPointF(x, y)
+            self.points.append(pt)
+            if i == 0:
+                self.path.moveTo(pt)
+            else:
+                self.path.lineTo(pt)
+        self.path.closeSubpath()
+        self.setAcceptedMouseButtons(Qt.NoButton)
+        self.setAcceptHoverEvents(False)
+
+    def boundingRect(self):
+        return self.path.boundingRect()
+
+    def paint(self, painter, option, widget):
+        if not self.color or self.color.alpha() == 0:
+            return
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setBrush(QBrush(self.color))
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(self.path)
+
+    def set_color(self, color):
+        self.color = color if color is not None else QColor(0, 0, 0, 0)
+        self.update()
+
+
 class LocationItem(QGraphicsItem):
     def __init__(self, center, loc_id, loc_type, is_capital, parent=None):
         super().__init__(parent)

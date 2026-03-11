@@ -117,6 +117,10 @@ class PhaseManager:
             self.game_state.resolve_supply_phase()
             self.next_turn()
 
+        try:
+            self.game_state.invalidate_overlays({"threat", "odds", "enemy_power"})
+        except Exception:
+            pass
         self.game_state.evaluate_victory_conditions()
 
     def next_turn(self):

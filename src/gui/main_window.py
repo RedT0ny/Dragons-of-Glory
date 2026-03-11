@@ -290,6 +290,31 @@ class MainWindow(QMainWindow):
         zoom_out_action.triggered.connect(lambda: self.map_view.scale(0.8, 0.8))
         view_menu.addAction(zoom_out_action)
 
+        view_menu.addSeparator()
+
+        from PySide6.QtGui import QActionGroup
+        overlay_group = QActionGroup(self)
+        overlay_group.setExclusive(True)
+
+        overlay_actions = [
+            ("Political", "political"),
+            ("Control", "control"),
+            ("Supply", "supply"),
+            ("WS Power", "ws_power"),
+            ("HL Power", "hl_power"),
+            ("Threat", "threat"),
+            ("Odds", "odds"),
+            ("Enemy Power", "enemy_power"),
+        ]
+
+        for label, mode in overlay_actions:
+            action = QAction(label, self, checkable=True)
+            action.triggered.connect(lambda _checked, m=mode: self.map_view.set_overlay(m))
+            overlay_group.addAction(action)
+            view_menu.addAction(action)
+            if mode == "political":
+                action.setChecked(True)
+
         # --- Settings Menu ---
         settings_menu = menubar.addMenu("Se&ttings")
 

@@ -24,10 +24,10 @@ class DiplomacyMapView(AnsalonMapView):
         if event.button() == Qt.LeftButton:
             scene_pos = self.mapToScene(event.position().toPoint())
             items = self.scene.items(scene_pos)
-            from src.gui.map_items import HexagonItem
+            from src.gui.map_items import HexagonItem, HexOverlayItem
 
             for item in items:
-                if isinstance(item, HexagonItem) and getattr(item, "country_id", None):
+                if isinstance(item, (HexagonItem, HexOverlayItem)) and getattr(item, "country_id", None):
                     if self.should_draw_country(item.country_id):
                         self.country_clicked.emit(item.country_id)
                         return

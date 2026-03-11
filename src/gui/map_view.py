@@ -5,13 +5,13 @@ from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
 
-from src.content.constants import WS, UI_COLORS
+from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import UnitState, GamePhase, UnitType
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
-from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter
+from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter, HexOverlayItem
 
 class AnsalonMapView(QGraphicsView):
     # Added Signals to notify main window
@@ -46,11 +46,14 @@ class AnsalonMapView(QGraphicsView):
         self.unit_items = []
         self.hex_items = []
         self.hex_items_by_coords = {}
+        self.overlay_items = []
+        self.overlay_items_by_coords = {}
         self.map_rendered = False
         self.initial_fit_done = False
         self.zoom_on_show = 1.0
         self._sync_in_progress = False
         self._sync_pending = False
+        self.overlay_mode = "political"
 
     def showEvent(self, event):
         """Fit the map to the view when shown for the first time."""
@@ -342,6 +345,8 @@ class AnsalonMapView(QGraphicsView):
         """Draws the static elements of the map based on GameState model."""
         self.hex_items = []
         self.hex_items_by_coords = {}
+        self.overlay_items = []
+        self.overlay_items_by_coords = {}
         self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
         self.bg_item.setZValue(-1)
 
@@ -396,6 +401,13 @@ class AnsalonMapView(QGraphicsView):
                 self.hex_items.append(hex_item)
                 self.hex_items_by_coords.setdefault((col, row), []).append(hex_item)
 
+                overlay_item = HexOverlayItem(center, HEX_RADIUS, QColor(0, 0, 0, 0))
+                overlay_item.coords = (col, row)
+                overlay_item.setZValue(1)
+                self.scene.addItem(overlay_item)
+                self.overlay_items.append(overlay_item)
+                self.overlay_items_by_coords[(col, row)] = overlay_item
+
                 # 5. Draw Location if present
                 # loc_data = board.get_location(hex_obj)
                 # if loc_data:
@@ -403,40 +415,7 @@ class AnsalonMapView(QGraphicsView):
                 #                              loc_data['type'], loc_data['is_capital'])
                 #     self.scene.addItem(loc_item)
 
-        # Overlay Country territories
-        # Iterate GameState countries directly
-        for country in self.game_state.countries.values():
-            if not self.should_draw_country(country.id):
-                continue
-
-            # Use country.color from Spec/YAML
-            c_color = QColor(country.color)
-            rgba = QColor(c_color.red(), c_color.green(), c_color.blue(), self.overlay_alpha)
-
-            for col, row in country.territories:
-                hex_obj = Hex.offset_to_axial(col, row)
-                center = self.get_hex_center(col, row)
-
-                # Re-query terrain for overlay
-                t_type = board.get_terrain(hex_obj)
-
-                # Re-calc coastal/pass for overlay
-                c_dirs = []
-                p_dirs = []
-                neighbors = hex_obj.neighbors()
-                for idx, neighbor in enumerate(neighbors):
-                    hexside = board.get_hexside(hex_obj, neighbor)
-                    if hexside == "sea": c_dirs.append(idx)
-                    if hexside == "pass": p_dirs.append(idx)
-
-                country_hex = HexagonItem(center, HEX_RADIUS, rgba,
-                                          terrain_type=t_type, coastal_directions=c_dirs,
-                                          pass_directions=p_dirs,
-                                          country_id=country.id)
-                country_hex.coords = (col, row)  # Fix: Ensure overlay hexes also have coords
-                self.scene.addItem(country_hex)
-                self.hex_items.append(country_hex)
-                self.hex_items_by_coords.setdefault((col, row), []).append(country_hex)
+        self.refresh_overlay()
 
     def sync_with_model(self):
         """Redraws the map based on the current GameState model."""
@@ -478,6 +457,7 @@ class AnsalonMapView(QGraphicsView):
                 # Draw each stack
                 for pos, stack in units_by_hex.items():
                     self.draw_stack(stack, pos[0], pos[1])
+            self.refresh_overlay()
             RuntimeDiagnostics.record_event("Map sync end")
         finally:
             self._sync_in_progress = False
@@ -495,6 +475,8 @@ class AnsalonMapView(QGraphicsView):
         self.unit_items.clear()
         self.hex_items.clear()
         self.hex_items_by_coords.clear()
+        self.overlay_items.clear()
+        self.overlay_items_by_coords.clear()
         self.scene.clear()
         self.map_rendered = False
 
@@ -578,3 +560,72 @@ class AnsalonMapView(QGraphicsView):
                 else:
                     if item.is_highlighted:
                         item.set_highlight(False)
+
+    def set_overlay(self, mode: str):
+        self.overlay_mode = mode or "political"
+        self.refresh_overlay()
+
+    def refresh_overlay(self):
+        if not self.game_state or not getattr(self.game_state, "map", None):
+            return
+        overlay = self.game_state.get_overlay(self.overlay_mode)
+        if overlay is None:
+            for item in self.overlay_items:
+                if shiboken6.isValid(item):
+                    item.set_color(QColor(0, 0, 0, 0))
+            return
+
+        values = overlay.values or {}
+        for (col, row), item in self.overlay_items_by_coords.items():
+            if not shiboken6.isValid(item):
+                continue
+            value = values.get((col, row))
+            if overlay.kind == "country":
+                item.country_id = value
+            else:
+                item.country_id = None
+            color = self._overlay_color_for_value(overlay, value)
+            item.set_color(color)
+
+    def _overlay_color_for_value(self, overlay, value):
+        if value is None:
+            return QColor(0, 0, 0, 0)
+        kind = overlay.kind
+        if kind == "country":
+            country = self.game_state.countries.get(value)
+            if not country:
+                return QColor(0, 0, 0, 0)
+            if not self.should_draw_country(country.id):
+                return QColor(0, 0, 0, 0)
+            c = QColor(country.color)
+            return QColor(c.red(), c.green(), c.blue(), self.overlay_alpha)
+        if kind == "allegiance":
+            if value == WS:
+                return QColor(0, 0, 255, self.overlay_alpha)
+            if value == HL:
+                return QColor(255, 0, 0, self.overlay_alpha)
+            return QColor(0, 0, 0, 0)
+
+        if kind == "scalar":
+            max_val = float(overlay.max_value or 0.0)
+            if max_val <= 0:
+                return QColor(0, 0, 0, 0)
+            intensity = min(1.0, max(0.0, float(value) / max_val))
+            if self.overlay_mode == "supply":
+                return QColor(120, 120, 120, int(self.overlay_alpha * intensity))
+            if self.overlay_mode == "ws_power":
+                return QColor(0, 0, 255, int(self.overlay_alpha * intensity))
+            if self.overlay_mode == "hl_power":
+                return QColor(255, 0, 0, int(self.overlay_alpha * intensity))
+            if self.overlay_mode == "enemy_power":
+                return QColor(200, 0, 0, int(self.overlay_alpha * intensity))
+            if self.overlay_mode == "odds":
+                ratio = float(value or 0.0)
+                if ratio >= 1.0:
+                    return QColor(0, 0, 255, int(self.overlay_alpha * min(1.0, ratio / 6.0)))
+                return QColor(255, 0, 0, int(self.overlay_alpha * min(1.0, (1.0 - ratio))))
+            if self.overlay_mode == "threat":
+                return QColor(255, 80, 0, int(self.overlay_alpha * intensity))
+            return QColor(0, 0, 0, 0)
+
+        return QColor(0, 0, 0, 0)
