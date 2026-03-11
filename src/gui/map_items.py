@@ -5,14 +5,14 @@ from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
 from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
 
-from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS
+from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, NEUTRAL
 from src.content.specs import UnitType, UnitRace, UnitState
 from src.content.text_formatter import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 
 class HexagonItem(QGraphicsItem):
-    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None, country_id=None):
+    def __init__(self, center, radius, color, terrain_type="grassland", coastal_directions=None, pass_directions=None, parent=None, country_id=None, allegiance=NEUTRAL):
         super().__init__(parent)
         self.center = center
         self.radius = radius
@@ -31,7 +31,8 @@ class HexagonItem(QGraphicsItem):
         self.highlight_color = None
         self.points = []
         self.country_id = country_id
-    
+        self.allegiance = allegiance
+
         # Create pointy-top hexagon path
         self.path = QPainterPath()
         # Creates hexagon vertices using polar coordinates
