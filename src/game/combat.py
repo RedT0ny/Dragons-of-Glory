@@ -182,7 +182,7 @@ class CombatResolver:
         # Use the centralized loader
         self.crt_data = load_data(CRT_DATA) # csv or yaml?
 
-    def calculate_odds(self, attacker_cs, defender_cs):
+    def calculate_odds(self, attacker_cs: float, defender_cs: float) -> str:
         """
         Calculates the odds of a combat based on the attacker's combat rating and the defender's combat rating.
         Rule 7.2: Minimum 1/3 odds, Maximum 6/1 odds logic

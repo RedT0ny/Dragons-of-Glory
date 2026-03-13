@@ -7,6 +7,7 @@ from src.content.config import CRT_DATA
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.loader import load_data
 from src.content.specs import UnitType, TerrainType, HexsideType
+from src.game.combat import CombatResolver
 from src.game.map import Hex
 
 
@@ -294,7 +295,7 @@ class ThreatMap(OverlayBase):
 
         for key, f_power in friendly.values.items():
             e_power = enemy_power.values.get(key, 0.0)
-            odds_str = _odds_from_power(f_power, e_power)
+            odds_str = CombatResolver.calculate_odds(f_power, e_power)
             expected_loss = loss_by_odds.get(odds_str, 0.0)
             values[key] = expected_loss
             max_val = max(max_val, expected_loss)
@@ -321,7 +322,6 @@ class ThreatMap(OverlayBase):
         self.__class__._expected_loss_by_odds = expected
         return expected
 
-
 def _min_max(values: Dict[Tuple[int, int], float]):
     if not values:
         return 0.0, 0.0
@@ -329,39 +329,12 @@ def _min_max(values: Dict[Tuple[int, int], float]):
     maxs = max(values.values())
     return float(mins), float(maxs)
 
-
 def _enemy_of(side: Optional[str]):
     if side == HL:
         return WS
     if side == WS:
         return HL
     return None
-
-
-def _odds_from_power(attacker: float, defender: float) -> str:
-    if defender <= 0:
-        return "6:1"
-    ratio = attacker / defender
-    if ratio >= 6:
-        return "6:1"
-    if ratio >= 5:
-        return "5:1"
-    if ratio >= 4:
-        return "4:1"
-    if ratio >= 3:
-        return "3:1"
-    if ratio >= 2:
-        return "2:1"
-    if ratio >= 1.5:
-        return "3:2"
-    if ratio >= 1:
-        return "1:1"
-    if ratio >= 0.66:
-        return "2:3"
-    if ratio >= 0.5:
-        return "1:2"
-    return "1:3"
-
 
 def _estimate_loss_from_result(result: str) -> float:
     if not result or result == "-":
@@ -375,7 +348,6 @@ def _estimate_loss_from_result(result: str) -> float:
         if ch.isdigit():
             loss += 0.5 * int(ch)
     return loss
-
 
 def _compute_supply_reach(game_state, allegiance: str):
     board = game_state.map
