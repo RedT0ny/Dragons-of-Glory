@@ -558,6 +558,7 @@ class GameState:
             return
 
         baseline = self.compute_territory_baseline()
+        scenario_seeds = self._compute_territory_scenario_baseline()
         overrides = dict(self.territory_overrides or {})
         board = self.map
 
@@ -622,6 +623,14 @@ class GameState:
             enemy_occupied = {coord for coord, s in occupied.items() if s == enemy}
             enemy_only_zoc = zoc_by_side[enemy] - zoc_by_side[side]
 
+            def neutral_seed_allows(hex_obj):
+                col, row = hex_obj.axial_to_offset()
+                country = self.get_country_by_hex(col, row)
+                if not country or country.allegiance != NEUTRAL:
+                    return True
+                seed = scenario_seeds.get((col, row))
+                return seed in (side, "contested")
+
             anchors = set()
             frontier = set()
 
@@ -640,7 +649,9 @@ class GameState:
                 hex_obj = Hex.offset_to_axial(col, row)
                 anchors.add((hex_obj.q, hex_obj.r))
 
-            frontier.update(zoc_by_side[side])
+            for q, r in zoc_by_side[side]:
+                if neutral_seed_allows(Hex(q, r)):
+                    frontier.add((q, r))
 
             if not anchors or not frontier:
                 return set()
@@ -662,6 +673,8 @@ class GameState:
                 if key in enemy_occupied:
                     return False
                 if key in enemy_only_zoc:
+                    return False
+                if not neutral_seed_allows(to_hex):
                     return False
                 return bool(self.can_unit_project_across_hexside(probe, from_hex, to_hex))
 
@@ -694,6 +707,8 @@ class GameState:
                     for neighbor in hex_obj.neighbors():
                         nk = (neighbor.q, neighbor.r)
                         if nk in enemy_occupied or nk in enemy_only_zoc:
+                            continue
+                        if not neutral_seed_allows(neighbor):
                             continue
                         if nk in zoc_by_side[side]:
                             extra.add(nk)
@@ -2843,6 +2858,8 @@ class GameState:
         self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
+        self.update_territory_overrides()
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         if carrier.unit_type == UnitType.WING:
             if hasattr(carrier, "movement_points"):
                 carrier.movement_points = 0

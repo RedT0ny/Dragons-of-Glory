@@ -7,7 +7,6 @@ from src.content.config import CRT_DATA
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.loader import load_data
 from src.content.specs import UnitType, TerrainType, HexsideType
-from src.game.combat import CombatResolver
 from src.game.map import Hex
 
 
@@ -169,6 +168,19 @@ class TerritoryMap(OverlayBase):
             return None
 
         values = game_state.compute_territory_baseline()
+        scenario_seeds = game_state._compute_territory_scenario_baseline()
+
+        def _hex_is_neutral_country(hex_obj):
+            col, row = hex_obj.axial_to_offset()
+            country = game_state.get_country_by_hex(col, row)
+            return bool(country and country.allegiance == NEUTRAL)
+
+        def _neutral_seed_allows(side, hex_obj):
+            if not _hex_is_neutral_country(hex_obj):
+                return True
+            col, row = hex_obj.axial_to_offset()
+            seed = scenario_seeds.get((col, row))
+            return seed in (side, "contested")
 
         for (col, row), value in (game_state.territory_overrides or {}).items():
             if value in (HL, WS, "contested"):
@@ -228,8 +240,15 @@ class TerritoryMap(OverlayBase):
                     sides.add(side)
             col, row = Hex(q, r).axial_to_offset()
             if len(sides) == 1:
-                values[(col, row)] = next(iter(sides))
+                side = next(iter(sides))
+                if not _neutral_seed_allows(side, Hex(q, r)):
+                    continue
+                values[(col, row)] = side
             elif len(sides) > 1:
+                if _hex_is_neutral_country(Hex(q, r)):
+                    seed = scenario_seeds.get((col, row))
+                    if seed != "contested":
+                        continue
                 values[(col, row)] = "contested"
 
         return OverlayData(kind="allegiance", values=values)
@@ -295,7 +314,7 @@ class ThreatMap(OverlayBase):
 
         for key, f_power in friendly.values.items():
             e_power = enemy_power.values.get(key, 0.0)
-            odds_str = CombatResolver.calculate_odds(f_power, e_power)
+            odds_str = _odds_from_power(f_power, e_power)
             expected_loss = loss_by_odds.get(odds_str, 0.0)
             values[key] = expected_loss
             max_val = max(max_val, expected_loss)
@@ -335,6 +354,30 @@ def _enemy_of(side: Optional[str]):
     if side == WS:
         return HL
     return None
+
+def _odds_from_power(attacker: float, defender: float) -> str:
+    if defender <= 0:
+        return "6:1"
+    ratio = attacker / defender
+    if ratio >= 6:
+        return "6:1"
+    if ratio >= 5:
+        return "5:1"
+    if ratio >= 4:
+        return "4:1"
+    if ratio >= 3:
+        return "3:1"
+    if ratio >= 2:
+        return "2:1"
+    if ratio >= 1.5:
+        return "3:2"
+    if ratio >= 1:
+        return "1:1"
+    if ratio >= 0.66:
+        return "2:3"
+    if ratio >= 0.5:
+        return "1:2"
+    return "1:3"
 
 def _estimate_loss_from_result(result: str) -> float:
     if not result or result == "-":

@@ -54,29 +54,29 @@ class MiniMapView(AnsalonMapView):
         super().draw_static_map()
         self.set_overlay("territory")
 
-    def update_allegiance_colors(self):
-        """Updates the colors of hexes based on current country allegiance."""
-        if not self.game_state:
-            return
-
-        for item in self.scene.items():
-            if isinstance(item, HexagonItem) and getattr(item, 'country_id', None):
-                country = self.game_state.countries.get(item.country_id)
-                if country:
-                    new_color = None
-                    if country.allegiance == HL:
-                        new_color = QColor("red")
-                    elif country.allegiance == WS:
-                        new_color = QColor("blue")
-
-                    if new_color:
-                        # Update item color to reflect allegiance
-                        rgba = QColor(new_color.red(), new_color.green(), new_color.blue(), self.overlay_alpha)
-                        item.color = rgba
-                    else:
-                        item.color = None
-
-                    item.update()
+    # def update_allegiance_colors(self):
+    #     """Updates the colors of hexes based on current country allegiance."""
+    #     if not self.game_state:
+    #         return
+    #
+    #     for item in self.scene.items():
+    #         if isinstance(item, HexagonItem) and getattr(item, 'country_id', None):
+    #             country = self.game_state.countries.get(item.country_id)
+    #             if country:
+    #                 new_color = None
+    #                 if country.allegiance == HL:
+    #                     new_color = QColor("red")
+    #                 elif country.allegiance == WS:
+    #                     new_color = QColor("blue")
+    #
+    #                 if new_color:
+    #                     # Update item color to reflect allegiance
+    #                     rgba = QColor(new_color.red(), new_color.green(), new_color.blue(), self.overlay_alpha)
+    #                     item.color = rgba
+    #                 else:
+    #                     item.color = None
+    #
+    #                 item.update()
 
     def sync_with_model(self):
         """Refreshes the view from the game state."""
