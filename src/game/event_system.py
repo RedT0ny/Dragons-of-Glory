@@ -55,10 +55,8 @@ class EventSystem:
 
         # 2. Flying Citadel
         elif unit_key == "citadel":
-            # Assuming UnitType.CITADEL exists, otherwise checking string representation
             candidates = [s for s in available_specs
-                          if (s.unit_type == UnitType.CITADEL.value if hasattr(UnitType, 'CITADEL') else str(s.unit_type).lower() == 'citadel')
-                          and s.allegiance == allegiance]
+                          if s.unit_type == UnitType.CITADEL.value and s.allegiance == allegiance]
             candidates = candidates[:1]
 
         # 3. Golden General (Laurana)

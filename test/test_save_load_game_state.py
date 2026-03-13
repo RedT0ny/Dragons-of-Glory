@@ -39,8 +39,8 @@ def test_save_load_roundtrip_restores_core_runtime_state():
         first_loc.occupier = HL
 
     # Units runtime state (including transport and fleet river mode)
-    fleet = next(u for u in gs.units if u.unit_type == UnitType.FLEET)
-    army = next(u for u in gs.units if hasattr(u, "is_army") and u.is_army())
+    fleet = next(u for u in gs.units if u.is_fleet())
+    army = next(u for u in gs.units if u.is_army())
     gs.map.remove_unit_from_spatial_map(fleet)
     gs.map.remove_unit_from_spatial_map(army)
 

@@ -189,7 +189,7 @@ def test_successful_interception_combat_can_stop_mover(monkeypatch):
 
     def fake_resolve_combat(attackers, target_hex, **kwargs):
         for unit in gs.map.get_units_in_hex(target_hex.q, target_hex.r):
-            if unit.allegiance == HL and unit.unit_type == UnitType.WING:
+            if unit.allegiance == HL and unit.is_wing():
                 unit.destroy()
         return {"result": "E/-", "leader_escape_requests": [], "advance_available": False}
 

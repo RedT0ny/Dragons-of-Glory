@@ -316,7 +316,7 @@ class CombatResolver:
         attacker_dragon_bonus = sum(
             u.combat_rating
             for u in self.attackers
-            if u.unit_type == UnitType.WING and self._is_dragon_race(u)
+            if u.is_wing() and self._is_dragon_race(u)
         )
         if self._defender_has_other_bonus("dragon_slayer") and attacker_dragon_bonus:
             attacker_dragon_bonus = 0
@@ -326,7 +326,7 @@ class CombatResolver:
         defender_dragon_bonus = sum(
             u.combat_rating
             for u in self.defenders
-            if u.unit_type == UnitType.WING and self._is_dragon_race(u)
+            if u.is_wing() and self._is_dragon_race(u)
         )
         add_part("defender_dragons", -defender_dragon_bonus)
 
@@ -438,7 +438,7 @@ class CombatResolver:
         return bool(self._get_defender_location())
 
     def _defenders_include_citadel(self):
-        return any(getattr(u, "unit_type", None) == UnitType.CITADEL and getattr(u, "is_on_map", False) for u in self.defenders)
+        return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in self.defenders)
 
     def _attacking_air_against_citadel(self):
         if not self._defenders_include_citadel():
@@ -447,7 +447,7 @@ class CombatResolver:
 
     def _citadel_attack_strips_ws_defender_bonuses(self):
         attacker_has_citadel = any(
-            getattr(u, "unit_type", None) == UnitType.CITADEL and getattr(u, "is_on_map", False)
+            u.is_citadel() and getattr(u, "is_on_map", False)
             for u in self.attackers
         )
         if not attacker_has_citadel:
@@ -580,19 +580,19 @@ class CombatResolver:
                 continue
             if not getattr(unit, "is_on_map", False):
                 continue
-            if unit.unit_type in (UnitType.WING, UnitType.CITADEL) or (hasattr(unit, "is_army") and unit.is_army()):
+            if unit.is_wing() or unit.is_citadel() or unit.is_army():
                 affected.append(unit)
         return affected
 
     def _apply_depletion_steps(self, units, steps):
         for _ in range(steps):
-            ground_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type != UnitType.WING]
+            ground_active = [u for u in units if u.status.name == "ACTIVE" and not u.is_wing()]
             if ground_active:
                 target = min(ground_active, key=lambda u: u.combat_rating)
                 target.deplete()
                 continue
 
-            ground_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type != UnitType.WING]
+            ground_depleted = [u for u in units if u.status.name == "DEPLETED" and not u.is_wing()]
             if ground_depleted:
                 target = min(ground_depleted, key=lambda u: u.combat_rating)
                 target.eliminate()
@@ -646,7 +646,7 @@ class CombatResolver:
                 continue
 
             friendly_present = any(
-                u.allegiance == unit.allegiance and (u.is_army() or u.unit_type == UnitType.WING)
+                u.allegiance == unit.allegiance and (u.is_army() or u.is_wing())
                 for u in self.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
             )
             if not friendly_present and self.game_state.map.is_adjacent_to_enemy(neighbor, unit):
@@ -662,8 +662,8 @@ class NavalCombatResolver:
     """
     def __init__(self, game_state, attackers, defenders, roll_d10_fn=None, roll_d6_fn=None):
         self.game_state = game_state
-        self.attackers = [u for u in attackers if getattr(u, "unit_type", None) == UnitType.FLEET and getattr(u, "is_on_map", False)]
-        self.defenders = [u for u in defenders if getattr(u, "unit_type", None) == UnitType.FLEET and getattr(u, "is_on_map", False)]
+        self.attackers = [u for u in attackers if u.is_fleet() and getattr(u, "is_on_map", False)]
+        self.defenders = [u for u in defenders if u.is_fleet() and getattr(u, "is_on_map", False)]
         self._roll_d10 = roll_d10_fn or (lambda: random.randint(1, 10))
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
@@ -1032,7 +1032,7 @@ class CombatClickHandler:
         if friendly_units:
             mode = self._selection_mode(self.attackers)
             if mode == "naval":
-                friendly_units = [u for u in friendly_units if u.unit_type == UnitType.FLEET]
+                friendly_units = [u for u in friendly_units if u.is_fleet()]
             elif mode == "land":
                 friendly_units = [u for u in friendly_units if u.unit_type != UnitType.FLEET]
             if not friendly_units:
@@ -1213,7 +1213,7 @@ class CombatClickHandler:
         return list(valid_target_offsets)
 
     def _calculate_naval_targets(self, attackers):
-        fleets = [u for u in attackers if u.unit_type == UnitType.FLEET]
+        fleets = [u for u in attackers if u.is_fleet()]
         if not fleets:
             return []
 
@@ -1221,7 +1221,7 @@ class CombatClickHandler:
         for (q, r), units in self.game_state.map.unit_map.items():
             enemy_fleets = [
                 u for u in units
-                if u.unit_type == UnitType.FLEET
+                if u.is_fleet()
                 and u.allegiance != self.game_state.active_player
                 and u.allegiance != "neutral"
                 and self._is_unit_on_map(u)
@@ -1266,7 +1266,7 @@ class CombatClickHandler:
     def _selection_mode(self, attackers):
         if not attackers:
             return None
-        fleets = [u for u in attackers if u.unit_type == UnitType.FLEET]
+        fleets = [u for u in attackers if u.is_fleet()]
         if fleets and len(fleets) == len(attackers):
             return "naval"
         return "land"
@@ -1274,7 +1274,7 @@ class CombatClickHandler:
     def _has_enemy_citadel_target(self, target_hex, attackers):
         active_player = self.game_state.active_player
         enemy_citadel_present = any(
-            u.unit_type == UnitType.CITADEL
+            u.is_citadel()
             and u.allegiance != active_player
             and u.allegiance != "neutral"
             and self._is_unit_on_map(u)

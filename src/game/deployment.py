@@ -125,7 +125,7 @@ class DeploymentService:
         for col, row in candidates:
             hex_obj = Hex.offset_to_axial(col, row)
 
-            if unit.unit_type == UnitType.FLEET:
+            if unit.is_fleet():
                 # Rule: Coastal and Port (Deployment) or Port (Replacements)
                 if self.game_state.phase == GamePhase.DEPLOYMENT and not country_deployment:
                     if self._is_deployment_fleet_hex(hex_obj):

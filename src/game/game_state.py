@@ -141,14 +141,14 @@ class GameState:
     def is_combat_unit(self, unit) -> bool:
         if unit is None:
             return False
-        if getattr(unit, "unit_type", None) == UnitType.FLEET:
+        if unit.is_fleet():
             return True
         return self._is_combat_stack_unit(unit)
 
     def can_unit_project_across_hexside(self, unit, from_hex, to_hex) -> bool:
         if not self.map or unit is None:
             return False
-        if getattr(unit, "unit_type", None) == UnitType.FLEET:
+        if unit.is_fleet():
             return False
         cost = self.map.get_movement_cost(unit, from_hex, to_hex)
         return cost is not None and cost != float("inf")
@@ -567,7 +567,7 @@ class GameState:
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -592,7 +592,7 @@ class GameState:
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if not self.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -844,7 +844,7 @@ class GameState:
 
     def apply_conscription(self, kept_unit, discarded_unit):
         """Apply conscription result: keep one unit, destroy the other."""
-        if kept_unit.unit_type == UnitType.FLEET:
+        if kept_unit.is_fleet():
             # Fleet replacements become READY on the next replacements turn.
             kept_unit.status = UnitState.INACTIVE
             kept_unit.replacement_ready_turn = self.turn + 1
@@ -874,7 +874,7 @@ class GameState:
         - Armies: same country OR same dragonflight.
         - Fleets: same country only.
         """
-        if unit.unit_type == UnitType.FLEET:
+        if unit.is_fleet():
             return ("fleet", unit.land)
         if hasattr(unit, "is_army") and unit.is_army():
             dragonflight = getattr(unit.spec, "dragonflight", None)
@@ -1068,7 +1068,7 @@ class GameState:
         # Find all fleets currently located in Maelstrom hexes
         trapped_ships = []
         for unit in self.units:
-            if unit.is_on_map and unit.unit_type == UnitType.FLEET:
+            if unit.is_on_map and unit.is_fleet():
                 if unit.position:
                     hex_obj = Hex.offset_to_axial(*unit.position)
                     if self.map.is_maelstrom(hex_obj):
@@ -1324,7 +1324,7 @@ class GameState:
             u for u in units_in_hex
             if (
                 u is not invading_unit
-                and u.unit_type == UnitType.FLEET
+                and u.is_fleet()
                 and getattr(u, "is_on_map", True)
                 and u.allegiance not in (invading_unit.allegiance, NEUTRAL)
             )
@@ -1371,11 +1371,10 @@ class GameState:
     def _unit_can_force_fleet_displacement(unit):
         if unit is None:
             return False
-        if getattr(unit, "unit_type", None) == UnitType.WING:
+        if unit.is_wing():
             return True
         return bool(
-            hasattr(unit, "is_army")
-            and unit.is_army()
+            unit.is_army()
             and getattr(unit, "unit_type", None) != UnitType.FLEET
         )
 
@@ -1402,7 +1401,7 @@ class GameState:
             if not hasattr(unit, 'movement_points'):
                 unit.movement_points = unit.movement
 
-            if unit.unit_type == UnitType.FLEET and state_path:
+            if unit.is_fleet() and state_path:
                 fleet_final_hexside = state_path[-1][1]
                 for i in range(1, len(state_path)):
                     prev_hex, prev_side = state_path[i - 1]
@@ -1433,7 +1432,7 @@ class GameState:
 
         if self.phase == GamePhase.MOVEMENT:
             unit.moved_this_turn = True
-            if unit.unit_type == UnitType.FLEET:
+            if unit.is_fleet():
                 unit.river_hexside = fleet_final_hexside
 
         # If this unit is a carrier (Fleet/Wing/Citadel) move its passengers implicitly
@@ -1444,7 +1443,7 @@ class GameState:
                 p.position = unit.position
                 p.is_transported = True
                 p.transport_host = unit
-                if self.phase == GamePhase.MOVEMENT and unit.unit_type == UnitType.CITADEL:
+                if self.phase == GamePhase.MOVEMENT and unit.is_citadel():
                     p.carried_by_citadel_this_turn = True
 
         # Rule: Ground armies and wings displace enemy fleets from entered hexes.
@@ -1727,9 +1726,8 @@ class GameState:
             for unit in self.map.get_units_in_hex(hex_obj.q, hex_obj.r):
                 if (unit.is_on_map
                         and unit.allegiance != map_loc.occupier
-                        and ((hasattr(unit, "is_army")
-                        and unit.is_army())
-                        or (unit.unit_type == UnitType.WING and map_loc.loc_type != LocType.UNDERCITY.value))):
+                        and (unit.is_army() or (unit.is_wing() and map_loc.loc_type != LocType.UNDERCITY.value))
+                ):
                     map_loc.occupier = unit.allegiance
                     break
 
@@ -1752,7 +1750,7 @@ class GameState:
             if unit.land != country.id:
                 continue
 
-            if unit.unit_type == UnitType.FLEET:
+            if unit.is_fleet():
                 if unit.status not in UnitState.on_map_states() and unit.status != UnitState.DESTROYED:
                     unit.destroy()
                     self.map.remove_unit_from_spatial_map(unit)
@@ -1760,7 +1758,7 @@ class GameState:
                 continue
 
             is_army = hasattr(unit, "is_army") and unit.is_army()
-            is_wing = unit.unit_type == UnitType.WING
+            is_wing = hasattr(unit, "is_wing") and unit.is_wing()
             is_leader = hasattr(unit, "is_leader") and unit.is_leader()
             if not (is_army or is_wing or is_leader):
                 continue
@@ -2290,10 +2288,10 @@ class GameState:
             pass
 
     def _is_naval_combat(self, attackers, defenders):
-        atk_fleets = [u for u in attackers if u.unit_type == UnitType.FLEET and u.is_on_map]
+        atk_fleets = [u for u in attackers if u.is_fleet() and u.is_on_map]
         if not atk_fleets or len(atk_fleets) != len([u for u in attackers if u.is_on_map]):
             return False
-        def_fleets = [u for u in defenders if u.unit_type == UnitType.FLEET and u.is_on_map and u.allegiance != self.active_player]
+        def_fleets = [u for u in defenders if u.is_fleet() and u.is_on_map and u.allegiance != self.active_player]
         return bool(def_fleets)
 
     def _fleet_attack_nodes(self, fleet):
@@ -2328,7 +2326,7 @@ class GameState:
             return False
         defenders = [
             u for u in self.get_units_at(target_hex)
-            if u.unit_type == UnitType.FLEET
+            if u.is_fleet()
             and u.allegiance != fleet.allegiance
             and u.allegiance != NEUTRAL
             and u.is_on_map
@@ -2366,7 +2364,7 @@ class GameState:
         if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in combat_defenders):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        attacker_has_wing = any(u.unit_type == UnitType.WING for u in combat_attackers)
+        attacker_has_wing = any(u.is_wing() for u in combat_attackers)
         attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in combat_attackers)
 
         wing_rule = not attacker_has_wing
@@ -2407,7 +2405,7 @@ class GameState:
 
         # Wing retreat special case: if a leader cannot legally occupy retreat hex,
         # attempt to board the leader onto the wing before moving.
-        if unit.unit_type == UnitType.WING:
+        if unit.is_wing():
             for leader in leaders_here:
                 can_land = (
                     self.map.can_unit_land_on_hex(leader, retreat_hex)
@@ -2458,9 +2456,7 @@ class GameState:
     def _force_board_leader_for_retreat(self, wing, leader):
         if not wing or not leader:
             return False
-        if getattr(wing, "unit_type", None) != UnitType.WING:
-            return False
-        if not (hasattr(leader, "is_leader") and leader.is_leader()):
+        if not wing.is_wing() or not leader.is_leader():
             return False
         if not wing.position or not leader.position or wing.position != leader.position:
             return False
@@ -2512,7 +2508,7 @@ class GameState:
                 continue
 
             friendly_present = any(
-                u.allegiance == unit.allegiance and (u.is_army() or u.unit_type == UnitType.WING)
+                u.allegiance == unit.allegiance and (u.is_army() or u.is_wing())
                 for u in self.map.get_units_in_hex(neighbor.q, neighbor.r)
             )
             if not friendly_present and self.map.is_adjacent_to_enemy(neighbor, unit):
@@ -2543,7 +2539,7 @@ class GameState:
                 continue
             if unit.position[0] is None or unit.position[1] is None:
                 continue
-            if not (unit.is_army() or unit.unit_type == UnitType.WING):
+            if not (unit.is_army() or unit.is_wing()):
                 continue
             if unit.allegiance != self.active_player:
                 continue
@@ -2561,7 +2557,7 @@ class GameState:
                 continue
             if unit.position[0] is None or unit.position[1] is None:
                 continue
-            if not (unit.is_army() or unit.unit_type == UnitType.WING):
+            if not (unit.is_army() or unit.is_wing()):
                 continue
 
             from_hex = Hex.offset_to_axial(*unit.position)
@@ -2583,7 +2579,7 @@ class GameState:
 
         moved = []
         groups = [
-            [u for u in candidates if u.unit_type == UnitType.WING],
+            [u for u in candidates if u.is_wing()],
             [u for u in candidates if u.unit_type == UnitType.CAVALRY],
             [u for u in candidates if u.is_army() and u.unit_type != UnitType.CAVALRY],
         ]
@@ -2631,7 +2627,7 @@ class GameState:
         escort_count = sum(
             1
             for u in src_units
-            if (hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING
+            if (u.is_army() or u.is_wing())
         )
         # If exactly one escort is present and it advances, leaders would be left alone.
         return escort_count <= 1
@@ -2696,17 +2692,13 @@ class GameState:
 
     @staticmethod
     def _attack_triggers_leader_stack_escape(attackers):
-        return any(
-            (
-                (hasattr(u, "is_army") and u.is_army())
-                or getattr(u, "unit_type", None) == UnitType.WING
-            )
+        return any((u.is_army() or u.is_wing())
             and getattr(u, "is_on_map", False)
             for u in attackers
         )
 
     def _defenders_have_citadel(self, defenders):
-        return any(u.unit_type == UnitType.CITADEL and getattr(u, "is_on_map", False) for u in defenders)
+        return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in defenders)
 
     def _is_ws_ground_combat_unit(self, unit):
         if unit.allegiance != WS or not getattr(unit, "is_on_map", False):
@@ -2860,7 +2852,7 @@ class GameState:
         self.map.add_unit_to_spatial_map(unit)
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
-        if carrier.unit_type == UnitType.WING:
+        if carrier.is_wing():
             if hasattr(carrier, "movement_points"):
                 carrier.movement_points = 0
             carrier.moved_this_turn = True

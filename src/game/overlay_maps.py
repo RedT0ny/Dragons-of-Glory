@@ -53,7 +53,7 @@ class ControlMap(OverlayBase):
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -83,7 +83,7 @@ class ControlMap(OverlayBase):
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -157,7 +157,7 @@ class TerritoryMap(OverlayBase):
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -203,7 +203,7 @@ class TerritoryMap(OverlayBase):
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                if not (u.is_army() or u.is_wing()):
                     continue
                 if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -298,32 +298,61 @@ class InfluenceMap(OverlayBase):
 
 class ThreatMap(OverlayBase):
     name = "threat"
-    _expected_loss_by_odds = None
+    _expected_defender_loss_by_odds = None
 
     def compute(self, game_state):
         active = getattr(game_state, "active_player", None)
         enemy = _enemy_of(active)
         if active not in (HL, WS) or enemy is None:
             return OverlayData(kind="scalar", values={})
+        board = game_state.map
+        if not board:
+            return OverlayData(kind="scalar", values={})
 
         friendly = InfluenceMap(active).compute(game_state)
         enemy_power = InfluenceMap(enemy).compute(game_state)
-        loss_by_odds = self._get_expected_loss_by_odds()
+        loss_by_odds = self._get_expected_defender_loss_by_odds()
+        occupied, zoc_by_side = self._compute_zoc(game_state)
+        enemy_occupied = {coord for coord, side in occupied.items() if side == enemy}
+        defender_ref = self._reference_defender_strength(game_state, active)
         values = {}
         max_val = 0.0
 
-        for key, f_power in friendly.values.items():
-            e_power = enemy_power.values.get(key, 0.0)
-            odds_str = _odds_from_power(f_power, e_power)
-            expected_loss = loss_by_odds.get(odds_str, 0.0)
-            values[key] = expected_loss
-            max_val = max(max_val, expected_loss)
+        for row in range(board.height):
+            for col in range(board.width):
+                hex_obj = Hex.offset_to_axial(col, row)
+                terrain = board.get_terrain(hex_obj)
+                if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+                    continue
+                e_power = float(enemy_power.values.get((col, row), 0.0))
+                defender_strength = self._adjust_defender_strength(defender_ref, board, hex_obj)
+                odds_str = _odds_from_power(e_power, defender_strength)
+                expected_loss = float(loss_by_odds.get(odds_str, 0.0))
 
-        return OverlayData(kind="scalar", values=values, min_value=0.0, max_value=max_val)
+                retreat_penalty = self._retreat_penalty(game_state, hex_obj, active, enemy, zoc_by_side, enemy_occupied)
+                enemy_only_zoc_penalty = 0.5 if self._enemy_only_zoc(hex_obj, active, enemy, zoc_by_side) else 0.0
+                location_penalty = 0.5 if board.get_location(hex_obj) else 0.0
 
-    def _get_expected_loss_by_odds(self):
-        if self.__class__._expected_loss_by_odds is not None:
-            return self.__class__._expected_loss_by_odds
+                support = float(friendly.values.get((col, row), 0.0))
+                support_discount = min(1.0, support / max(1.0, defender_strength)) * 0.5
+
+                threat = max(0.0, expected_loss + retreat_penalty + enemy_only_zoc_penalty + location_penalty - support_discount)
+                if threat <= 0:
+                    continue
+                values[(col, row)] = threat
+                max_val = max(max_val, threat)
+
+        return OverlayData(
+            kind="scalar",
+            values=values,
+            min_value=0.0,
+            max_value=max_val,
+            meta={"side": active, "perspective": "defender"},
+        )
+
+    def _get_expected_defender_loss_by_odds(self):
+        if self.__class__._expected_defender_loss_by_odds is not None:
+            return self.__class__._expected_defender_loss_by_odds
         crt_data = load_data(CRT_DATA)
         odds_columns = set()
         for row in crt_data.values():
@@ -335,11 +364,134 @@ class ThreatMap(OverlayBase):
                 result = crt_data[roll].get(odds)
                 if result is None:
                     continue
-                attacker_result = str(result).split("/")[0]
-                losses.append(_estimate_loss_from_result(attacker_result))
+                defender_result = str(result).split("/")[-1]
+                losses.append(_estimate_loss_from_result(defender_result))
             expected[odds] = sum(losses) / len(losses) if losses else 0.0
-        self.__class__._expected_loss_by_odds = expected
+        self.__class__._expected_defender_loss_by_odds = expected
         return expected
+
+    def _compute_zoc(self, game_state):
+        board = game_state.map
+        occupied = {}
+        zoc_by_side = {HL: set(), WS: set()}
+
+        def _stack_control_allegiance(units):
+            allies = set()
+            for u in units:
+                if not getattr(u, "is_on_map", False):
+                    continue
+                if not (u.is_army() or u.is_wing()):
+                    continue
+                if u.allegiance in (HL, WS):
+                    allies.add(u.allegiance)
+            if len(allies) == 1:
+                return next(iter(allies))
+            return None
+
+        def _stack_can_project(stack_units, from_hex, to_hex):
+            for u in stack_units:
+                if not getattr(u, "is_on_map", False):
+                    continue
+                if not (u.is_army() or u.is_wing()):
+                    continue
+                if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
+                    continue
+                return True
+            return False
+
+        for (q, r), units in board.unit_map.items():
+            side = _stack_control_allegiance(units)
+            if side in (HL, WS):
+                occupied[(q, r)] = side
+
+        for (q, r), units in board.unit_map.items():
+            side = occupied.get((q, r))
+            if side not in (HL, WS):
+                continue
+            from_hex = Hex(q, r)
+            for neighbor in from_hex.neighbors():
+                if (neighbor.q, neighbor.r) in occupied and occupied[(neighbor.q, neighbor.r)] != side:
+                    continue
+                if not _stack_can_project(units, from_hex, neighbor):
+                    continue
+                zoc_by_side[side].add((neighbor.q, neighbor.r))
+
+        return occupied, zoc_by_side
+
+    def _reference_defender_strength(self, game_state, side):
+        ratings = [
+            float(getattr(u, "combat_rating", 0) or 0)
+            for u in game_state.units
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "allegiance", None) == side
+            and (u.is_army() or u.is_wing())
+        ]
+        if not ratings:
+            return 4.0
+        return max(1.0, sum(ratings) / len(ratings))
+
+    def _adjust_defender_strength(self, base_strength, board, hex_obj):
+        strength = float(base_strength)
+        terrain = board.get_terrain(hex_obj)
+        if terrain == TerrainType.MOUNTAIN:
+            strength += 1.5
+        elif terrain == TerrainType.FOREST:
+            strength += 0.5
+        elif terrain == TerrainType.JUNGLE:
+            strength += 0.5
+
+        loc = board.get_location(hex_obj)
+        if loc and hasattr(loc, "get_defense_modifier"):
+            mod = float(loc.get_defense_modifier() or 0.0)
+            if mod < 0:
+                strength += abs(mod) * 0.25
+
+        defensive_sides = 0
+        for neighbor in hex_obj.neighbors():
+            hexside = board.get_effective_hexside(hex_obj, neighbor)
+            if board._hexside_is(hexside, HexsideType.RIVER):
+                defensive_sides += 1
+            elif board._hexside_is(hexside, HexsideType.DEEP_RIVER):
+                defensive_sides += 1
+            elif board._hexside_is(hexside, HexsideType.MOUNTAIN):
+                defensive_sides += 1
+        strength += min(1.5, defensive_sides * 0.2)
+        return max(1.0, strength)
+
+    def _enemy_only_zoc(self, hex_obj, active, enemy, zoc_by_side):
+        key = (hex_obj.q, hex_obj.r)
+        return key in zoc_by_side.get(enemy, set()) and key not in zoc_by_side.get(active, set())
+
+    def _retreat_penalty(self, game_state, hex_obj, active, enemy, zoc_by_side, enemy_occupied):
+        board = game_state.map
+
+        class _Probe:
+            def __init__(self, side):
+                self.allegiance = side
+                self.unit_type = UnitType.INFANTRY
+                self.terrain_affinity = None
+
+        probe = _Probe(active)
+        safe_exits = 0
+        for neighbor in hex_obj.neighbors():
+            if not board._is_valid_local_hex(neighbor):
+                continue
+            terrain = board.get_terrain(neighbor)
+            if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+                continue
+            if (neighbor.q, neighbor.r) in enemy_occupied:
+                continue
+            if self._enemy_only_zoc(neighbor, active, enemy, zoc_by_side):
+                continue
+            if not game_state.can_unit_project_across_hexside(probe, hex_obj, neighbor):
+                continue
+            safe_exits += 1
+
+        if safe_exits <= 0:
+            return 1.5
+        if safe_exits == 1:
+            return 0.75
+        return 0.0
 
 def _min_max(values: Dict[Tuple[int, int], float]):
     if not values:

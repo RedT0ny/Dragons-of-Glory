@@ -243,7 +243,7 @@ class Board:
         for hex_coord in [from_hex, to_hex]:
             units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
             for u in units:
-                if u.unit_type == UnitType.FLEET and u.allegiance == alliance:
+                if u.is_fleet() and u.allegiance == alliance:
                     # Check if this ship is stationed on THIS specific hexside
                     if getattr(u, 'river_hexside', None) == key and not getattr(u, "moved_this_turn", False):
                         return True
@@ -629,15 +629,7 @@ class Board:
         )
 
     def _stack_has_ground_or_wing(self, moving_units):
-        return any(
-            (
-                hasattr(u, "is_army")
-                and u.is_army()
-                and u.unit_type not in (UnitType.FLEET,)
-            )
-            or getattr(u, "unit_type", None) == UnitType.WING
-            for u in moving_units
-        )
+        return any( u.is_army() or u.is_wing() for u in moving_units )
 
     def has_enemy_unit(self, hex_coord, alliance):
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
@@ -711,7 +703,7 @@ class Board:
 
         # 4. Count Totals
         army_count = sum(1 for u in combined_stack if u.is_army())
-        wing_count = sum(1 for u in combined_stack if u.unit_type == UnitType.WING)
+        wing_count = sum(1 for u in combined_stack if u.is_wing())
 
         # 5. Check Limits
         # Base limits
@@ -746,7 +738,7 @@ class Board:
         This checks terrain restrictions only, not stacking or ZOC.
         """
         # Wings can fly over sea, but must start/end on land (including coastal).
-        if unit.unit_type == UnitType.WING:
+        if unit.is_wing():
             terrain = self.get_terrain(target_hex)
             forbidden_terrain = {
                 TerrainType.DESERT,
@@ -772,7 +764,7 @@ class Board:
             return is_coastal or is_port
 
         # Flying Citadels ignore terrain restrictions.
-        if unit.unit_type == UnitType.CITADEL:
+        if unit.is_citadel():
             return True
 
         # Ground units (Army, Leader, etc.)
@@ -828,11 +820,11 @@ class Board:
         if unit.unit_type == UnitType.WIZARD:
             return 0  # Rule 5: Wizards ignore hex costs
 
-        if unit.unit_type == UnitType.WING:
+        if unit.is_wing():
             return self._get_wing_movement_cost(unit, from_hex, to_hex)
-        if unit.unit_type == UnitType.CITADEL:
+        if unit.is_citadel():
             return self._get_citadel_movement_cost(unit, from_hex, to_hex)
-        if unit.unit_type == UnitType.FLEET:
+        if unit.is_fleet():
             # Pass unit to helper for enemy checks
             return self._get_fleet_movement_cost(unit, from_hex, to_hex)
 

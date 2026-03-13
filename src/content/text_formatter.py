@@ -71,8 +71,8 @@ class TextFormatter:
 
     @staticmethod
     def format_naval_log(attackers, defenders, outcome):
-        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers if u.unit_type == UnitType.FLEET)
-        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders if u.unit_type == UnitType.FLEET)
+        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers if u.is_fleet())
+        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders if u.is_fleet())
         rounds = outcome.get("rounds", 0)
         result = outcome.get("result", "-/-")
         return f"Naval combat {result} after {rounds} rounds: Attackers [{attacker_names}] vs Defenders [{defender_names}]"

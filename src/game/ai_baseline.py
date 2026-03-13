@@ -123,7 +123,7 @@ class BaselineAIPlayer:
             ]
             if country_filter:
                 ready = [u for u in ready if getattr(u, "land", None) == country_filter]
-            fleets = [u for u in ready if getattr(u, "unit_type", None) == UnitType.FLEET]
+            fleets = [u for u in ready if u.is_fleet()]
             armies = [
                 u for u in ready
                 if hasattr(u, "is_army")
@@ -204,7 +204,7 @@ class BaselineAIPlayer:
 
         wings = [
             u for u in ready
-            if getattr(u, "unit_type", None) == UnitType.WING
+            if u.is_wing()
             and bool(getattr(getattr(u, "spec", None), "dragonflight", None))
         ]
         if not wings:
@@ -545,13 +545,13 @@ class BaselineAIPlayer:
 
     def _score_asset_target(self, asset, unit, side: str) -> int:
         score = 0
-        if getattr(unit, "unit_type", None) in (UnitType.HIGHLORD, UnitType.GENERAL, UnitType.ADMIRAL, UnitType.WIZARD):
+        if unit.is_leader():
             score += 160
-        elif hasattr(unit, "is_army") and unit.is_army():
+        elif unit.is_army():
             score += 120
-        elif getattr(unit, "unit_type", None) == UnitType.WING:
+        elif unit.is_wing():
             score += 90
-        elif getattr(unit, "unit_type", None) == UnitType.FLEET:
+        elif unit.is_fleet():
             score += 70
 
         if hasattr(asset, "has_other_bonus"):
@@ -1235,8 +1235,8 @@ class BaselineAIPlayer:
             ]
             leaders = [u for u in units if hasattr(u, "is_leader") and u.is_leader()]
             ground = combat_ground + leaders
-            air = [u for u in units if getattr(u, "unit_type", None) in (UnitType.WING, UnitType.CITADEL)]
-            fleet = [u for u in units if getattr(u, "unit_type", None) == UnitType.FLEET]
+            air = [u for u in units if (u.is_wing() or u.is_citadel())]
+            fleet = [u for u in units if u.is_fleet()]
             # Never move leaders alone; leaders move only as part of escorted ground stacks.
             if combat_ground:
                 stacks.append(sorted(ground, key=lambda u: (u.id, int(getattr(u, "ordinal", 1)))))
@@ -1478,9 +1478,9 @@ class BaselineAIPlayer:
         return float(distance)
 
     def _stack_role_weights(self, stack, side: str) -> dict[str, float]:
-        has_fleet = any(getattr(u, "unit_type", None) == UnitType.FLEET for u in stack)
-        has_wing = any(getattr(u, "unit_type", None) == UnitType.WING for u in stack)
-        has_army = any(getattr(u, "is_army", lambda: False)() for u in stack)
+        has_fleet = any(u.is_fleet() for u in stack)
+        has_wing = any(u.is_wing() for u in stack)
+        has_army = any(u.is_army() for u in stack)
         profile = self._side_strategy_profile(side)
         posture = profile.get("posture", "balanced")
         if has_fleet and not has_army and not has_wing:
@@ -1613,7 +1613,7 @@ class BaselineAIPlayer:
         return int(best)
 
     def _is_fleet_only_stack(self, stack) -> bool:
-        return bool(stack) and all(getattr(u, "unit_type", None) == UnitType.FLEET for u in stack)
+        return bool(stack) and all(u.is_fleet() for u in stack)
 
     def _is_empty_fleet_stack(self, stack) -> bool:
         if not self._is_fleet_only_stack(stack):
@@ -1916,7 +1916,7 @@ class BaselineAIPlayer:
         for n in target_hex.neighbors():
             for u in self.game_state.get_units_at(n):
                 if getattr(u, "is_on_map", False) and getattr(u, "allegiance", None) == side:
-                    if hasattr(u, "is_army") and u.is_army() and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL):
+                    if u.is_army() and getattr(u, "unit_type", None) not in (UnitType.FLEET, UnitType.WING, UnitType.CITADEL):
                         friendly_ground_adj += 1
         enemy_adj = self._adjacent_enemy_count(target_hex, side)
         # Hard rule: air-only stacks do not end adjacent to enemies without adjacent ground support.
@@ -2005,7 +2005,7 @@ class BaselineAIPlayer:
                 u for u in self.game_state.get_units_at(target_hex)
                 if getattr(u, "is_on_map", False) and getattr(u, "allegiance", None) == side
             ]
-            fleets_here = sum(1 for u in target_hex_units if getattr(u, "unit_type", None) == UnitType.FLEET)
+            fleets_here = sum(1 for u in target_hex_units if u.is_fleet())
             ground_here = sum(
                 1
                 for u in target_hex_units
@@ -2113,7 +2113,7 @@ class BaselineAIPlayer:
                 u for u in source_units
                 if self.game_state._is_combat_stack_unit(u) and getattr(u, "unit_type", None) != UnitType.FLEET
             ]
-            fleet_attackers = [u for u in source_units if getattr(u, "unit_type", None) == UnitType.FLEET]
+            fleet_attackers = [u for u in source_units if u.is_fleet()]
 
             for target_hex in source_hex.neighbors():
                 defenders = [
@@ -2344,7 +2344,7 @@ class BaselineAIPlayer:
             return False
         has_fleet = any(
             getattr(u, "allegiance", None) == side
-            and getattr(u, "unit_type", None) == UnitType.FLEET
+            and u.is_fleet()
             and getattr(u, "status", None) in (UnitState.READY, UnitState.ACTIVE, UnitState.DEPLETED)
             for u in self.game_state.units
         )

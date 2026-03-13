@@ -319,7 +319,7 @@ class AnsalonMapView(QGraphicsView):
         candidates = [u for u in clicked_units
                       if u.status == UnitState.DEPLETED
                       and u.allegiance == self.game_state.active_player
-                      and (u.unit_type == UnitType.FLEET or u.is_army())]
+                      and (u.is_fleet() or u.is_army())]
 
         # Group by replacement rule key (army country/dragonflight or fleet country).
         from collections import defaultdict

@@ -328,7 +328,7 @@ class MovementService:
         """
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
-        if all(u.unit_type == UnitType.FLEET for u in units):
+        if all(u.is_fleet() for u in units):
             start_hex, _ = self._get_stack_start_and_min_mp(units)
             # A selected "stack" of fleets must be co-located.
             if not start_hex:
@@ -724,7 +724,7 @@ class MovementService:
         moving_types = {getattr(u, "unit_type", None) for u in moving_units if getattr(u, "is_on_map", False)}
         if interceptor.unit_type == UnitType.FLEET:
             return UnitType.FLEET in moving_types
-        if interceptor.unit_type == UnitType.WING:
+        if interceptor.is_wing():
             return bool(moving_types & {UnitType.WING, UnitType.FLEET})
         return False
 
@@ -735,7 +735,7 @@ class MovementService:
         - WS Dragon Wings can only intercept if they have an Elf/Solamnic commander on board.
         - Other units do not have commander requirements.
         """
-        if getattr(interceptor, "unit_type", None) != UnitType.WING:
+        if not interceptor.is_wing():
             return True
         if getattr(interceptor, "race", None) != UnitRace.DRAGON:
             return True
@@ -1029,7 +1029,7 @@ class MovementService:
         messages = []
 
         # Separate carriers, armies, leaders
-        carriers = [u for u in selected_units if u.unit_type == UnitType.FLEET or getattr(u, 'passengers', None) is not None]
+        carriers = [u for u in selected_units if u.is_fleet() or getattr(u, 'passengers', None) is not None]
         armies = [u for u in selected_units if u.is_army()]
         leaders = [u for u in selected_units if u.is_leader()]
 
@@ -1042,11 +1042,11 @@ class MovementService:
                     messages.append(f"Cannot unboard {u.id}: carrier missing position")
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
-                if carrier.unit_type == UnitType.WING:
+                if carrier.is_wing():
                     if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
                         messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
                         continue
-                elif carrier.unit_type == UnitType.CITADEL:
+                elif carrier.is_citadel():
                     if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
                         messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
                         continue
@@ -1072,7 +1072,7 @@ class MovementService:
                     messages.append(f"Carrier {carrier.id} has no position, skipping unboard.")
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
-                if carrier.unit_type == UnitType.WING:
+                if carrier.is_wing():
                     for p in carrier.passengers[:]:
                         if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
                             messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
@@ -1081,7 +1081,7 @@ class MovementService:
                         if not ok:
                             messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
                     continue
-                if carrier.unit_type == UnitType.CITADEL:
+                if carrier.is_citadel():
                     for p in carrier.passengers[:]:
                         if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
                             messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")

@@ -210,8 +210,17 @@ class Unit:
     def is_leader(self) -> bool:
         return False # Base unit is not a leader
 
+    def is_wing(self) -> bool:
+        return False # Base unit is not a wing either
+
     def is_army(self) -> bool:
         return False # Base unit is not an army either
+
+    def is_fleet(self) -> bool:
+        return False # Base unit is not an army either
+
+    def is_citadel(self) -> bool:
+        return False # Base unit is not a citadel either
 
     # --- State Logic ---
 
@@ -328,6 +337,9 @@ class Fleet(Unit):
         self.passengers = []
         self.river_hexside = None
 
+    def is_fleet(self) -> bool:
+        return True
+
     def can_carry(self, unit):
         """Ships carry one ground army and any number of leaders."""
         if unit.is_leader(): return True
@@ -351,6 +363,9 @@ class Wing(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
         self.passengers = []
+
+    def is_wing(self) -> bool:
+        return True
 
     def can_carry(self, unit: Unit) -> bool:
         # Griffons and Pegasi: Can carry 1 Infantry AND 1 Leader
@@ -406,6 +421,9 @@ class FlyingCitadel(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
         self.passengers = []
+
+    def is_citadel(self) -> bool:
+        return True
 
     def can_carry(self, unit: Unit) -> bool:
         if unit.allegiance != HL:

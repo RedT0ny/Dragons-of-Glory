@@ -161,7 +161,7 @@ def test_campaign_deep_river_chain_from_3240_is_reachable():
     gs.load_scenario(load_scenario_yaml(str(Path(SCENARIOS_DIR) / "campaign_0_war_of_the_lance.yaml")))
     gs.phase = GamePhase.MOVEMENT
 
-    fleet = next(u for u in gs.units if u.unit_type == UnitType.FLEET)
+    fleet = next(u for u in gs.units if u.is_fleet())
     gs.map.remove_unit_from_spatial_map(fleet)
     fleet.status = UnitState.ACTIVE
     fleet.allegiance = HL
@@ -181,7 +181,7 @@ def test_campaign_port_326_can_exit_via_river_to_324():
     gs.load_scenario(load_scenario_yaml(str(Path(SCENARIOS_DIR) / "campaign_0_war_of_the_lance.yaml")))
     gs.phase = GamePhase.MOVEMENT
 
-    fleet = next(u for u in gs.units if u.unit_type == UnitType.FLEET)
+    fleet = next(u for u in gs.units if u.is_fleet())
     gs.map.remove_unit_from_spatial_map(fleet)
     fleet.status = UnitState.ACTIVE
     fleet.allegiance = HL
