@@ -222,6 +222,9 @@ class Unit:
     def is_citadel(self) -> bool:
         return False # Base unit is not a citadel either
 
+    def is_control_unit(self) -> bool:
+        return self.is_army() or self.is_wing() or self.is_citadel()
+
     # --- State Logic ---
 
     def apply_combat_loss(self, dmg_type: str, must_retreat: bool = False):

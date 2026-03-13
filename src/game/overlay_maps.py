@@ -53,7 +53,7 @@ class ControlMap(OverlayBase):
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -83,7 +83,7 @@ class ControlMap(OverlayBase):
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -157,7 +157,7 @@ class TerritoryMap(OverlayBase):
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -203,7 +203,7 @@ class TerritoryMap(OverlayBase):
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -380,7 +380,7 @@ class ThreatMap(OverlayBase):
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -392,7 +392,7 @@ class ThreatMap(OverlayBase):
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -424,7 +424,7 @@ class ThreatMap(OverlayBase):
             for u in game_state.units
             if getattr(u, "is_on_map", False)
             and getattr(u, "allegiance", None) == side
-            and (u.is_army() or u.is_wing())
+            and u.is_control_unit()
         ]
         if not ratings:
             return 4.0

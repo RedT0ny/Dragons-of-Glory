@@ -646,7 +646,7 @@ class CombatResolver:
                 continue
 
             friendly_present = any(
-                u.allegiance == unit.allegiance and (u.is_army() or u.is_wing())
+                u.allegiance == unit.allegiance and u.is_control_unit()
                 for u in self.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
             )
             if not friendly_present and self.game_state.map.is_adjacent_to_enemy(neighbor, unit):

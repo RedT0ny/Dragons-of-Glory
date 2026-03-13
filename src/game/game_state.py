@@ -567,7 +567,7 @@ class GameState:
             for u in units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if u.allegiance in (HL, WS):
                     allies.add(u.allegiance)
@@ -592,7 +592,7 @@ class GameState:
             for u in stack_units:
                 if not getattr(u, "is_on_map", False):
                     continue
-                if not (u.is_army() or u.is_wing()):
+                if not u.is_control_unit():
                     continue
                 if not self.can_unit_project_across_hexside(u, from_hex, to_hex):
                     continue
@@ -617,6 +617,24 @@ class GameState:
                 self.allegiance = side
                 self.unit_type = UnitType.INFANTRY
                 self.terrain_affinity = None
+
+            def is_army(self):
+                return True
+
+            def is_wing(self):
+                return False
+
+            def is_fleet(self):
+                return False
+
+            def is_citadel(self):
+                return False
+
+            def is_leader(self):
+                return False
+
+            def is_control_unit(self) -> bool:
+                return self.is_army() or self.is_wing()
 
         def build_capture_set(side):
             enemy = WS if side == HL else HL
@@ -2508,7 +2526,7 @@ class GameState:
                 continue
 
             friendly_present = any(
-                u.allegiance == unit.allegiance and (u.is_army() or u.is_wing())
+                u.allegiance == unit.allegiance and u.is_control_unit()
                 for u in self.map.get_units_in_hex(neighbor.q, neighbor.r)
             )
             if not friendly_present and self.map.is_adjacent_to_enemy(neighbor, unit):
@@ -2627,7 +2645,7 @@ class GameState:
         escort_count = sum(
             1
             for u in src_units
-            if (u.is_army() or u.is_wing())
+            if u.is_control_unit()
         )
         # If exactly one escort is present and it advances, leaders would be left alone.
         return escort_count <= 1
@@ -2692,7 +2710,7 @@ class GameState:
 
     @staticmethod
     def _attack_triggers_leader_stack_escape(attackers):
-        return any((u.is_army() or u.is_wing())
+        return any(u.is_control_unit()
             and getattr(u, "is_on_map", False)
             for u in attackers
         )
