@@ -4,7 +4,7 @@ from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox, QApplication,
-                               QAbstractButton, QDialog)
+                               QAbstractButton, QDialog, QMenu)
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
@@ -293,6 +293,7 @@ class MainWindow(QMainWindow):
         view_menu.addSeparator()
 
         from PySide6.QtGui import QActionGroup
+
         overlay_group = QActionGroup(self)
         overlay_group.setExclusive(True)
 
@@ -306,13 +307,23 @@ class MainWindow(QMainWindow):
             ("Threat", "threat"),
         ]
 
+        # Create the submenu
+        overlay_menu = QMenu("Map overlays", self)
+        overlay_menu.setToolTipsVisible(True)  # Optional: show tooltips on hover
+
+        # Or if you want it to pop up on hover automatically, you can set this property
+        # overlay_menu.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+
         for label, mode in overlay_actions:
             action = QAction(label, self, checkable=True)
             action.triggered.connect(lambda _checked, m=mode: self.map_view.set_overlay(m))
             overlay_group.addAction(action)
-            view_menu.addAction(action)
+            overlay_menu.addAction(action)
             if mode == "political":
                 action.setChecked(True)
+
+        # Add the submenu to the view_menu
+        view_menu.addMenu(overlay_menu)
 
         # --- Settings Menu ---
         settings_menu = menubar.addMenu("Se&ttings")
