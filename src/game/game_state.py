@@ -94,6 +94,7 @@ class GameState:
         self._overlays = {}
         self._overlay_cache = {}
         self._overlay_dirty = set()
+        self.territory_overrides = {}
 
     @property
     def current_player(self):
@@ -220,6 +221,10 @@ class GameState:
                     }
                     for evt in self.strategic_event_pool
                 },
+                "territory_overrides": [
+                    {"col": int(col), "row": int(row), "value": value}
+                    for (col, row), value in (self.territory_overrides or {}).items()
+                ],
             },
         }
         loader.save_game_state(path=filename, payload=payload)
@@ -269,6 +274,8 @@ class GameState:
         )
         self._restore_players_from_save(world_state.get("players", {}))
         self._restore_events_from_save(world_state)
+        self._restore_territory_overrides(world_state.get("territory_overrides", []))
+        self.invalidate_overlays({"territory"})
         self.clear_movement_undo()
 
     def load_scenario(self, scenario_spec):
@@ -282,6 +289,7 @@ class GameState:
         self.winner = None
         self.victory_reason = ""
         self.victory_points = {HL: 0, WS: 0}
+        self.territory_overrides = {}
         self._init_overlays()
 
     def evaluate_victory_conditions(self):
@@ -438,6 +446,293 @@ class GameState:
                 continue
             event.occurrence_count = int(state.get("occurrence_count", event.occurrence_count))
             event.is_active = bool(state.get("is_active", event.is_active))
+
+    def _restore_territory_overrides(self, overrides_state):
+        self.territory_overrides = {}
+        if not isinstance(overrides_state, list):
+            return
+        for entry in overrides_state:
+            if not isinstance(entry, dict):
+                continue
+            try:
+                col = int(entry.get("col"))
+                row = int(entry.get("row"))
+            except (TypeError, ValueError):
+                continue
+            value = entry.get("value")
+            if value in (HL, WS, "contested"):
+                self.territory_overrides[(col, row)] = value
+
+    def _compute_territory_scenario_baseline(self) -> Dict[Tuple[int, int], str]:
+        if not self.scenario_spec:
+            return {}
+        setup = getattr(self.scenario_spec, "setup", {}) or {}
+        seeds = {HL: set(), WS: set()}
+        contested = set()
+
+        def add_seed(side, coord):
+            other = WS if side == HL else HL
+            if coord in seeds[other]:
+                seeds[other].discard(coord)
+                contested.add(coord)
+                return
+            if coord in contested:
+                return
+            seeds[side].add(coord)
+
+        def add_country_territories(side, country_id):
+            country = self.countries.get(country_id)
+            if not country:
+                return
+            for col, row in country.territories:
+                add_seed(side, (int(col), int(row)))
+
+        def add_deployment_entry(side, entry):
+            if isinstance(entry, str):
+                add_country_territories(side, entry)
+                return
+            if isinstance(entry, (list, tuple)) and len(entry) == 2:
+                try:
+                    col, row = int(entry[0]), int(entry[1])
+                except Exception:
+                    return
+                add_seed(side, (col, row))
+
+        def consume_deployment_area(side, deployment_area):
+            if deployment_area is None:
+                return
+            if isinstance(deployment_area, str):
+                if deployment_area.lower() == "country_based":
+                    return
+                add_country_territories(side, deployment_area)
+                return
+            if isinstance(deployment_area, dict):
+                countries = deployment_area.get("countries") or []
+                coords = deployment_area.get("coords") or []
+                hexes = deployment_area.get("hexes") or []
+                for cid in countries:
+                    if isinstance(cid, str):
+                        add_country_territories(side, cid)
+                for entry in list(coords) + list(hexes):
+                    add_deployment_entry(side, entry)
+                return
+            if isinstance(deployment_area, list):
+                for entry in deployment_area:
+                    add_deployment_entry(side, entry)
+
+        for side in (HL, WS):
+            side_setup = setup.get(side, {}) or {}
+            countries = side_setup.get("countries") or {}
+            for cid in countries.keys():
+                if isinstance(cid, str):
+                    add_country_territories(side, cid)
+            consume_deployment_area(side, side_setup.get("deployment_area"))
+
+        values = {}
+        for col, row in seeds[HL]:
+            values[(col, row)] = HL
+        for col, row in seeds[WS]:
+            values[(col, row)] = WS
+        for col, row in contested:
+            values[(col, row)] = "contested"
+        return values
+
+    def _apply_country_territory_overrides(self, values: Dict[Tuple[int, int], str]) -> Dict[Tuple[int, int], str]:
+        for country in self.countries.values():
+            allegiance = getattr(country, "allegiance", None)
+            for col, row in country.territories:
+                key = (int(col), int(row))
+                if allegiance in (HL, WS):
+                    values[key] = allegiance
+                else:
+                    values.pop(key, None)
+        return values
+
+    def compute_territory_baseline(self) -> Dict[Tuple[int, int], str]:
+        values = self._compute_territory_scenario_baseline()
+        return self._apply_country_territory_overrides(values)
+
+    def update_territory_overrides(self):
+        if not self.map or not self.scenario_spec:
+            self.territory_overrides = {}
+            return
+
+        baseline = self.compute_territory_baseline()
+        overrides = dict(self.territory_overrides or {})
+        board = self.map
+
+        def _stack_control_allegiance(units):
+            allies = set()
+            for u in units:
+                if not getattr(u, "is_on_map", False):
+                    continue
+                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                    continue
+                if u.allegiance in (HL, WS):
+                    allies.add(u.allegiance)
+            if len(allies) == 1:
+                return next(iter(allies))
+            if len(allies) > 1:
+                return "contested"
+            return None
+
+        occupied = {}
+        occupied_contested = set()
+        for (q, r), units in board.unit_map.items():
+            side = _stack_control_allegiance(units)
+            if side is None:
+                continue
+            if side == "contested":
+                occupied_contested.add((q, r))
+                continue
+            occupied[(q, r)] = side
+
+        def _stack_can_project(stack_units, from_hex, to_hex):
+            for u in stack_units:
+                if not getattr(u, "is_on_map", False):
+                    continue
+                if not ((hasattr(u, "is_army") and u.is_army()) or getattr(u, "unit_type", None) == UnitType.WING):
+                    continue
+                if not self.can_unit_project_across_hexside(u, from_hex, to_hex):
+                    continue
+                return True
+            return False
+
+        zoc_by_side = {HL: set(), WS: set()}
+        for (q, r), units in board.unit_map.items():
+            side = occupied.get((q, r))
+            if side not in (HL, WS):
+                continue
+            from_hex = Hex(q, r)
+            for neighbor in from_hex.neighbors():
+                if (neighbor.q, neighbor.r) in occupied and occupied[(neighbor.q, neighbor.r)] != side:
+                    continue
+                if not _stack_can_project(units, from_hex, neighbor):
+                    continue
+                zoc_by_side[side].add((neighbor.q, neighbor.r))
+
+        class _TerritoryProbe:
+            def __init__(self, side):
+                self.allegiance = side
+                self.unit_type = UnitType.INFANTRY
+                self.terrain_affinity = None
+
+        def build_capture_set(side):
+            enemy = WS if side == HL else HL
+            enemy_occupied = {coord for coord, s in occupied.items() if s == enemy}
+            enemy_only_zoc = zoc_by_side[enemy] - zoc_by_side[side]
+
+            anchors = set()
+            frontier = set()
+
+            for (q, r), loc in getattr(board, "locations", {}).items():
+                if getattr(loc, "occupier", None) == side:
+                    anchors.add((q, r))
+
+            for (q, r), occ_side in occupied.items():
+                if occ_side == side:
+                    anchors.add((q, r))
+                    frontier.add((q, r))
+
+            for (col, row), value in (self.territory_overrides or {}).items():
+                if value != side:
+                    continue
+                hex_obj = Hex.offset_to_axial(col, row)
+                anchors.add((hex_obj.q, hex_obj.r))
+
+            frontier.update(zoc_by_side[side])
+
+            if not anchors or not frontier:
+                return set()
+
+            probe = _TerritoryProbe(side)
+            visited = set()
+            parent = {}
+            queue = deque()
+
+            for anchor in anchors:
+                queue.append(anchor)
+                visited.add(anchor)
+                parent[anchor] = None
+
+            def can_step(from_hex, to_hex):
+                if not board._is_valid_local_hex(to_hex):
+                    return False
+                key = (to_hex.q, to_hex.r)
+                if key in enemy_occupied:
+                    return False
+                if key in enemy_only_zoc:
+                    return False
+                return bool(self.can_unit_project_across_hexside(probe, from_hex, to_hex))
+
+            while queue:
+                current = queue.popleft()
+                current_hex = Hex(*current)
+                for neighbor in current_hex.neighbors():
+                    nk = (neighbor.q, neighbor.r)
+                    if nk in visited:
+                        continue
+                    if not can_step(current_hex, neighbor):
+                        continue
+                    visited.add(nk)
+                    parent[nk] = current
+                    queue.append(nk)
+
+            captured = set()
+            for f_hex in frontier:
+                if f_hex not in visited:
+                    continue
+                cursor = f_hex
+                while cursor is not None:
+                    captured.add(cursor)
+                    cursor = parent.get(cursor)
+
+            if captured:
+                extra = set()
+                for q, r in captured:
+                    hex_obj = Hex(q, r)
+                    for neighbor in hex_obj.neighbors():
+                        nk = (neighbor.q, neighbor.r)
+                        if nk in enemy_occupied or nk in enemy_only_zoc:
+                            continue
+                        if nk in zoc_by_side[side]:
+                            extra.add(nk)
+                captured |= extra
+
+            return captured
+
+        captured_by_side = {
+            HL: build_capture_set(HL),
+            WS: build_capture_set(WS),
+        }
+
+        desired = dict(overrides)
+
+        for side in (HL, WS):
+            for q, r in captured_by_side[side]:
+                col, row = Hex(q, r).axial_to_offset()
+                desired[(col, row)] = side
+
+        for q, r in (captured_by_side[HL] & captured_by_side[WS]):
+            col, row = Hex(q, r).axial_to_offset()
+            desired[(col, row)] = "contested"
+
+        for (q, r), side in occupied.items():
+            col, row = Hex(q, r).axial_to_offset()
+            desired[(col, row)] = side
+        for (q, r) in occupied_contested:
+            col, row = Hex(q, r).axial_to_offset()
+            desired[(col, row)] = "contested"
+
+        cleaned = {}
+        for key, value in desired.items():
+            if value not in (HL, WS, "contested"):
+                continue
+            if baseline.get(key) == value:
+                continue
+            cleaned[key] = value
+
+        self.territory_overrides = cleaned
 
     def get_map_bounds(self) -> Dict[str, List[int]]:
         """Returns the subset range or full map defaults."""
@@ -822,6 +1117,7 @@ class GameState:
             casualty.position = (None, None)
             losses.append(casualty)
 
+        self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return losses
 
@@ -1141,6 +1437,7 @@ class GameState:
             self._displace_enemy_fleets_in_hex(unit, target_hex)
             self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
+        self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
         self._apply_escape_if_eligible(unit, offset_coords)
@@ -1212,6 +1509,7 @@ class GameState:
             "turn": self.turn,
             "active_player": self.active_player,
             "units": unit_states,
+            "territory_overrides": dict(self.territory_overrides or {}),
         })
 
     def discard_last_movement_snapshot(self):
@@ -1256,6 +1554,7 @@ class GameState:
                 continue
             self.map.add_unit_to_spatial_map(unit)
 
+        self.territory_overrides = dict(snapshot.get("territory_overrides", {}) or {})
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return True
 
@@ -1294,6 +1593,7 @@ class GameState:
         self._apply_solamnic_tower_activation(country_id, previous_allegiance)
 
         print(f"Country {country_id} activated for {allegiance}")
+        self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply"})
 
     def is_solamnic_country_for_tower_rule(self, country_id: str) -> bool:
@@ -1533,6 +1833,7 @@ class GameState:
         self._apply_standard_country_conquests()
         self._apply_solamnic_group_conquest()
         self._enforce_conquered_fleet_replacement_rule()
+        self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply"})
 
     def _resolve_add_units(self, unit_key: str, allegiance: str):
@@ -2435,6 +2736,7 @@ class GameState:
                 self.map.remove_unit_from_spatial_map(unit)
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
+        self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
     def board_unit(self, carrier, unit):

@@ -6,7 +6,7 @@ from typing import Dict, Tuple, Optional
 from src.content.config import CRT_DATA
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.loader import load_data
-from src.content.specs import UnitType
+from src.content.specs import UnitType, TerrainType, HexsideType
 from src.game.map import Hex
 
 
@@ -152,10 +152,6 @@ class TerritoryMap(OverlayBase):
         if not board or not getattr(game_state, "scenario_spec", None):
             return OverlayData(kind="allegiance", values={})
 
-        setup = getattr(game_state.scenario_spec, "setup", {}) or {}
-        seeds = {HL: set(), WS: set()}
-        contested = set()
-
         def _stack_control_allegiance(units):
             allies = set()
             for u in units:
@@ -171,82 +167,13 @@ class TerritoryMap(OverlayBase):
                 return "contested"
             return None
 
-        def add_seed(side, coord):
-            if coord in seeds[_enemy_of(side)]:
-                seeds[_enemy_of(side)].discard(coord)
-                contested.add(coord)
-                return
-            if coord in contested:
-                return
-            seeds[side].add(coord)
+        values = game_state.compute_territory_baseline()
 
-        def add_country_territories(side, country_id):
-            country = game_state.countries.get(country_id)
-            if not country:
-                return
-            for col, row in country.territories:
-                add_seed(side, (int(col), int(row)))
+        for (col, row), value in (game_state.territory_overrides or {}).items():
+            if value in (HL, WS, "contested"):
+                values[(int(col), int(row))] = value
 
-        def add_deployment_entry(side, entry):
-            if isinstance(entry, str):
-                add_country_territories(side, entry)
-                return
-            if isinstance(entry, (list, tuple)) and len(entry) == 2:
-                try:
-                    col, row = int(entry[0]), int(entry[1])
-                except Exception:
-                    return
-                add_seed(side, (col, row))
-
-        def consume_deployment_area(side, deployment_area):
-            if deployment_area is None:
-                return
-            if isinstance(deployment_area, str):
-                if deployment_area.lower() == "country_based":
-                    return
-                add_country_territories(side, deployment_area)
-                return
-            if isinstance(deployment_area, dict):
-                countries = deployment_area.get("countries") or []
-                coords = deployment_area.get("coords") or []
-                hexes = deployment_area.get("hexes") or []
-                for cid in countries:
-                    if isinstance(cid, str):
-                        add_country_territories(side, cid)
-                for entry in list(coords) + list(hexes):
-                    add_deployment_entry(side, entry)
-                return
-            if isinstance(deployment_area, list):
-                for entry in deployment_area:
-                    add_deployment_entry(side, entry)
-
-        for side in (HL, WS):
-            side_setup = setup.get(side, {}) or {}
-            countries = side_setup.get("countries") or {}
-            for cid in countries.keys():
-                if isinstance(cid, str):
-                    add_country_territories(side, cid)
-            consume_deployment_area(side, side_setup.get("deployment_area"))
-
-        values = {}
-        for col, row in seeds[HL]:
-            values[(col, row)] = HL
-        for col, row in seeds[WS]:
-            values[(col, row)] = WS
-        for col, row in contested:
-            values[(col, row)] = "contested"
-
-        # Step 2: live country-level override
-        for country in game_state.countries.values():
-            allegiance = getattr(country, "allegiance", None)
-            for col, row in country.territories:
-                key = (int(col), int(row))
-                if allegiance in (HL, WS):
-                    values[key] = allegiance
-                else:
-                    values.pop(key, None)
-
-        # Step 3: live unit-occupation override (occupied + adjacent ZOC)
+        # Step 4: live unit-occupation overlay (occupied + adjacent ZOC)
         occupied = {}
         occupied_contested = set()
 

@@ -145,6 +145,24 @@ class AnsalonMapView(QGraphicsView):
                 if loc_obj:
                     loc_name = getattr(loc_obj, 'id', 'Unknown')
                     loc_name = str(loc_name).replace("_", " ").title()
+
+                overlay = None
+                if self.game_state:
+                    overlay = self.game_state.get_overlay("territory")
+                    if overlay is None:
+                        overlay = self.game_state.get_overlay("control")
+
+                allegiance = None
+                if overlay and overlay.values:
+                    allegiance = overlay.values.get((col, row))
+
+                if allegiance == HL:
+                    occupier_name = "Highlord"
+                elif allegiance == WS:
+                    occupier_name = "Whitestone"
+                elif allegiance == "contested":
+                    occupier_name = "Contested"
+                elif loc_obj:
                     occupier = getattr(loc_obj, "occupier", None)
                     if occupier:
                         occupier_name = str(occupier).replace("_", " ").title()
