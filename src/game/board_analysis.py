@@ -179,7 +179,7 @@ def compute_territory_baseline(game_state) -> Dict[Tuple[int, int], str]:
     return apply_country_territory_overrides(game_state, values)
 
 
-def compute_territory_overrides(game_state) -> Dict[Tuple[int, int], str]:
+def compute_territory_overrides(game_state, control_facts: ControlFacts | None = None) -> Dict[Tuple[int, int], str]:
     if not game_state.map or not game_state.scenario_spec:
         return {}
 
@@ -188,7 +188,7 @@ def compute_territory_overrides(game_state) -> Dict[Tuple[int, int], str]:
     overrides = dict(getattr(game_state, "territory_overrides", {}) or {})
     board = game_state.map
 
-    control = compute_control_facts(game_state)
+    control = control_facts or compute_control_facts(game_state)
     occupied = control.occupied
     occupied_contested = control.occupied_contested
     zoc_by_side = control.zoc_by_side

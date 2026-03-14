@@ -63,6 +63,7 @@ scenario:
           ready: 12
         estwilde: null
         gaarlund: null
+        icerreach: all
         kern: all
         khur: all
         lemish: all
@@ -137,32 +138,22 @@ scenario:
         - [13, 38]
 
       countries:
-        coastlund:
-          units: all
-        goodlund:
-          units: all
-        hinterlund:
-          units: all
-        hylo:
-          units: all
-        nergoth:
-          units: all
-        qualinesti:
-          units: all
-        sancrist:
-          units: all
+        coastlund: all
+        goodlund: all
+        hinterlund: all
+        hylo: all
+        nergoth: all
+        qualinesti: all
+        sancrist: all
         silvanesti:
           units_by_type:
             inf: 3
             fleet: 2
             general: 1
           #territories: {[9, 33], [10, 34]}
-        solanthus:
-          units: all
-        southlund:
-          units: all
-        tower:
-          units: all
+        solanthus: all
+        southlund: all
+        tower: all
 
       assets:
         dragonmetal: 1

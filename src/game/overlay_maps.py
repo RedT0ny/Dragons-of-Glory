@@ -46,7 +46,7 @@ class ControlMap(OverlayBase):
         if not board:
             return OverlayData(kind="allegiance", values={})
 
-        facts = board_analysis.compute_control_facts(game_state)
+        facts = game_state.get_control_facts()
         occupied = facts.occupied
         contested = facts.occupied_contested
         zoc_by_side = facts.zoc_by_side
@@ -107,7 +107,7 @@ class TerritoryMap(OverlayBase):
                 values[(int(col), int(row))] = value
 
         # Step 4: live unit-occupation overlay (occupied + adjacent ZOC)
-        facts = board_analysis.compute_control_facts(game_state)
+        facts = game_state.get_control_facts()
         occupied = facts.occupied
         occupied_contested = facts.occupied_contested
         zoc_by_side = facts.zoc_by_side
@@ -200,7 +200,7 @@ class ThreatMap(OverlayBase):
         friendly = InfluenceMap(active).compute(game_state)
         enemy_power = InfluenceMap(enemy).compute(game_state)
         loss_by_odds = self._get_expected_defender_loss_by_odds()
-        facts = board_analysis.compute_control_facts(game_state)
+        facts = game_state.get_control_facts()
         occupied = facts.occupied
         contested_occupied = facts.occupied_contested
         zoc_by_side = facts.zoc_by_side

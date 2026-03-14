@@ -121,7 +121,7 @@ class PhaseManager:
             self.game_state.invalidate_overlays({"threat"})
         except Exception:
             pass
-        self.game_state.evaluate_victory_conditions()
+        #self.game_state.evaluate_victory_conditions()
 
     def next_turn(self):
         """Advances the game to the next turn (Step 9)."""

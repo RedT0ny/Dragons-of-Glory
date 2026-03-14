@@ -96,6 +96,8 @@ class GameState:
         self._overlay_cache = {}
         self._overlay_dirty = set()
         self.territory_overrides = {}
+        self._analysis_cache = {}
+        self._analysis_dirty = set()
 
     @property
     def current_player(self):
@@ -117,6 +119,8 @@ class GameState:
         }
         self._overlay_cache = {}
         self._overlay_dirty = set(self._overlays.keys())
+        self._analysis_cache = {}
+        self._analysis_dirty = set()
 
     def invalidate_overlays(self, names=None):
         if not self._overlays:
@@ -128,6 +132,14 @@ class GameState:
             names = {names}
         self._overlay_dirty.update(set(names))
 
+    def invalidate_analysis(self, names=None):
+        if names is None:
+            self._analysis_dirty = set(self._analysis_cache.keys())
+            return
+        if isinstance(names, str):
+            names = {names}
+        self._analysis_dirty.update(set(names))
+
     def get_overlay(self, name: str):
         if not self._overlays:
             self._init_overlays()
@@ -138,6 +150,13 @@ class GameState:
             self._overlay_cache[name] = overlay.compute(self)
             self._overlay_dirty.discard(name)
         return self._overlay_cache.get(name)
+
+    def get_control_facts(self):
+        key = "control_facts"
+        if key in self._analysis_dirty or key not in self._analysis_cache:
+            self._analysis_cache[key] = board_analysis.compute_control_facts(self)
+            self._analysis_dirty.discard(key)
+        return self._analysis_cache.get(key)
 
     def is_combat_unit(self, unit) -> bool:
         if unit is None:
@@ -281,6 +300,8 @@ class GameState:
         self._restore_players_from_save(world_state.get("players", {}))
         self._restore_events_from_save(world_state)
         self._restore_territory_overrides(world_state.get("territory_overrides", []))
+        self._analysis_cache = {}
+        self._analysis_dirty = set()
         self.invalidate_overlays({"territory"})
         self.clear_movement_undo()
 
@@ -296,6 +317,8 @@ class GameState:
         self.victory_reason = ""
         self.victory_points = {HL: 0, WS: 0}
         self.territory_overrides = {}
+        self._analysis_cache = {}
+        self._analysis_dirty = set()
         self._init_overlays()
 
     def evaluate_victory_conditions(self):
@@ -479,7 +502,8 @@ class GameState:
         return board_analysis.compute_territory_baseline(self)
 
     def update_territory_overrides(self):
-        self.territory_overrides = board_analysis.compute_territory_overrides(self)
+        facts = self.get_control_facts()
+        self.territory_overrides = board_analysis.compute_territory_overrides(self, control_facts=facts)
 
     def get_map_bounds(self) -> Dict[str, List[int]]:
         """Returns the subset range or full map defaults."""
@@ -864,6 +888,7 @@ class GameState:
             casualty.position = (None, None)
             losses.append(casualty)
 
+        self.invalidate_analysis({"control_facts"})
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return losses
@@ -1182,6 +1207,7 @@ class GameState:
             self._displace_enemy_fleets_in_hex(unit, target_hex)
             self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
+        self.invalidate_analysis({"control_facts"})
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
@@ -1300,6 +1326,7 @@ class GameState:
             self.map.add_unit_to_spatial_map(unit)
 
         self.territory_overrides = dict(snapshot.get("territory_overrides", {}) or {})
+        self.invalidate_analysis({"control_facts"})
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         return True
 
@@ -2474,6 +2501,7 @@ class GameState:
                 self.map.remove_unit_from_spatial_map(unit)
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
+        self.invalidate_analysis({"control_facts"})
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
@@ -2581,6 +2609,7 @@ class GameState:
         self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
+        self.invalidate_analysis({"control_facts"})
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
         if carrier.is_wing():
