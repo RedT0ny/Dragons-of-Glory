@@ -375,18 +375,12 @@ class MovementService:
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
 
-            target_offset = target_hex.axial_to_offset()
-            moved = []
             ordered_units = sorted(units, key=lambda u: 0 if self._is_ground_army(u) else 1)
-            for unit in ordered_units:
-                self.game_state.move_unit(unit, target_hex)
-                if getattr(unit, "position", None) != target_offset:
-                    return MoveUnitsResult(
-                        moved=moved,
-                        errors=[f"{unit.id} cannot move."],
-                    )
-                moved.append(unit)
-            return MoveUnitsResult(moved=moved, errors=[])
+            return self._execute_unit_move_batch(
+                ordered_units,
+                target_hex,
+                verify_target=True,
+            )
 
         if self._should_check_interception(units):
             return self._move_units_with_interception(units, target_hex)
@@ -400,10 +394,27 @@ class MovementService:
         if errors:
             return MoveUnitsResult(moved=[], errors=errors)
 
+        return self._execute_unit_move_batch(units, target_hex)
+
+    def _execute_unit_move_batch(self, units, target_hex, verify_target: bool = False) -> MoveUnitsResult:
         moved = []
+        target_offset = target_hex.axial_to_offset() if verify_target else None
         for unit in units:
-            self.game_state.move_unit(unit, target_hex)
+            self.game_state.move_unit(
+                unit,
+                target_hex,
+                invalidate_analysis=False,
+                update_territory=False,
+                invalidate_overlays=False,
+            )
+            if verify_target and getattr(unit, "position", None) != target_offset:
+                return MoveUnitsResult(
+                    moved=moved,
+                    errors=[f"{unit.id} cannot move."],
+                )
             moved.append(unit)
+        if moved:
+            self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=moved, errors=[])
 
     def _should_check_interception(self, units):
@@ -476,6 +487,7 @@ class MovementService:
                 continue
             self._finalize_interception_move(unit, plan)
 
+        self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
 
     def _build_movement_hex_path(self, units, target_hex, precomputed_state_path=None):
@@ -579,21 +591,7 @@ class MovementService:
 
     def _relocate_unit_for_interception_step(self, unit, target_hex):
         """Temporarily moves a unit to a new hex for interception resolution, without applying movement costs or rules."""
-        self.game_state.map.remove_unit_from_spatial_map(unit)
-        unit.position = target_hex.axial_to_offset()
-        unit.escaped = False
-        self.game_state.map.add_unit_to_spatial_map(unit)
-
-        passengers = getattr(unit, "passengers", None)
-        if passengers:
-            for p in passengers:
-                p.position = unit.position
-                p.is_transported = True
-                p.transport_host = unit
-
-        apply_escape = getattr(self.game_state, "_apply_escape_if_eligible", None)
-        if callable(apply_escape):
-            apply_escape(unit, unit.position)
+        self._relocate_unit_no_refresh(unit, target_hex, set_escaped=True, apply_escape=True)
 
     def _finalize_interception_move(self, unit, plan):
         """After interception steps are resolved, applies the final movement costs and state changes to the unit."""
@@ -765,8 +763,13 @@ class MovementService:
 
     def _teleport_unit_no_cost(self, unit, target_hex):
         """Temporarily moves a unit to a new hex without applying movement costs or rules, used for interception resolution."""
+        self._relocate_unit_no_refresh(unit, target_hex)
+
+    def _relocate_unit_no_refresh(self, unit, target_hex, set_escaped: bool = False, apply_escape: bool = False):
         self.game_state.map.remove_unit_from_spatial_map(unit)
         unit.position = target_hex.axial_to_offset()
+        if set_escaped:
+            unit.escaped = False
         self.game_state.map.add_unit_to_spatial_map(unit)
         passengers = getattr(unit, "passengers", None)
         if passengers:
@@ -774,6 +777,10 @@ class MovementService:
                 p.position = unit.position
                 p.is_transported = True
                 p.transport_host = unit
+        if apply_escape:
+            apply_escape_fn = getattr(self.game_state, "_apply_escape_if_eligible", None)
+            if callable(apply_escape_fn):
+                apply_escape_fn(unit, unit.position)
 
     @staticmethod
     def _is_ground_army(unit):

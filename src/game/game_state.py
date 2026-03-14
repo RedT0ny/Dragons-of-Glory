@@ -140,6 +140,11 @@ class GameState:
             names = {names}
         self._analysis_dirty.update(set(names))
 
+    def finalize_board_state_change(self):
+        self.invalidate_analysis({"control_facts"})
+        self.update_territory_overrides()
+        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+
     def get_overlay(self, name: str):
         if not self._overlays:
             self._init_overlays()
@@ -1134,7 +1139,14 @@ class GameState:
             and getattr(unit, "unit_type", None) != UnitType.FLEET
         )
 
-    def move_unit(self, unit, target_hex):
+    def move_unit(
+        self,
+        unit,
+        target_hex,
+        invalidate_analysis: bool = True,
+        update_territory: bool = True,
+        invalidate_overlays: bool = True,
+    ):
         """
         Centralizes the move: updates unit.position AND the spatial map.
         target_hex: Hex object (axial)
@@ -1207,9 +1219,12 @@ class GameState:
             self._displace_enemy_fleets_in_hex(unit, target_hex)
             self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
-        self.invalidate_analysis({"control_facts"})
-        self.update_territory_overrides()
-        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        if invalidate_analysis:
+            self.invalidate_analysis({"control_facts"})
+        if update_territory:
+            self.update_territory_overrides()
+        if invalidate_overlays:
+            self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
         self._apply_escape_if_eligible(unit, offset_coords)
 

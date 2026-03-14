@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 
+from src.content import loader
+from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import UnitType, UnitState, LocType, UnitRace
 from src.game.map import Hex
@@ -23,6 +25,10 @@ def _unit_key(unit) -> Tuple[str, int]:
     return (str(getattr(unit, "id", "")), int(getattr(unit, "ordinal", 1) or 1))
 
 
+def _task_group_key(group) -> Tuple[Tuple[str, int], ...]:
+    return tuple(sorted(_unit_key(u) for u in group.units))
+
+
 def _hex_distance(a: Hex, b: Hex) -> int:
     return a.distance_to(b)
 
@@ -37,6 +43,142 @@ def _slugify(value: str) -> str:
     import re
 
     return re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_")
+
+_AI_STANCE_CACHE: Optional[Dict[str, Dict[str, str]]] = None
+_VICTORY_CATEGORY_PRIORITY = [
+    "capture",
+    "conquer",
+    "control",
+    "destroy",
+    "prevent",
+    "escape",
+    "survive",
+]
+
+
+def _load_ai_stance_matrix() -> Dict[str, Dict[str, str]]:
+    global _AI_STANCE_CACHE
+    if _AI_STANCE_CACHE is None:
+        _AI_STANCE_CACHE = loader.load_ai_stance_csv(AI_STANCE_DATA)
+    return _AI_STANCE_CACHE or {}
+
+
+def _victory_category_for_type(node_type: str) -> Optional[str]:
+    key = str(node_type or "").strip().lower()
+    if not key:
+        return None
+    if key.startswith("capture"):
+        return "capture"
+    if key.startswith("conquer"):
+        return "conquer"
+    if key.startswith("control"):
+        return "control"
+    if key.startswith("destroy"):
+        return "destroy"
+    if key.startswith("prevent"):
+        return "prevent"
+    if key.startswith("escape"):
+        return "escape"
+    if key.startswith("survive"):
+        return "survive"
+    return None
+
+
+def _extract_victory_metadata(raw: Any) -> Dict[str, Any]:
+    categories_by_tier = {"major": [], "minor": [], "marginal": []}
+    location_targets: Set[str] = set()
+    country_targets: Set[str] = set()
+    location_deadlines: Dict[str, int] = {}
+    country_deadlines: Dict[str, int] = {}
+    overall_deadline: Optional[int] = None
+
+    def record_deadline(deadline: Optional[int], bucket: Dict[str, int], key: str):
+        nonlocal overall_deadline
+        if deadline is None:
+            return
+        bucket[key] = min(deadline, bucket.get(key, deadline))
+        overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
+
+    def walk(node: Any, tier: str):
+        nonlocal overall_deadline
+        if isinstance(node, dict):
+            if "all" in node:
+                for child in node.get("all", []) or []:
+                    walk(child, tier)
+            if "any" in node:
+                for child in node.get("any", []) or []:
+                    walk(child, tier)
+            if "type" in node:
+                node_type = str(node.get("type", "") or "")
+                category = _victory_category_for_type(node_type)
+                if category:
+                    categories_by_tier[tier].append(category)
+                deadline = node.get("by_turn")
+                try:
+                    deadline = int(deadline) if deadline is not None else None
+                except Exception:
+                    deadline = None
+                if node_type in {"capture_location", "prevent_location_captured"}:
+                    loc_id = _slugify(node.get("location", ""))
+                    if loc_id:
+                        location_targets.add(loc_id)
+                        record_deadline(deadline, location_deadlines, loc_id)
+                elif node_type in {"conquer_country", "prevent_country_conquered"}:
+                    country_id = _slugify(node.get("country", ""))
+                    if country_id:
+                        country_targets.add(country_id)
+                        record_deadline(deadline, country_deadlines, country_id)
+                elif deadline is not None:
+                    overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
+            return
+        if isinstance(node, list):
+            for child in node:
+                walk(child, tier)
+
+    if isinstance(raw, dict):
+        for tier in ("major", "minor", "marginal"):
+            if tier in raw:
+                walk(raw.get(tier), tier)
+    elif isinstance(raw, list):
+        walk(raw, "minor")
+
+    def pick_primary_category() -> Optional[str]:
+        for tier in ("major", "minor", "marginal"):
+            cats = categories_by_tier.get(tier) or []
+            if not cats:
+                continue
+            counts: Dict[str, int] = {}
+            for cat in cats:
+                counts[cat] = counts.get(cat, 0) + 1
+            best = sorted(
+                counts.items(),
+                key=lambda item: (item[1], -_VICTORY_CATEGORY_PRIORITY.index(item[0])),
+                reverse=True,
+            )
+            return best[0][0] if best else None
+        return None
+
+    return {
+        "primary_category": pick_primary_category(),
+        "location_targets": location_targets,
+        "country_targets": country_targets,
+        "location_deadlines": location_deadlines,
+        "country_deadlines": country_deadlines,
+        "deadline": overall_deadline,
+    }
+
+
+def _determine_offensive_side(hl_category: Optional[str], ws_category: Optional[str]) -> Optional[str]:
+    if not hl_category or not ws_category:
+        return None
+    matrix = _load_ai_stance_matrix()
+    row = matrix.get(str(hl_category).lower(), {})
+    entry = row.get(str(ws_category).lower())
+    if entry == "HL":
+        return HL
+    if entry == "WS":
+        return WS
+    return None
 
 
 @dataclass
@@ -56,6 +198,12 @@ class StrategicPlan:
     objectives: List[Objective]
     transport_campaign: bool = False
     invasion_target: Optional[str] = None
+    main_objective: Optional[Objective] = None
+    objective_deadline_turn: Optional[int] = None
+    urgency_score: float = 0.0
+    offensive_side: Optional[str] = None
+    must_act: bool = False
+    victory_category: Optional[str] = None
     notes: List[str] = field(default_factory=list)
 
 
@@ -102,11 +250,13 @@ class AIContext:
     objectives: List[Objective]
     friendly_units: List[object]
     enemy_units: List[object]
+    moved_task_groups: Optional[set] = None
+    failed_combat_targets: Optional[Set[Tuple[int, int]]] = None
 
 
 class StrategicPlanner:
     def build_plan(self, ctx: AIContext) -> StrategicPlan:
-        posture, notes = self._choose_posture(ctx)
+        posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category = self._choose_posture(ctx)
         objectives = self._prioritize_objectives(ctx)
         transport_campaign = self._should_use_transport(ctx, objectives)
         invasion_target = self._choose_invasion_target(ctx, objectives)
@@ -115,11 +265,26 @@ class StrategicPlanner:
             objectives=objectives,
             transport_campaign=transport_campaign,
             invasion_target=invasion_target,
+            main_objective=main_objective,
+            objective_deadline_turn=deadline_turn,
+            urgency_score=urgency_score,
+            offensive_side=offensive_side,
+            must_act=must_act,
+            victory_category=victory_category,
             notes=notes,
         )
 
-    def _choose_posture(self, ctx: AIContext) -> Tuple[str, List[str]]:
+    def _choose_posture(self, ctx: AIContext) -> Tuple[str, List[str], Optional[str], Optional[Objective], Optional[int], float, bool, Optional[str]]:
         notes = []
+        victory_conditions = getattr(ctx.game_state.scenario_spec, "victory_conditions", {}) or {}
+        hl_meta = _extract_victory_metadata(victory_conditions.get(HL, {}))
+        ws_meta = _extract_victory_metadata(victory_conditions.get(WS, {}))
+        hl_category = hl_meta.get("primary_category")
+        ws_category = ws_meta.get("primary_category")
+        offensive_side = _determine_offensive_side(hl_category, ws_category)
+        side_meta = hl_meta if ctx.side == HL else ws_meta
+        victory_category = side_meta.get("primary_category")
+
         friendly_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in ctx.friendly_units
@@ -135,11 +300,23 @@ class StrategicPlanner:
         enemy_hexes = sum(1 for v in territory.values.values() if v == ctx.enemy) if territory else 0
 
         ratio = friendly_power / max(enemy_power, 1.0)
-        posture = "balanced"
-        if ratio < 0.85 or friendly_hexes < enemy_hexes * 0.8:
-            posture = "defensive"
-        elif ratio > 1.2 or friendly_hexes > enemy_hexes * 1.2:
-            posture = "offensive"
+        base_posture = "balanced"
+        if offensive_side == ctx.side:
+            base_posture = "offensive"
+        elif offensive_side and offensive_side != ctx.side:
+            base_posture = "defensive"
+
+        main_objective, deadline_turn = self._select_main_objective(ctx, side_meta, offensive_side)
+        urgency_score = self._compute_urgency(ctx, deadline_turn, offensive_side == ctx.side)
+        posture = self._modulate_posture(
+            ctx,
+            base_posture,
+            ratio,
+            friendly_hexes,
+            enemy_hexes,
+            urgency_score,
+        )
+        must_act = bool(offensive_side == ctx.side and (urgency_score >= 0.5 or base_posture == "offensive"))
 
         end_turn = int(getattr(ctx.game_state.scenario_spec, "end_turn", 0) or 0)
         if end_turn:
@@ -150,11 +327,98 @@ class StrategicPlanner:
                     status = victory_eval.evaluate()
                     points = status.minor_points
                     if points.get(ctx.side, 0) < points.get(ctx.enemy, 0):
-                        posture = "offensive"
+                        if base_posture == "offensive":
+                            posture = "desperate_offensive"
+                        else:
+                            posture = "offensive"
                         notes.append("late-game push")
         notes.append(f"power_ratio={ratio:.2f}")
         notes.append(f"territory={friendly_hexes}:{enemy_hexes}")
-        return posture, notes
+        if offensive_side:
+            notes.append(f"offensive_side={offensive_side}")
+        if victory_category:
+            notes.append(f"victory_category={victory_category}")
+        if deadline_turn:
+            notes.append(f"deadline_turn={deadline_turn}")
+        notes.append(f"urgency={urgency_score:.2f}")
+        return posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category
+
+    def _select_main_objective(self, ctx: AIContext, side_meta: Dict[str, Any], offensive_side: Optional[str]):
+        objectives = list(ctx.objectives or [])
+        location_targets = side_meta.get("location_targets", set()) or set()
+        country_targets = side_meta.get("country_targets", set()) or set()
+        location_deadlines = side_meta.get("location_deadlines", {}) or {}
+        country_deadlines = side_meta.get("country_deadlines", {}) or {}
+        deadline_turn = side_meta.get("deadline")
+
+        candidates = [
+            obj for obj in objectives
+            if obj.id in location_targets or (obj.country_id and obj.country_id in country_targets)
+        ]
+        if not candidates and offensive_side == ctx.side:
+            candidates = [obj for obj in objectives if obj.owner != ctx.side]
+        if not candidates:
+            candidates = objectives
+
+        if not candidates:
+            return None, deadline_turn
+
+        main_objective = max(
+            candidates,
+            key=lambda o: (o.owner != ctx.side, o.value, o.is_capital),
+        )
+        if main_objective.id in location_deadlines:
+            deadline_turn = min(deadline_turn, location_deadlines[main_objective.id]) if deadline_turn else location_deadlines[main_objective.id]
+        elif main_objective.country_id in country_deadlines:
+            deadline_turn = min(deadline_turn, country_deadlines[main_objective.country_id]) if deadline_turn else country_deadlines[main_objective.country_id]
+        return main_objective, deadline_turn
+
+    def _compute_urgency(self, ctx: AIContext, deadline_turn: Optional[int], is_offensive_side: bool) -> float:
+        if deadline_turn is not None:
+            turns_left = deadline_turn - ctx.turn
+            if turns_left <= 0:
+                return 1.0
+            if turns_left <= 2:
+                return 0.9
+            if turns_left <= 4:
+                return 0.7
+            if turns_left <= 6:
+                return 0.5
+            return 0.3
+        end_turn = int(getattr(ctx.game_state.scenario_spec, "end_turn", 0) or 0)
+        if end_turn:
+            turns_left = max(0, end_turn - ctx.turn)
+            if turns_left <= 2:
+                return 0.6 if is_offensive_side else 0.4
+            if turns_left <= 4:
+                return 0.4 if is_offensive_side else 0.2
+        return 0.2 if is_offensive_side else 0.1
+
+    def _modulate_posture(
+        self,
+        ctx: AIContext,
+        base_posture: str,
+        ratio: float,
+        friendly_hexes: int,
+        enemy_hexes: int,
+        urgency_score: float,
+    ) -> str:
+        if base_posture == "offensive":
+            if urgency_score >= 0.8:
+                return "desperate_offensive"
+            if ratio < 0.8 or friendly_hexes < enemy_hexes * 0.75:
+                return "cautious_offensive"
+            return "offensive"
+        if base_posture == "defensive":
+            if ratio > 1.3 and urgency_score < 0.4:
+                return "balanced"
+            return "defensive"
+
+        if ratio < 0.85 or friendly_hexes < enemy_hexes * 0.8:
+            return "defensive"
+        if ratio > 1.2 or friendly_hexes > enemy_hexes * 1.2:
+            return "offensive"
+        return "balanced"
 
     def _prioritize_objectives(self, ctx: AIContext) -> List[Objective]:
         objectives = list(ctx.objectives)
@@ -211,49 +475,144 @@ class OperationalPlanner:
             if not stack:
                 continue
             hex_obj = Hex(q, r)
-            combat_units = [u for u in stack if ctx.game_state.is_combat_unit(u)]
-            power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in combat_units)
-            has_army = any(getattr(u, "is_army", lambda: False)() for u in stack)
-            has_wing = any(getattr(u, "is_wing", lambda: False)() for u in stack)
-            has_fleet = any(getattr(u, "unit_type", None) == UnitType.FLEET for u in stack)
-            mobile_units = [
+            # Structural split by role/mobility:
+            # - Ground: armies + leaders (leaders are never isolated as standalone groups)
+            # - Air: wings + citadels
+            # - Fleet: fleets only
+            armies = [u for u in stack if getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET]
+            leaders = [
                 u for u in stack
-                if getattr(u, "transport_host", None) is None
-                and float(getattr(u, "movement_points", 0) or 0) > 0
+                if hasattr(u, "is_leader")
+                and u.is_leader()
+                and getattr(u, "transport_host", None) is None
             ]
-            groups.append(TaskGroup(
-                units=stack,
-                hex=hex_obj,
-                power=power,
-                has_army=has_army,
-                has_wing=has_wing,
-                has_fleet=has_fleet,
-                mobile_units=mobile_units,
-            ))
+            air_units = [u for u in stack if getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)()]
+            fleets = [u for u in stack if getattr(u, "unit_type", None) == UnitType.FLEET]
+
+            role_groups: List[List[object]] = []
+            if armies:
+                role_groups.append(armies + leaders)
+            if air_units:
+                role_groups.append(air_units)
+            if fleets:
+                role_groups.append(fleets)
+
+            for role_units in role_groups:
+                combat_units = [u for u in role_units if ctx.game_state.is_combat_unit(u)]
+                if not combat_units:
+                    continue
+                power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in combat_units)
+                has_fleet = any(getattr(u, "unit_type", None) == UnitType.FLEET for u in role_units)
+                has_air = any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in role_units)
+                has_army = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in role_units)
+                mobile_units = [
+                    u for u in role_units
+                    if getattr(u, "transport_host", None) is None
+                    and float(getattr(u, "movement_points", 0) or 0) > 0
+                ]
+                groups.append(TaskGroup(
+                    units=role_units,
+                    hex=hex_obj,
+                    power=power,
+                    has_army=has_army,
+                    has_wing=has_air,
+                    has_fleet=has_fleet,
+                    mobile_units=mobile_units,
+                ))
         return groups
 
     def build_missions(self, ctx: AIContext, plan: StrategicPlan, groups: List[TaskGroup]) -> List[Mission]:
         missions = []
         threat = ctx.overlays.get("threat")
         locations = self._collect_location_map(ctx)
+        offensive = plan.offensive_side == ctx.side
+        main_objective = plan.main_objective
+        main_hex = Hex.offset_to_axial(main_objective.coords[0], main_objective.coords[1]) if main_objective else None
+
+        main_effort_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        support_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+
+        if offensive and main_hex:
+            # Get all mobile ground-capable groups for main effort consideration
+            candidates = [
+                g for g in groups
+                if g.mobile_units and (g.has_army or g.has_wing)
+            ]
+            candidates.sort(key=lambda g: (-g.power, g.hex.distance_to(main_hex)))
+
+            if candidates:
+                # Offensive force concentration: commit MAJORITY of mobile force to main effort
+                # Scale by urgency and posture - high urgency means more commitment
+                is_high_urgency = plan.urgency_score >= 0.5 or plan.must_act
+                is_desperate = plan.posture == "desperate_offensive"
+
+                if is_desperate:
+                    # Desperate offensive: commit 75-80% of force
+                    main_count = max(3, (len(candidates) * 75) // 100)
+                    support_count = max(2, (len(candidates) * 15) // 100)
+                elif is_high_urgency:
+                    # High urgency: commit 65-70% of force
+                    main_count = max(3, (len(candidates) * 65) // 100)
+                    support_count = max(2, (len(candidates) * 15) // 100)
+                elif plan.posture in ("offensive", "cautious_offensive"):
+                    # Standard offensive: commit 55-60% of force
+                    main_count = max(2, (len(candidates) * 55) // 100)
+                    support_count = max(1, (len(candidates) * 15) // 100)
+                else:
+                    # Balanced: conservative but still meaningful commitment
+                    main_count = max(2, (len(candidates) * 45) // 100)
+                    support_count = max(1, (len(candidates) * 15) // 100)
+
+                # Clamp to available candidates
+                total_commit = min(len(candidates), main_count + support_count)
+                main_count = min(main_count, total_commit)
+                support_count = min(support_count, total_commit - main_count)
+
+                main_effort_group_keys = {_task_group_key(g) for g in candidates[:main_count]}
+                support_group_keys = {_task_group_key(g) for g in candidates[main_count:main_count + support_count]}
 
         for group in groups:
             col, row = group.hex.axial_to_offset()
             loc = locations.get((col, row))
             local_threat = _overlay_value(threat, col, row, 0.0)
+            group_key = _task_group_key(group)
 
-            if loc and loc.occupier == ctx.side and local_threat >= 1.5:
+            # Priority 1: Main effort and support missions (offensive only)
+            if offensive and main_hex:
+                if group_key in main_effort_group_keys:
+                    missions.append(Mission(
+                        group=group,
+                        mission_type="main_effort_attack",
+                        target_hex=main_hex,
+                        objective=main_objective,
+                        priority=150 + plan.urgency_score * 50 + group.power,
+                    ))
+                    continue
+                if group_key in support_group_keys:
+                    missions.append(Mission(
+                        group=group,
+                        mission_type="support_main_effort",
+                        target_hex=main_hex,
+                        objective=main_objective,
+                        priority=110 + plan.urgency_score * 30 + group.power * 0.7,
+                    ))
+                    continue
+
+            # Priority 2: Defend threatened key locations (minimum defense)
+            if loc and loc.occupier == ctx.side and local_threat >= 2.0:
+                mission_type = "defend_key_location" if offensive else "defend"
                 missions.append(Mission(
                     group=group,
-                    mission_type="defend",
+                    mission_type=mission_type,
                     target_hex=group.hex,
                     objective=None,
-                    priority=80 + local_threat * 10,
+                    priority=(70 if offensive else 80) + local_threat * 10,
                 ))
                 continue
 
+            # Priority 3: Objective-driven missions
             objective, distance = self._nearest_objective(group.hex, plan.objectives)
-            if plan.posture == "defensive":
+            if plan.posture == "defensive" and not offensive:
                 if loc and loc.occupier == ctx.side:
                     missions.append(Mission(
                         group=group,
@@ -286,15 +645,16 @@ class OperationalPlanner:
                         mission_type=mission_type,
                         target_hex=Hex.offset_to_axial(objective.coords[0], objective.coords[1]),
                         objective=objective,
-                        priority=max(15.0, objective.value - distance * 1.5),
+                        priority=max(20.0, objective.value - distance * 1.5)
+                        + (15 if offensive and objective.owner != ctx.side else 0),
                     ))
                 else:
                     missions.append(Mission(
                         group=group,
-                        mission_type="screen",
+                        mission_type="reserve_screen" if offensive else "screen",
                         target_hex=group.hex,
                         objective=None,
-                        priority=15,
+                        priority=12 if offensive else 15,
                     ))
 
         missions.sort(key=lambda m: (m.priority, m.group.power), reverse=True)
@@ -327,16 +687,21 @@ class OperationalPlanner:
 class TacticalPlanner:
     MOVE_WEIGHTS = {
         "push_objective": {"objective": 12, "threat": -4, "support": 2, "capture": 8},
+        "main_effort_attack": {"objective": 16, "threat": -5, "support": 4, "capture": 10},
+        "support_main_effort": {"objective": 10, "threat": -4, "support": 5, "capture": 6},
         "secure": {"objective": 8, "threat": -5, "support": 3, "capture": 3},
         "defend": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
+        "defend_key_location": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
         "reinforce": {"objective": 9, "threat": -6, "support": 3, "capture": 2},
         "hold": {"objective": 2, "threat": -8, "support": 2, "capture": 1},
         "screen": {"objective": 6, "threat": -7, "support": 2, "capture": 2},
+        "reserve_screen": {"objective": 5, "threat": -6, "support": 2, "capture": 2},
     }
 
     def deploy_ready_units(
         self,
         ctx: AIContext,
+        plan: StrategicPlan,
         allow_territory_wide: bool = False,
         country_filter: Optional[str] = None,
         invasion_deployment_active: bool = False,
@@ -358,6 +723,7 @@ class TacticalPlanner:
         if ctx.side == HL:
             deployed += self._deploy_hl_dragon_pairs(
                 ctx,
+                plan,
                 ready_units,
                 allow_territory_wide,
                 country_filter,
@@ -374,7 +740,7 @@ class TacticalPlanner:
                 continue
             best_hex = max(
                 valid,
-                key=lambda coords: self._score_deployment_hex(ctx, unit, coords),
+                key=lambda coords: self._score_deployment_hex(ctx, plan, unit, coords),
             )
             result = ctx.game_state.deployment_service.deploy_unit(
                 unit,
@@ -390,6 +756,7 @@ class TacticalPlanner:
     def _deploy_hl_dragon_pairs(
         self,
         ctx: AIContext,
+        plan: StrategicPlan,
         ready_units: List[object],
         allow_territory_wide: bool,
         country_filter: Optional[str],
@@ -415,7 +782,7 @@ class TacticalPlanner:
             joint = [tuple(c) for c in wing_valid if tuple(c) in cmd_set]
             if not joint:
                 continue
-            best_hex = max(joint, key=lambda coords: self._score_deployment_hex(ctx, wing, coords))
+            best_hex = max(joint, key=lambda coords: self._score_deployment_hex(ctx, plan, wing, coords))
             target_hex = Hex.offset_to_axial(best_hex[0], best_hex[1])
             wing_res = ctx.game_state.deployment_service.deploy_unit(
                 wing,
@@ -459,23 +826,68 @@ class TacticalPlanner:
         return None
 
     @staticmethod
-    def _score_deployment_hex(ctx: AIContext, unit, coords: Tuple[int, int]) -> float:
+    def _score_deployment_hex(ctx: AIContext, plan: StrategicPlan, unit, coords: Tuple[int, int]) -> float:
         col, row = int(coords[0]), int(coords[1])
         threat = _overlay_value(ctx.overlays.get("threat"), col, row, 0.0)
         territory = ctx.overlays.get("territory")
         territory_val = territory.values.get((col, row)) if territory else None
         score = 0.0
-        score -= threat * 3
-        if territory_val == ctx.side:
-            score += 6
-        if territory_val == ctx.enemy:
-            score -= 4
 
-        loc = ctx.game_state.map.get_location(Hex.offset_to_axial(col, row))
-        if loc:
-            score += 5
-            if getattr(loc, "is_capital", False):
-                score += 8
+        # Base safety: avoid immediate threats
+        score -= threat * 2
+
+        # Territory comfort: slight preference for friendly territory
+        if territory_val == ctx.side:
+            score += 3
+        if territory_val == ctx.enemy:
+            score += 5  # Forward deployment on enemy soil is GOOD for offense
+
+        # Offensive forward staging: DOMINATE the score when offensive side
+        offensive = plan.offensive_side == ctx.side
+        if offensive and plan.main_objective:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            deploy_hex = Hex.offset_to_axial(col, row)
+            dist_to_objective = deploy_hex.distance_to(main_hex)
+
+            # Primary scoring: distance to main objective (dominates all other factors)
+            # Closer = much better. This should overwhelm capital bias.
+            score += (30.0 - dist_to_objective) * 4.0
+
+            # Strong bonus for being within striking distance (<=8 hexes)
+            if dist_to_objective <= 8:
+                score += 25.0
+            # Extra bonus for very close staging (<=4 hexes)
+            if dist_to_objective <= 4:
+                score += 20.0
+
+            # Enemy territory near objective is prime staging ground
+            if territory_val == ctx.enemy and dist_to_objective <= 10:
+                score += 30.0
+
+            # Prevent offensive overstacking in own capital once garrison is sufficient.
+            loc = ctx.game_state.map.get_location(deploy_hex)
+            if loc and getattr(loc, "is_capital", False) and getattr(loc, "occupier", None) == ctx.side:
+                stack = ctx.game_state.map.get_units_in_hex(deploy_hex.q, deploy_hex.r)
+                defenders = [
+                    u for u in stack
+                    if getattr(u, "allegiance", None) == ctx.side
+                    and getattr(u, "is_on_map", False)
+                    and ctx.game_state.is_combat_unit(u)
+                ]
+                garrison_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+                garrison_count = len(defenders)
+                min_garrison_power = max(8.0, threat * 4.0)
+                min_garrison_units = 2 if threat < 2.0 else 3
+                if garrison_power >= min_garrison_power and garrison_count >= min_garrison_units:
+                    excess = max(0, garrison_count - min_garrison_units)
+                    score -= 80.0 + excess * 15.0
+        else:
+            # Defensive/posture-neutral: modest location bonuses
+            loc = ctx.game_state.map.get_location(Hex.offset_to_axial(col, row))
+            if loc:
+                score += 3
+                if getattr(loc, "is_capital", False):
+                    score += 5  # Reduced capital bias (was +8)
         return score
 
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
@@ -484,6 +896,9 @@ class TacticalPlanner:
 
         actions = []
         for mission in missions:
+            if ctx.moved_task_groups is not None:
+                if _task_group_key(mission.group) in ctx.moved_task_groups:
+                    continue
             if not mission.group.mobile_units:
                 continue
             action = self._best_move_for_mission(ctx, plan, mission)
@@ -512,6 +927,8 @@ class TacticalPlanner:
         move_result = ctx.movement_service.move_units_to_hex(best.group.units, target_hex)
         if move_result.errors:
             return False
+        if ctx.moved_task_groups is not None:
+            ctx.moved_task_groups.add(_task_group_key(best.group))
         return True
 
     def _best_move_for_mission(self, ctx: AIContext, plan: StrategicPlan, mission: Mission) -> Optional[TacticalAction]:
@@ -564,9 +981,60 @@ class TacticalPlanner:
         loc = ctx.game_state.map.get_location(Hex.offset_to_axial(col, row))
         if loc and loc.occupier != ctx.side:
             score += 10
+
+        # Offensive mission scoring: STRICT anti-passivity
+        offensive_types = {"push_objective", "main_effort_attack", "support_main_effort"}
+        if mission.mission_type in offensive_types and plan.main_objective:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            current_hex = mission.group.hex
+            current_dist = current_hex.distance_to(main_hex)
+            next_dist = target_hex.distance_to(main_hex)
+            current_col, current_row = current_hex.axial_to_offset()
+            support_now = _overlay_value(friendly_power_overlay, current_col, current_row, 0.0)
+            support_gain = support - support_now
+
+            # REWARD: Advancing toward the objective
+            if next_dist < current_dist:
+                advance_gain = current_dist - next_dist
+                # Base reward for any forward progress
+                score += advance_gain * 12
+                # Bonus for meaningful advances (2+ hexes)
+                if advance_gain >= 2:
+                    score += 20
+                # High urgency bonus: reward decisive movement
+                if plan.must_act or plan.urgency_score >= 0.7:
+                    score += 15
+            # PENALTY: Lateral or backward moves
+            else:
+                if support_gain <= 0:
+                    # No progress AND no support gain = useless move
+                    score -= 35
+                else:
+                    # Support gain alone doesn't justify no advance on offensive missions
+                    score += min(3.0, support_gain)
+
+            # CRITICAL: Hard penalties under pressure
+            if plan.must_act:
+                if next_dist >= current_dist and support_gain <= 0:
+                    score -= 40  # Must act + passive = unacceptable
+            if plan.urgency_score >= 0.7:
+                if next_dist >= current_dist:
+                    score -= 25  # High urgency + no progress = bad
+            # Deadline pressure: turns running out
+            if plan.objective_deadline_turn is not None:
+                turns_left = plan.objective_deadline_turn - ctx.turn
+                if turns_left <= 3:
+                    if next_dist >= current_dist:
+                        score -= 45  # Critical deadline + passive = reject
+                elif turns_left <= 5:
+                    if next_dist >= current_dist and support_gain <= 0:
+                        score -= 25
         return score
 
     def _maybe_execute_transport_action(self, ctx: AIContext, plan: StrategicPlan) -> bool:
+        """Execute transport actions in priority order: unboard, board commanders, fleet transport."""
+        # Stage 1: Unboard passengers where appropriate.
+        # Keep valid dragon commanders boarded on wings/citadels.
         for unit in ctx.friendly_units:
             passengers = list(getattr(unit, "passengers", []) or [])
             if not passengers:
@@ -575,31 +1043,102 @@ class TacticalPlanner:
                 continue
             carrier_hex = Hex.offset_to_axial(*unit.position)
             if unit.is_wing() or unit.is_citadel():
-                unboarded = self._unboard_all(ctx, unit, passengers)
-                if unboarded:
+                ground_passengers = [
+                    p for p in passengers
+                    if not (hasattr(p, "is_leader") and p.is_leader())
+                ]
+                if self._unboard_all(ctx, unit, ground_passengers):
                     return True
-            else:
-                if ctx.game_state.map.is_open_sea(carrier_hex):
+            elif ctx.game_state.map.is_coastal(carrier_hex) or ctx.game_state.map.get_location(carrier_hex):
+                if self._unboard_all(ctx, unit, passengers):
+                    return True
+
+        # Stage 2: Board dragon commanders onto wings lacking them (CRITICAL for HL)
+        if self._board_dragon_commanders(ctx):
+            return True
+
+        # Stage 3: Fleet transport campaign (armies boarding fleets)
+        if plan.transport_campaign:
+            for unit in ctx.friendly_units:
+                if getattr(unit, "unit_type", None) != UnitType.FLEET:
                     continue
-                if ctx.game_state.map.is_coastal(carrier_hex) or ctx.game_state.map.get_location(carrier_hex):
-                    unboarded = self._unboard_all(ctx, unit, passengers)
-                    if unboarded:
+                if not getattr(unit, "position", None) or unit.position[0] is None:
+                    continue
+                stack = ctx.game_state.map.get_units_in_hex(unit.position[0], unit.position[1])
+                armies = [u for u in stack if getattr(u, "is_army", lambda: False)()]
+                for army in armies:
+                    if ctx.game_state.board_unit(unit, army):
                         return True
-
-        if not plan.transport_campaign:
-            return False
-
-        for unit in ctx.friendly_units:
-            if getattr(unit, "unit_type", None) != UnitType.FLEET:
-                continue
-            if not getattr(unit, "position", None) or unit.position[0] is None:
-                continue
-            stack = ctx.game_state.map.get_units_in_hex(unit.position[0], unit.position[1])
-            armies = [u for u in stack if getattr(u, "is_army", lambda: False)()]
-            for army in armies:
-                if ctx.game_state.board_unit(unit, army):
-                    return True
         return False
+
+    def _board_dragon_commanders(self, ctx: AIContext) -> bool:
+        """Board eligible leaders onto dragon wings that lack a commander.
+        
+        For HL: same-flight Highlord preferred, Emperor fallback.
+        For WS: equivalent valid commander logic.
+        """
+        wings = sorted(
+            [
+                u for u in ctx.friendly_units
+                if getattr(u, "unit_type", None) == UnitType.WING
+                and getattr(u, "race", None) == UnitRace.DRAGON
+                and getattr(u, "is_on_map", False)
+                and getattr(u, "transport_host", None) is None
+                and getattr(u, "position", None)
+                and u.position[0] is not None
+            ],
+            key=_unit_key,
+        )
+        for wing in wings:
+            if self._wing_has_valid_dragon_commander(ctx, wing):
+                continue
+            wing_hex = Hex.offset_to_axial(*wing.position)
+            stack = ctx.game_state.map.get_units_in_hex(wing_hex.q, wing_hex.r)
+            leaders = [
+                u for u in stack
+                if getattr(u, "allegiance", None) == ctx.side
+                and hasattr(u, "is_leader")
+                and u.is_leader()
+                and getattr(u, "is_on_map", False)
+                and getattr(u, "transport_host", None) is None
+            ]
+            if not leaders:
+                continue
+            commander = self._select_dragon_commander_for_wing(ctx, wing, leaders)
+            if commander and ctx.game_state.board_unit(wing, commander):
+                return True
+        return False
+
+    @staticmethod
+    def _wing_has_valid_dragon_commander(ctx: AIContext, wing) -> bool:
+        passengers = list(getattr(wing, "passengers", []) or [])
+        if not passengers:
+            return False
+        if getattr(wing, "allegiance", None) == HL:
+            for p in passengers:
+                if getattr(p, "unit_type", None) == UnitType.EMPEROR:
+                    return True
+                if getattr(p, "unit_type", None) != UnitType.HIGHLORD:
+                    continue
+                p_flight = str(getattr(getattr(p, "spec", None), "dragonflight", "") or "").strip().lower()
+                wing_flight = str(getattr(getattr(wing, "spec", None), "dragonflight", "") or "").strip().lower()
+                if p_flight and p_flight == wing_flight:
+                    return True
+            return False
+        if getattr(wing, "allegiance", None) == WS:
+            return any(getattr(p, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF) for p in passengers)
+        return any(hasattr(p, "is_leader") and p.is_leader() for p in passengers)
+
+    @staticmethod
+    def _select_dragon_commander_for_wing(ctx: AIContext, wing, leaders: List[object]) -> Optional[object]:
+        if getattr(wing, "allegiance", None) == HL:
+            return TacticalPlanner._select_hl_dragon_commander(wing, leaders)
+        if getattr(wing, "allegiance", None) == WS:
+            ws = [l for l in leaders if getattr(l, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)]
+            if ws:
+                return sorted(ws, key=_unit_key)[0]
+        fallback = [l for l in leaders if hasattr(l, "is_leader") and l.is_leader()]
+        return sorted(fallback, key=_unit_key)[0] if fallback else None
 
     @staticmethod
     def _unboard_all(ctx: AIContext, carrier, passengers: List[object]) -> bool:
@@ -612,6 +1151,7 @@ class TacticalPlanner:
     def execute_best_combat(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission]) -> bool:
         actions = []
         board = ctx.game_state.map
+        failed_targets = ctx.failed_combat_targets or set()
         for mission in missions:
             group = mission.group
             if not group.units:
@@ -619,6 +1159,9 @@ class TacticalPlanner:
             if all(getattr(u, "attacked_this_turn", False) for u in group.units):
                 continue
             for neighbor in group.hex.neighbors():
+                # Skip targets that previously produced no-effect results this phase
+                if (neighbor.q, neighbor.r) in failed_targets:
+                    continue
                 defenders = board.get_units_in_hex(neighbor.q, neighbor.r)
                 defenders = [u for u in defenders if getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False)]
                 if not defenders:
@@ -654,6 +1197,14 @@ class TacticalPlanner:
             context="ai_combat",
             target_hex=best.target_hex,
         )
+        # Mark all attacking units as having attacked this turn
+        # This prevents endless repeated attacks in the same combat phase
+        for u in attackers:
+            u.attacked_this_turn = True
+        # Safety net: track no-effect combat results to avoid retrying same target
+        if resolution and resolution.get("result") == "-/-":
+            target_key = (best.target_hex.q, best.target_hex.r)
+            failed_targets.add(target_key)
         if resolution and resolution.get("advance_available"):
             ctx.game_state.advance_after_combat(attackers, best.target_hex)
         return True
@@ -677,6 +1228,19 @@ class TacticalPlanner:
             score += 8
         elif plan.posture == "defensive":
             score -= 6
+        offensive_types = {"push_objective", "main_effort_attack", "support_main_effort"}
+        if plan.offensive_side == ctx.side and mission.mission_type in offensive_types and plan.main_objective:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            dist_before = group.hex.distance_to(main_hex)
+            dist_after = target_hex.distance_to(main_hex)
+            if dist_after < dist_before:
+                score += 8 + (dist_before - dist_after) * 2
+            if dist_after == 0:
+                score += 20 + plan.urgency_score * 20
+            if plan.urgency_score >= 0.7:
+                score += 10
+            if plan.must_act:
+                score += 6
         return score
 
 class BaselineAIPlayer:
@@ -688,6 +1252,9 @@ class BaselineAIPlayer:
         self._combat_phase_key = None
         self._unit_last_position: Dict[Tuple[str, int], Tuple[int, int]] = {}
         self._failed_combat_targets = defaultdict(set)
+        self._moved_task_groups_in_phase: set = set()
+        # NOTE: No planning cache - board state changes after each action, so caching
+        # TaskGroups/Missions across moves causes stale decisions. Rebuild fresh each time.
         self._strategic = StrategicPlanner()
         self._operational = OperationalPlanner()
         self._tactical = TacticalPlanner()
@@ -706,6 +1273,7 @@ class BaselineAIPlayer:
         plan = self._strategic.build_plan(ctx)
         deployed = self._tactical.deploy_ready_units(
             ctx,
+            plan,
             allow_territory_wide=allow_territory_wide,
             country_filter=country_filter,
             invasion_deployment_active=invasion_deployment_active,
@@ -853,7 +1421,8 @@ class BaselineAIPlayer:
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
-        ctx = self._build_context(side)
+        moved_groups = self._ensure_movement_phase_memory()
+        ctx = self._build_context(side, moved_task_groups=moved_groups)
         plan = self._strategic.build_plan(ctx)
         groups = self._operational.build_task_groups(ctx)
         missions = self._operational.build_missions(ctx, plan, groups)
@@ -864,6 +1433,15 @@ class BaselineAIPlayer:
 
     # ---------- Combat ----------
     def execute_best_combat(self, side: str) -> bool:
+        # Clear failed combat targets at the start of each combat phase
+        combat_phase_key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+        )
+        if self._combat_phase_key != combat_phase_key:
+            self._combat_phase_key = combat_phase_key
+            self._failed_combat_targets.clear()
         ctx = self._build_context(side)
         plan = self._strategic.build_plan(ctx)
         groups = self._operational.build_task_groups(ctx)
@@ -874,7 +1452,7 @@ class BaselineAIPlayer:
         return fought
 
     # ---------- Context ----------
-    def _build_context(self, side: str) -> AIContext:
+    def _build_context(self, side: str, moved_task_groups: Optional[set] = None) -> AIContext:
         enemy = _enemy_of(side)
         overlays = {
             "control": self.game_state.get_overlay("control"),
@@ -902,7 +1480,20 @@ class BaselineAIPlayer:
             objectives=objectives,
             friendly_units=friendly_units,
             enemy_units=enemy_units,
+            moved_task_groups=moved_task_groups,
+            failed_combat_targets=self._failed_combat_targets.get(side, set()),
         )
+
+    def _ensure_movement_phase_memory(self) -> set:
+        key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+        )
+        if self._movement_phase_key != key:
+            self._movement_phase_key = key
+            self._moved_task_groups_in_phase = set()
+        return self._moved_task_groups_in_phase
 
     def _collect_objectives(self, side: str) -> List[Objective]:
         raw_victory = (getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}).get(side, {})
