@@ -45,7 +45,7 @@ WS = "whitestone"
 HL = "highlord"
 NEUTRAL = "neutral"
 
-# --- DRAGON FLIGHTS ---
+# --- DRAGONFLIGHTS ---
 EVIL_DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
 GOOD_DRAGONFLIGHTS = {"gold", "silver", "bronze", "copper", "brass"}
 DRAGONFLIGHTS = EVIL_DRAGONFLIGHTS | GOOD_DRAGONFLIGHTS

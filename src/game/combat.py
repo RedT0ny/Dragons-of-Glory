@@ -354,7 +354,7 @@ class CombatResolver:
         # LOCATIONS (defender benefit only)
         if defender_loc_type == LocType.FORTRESS.value:
             add_part("location_fortress", -4)
-        elif defender_loc_type in (LocType.CITY.value, LocType.PORT.value):
+        elif defender_loc_type in (LocType.CITY.value, LocType.PORT.value, LocType.TEMPLE.value):
             add_part("location_city_port", -2)
         elif defender_loc_type == LocType.UNDERCITY.value:
             add_part("location_undercity", -10)

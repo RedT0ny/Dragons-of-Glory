@@ -153,6 +153,11 @@ class GameState:
         cost = self.map.get_movement_cost(unit, from_hex, to_hex)
         return cost is not None and cost != float("inf")
 
+    def can_control_probe_project_across_hexside(self, from_hex, to_hex, allegiance=None) -> bool:
+        if not self.map:
+            return False
+        return self.map.can_ground_probe_cross_hexside(from_hex, to_hex)
+
     def _get_leader_escape_handler(self):
         if self._leader_escape_handler is None:
             self._leader_escape_handler = LeaderEscapeHandler(self)
@@ -1183,11 +1188,16 @@ class GameState:
             return False
 
         terrain = self.map.get_terrain(to_hex)
-        if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM):
+        if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM, TerrainType.DESERT, TerrainType.SWAMP):
+            return False
+
+        # Neutral countries block supply
+        country = self.get_country_by_hex(col, row)
+        if country and country.allegiance == NEUTRAL:
             return False
 
         hexside = self.map.get_effective_hexside(from_hex, to_hex)
-        if self.map._hexside_is(hexside, HexsideType.MOUNTAIN) and not self.map._hexside_is(hexside, HexsideType.PASS):
+        if hexside in ([HexsideType.MOUNTAIN.value, HexsideType.DEEP_RIVER.value, HexsideType.SEA.value] or set()):
             return False
 
         if self.map.has_enemy_army(to_hex, allegiance):

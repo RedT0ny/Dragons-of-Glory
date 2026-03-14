@@ -1,5 +1,5 @@
 from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import CountrySpec, LocationSpec, UnitType
+from src.content.specs import CountrySpec, LocationSpec, UnitType, LocType
 
 
 class Location:
@@ -33,11 +33,11 @@ class Location:
 
     def get_defense_modifier(self):
         # Access type via spec
-        if self.loc_type == UnitType.FORTRESS:
+        if self.loc_type == LocType.FORTRESS.value:
             return -4
-        if self.loc_type == UnitType.UNDERCITY:
+        if self.loc_type == LocType.UNDERCITY.value:
             return -10
-        if self.loc_type in [UnitType.CITY, UnitType.PORT]:
+        if self.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.TEMPLE.value]:
             return -2
         return 0
 

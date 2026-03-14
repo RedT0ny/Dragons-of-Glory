@@ -312,7 +312,7 @@ class ThreatMap(OverlayBase):
         friendly = InfluenceMap(active).compute(game_state)
         enemy_power = InfluenceMap(enemy).compute(game_state)
         loss_by_odds = self._get_expected_defender_loss_by_odds()
-        occupied, zoc_by_side = self._compute_zoc(game_state)
+        occupied, contested_occupied, zoc_by_side = self._compute_zoc(game_state)
         enemy_occupied = {coord for coord, side in occupied.items() if side == enemy}
         defender_ref = self._reference_defender_strength(game_state, active)
         values = {}
@@ -327,11 +327,27 @@ class ThreatMap(OverlayBase):
                 e_power = float(enemy_power.values.get((col, row), 0.0))
                 defender_strength = self._adjust_defender_strength(defender_ref, board, hex_obj)
                 odds_str = _odds_from_power(e_power, defender_strength)
-                expected_loss = float(loss_by_odds.get(odds_str, 0.0))
+                expected_loss = 0.0 if e_power <= 0 else float(loss_by_odds.get(odds_str, 0.0))
 
-                retreat_penalty = self._retreat_penalty(game_state, hex_obj, active, enemy, zoc_by_side, enemy_occupied)
-                enemy_only_zoc_penalty = 0.5 if self._enemy_only_zoc(hex_obj, active, enemy, zoc_by_side) else 0.0
-                location_penalty = 0.5 if board.get_location(hex_obj) else 0.0
+                enemy_only_zoc = self._enemy_only_zoc(hex_obj, active, enemy, zoc_by_side)
+                has_enemy_pressure = (e_power > 0.0) or enemy_only_zoc
+                if not has_enemy_pressure:
+                    expected_loss = 0.0
+                    retreat_penalty = 0.0
+                    enemy_only_zoc_penalty = 0.0
+                    location_penalty = 0.0
+                else:
+                    retreat_penalty = self._retreat_penalty(
+                        game_state,
+                        hex_obj,
+                        active,
+                        enemy,
+                        zoc_by_side,
+                        enemy_occupied,
+                        contested_occupied,
+                    )
+                    enemy_only_zoc_penalty = 0.5 if enemy_only_zoc else 0.0
+                    location_penalty = 0.5 if board.get_location(hex_obj) else 0.0
 
                 support = float(friendly.values.get((col, row), 0.0))
                 support_discount = min(1.0, support / max(1.0, defender_strength)) * 0.5
@@ -373,6 +389,7 @@ class ThreatMap(OverlayBase):
     def _compute_zoc(self, game_state):
         board = game_state.map
         occupied = {}
+        contested_occupied = set()
         zoc_by_side = {HL: set(), WS: set()}
 
         def _stack_control_allegiance(units):
@@ -386,6 +403,8 @@ class ThreatMap(OverlayBase):
                     allies.add(u.allegiance)
             if len(allies) == 1:
                 return next(iter(allies))
+            if len(allies) > 1:
+                return "contested"
             return None
 
         def _stack_can_project(stack_units, from_hex, to_hex):
@@ -401,6 +420,9 @@ class ThreatMap(OverlayBase):
 
         for (q, r), units in board.unit_map.items():
             side = _stack_control_allegiance(units)
+            if side == "contested":
+                contested_occupied.add((q, r))
+                continue
             if side in (HL, WS):
                 occupied[(q, r)] = side
 
@@ -416,7 +438,7 @@ class ThreatMap(OverlayBase):
                     continue
                 zoc_by_side[side].add((neighbor.q, neighbor.r))
 
-        return occupied, zoc_by_side
+        return occupied, contested_occupied, zoc_by_side
 
     def _reference_defender_strength(self, game_state, side):
         ratings = [
@@ -462,16 +484,8 @@ class ThreatMap(OverlayBase):
         key = (hex_obj.q, hex_obj.r)
         return key in zoc_by_side.get(enemy, set()) and key not in zoc_by_side.get(active, set())
 
-    def _retreat_penalty(self, game_state, hex_obj, active, enemy, zoc_by_side, enemy_occupied):
+    def _retreat_penalty(self, game_state, hex_obj, active, enemy, zoc_by_side, enemy_occupied, contested_occupied):
         board = game_state.map
-
-        class _Probe:
-            def __init__(self, side):
-                self.allegiance = side
-                self.unit_type = UnitType.INFANTRY
-                self.terrain_affinity = None
-
-        probe = _Probe(active)
         safe_exits = 0
         for neighbor in hex_obj.neighbors():
             if not board._is_valid_local_hex(neighbor):
@@ -481,9 +495,11 @@ class ThreatMap(OverlayBase):
                 continue
             if (neighbor.q, neighbor.r) in enemy_occupied:
                 continue
+            if (neighbor.q, neighbor.r) in contested_occupied:
+                continue
             if self._enemy_only_zoc(neighbor, active, enemy, zoc_by_side):
                 continue
-            if not game_state.can_unit_project_across_hexside(probe, hex_obj, neighbor):
+            if not game_state.can_control_probe_project_across_hexside(hex_obj, neighbor, active):
                 continue
             safe_exits += 1
 
@@ -508,27 +524,19 @@ def _enemy_of(side: Optional[str]):
     return None
 
 def _odds_from_power(attacker: float, defender: float) -> str:
-    if defender <= 0:
-        return "6:1"
+    if defender <= 0: return "6:1"
     ratio = attacker / defender
-    if ratio >= 6:
-        return "6:1"
-    if ratio >= 5:
-        return "5:1"
-    if ratio >= 4:
-        return "4:1"
-    if ratio >= 3:
-        return "3:1"
-    if ratio >= 2:
-        return "2:1"
-    if ratio >= 1.5:
-        return "3:2"
-    if ratio >= 1:
-        return "1:1"
-    if ratio >= 0.66:
-        return "2:3"
-    if ratio >= 0.5:
-        return "1:2"
+
+    if ratio >= 6: return "6:1"
+    if ratio >= 5: return "5:1"
+    if ratio >= 4: return "4:1"
+    if ratio >= 3: return "3:1"
+    if ratio >= 2: return "2:1"
+    if ratio >= 1.5: return "3:2"
+    if ratio >= 1: return "1:1"
+    if ratio >= 0.66: return "2:3"
+    if ratio >= 0.5: return "1:2"
+
     return "1:3"
 
 def _estimate_loss_from_result(result: str) -> float:

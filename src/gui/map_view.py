@@ -632,13 +632,23 @@ class AnsalonMapView(QGraphicsView):
                 return QColor(0, 0, 0, 0)
             intensity = min(1.0, max(0.0, float(value) / max_val))
             if self.overlay_mode == "supply":
-                return QColor(120, 120, 120, int(self.overlay_alpha * intensity))
+                return QColor(0, 128, 0, int(self.overlay_alpha * intensity))
             if self.overlay_mode == "ws_power":
                 return QColor(0, 0, 255, int(self.overlay_alpha * intensity))
             if self.overlay_mode == "hl_power":
                 return QColor(255, 0, 0, int(self.overlay_alpha * intensity))
             if self.overlay_mode == "threat":
-                return QColor(255, 80, 0, int(self.overlay_alpha * intensity))
+                if intensity <= 0.1:
+                    return QColor(0, 120, 0, int(self.overlay_alpha))
+                if intensity <= 0.25:
+                    return QColor(120, 180, 0, int(self.overlay_alpha))
+                if intensity <= 0.45:
+                    return QColor(220, 200, 0, int(self.overlay_alpha))
+                if intensity <= 0.65:
+                    return QColor(255, 140, 0, int(self.overlay_alpha))
+                if intensity <= 0.85:
+                    return QColor(200, 0, 0, int(self.overlay_alpha))
+                return QColor(80, 0, 0, self.overlay_alpha)
             return QColor(0, 0, 0, 0)
 
         return QColor(0, 0, 0, 0)

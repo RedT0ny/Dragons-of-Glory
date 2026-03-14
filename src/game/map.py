@@ -830,6 +830,22 @@ class Board:
 
         return self._get_ground_movement_cost(unit, from_hex, to_hex)
 
+    def can_ground_probe_cross_hexside(self, from_hex, to_hex) -> bool:
+        """
+        Generic ground/control probe movement legality without a concrete Unit.
+        Used for threat/retreat/control heuristics.
+        """
+        terrain = self.get_terrain(to_hex)
+        if terrain in (TerrainType.OCEAN, TerrainType.DESERT, TerrainType.SWAMP, TerrainType.MAELSTROM):
+            return False
+
+        hexside_type = self.get_effective_hexside(from_hex, to_hex)
+        if self._hexside_is(hexside_type, HexsideType.SEA):
+            return False
+        if self._hexside_is(hexside_type, HexsideType.MOUNTAIN) and not self._hexside_is(hexside_type, HexsideType.PASS):
+            return False
+        return True
+
     def _get_wing_movement_cost(self, unit, from_hex, to_hex):
         """Rule 6: Flying creatures."""
         terrain = self.get_terrain(to_hex)
