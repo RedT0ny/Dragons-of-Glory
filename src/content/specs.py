@@ -333,7 +333,7 @@ ASSET_REQUIREMENTS = {
         "ogre": UnitRace.OGRE,
     },
     "trait_requirements": {
-        "is_leader": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type in [UnitType.GENERAL, UnitType.ADMIRAL, UnitType.EMPEROR],
+        "placeholder": lambda unit: True,
         "is_magical": lambda unit: hasattr(unit, 'unit_type') and unit.unit_type == UnitType.WIZARD,
     },
     "allegiance_requirements": {

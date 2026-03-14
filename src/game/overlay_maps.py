@@ -4,10 +4,11 @@ from dataclasses import dataclass, field
 from typing import Dict, Tuple, Optional
 
 from src.content.config import CRT_DATA
-from src.content.constants import HL, WS, NEUTRAL
+from src.content.constants import HL, WS
 from src.content.loader import load_data
 from src.content.specs import UnitType, TerrainType, HexsideType
 from src.game.map import Hex
+from src.game import board_analysis
 
 
 @dataclass
@@ -45,71 +46,17 @@ class ControlMap(OverlayBase):
         if not board:
             return OverlayData(kind="allegiance", values={})
 
-        occupied = {}
-        contested = set()
-
-        def _stack_control_allegiance(units):
-            allies = set()
-            for u in units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if u.allegiance in (HL, WS):
-                    allies.add(u.allegiance)
-            if len(allies) == 1:
-                return next(iter(allies))
-            if len(allies) > 1:
-                return "contested"
-            return None
-
-        for (q, r), units in board.unit_map.items():
-            side = _stack_control_allegiance(units)
-            if side is None:
-                continue
-            if side == "contested":
-                contested.add((q, r))
-                continue
-            occupied[(q, r)] = side
-
-        zoc_by_side = {HL: set(), WS: set()}
-
-        def _hex_is_neutral_country(hex_obj):
-            col, row = hex_obj.axial_to_offset()
-            country = game_state.get_country_by_hex(col, row)
-            return bool(country and country.allegiance == NEUTRAL)
-
-        def _stack_can_project(stack_units, from_hex, to_hex):
-            for u in stack_units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
-                    continue
-                return True
-            return False
-
-        for (q, r), units in board.unit_map.items():
-            side = occupied.get((q, r))
-            if side not in (HL, WS):
-                continue
-            from_hex = Hex(q, r)
-            for neighbor in from_hex.neighbors():
-                if _hex_is_neutral_country(neighbor):
-                    continue
-                if (neighbor.q, neighbor.r) in occupied and occupied[(neighbor.q, neighbor.r)] != side:
-                    continue
-                if not _stack_can_project(units, from_hex, neighbor):
-                    continue
-                zoc_by_side[side].add((neighbor.q, neighbor.r))
+        facts = board_analysis.compute_control_facts(game_state)
+        occupied = facts.occupied
+        contested = facts.occupied_contested
+        zoc_by_side = facts.zoc_by_side
 
         values = {}
         for row in range(board.height):
             for col in range(board.width):
                 hex_obj = Hex.offset_to_axial(col, row)
                 key = (hex_obj.q, hex_obj.r)
-                if _hex_is_neutral_country(hex_obj):
+                if board_analysis.is_neutral_country_hex(game_state, hex_obj):
                     continue
                 if key in occupied:
                     values[(col, row)] = occupied[key]
@@ -152,76 +99,18 @@ class TerritoryMap(OverlayBase):
         if not board or not getattr(game_state, "scenario_spec", None):
             return OverlayData(kind="allegiance", values={})
 
-        def _stack_control_allegiance(units):
-            allies = set()
-            for u in units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if u.allegiance in (HL, WS):
-                    allies.add(u.allegiance)
-            if len(allies) == 1:
-                return next(iter(allies))
-            if len(allies) > 1:
-                return "contested"
-            return None
-
-        values = game_state.compute_territory_baseline()
-        scenario_seeds = game_state._compute_territory_scenario_baseline()
-
-        def _hex_is_neutral_country(hex_obj):
-            col, row = hex_obj.axial_to_offset()
-            country = game_state.get_country_by_hex(col, row)
-            return bool(country and country.allegiance == NEUTRAL)
-
-        def _neutral_seed_allows(side, hex_obj):
-            if not _hex_is_neutral_country(hex_obj):
-                return True
-            col, row = hex_obj.axial_to_offset()
-            seed = scenario_seeds.get((col, row))
-            return seed in (side, "contested")
+        values = board_analysis.compute_territory_baseline(game_state)
+        scenario_seeds = board_analysis.compute_territory_scenario_baseline(game_state)
 
         for (col, row), value in (game_state.territory_overrides or {}).items():
             if value in (HL, WS, "contested"):
                 values[(int(col), int(row))] = value
 
         # Step 4: live unit-occupation overlay (occupied + adjacent ZOC)
-        occupied = {}
-        occupied_contested = set()
-
-        for (q, r), units in board.unit_map.items():
-            side = _stack_control_allegiance(units)
-            if side is None:
-                continue
-            if side == "contested":
-                occupied_contested.add((q, r))
-                continue
-            occupied[(q, r)] = side
-
-        def _stack_can_project(stack_units, from_hex, to_hex):
-            for u in stack_units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
-                    continue
-                return True
-            return False
-
-        zoc_by_side = {HL: set(), WS: set()}
-        for (q, r), units in board.unit_map.items():
-            side = occupied.get((q, r))
-            if side not in (HL, WS):
-                continue
-            from_hex = Hex(q, r)
-            for neighbor in from_hex.neighbors():
-                if (neighbor.q, neighbor.r) in occupied and occupied[(neighbor.q, neighbor.r)] != side:
-                    continue
-                if not _stack_can_project(units, from_hex, neighbor):
-                    continue
-                zoc_by_side[side].add((neighbor.q, neighbor.r))
+        facts = board_analysis.compute_control_facts(game_state)
+        occupied = facts.occupied
+        occupied_contested = facts.occupied_contested
+        zoc_by_side = facts.zoc_by_side
 
         for (q, r), side in occupied.items():
             col, row = Hex(q, r).axial_to_offset()
@@ -241,13 +130,12 @@ class TerritoryMap(OverlayBase):
             col, row = Hex(q, r).axial_to_offset()
             if len(sides) == 1:
                 side = next(iter(sides))
-                if not _neutral_seed_allows(side, Hex(q, r)):
+                if not board_analysis.neutral_seed_allows(game_state, scenario_seeds, side, Hex(q, r)):
                     continue
                 values[(col, row)] = side
             elif len(sides) > 1:
-                if _hex_is_neutral_country(Hex(q, r)):
-                    seed = scenario_seeds.get((col, row))
-                    if seed != "contested":
+                if board_analysis.is_neutral_country_hex(game_state, Hex(q, r)):
+                    if scenario_seeds.get((col, row)) != "contested":
                         continue
                 values[(col, row)] = "contested"
 
@@ -312,7 +200,10 @@ class ThreatMap(OverlayBase):
         friendly = InfluenceMap(active).compute(game_state)
         enemy_power = InfluenceMap(enemy).compute(game_state)
         loss_by_odds = self._get_expected_defender_loss_by_odds()
-        occupied, contested_occupied, zoc_by_side = self._compute_zoc(game_state)
+        facts = board_analysis.compute_control_facts(game_state)
+        occupied = facts.occupied
+        contested_occupied = facts.occupied_contested
+        zoc_by_side = facts.zoc_by_side
         enemy_occupied = {coord for coord, side in occupied.items() if side == enemy}
         defender_ref = self._reference_defender_strength(game_state, active)
         values = {}
@@ -385,60 +276,6 @@ class ThreatMap(OverlayBase):
             expected[odds] = sum(losses) / len(losses) if losses else 0.0
         self.__class__._expected_defender_loss_by_odds = expected
         return expected
-
-    def _compute_zoc(self, game_state):
-        board = game_state.map
-        occupied = {}
-        contested_occupied = set()
-        zoc_by_side = {HL: set(), WS: set()}
-
-        def _stack_control_allegiance(units):
-            allies = set()
-            for u in units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if u.allegiance in (HL, WS):
-                    allies.add(u.allegiance)
-            if len(allies) == 1:
-                return next(iter(allies))
-            if len(allies) > 1:
-                return "contested"
-            return None
-
-        def _stack_can_project(stack_units, from_hex, to_hex):
-            for u in stack_units:
-                if not getattr(u, "is_on_map", False):
-                    continue
-                if not u.is_control_unit():
-                    continue
-                if not game_state.can_unit_project_across_hexside(u, from_hex, to_hex):
-                    continue
-                return True
-            return False
-
-        for (q, r), units in board.unit_map.items():
-            side = _stack_control_allegiance(units)
-            if side == "contested":
-                contested_occupied.add((q, r))
-                continue
-            if side in (HL, WS):
-                occupied[(q, r)] = side
-
-        for (q, r), units in board.unit_map.items():
-            side = occupied.get((q, r))
-            if side not in (HL, WS):
-                continue
-            from_hex = Hex(q, r)
-            for neighbor in from_hex.neighbors():
-                if (neighbor.q, neighbor.r) in occupied and occupied[(neighbor.q, neighbor.r)] != side:
-                    continue
-                if not _stack_can_project(units, from_hex, neighbor):
-                    continue
-                zoc_by_side[side].add((neighbor.q, neighbor.r))
-
-        return occupied, contested_occupied, zoc_by_side
 
     def _reference_defender_strength(self, game_state, side):
         ratings = [
