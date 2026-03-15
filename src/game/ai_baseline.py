@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple, Set
 from src.content import loader
 from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import UnitType, UnitState, LocType, UnitRace
+from src.content.specs import UnitType, UnitState, LocType, UnitRace, HexsideType
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
@@ -640,6 +640,12 @@ class OperationalPlanner:
             else:
                 if objective:
                     mission_type = "push_objective" if objective.owner != ctx.side else "secure"
+                    if (
+                        offensive
+                        and objective.owner != ctx.side
+                        and self._should_prepare_assault(ctx, plan, group, objective)
+                    ):
+                        mission_type = "prepare_assault"
                     missions.append(Mission(
                         group=group,
                         mission_type=mission_type,
@@ -659,6 +665,36 @@ class OperationalPlanner:
 
         missions.sort(key=lambda m: (m.priority, m.group.power), reverse=True)
         return missions
+
+    @staticmethod
+    def _should_prepare_assault(ctx: AIContext, plan: StrategicPlan, group: TaskGroup, objective: Objective) -> bool:
+        target_hex = Hex.offset_to_axial(objective.coords[0], objective.coords[1])
+        distance = group.hex.distance_to(target_hex)
+        if distance > 6:
+            return False
+        if distance <= 1:
+            return False
+        if group.has_fleet:
+            return False
+
+        defenders = [
+            u for u in ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+            if getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False)
+        ]
+        defender_power = sum(
+            float(getattr(u, "combat_rating", 0) or 0)
+            for u in defenders
+            if ctx.game_state.is_combat_unit(u)
+        )
+        if defender_power <= 0:
+            return False
+
+        # Offensive groups near important fronts should stage when currently underpowered,
+        # unless must-act pressure requires immediate risk acceptance.
+        must_force = bool(plan.must_act or (plan.objective_deadline_turn is not None and plan.objective_deadline_turn - ctx.turn <= 2))
+        if must_force:
+            return False
+        return group.power < defender_power * 1.15
 
     @staticmethod
     def _collect_location_map(ctx: AIContext) -> Dict[Tuple[int, int], object]:
@@ -687,6 +723,7 @@ class OperationalPlanner:
 class TacticalPlanner:
     MOVE_WEIGHTS = {
         "push_objective": {"objective": 12, "threat": -4, "support": 2, "capture": 8},
+        "prepare_assault": {"objective": 11, "threat": -5, "support": 5, "capture": 3},
         "main_effort_attack": {"objective": 16, "threat": -5, "support": 4, "capture": 10},
         "support_main_effort": {"objective": 10, "threat": -4, "support": 5, "capture": 6},
         "secure": {"objective": 8, "threat": -5, "support": 3, "capture": 3},
@@ -982,6 +1019,31 @@ class TacticalPlanner:
         if loc and loc.occupier != ctx.side:
             score += 10
 
+        if mission.mission_type == "prepare_assault" and mission.target_hex is not None:
+            front_dist = target_hex.distance_to(mission.target_hex)
+            if front_dist == 1:
+                score += 24
+            elif front_dist == 2:
+                score += 12
+            elif front_dist == 0:
+                score -= 20
+
+            # Avoid isolated forward staging on contested fronts.
+            adj_friendly = 0
+            adj_enemy = 0
+            for neighbor in target_hex.neighbors():
+                nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
+                if any(getattr(u, "allegiance", None) == ctx.side and ctx.game_state.is_combat_unit(u) for u in nstack):
+                    adj_friendly += 1
+                if any(getattr(u, "allegiance", None) == ctx.enemy and ctx.game_state.is_combat_unit(u) for u in nstack):
+                    adj_enemy += 1
+            if front_dist <= 1 and adj_friendly < adj_enemy:
+                score -= 18
+
+        # Air support doctrine: avoid unsupported spearhead moves by air-only groups.
+        if mission.group.has_wing and not mission.group.has_army and not mission.group.has_fleet:
+            score += self._air_support_doctrine_score(ctx, plan, mission, target_hex)
+
         # Offensive mission scoring: STRICT anti-passivity
         offensive_types = {"push_objective", "main_effort_attack", "support_main_effort"}
         if mission.mission_type in offensive_types and plan.main_objective:
@@ -1030,6 +1092,42 @@ class TacticalPlanner:
                     if next_dist >= current_dist and support_gain <= 0:
                         score -= 25
         return score
+
+    @staticmethod
+    def _air_support_doctrine_score(ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
+        friendly_ground_hexes: List[Hex] = []
+        for u in ctx.friendly_units:
+            if not getattr(u, "is_on_map", False):
+                continue
+            if getattr(u, "transport_host", None) is not None:
+                continue
+            is_ground = getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET
+            if not is_ground:
+                continue
+            if not getattr(u, "position", None) or u.position[0] is None:
+                continue
+            friendly_ground_hexes.append(Hex.offset_to_axial(*u.position))
+
+        nearest_ground_dist = min((target_hex.distance_to(h) for h in friendly_ground_hexes), default=99)
+        target_stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+        enemy_combat = [
+            u for u in target_stack
+            if getattr(u, "allegiance", None) == ctx.enemy
+            and getattr(u, "is_on_map", False)
+            and ctx.game_state.is_combat_unit(u)
+        ]
+        enemy_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in enemy_combat)
+        loc = ctx.game_state.map.get_location(target_hex)
+        is_enemy_location = bool(loc and getattr(loc, "occupier", None) == ctx.enemy)
+
+        # Stay near ground effort unless attacking clearly weak/valuable targets.
+        if nearest_ground_dist > 3 and enemy_power > 3:
+            return -28.0
+        if nearest_ground_dist > 4 and is_enemy_location and enemy_power <= 3:
+            return 8.0
+        if plan.main_objective and target_hex.distance_to(Hex.offset_to_axial(*plan.main_objective.coords)) <= 2:
+            return 6.0
+        return 0.0
 
     def _maybe_execute_transport_action(self, ctx: AIContext, plan: StrategicPlan) -> bool:
         """Execute transport actions in priority order: unboard, board commanders, fleet transport."""
@@ -1152,6 +1250,9 @@ class TacticalPlanner:
         actions = []
         board = ctx.game_state.map
         failed_targets = ctx.failed_combat_targets or set()
+        missions_by_group = {_task_group_key(m.group): m for m in missions}
+        target_to_groups: Dict[Tuple[int, int], Dict[str, Any]] = {}
+
         for mission in missions:
             group = mission.group
             if not group.units:
@@ -1159,7 +1260,6 @@ class TacticalPlanner:
             if all(getattr(u, "attacked_this_turn", False) for u in group.units):
                 continue
             for neighbor in group.hex.neighbors():
-                # Skip targets that previously produced no-effect results this phase
                 if (neighbor.q, neighbor.r) in failed_targets:
                     continue
                 defenders = board.get_units_in_hex(neighbor.q, neighbor.r)
@@ -1168,26 +1268,69 @@ class TacticalPlanner:
                     continue
                 if not ctx.game_state.can_units_attack_stack(group.units, defenders):
                     continue
-                score = self._score_combat(ctx, plan, mission, group, defenders, neighbor)
-                actions.append(TacticalAction(
-                    kind="combat",
-                    group=group,
-                    target_hex=neighbor,
-                    score=score,
-                    details=mission.mission_type,
-                ))
+                target_key = (neighbor.q, neighbor.r)
+                bucket = target_to_groups.setdefault(target_key, {"hex": neighbor, "defenders": defenders, "groups": {}})
+                bucket["groups"][_task_group_key(group)] = group
+
+        for bucket in target_to_groups.values():
+            target_hex = bucket["hex"]
+            defenders = bucket["defenders"]
+            eligible_groups: List[TaskGroup] = sorted(
+                list(bucket["groups"].values()),
+                key=lambda g: (self._attack_group_strength(ctx, g), g.power),
+                reverse=True,
+            )
+            if not eligible_groups:
+                continue
+            for package in self._generate_attack_packages(eligible_groups, max_groups=4):
+                attackers = [
+                    u for g in package for u in g.units
+                    if getattr(u, "is_on_map", False)
+                    and not getattr(u, "attacked_this_turn", False)
+                ]
+                if not attackers:
+                    continue
+                if not ctx.game_state.can_units_attack_stack(attackers, defenders):
+                    continue
+                gate = self._evaluate_combat_package_gate(ctx, plan, target_hex, attackers, defenders)
+                if not gate["allow"]:
+                    continue
+                score = self._score_combat_package(
+                    ctx,
+                    plan,
+                    package,
+                    [missions_by_group.get(_task_group_key(g)) for g in package if missions_by_group.get(_task_group_key(g))],
+                    defenders,
+                    target_hex,
+                    gate,
+                )
+                actions.append({
+                    "target_hex": target_hex,
+                    "attackers": attackers,
+                    "groups": package,
+                    "score": score,
+                    "details": gate.get("note", ""),
+                })
 
         if not actions:
             return False
 
-        actions.sort(key=lambda a: (a.score, a.group.power), reverse=True)
+        actions.sort(
+            key=lambda a: (
+                a["score"],
+                sum(g.power for g in a["groups"]),
+                len(a["groups"]),
+            ),
+            reverse=True,
+        )
         best = actions[0]
-        if best.score < 20:
+        if best["score"] < 20:
             return False
 
-        attackers = [u for u in best.group.units if getattr(u, "is_on_map", False)]
-        defenders_before = list(ctx.game_state.get_units_at(best.target_hex))
-        resolution = ctx.game_state.resolve_combat(attackers, best.target_hex)
+        target_hex = best["target_hex"]
+        attackers = [u for u in best["attackers"] if getattr(u, "is_on_map", False)]
+        defenders_before = list(ctx.game_state.get_units_at(target_hex))
+        resolution = ctx.game_state.resolve_combat(attackers, target_hex)
         show_combat_result_popup(
             ctx.game_state,
             title="AI Combat",
@@ -1195,19 +1338,175 @@ class TacticalPlanner:
             defenders=defenders_before,
             resolution=resolution,
             context="ai_combat",
-            target_hex=best.target_hex,
+            target_hex=target_hex,
         )
-        # Mark all attacking units as having attacked this turn
-        # This prevents endless repeated attacks in the same combat phase
         for u in attackers:
             u.attacked_this_turn = True
-        # Safety net: track no-effect combat results to avoid retrying same target
         if resolution and resolution.get("result") == "-/-":
-            target_key = (best.target_hex.q, best.target_hex.r)
+            target_key = (target_hex.q, target_hex.r)
             failed_targets.add(target_key)
         if resolution and resolution.get("advance_available"):
-            ctx.game_state.advance_after_combat(attackers, best.target_hex)
+            ctx.game_state.advance_after_combat(attackers, target_hex)
         return True
+
+    @staticmethod
+    def _generate_attack_packages(groups: List[TaskGroup], max_groups: int = 4) -> List[List[TaskGroup]]:
+        pool = list(groups[:max_groups])
+        if not pool:
+            return []
+        packages: List[List[TaskGroup]] = []
+        for size in (1, 2, 3):
+            if len(pool) >= size:
+                packages.append(pool[:size])
+        if len(pool) > 3:
+            packages.append(pool)
+        return packages
+
+    @staticmethod
+    def _attack_group_strength(ctx: AIContext, group: TaskGroup) -> float:
+        combat_power = sum(
+            float(getattr(u, "combat_rating", 0) or 0)
+            for u in group.units
+            if ctx.game_state.is_combat_unit(u)
+        )
+        if group.has_army:
+            combat_power += 2.0
+        if group.has_wing and not group.has_army:
+            combat_power -= 1.5
+        return combat_power
+
+    def _evaluate_combat_package_gate(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        target_hex: Hex,
+        attackers: List[object],
+        defenders: List[object],
+    ) -> Dict[str, Any]:
+        att_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in attackers if ctx.game_state.is_combat_unit(u))
+        def_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders if ctx.game_state.is_combat_unit(u))
+        if att_power <= 0 or def_power <= 0:
+            return {"allow": False, "note": "no_combat_power"}
+
+        loc = ctx.game_state.map.get_location(target_hex)
+        loc_bonus = 0.0
+        if loc:
+            lt = str(getattr(loc, "loc_type", "") or "")
+            if lt == LocType.CITY.value:
+                loc_bonus += 3.0
+            elif lt == LocType.PORT.value:
+                loc_bonus += 2.0
+            elif lt == LocType.FORTRESS.value:
+                loc_bonus += 5.0
+            elif lt == LocType.UNDERCITY.value:
+                loc_bonus += 5.0
+            if getattr(loc, "is_capital", False):
+                loc_bonus += 2.0
+
+        crossing_pen = self._crossing_attack_penalty(ctx, attackers, target_hex)
+        effective_att = max(1.0, att_power - crossing_pen)
+        effective_def = max(1.0, def_power + loc_bonus)
+        odds = effective_att / effective_def
+
+        offensive = plan.offensive_side == ctx.side
+        min_odds = 1.05 if offensive else 1.2
+        if plan.posture == "desperate_offensive":
+            min_odds -= 0.08
+
+        turns_left = None
+        if plan.objective_deadline_turn is not None:
+            turns_left = plan.objective_deadline_turn - ctx.turn
+        critical_deadline = bool(plan.must_act or (turns_left is not None and turns_left <= 2))
+        if critical_deadline:
+            min_odds -= 0.2
+        min_odds = max(0.85, min_odds)
+
+        main_obj_hex = Hex.offset_to_axial(*plan.main_objective.coords) if plan.main_objective else None
+        is_main_objective_hex = bool(main_obj_hex and target_hex.q == main_obj_hex.q and target_hex.r == main_obj_hex.r)
+
+        air_combat = [u for u in attackers if ctx.game_state.is_combat_unit(u)]
+        ground_present = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in air_combat)
+        air_only = bool(air_combat) and not ground_present and any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in air_combat)
+        if air_only and not self._is_air_special_opportunity(ctx, target_hex, defenders, is_main_objective_hex):
+            return {"allow": False, "note": "air_only_gate", "odds": odds}
+
+        if odds < 0.75 and not (critical_deadline and is_main_objective_hex and odds >= 0.6):
+            return {"allow": False, "note": "suicide_odds_gate", "odds": odds}
+        if crossing_pen >= 4.0 and odds < 1.35:
+            return {"allow": False, "note": "crossing_gate", "odds": odds}
+        if odds < min_odds:
+            return {"allow": False, "note": "odds_gate", "odds": odds}
+
+        return {
+            "allow": True,
+            "note": "ok",
+            "odds": odds,
+            "effective_att": effective_att,
+            "effective_def": effective_def,
+        }
+
+    @staticmethod
+    def _is_air_special_opportunity(ctx: AIContext, target_hex: Hex, defenders: List[object], is_main_objective_hex: bool) -> bool:
+        def_power = sum(
+            float(getattr(u, "combat_rating", 0) or 0)
+            for u in defenders
+            if ctx.game_state.is_combat_unit(u)
+        )
+        loc = ctx.game_state.map.get_location(target_hex)
+        weak_enemy_location = bool(loc and getattr(loc, "occupier", None) == ctx.enemy and def_power <= 3.0)
+        return weak_enemy_location or (is_main_objective_hex and def_power <= 2.0)
+
+    @staticmethod
+    def _crossing_attack_penalty(ctx: AIContext, attackers: List[object], target_hex: Hex) -> float:
+        penalty = 0.0
+        for u in attackers:
+            if not getattr(u, "is_on_map", False):
+                continue
+            if not getattr(u, "position", None) or u.position[0] is None:
+                continue
+            if getattr(u, "unit_type", None) == UnitType.FLEET:
+                continue
+            if not getattr(u, "is_army", lambda: False)():
+                continue
+            src = Hex.offset_to_axial(*u.position)
+            if target_hex not in src.neighbors():
+                continue
+            edge = ctx.game_state.map.get_effective_hexside(src, target_hex)
+            if edge in (HexsideType.RIVER, HexsideType.RIVER.value, HexsideType.BRIDGE, HexsideType.BRIDGE.value):
+                penalty += 1.0
+            elif edge in (HexsideType.FORD, HexsideType.FORD.value):
+                penalty += 0.7
+            elif edge in (HexsideType.PASS, HexsideType.PASS.value):
+                penalty += 0.5
+        return penalty
+
+    def _score_combat_package(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        groups: List[TaskGroup],
+        missions: List[Mission],
+        defenders: List[object],
+        target_hex: Hex,
+        gate: Dict[str, Any],
+    ) -> float:
+        total_power = sum(g.power for g in groups)
+        defenders_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders if ctx.game_state.is_combat_unit(u))
+        odds = float(gate.get("odds", 1.0))
+        score = odds * 45.0 + total_power - defenders_power * 0.4
+
+        loc = ctx.game_state.map.get_location(target_hex)
+        if loc and getattr(loc, "occupier", None) == ctx.enemy:
+            score += 12.0
+        if any(m and m.objective and m.objective.coords == target_hex.axial_to_offset() for m in missions):
+            score += 10.0
+        if plan.main_objective and target_hex.axial_to_offset() == plan.main_objective.coords:
+            score += 20.0 + plan.urgency_score * 15.0
+        if plan.must_act:
+            score += 8.0
+        if len(groups) >= 2:
+            score += 6.0
+        return score
 
     def _score_combat(self, ctx: AIContext, plan: StrategicPlan, mission: Mission, group: TaskGroup, defenders: List[object], target_hex: Hex) -> float:
         att_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in group.units if ctx.game_state.is_combat_unit(u))

@@ -67,7 +67,7 @@ class TextFormatter:
     def format_combat_log(attackers, defenders, result):
         attacker_names = TextFormatter.format_units(attackers)
         defender_names = TextFormatter.format_units(defenders)
-        return f"Combat result {result}: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
+        return f"Combat result {result}: \nAttackers [{attacker_names}] \nvs \nDefenders [{defender_names}]"
 
     @staticmethod
     def format_naval_log(attackers, defenders, outcome):

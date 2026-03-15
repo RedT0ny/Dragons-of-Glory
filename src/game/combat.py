@@ -359,16 +359,10 @@ class CombatResolver:
         elif defender_loc_type == LocType.UNDERCITY.value:
             add_part("location_undercity", -10)
 
-        # CROSSINGS (if any attacking army crosses these)
-        crossings = self._get_attacker_crossing_types(defender_hex)
-        if "river" in crossings:
-            add_part("crossing_river", -4)
-        if "bridge" in crossings:
-            add_part("crossing_bridge", -4)
-        if "ford" in crossings:
-            add_part("crossing_ford", -3)
-        if "pass" in crossings:
-            add_part("crossing_pass", -2)
+        # CROSSINGS: apply exactly one crossing DRM (the single worst among participating ground attackers)
+        crossing_label, crossing_drm = self._resolve_worst_attacker_crossing(defender_hex)
+        if crossing_label and crossing_drm:
+            add_part(crossing_label, crossing_drm)
 
         # TERRAIN AFFINITY
         add_part("attacker_terrain_affinity", self._count_attacker_terrain_affinity_bonus())
@@ -491,10 +485,10 @@ class CombatResolver:
             self.game_state._consume_asset(asset, unit)
             return
 
-    def _get_attacker_crossing_types(self, defender_hex):
-        crossings = set()
+    def _collect_attacker_crossing_candidates(self, defender_hex):
+        candidates = []
         if not defender_hex or not self.game_state or not self.game_state.map:
-            return crossings
+            return candidates
         for unit in self.attackers:
             if not (hasattr(unit, "is_army") and unit.is_army()):
                 continue
@@ -511,7 +505,7 @@ class CombatResolver:
                 continue
 
             if self.game_state.map.is_ship_bridge(attacker_hex, defender_hex, unit.allegiance):
-                crossings.add("bridge")
+                candidates.append(("crossing_bridge", -4))
                 continue
 
             hexside = self.game_state.map.get_effective_hexside(attacker_hex, defender_hex)
@@ -521,14 +515,27 @@ class CombatResolver:
                 HexsideType.DEEP_RIVER,
                 HexsideType.DEEP_RIVER.value,
             ):
-                crossings.add("river")
+                candidates.append(("crossing_river", -4))
             elif hexside in (HexsideType.BRIDGE, HexsideType.BRIDGE.value):
-                crossings.add("bridge")
+                candidates.append(("crossing_bridge", -4))
             elif hexside in (HexsideType.FORD, HexsideType.FORD.value):
-                crossings.add("ford")
+                candidates.append(("crossing_ford", -3))
             elif hexside in (HexsideType.PASS, HexsideType.PASS.value):
-                crossings.add("pass")
-        return crossings
+                candidates.append(("crossing_pass", -2))
+        return candidates
+
+    def _resolve_worst_attacker_crossing(self, defender_hex):
+        candidates = self._collect_attacker_crossing_candidates(defender_hex)
+        if not candidates:
+            return None, 0
+        # Worst means most negative DRM; tie-break keeps a stable severity order.
+        tie_priority = {
+            "crossing_river": 4,
+            "crossing_bridge": 3,
+            "crossing_ford": 2,
+            "crossing_pass": 1,
+        }
+        return min(candidates, key=lambda item: (item[1], -tie_priority.get(item[0], 0)))
 
     def _normalize_loc_type(self, loc):
         if not loc:
@@ -622,38 +629,12 @@ class CombatResolver:
             if not unit.position or unit.position[0] is None or unit.position[1] is None:
                 continue
             start_hex = Hex.offset_to_axial(*unit.position)
-            valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
+            valid_hexes = self.game_state._get_valid_retreat_hexes(unit, start_hex)
             if not valid_hexes:
                 unit.eliminate()
                 continue
             retreat_hex = random.choice(valid_hexes)
             self.game_state.move_unit(unit, retreat_hex)
-
-    def _get_valid_retreat_hexes(self, unit, start_hex):
-        valid = []
-        for neighbor in start_hex.neighbors():
-            col, row = neighbor.axial_to_offset()
-            if not self.game_state.is_hex_in_bounds(col, row):
-                continue
-            if not self.game_state.map.can_unit_land_on_hex(unit, neighbor):
-                continue
-            if self.game_state.map.has_enemy_army(neighbor, unit.allegiance):
-                continue
-            if not self.game_state.map.can_stack_move_to([unit], neighbor):
-                continue
-            cost = self.game_state.map.get_movement_cost(unit, start_hex, neighbor)
-            if cost == float('inf') or cost is None:
-                continue
-
-            friendly_present = any(
-                u.allegiance == unit.allegiance and u.is_control_unit()
-                for u in self.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-            )
-            if not friendly_present and self.game_state.map.is_adjacent_to_enemy(neighbor, unit):
-                continue
-
-            valid.append(neighbor)
-        return valid
 
 
 class NavalCombatResolver:
@@ -1153,7 +1134,7 @@ class CombatClickHandler:
         from collections import defaultdict
         stacks = defaultdict(list)
         for u in attackers:
-            if u.position and u.position[0] is not None and u.position[1] is not None:
+            if u.position and None not in u.position:
                 stacks[u.position].append(u)
 
         if not stacks:
@@ -1186,7 +1167,7 @@ class CombatClickHandler:
         # 1. Get all unique positions of attackers (usually they are in one stack, but could be multi-hex attack)
         attacker_hexes = set()
         for u in attackers:
-            if u.position and u.position[0] is not None and u.position[1] is not None:
+            if u.position and None not in u.position:
                 from src.game.map import Hex
                 attacker_hexes.add(Hex.offset_to_axial(*u.position))
 
@@ -1203,12 +1184,11 @@ class CombatClickHandler:
                 if not enemy_units:
                     continue
 
-                if not self.game_state.can_units_attack_stack(attackers, enemy_units):
+                if not self.game_state.can_units_attack_target_hex(attackers, next_hex):
                     continue
-
-                # Validate "Move into" rule
-                if self.is_valid_attack_hex(attackers, start_hex, next_hex):
-                    valid_target_offsets.add(next_hex.axial_to_offset())
+                if not self.game_state.can_units_attack_stack(attackers, enemy_units, target_hex=next_hex):
+                    continue
+                valid_target_offsets.add(next_hex.axial_to_offset())
 
         return list(valid_target_offsets)
 
@@ -1234,20 +1214,6 @@ class CombatClickHandler:
                 valid_target_offsets.add(target_hex.axial_to_offset())
 
         return list(valid_target_offsets)
-
-    def is_valid_attack_hex(self, attackers, start_hex, target_hex):
-        """
-        Checks if specific units can attack across this hexside.
-        """
-        hexside = self.game_state.map.get_effective_hexside(start_hex, target_hex)
-
-        if hexside == HexsideType.MOUNTAIN.value:
-            # Check if ALL attackers are capable
-            for u in attackers:
-                can_cross = u.unit_type == 'wing' or u.terrain_affinity == TerrainType.MOUNTAIN
-                if not can_cross:
-                    return False
-        return True
 
     def calculate_odds_preview(self, attackers, defenders, hex_position):
         """Helper to just get the string "3:1" etc without rolling."""

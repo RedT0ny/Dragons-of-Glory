@@ -178,6 +178,35 @@ class GameState:
         cost = self.map.get_movement_cost(unit, from_hex, to_hex)
         return cost is not None and cost != float("inf")
 
+    def can_units_attack_target_hex(self, attackers, target_hex) -> bool:
+        """
+        Shared land-combat hexside legality check.
+        Returns False when any relevant attacking combat unit cannot legally
+        project/attack across its own attacker->target hexside.
+        """
+        if not target_hex:
+            return False
+
+        relevant = [
+            u for u in (attackers or [])
+            if getattr(u, "is_on_map", False)
+            and self._is_combat_stack_unit(u)
+            and not u.is_fleet()
+            and getattr(u, "transport_host", None) is None
+        ]
+        if not relevant:
+            return False
+
+        for unit in relevant:
+            if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:
+                return False
+            from_hex = Hex.offset_to_axial(*unit.position)
+            if target_hex not in from_hex.neighbors():
+                return False
+            if not self.can_unit_project_across_hexside(unit, from_hex, target_hex):
+                return False
+        return True
+
     def can_control_probe_project_across_hexside(self, from_hex, to_hex, allegiance=None) -> bool:
         if not self.map:
             return False
@@ -893,9 +922,7 @@ class GameState:
             casualty.position = (None, None)
             losses.append(casualty)
 
-        self.invalidate_analysis({"control_facts"})
-        self.update_territory_overrides()
-        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        self.finalize_board_state_change()
         return losses
 
     def _can_trace_supply_line(self, start_hex, allegiance, sample_unit, friendly_locations):
@@ -1219,12 +1246,15 @@ class GameState:
             self._displace_enemy_fleets_in_hex(unit, target_hex)
             self._force_enemy_leader_escapes_in_hex(unit, target_hex)
 
-        if invalidate_analysis:
-            self.invalidate_analysis({"control_facts"})
-        if update_territory:
-            self.update_territory_overrides()
-        if invalidate_overlays:
-            self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        if invalidate_analysis and update_territory and invalidate_overlays:
+            self.finalize_board_state_change()
+        else:
+            if invalidate_analysis:
+                self.invalidate_analysis({"control_facts"})
+            if update_territory:
+                self.update_territory_overrides()
+            if invalidate_overlays:
+                self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
         self._apply_escape_if_eligible(unit, offset_coords)
 
@@ -1680,7 +1710,7 @@ class GameState:
                 "advance_available": False,
             }
         attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
-        if not self.can_units_attack_stack(attackers, defenders):
+        if not self.can_units_attack_stack(attackers, defenders, target_hex=hex_position):
             result = "-/-"
             print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
@@ -1838,6 +1868,7 @@ class GameState:
             allow_consumable_other_bonus=True,
         )
         result = resolver.resolve()
+        print(f"Combat at Hex ({hex_position})")
         print(TextFormatter.format_combat_log(attackers, defenders, result))
         self._cleanup_destroyed_units(attackers + defenders)
         revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
@@ -1930,10 +1961,18 @@ class GameState:
                 player.assets.pop(asset.id, None)
                 return
 
-    def can_units_attack_stack(self, attackers, defenders):
+    def can_units_attack_stack(self, attackers, defenders, target_hex=None):
         attackers = [u for u in attackers if getattr(u, "is_on_map", False)]
         defenders = [u for u in defenders if getattr(u, "is_on_map", False)]
         if not attackers or not defenders:
+            return False
+
+        if target_hex is None:
+            for d in defenders:
+                if getattr(d, "position", None) and d.position[0] is not None and d.position[1] is not None:
+                    target_hex = Hex.offset_to_axial(*d.position)
+                    break
+        if target_hex and not self.can_units_attack_target_hex(attackers, target_hex):
             return False
 
         defenders_have_dragons = any(self._is_dragon_unit(u) for u in defenders)
@@ -2290,7 +2329,8 @@ class GameState:
             valid.append(neighbor)
         return valid
 
-    def _can_advance_after_combat(self, attackers, target_hex, defender_allegiances, attacker_had_to_retreat):
+    def _can_advance_after_combat(self, attackers, target_hex, defender_allegiances, attacker_had_to_retreat) -> bool:
+        #Check if the attacker can advance after combat.
         if attacker_had_to_retreat:
             return False
         if not defender_allegiances:
@@ -2324,11 +2364,15 @@ class GameState:
         return False
 
     def advance_after_combat(self, attackers, target_hex):
+        """
+        Advances the game state after a combat round.
+        Handles movement of units after combat, ensuring they can move to the target hex.
+        """
         candidates = []
         for unit in attackers:
             if not unit.is_on_map or not unit.position:
                 continue
-            if unit.position[0] is None or unit.position[1] is None:
+            if None in unit.position:
                 continue
             if not (unit.is_army() or unit.is_wing()):
                 continue
@@ -2451,10 +2495,10 @@ class GameState:
         return [h for h in candidates if origin_hex.distance_to(h) == min_distance]
 
     def _is_combat_stack_unit(self, unit):
-        return bool(
-            (hasattr(unit, "is_army") and unit.is_army())
-            or unit.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING, UnitType.CITADEL)
-        )
+        """
+        Determines if a unit is part of a combat stack.
+        """
+        return unit.is_army() or unit.is_wing() or unit.is_citadel()
 
     @staticmethod
     def _is_leader_only_stack(units):
@@ -2516,9 +2560,7 @@ class GameState:
                 self.map.remove_unit_from_spatial_map(unit)
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
-        self.invalidate_analysis({"control_facts"})
-        self.update_territory_overrides()
-        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        self.finalize_board_state_change()
 
     def board_unit(self, carrier, unit):
         """Boards `unit` onto `carrier` if allowed.
@@ -2624,9 +2666,7 @@ class GameState:
         self.map.remove_unit_from_spatial_map(unit)
         unit.position = offset_coords
         self.map.add_unit_to_spatial_map(unit)
-        self.invalidate_analysis({"control_facts"})
-        self.update_territory_overrides()
-        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        self.finalize_board_state_change()
         if carrier.is_wing():
             if hasattr(carrier, "movement_points"):
                 carrier.movement_points = 0
