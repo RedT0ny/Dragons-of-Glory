@@ -196,31 +196,18 @@ class DiplomacyActivationService:
         )
 
     def _invasion_modifier(self, invader_sp: int, defender_sp: int) -> int:
-        if defender_sp <= 0:
-            return 6
+        if defender_sp <= 0: return 6
         ratio = invader_sp / defender_sp
-        if ratio < 0.18:
-            return -6
-        if ratio < 0.22:
-            return -5
-        if ratio < 0.29:
-            return -4
-        if ratio < 0.40:
-            return -3
-        if ratio < 0.83:
-            return -2
-        if ratio < 1.0:
-            return -1
-        if ratio == 1.0:
-            return 0
-        if ratio <= 1.5:
-            return 1
-        if ratio <= 2.0:
-            return 2
-        if ratio <= 3.0:
-            return 3
-        if ratio <= 4.0:
-            return 4
-        if ratio <= 5.0:
-            return 5
+        if ratio < 0.18: return -6
+        if ratio < 0.22: return -5
+        if ratio < 0.29: return -4
+        if ratio < 0.40: return -3
+        if ratio < 0.83: return -2
+        if ratio < 1.0: return -1
+        if ratio == 1.0: return 0
+        if ratio <= 1.5: return 1
+        if ratio <= 2.0: return 2
+        if ratio <= 3.0: return 3
+        if ratio <= 4.0: return 4
+        if ratio <= 5.0: return 5
         return 6

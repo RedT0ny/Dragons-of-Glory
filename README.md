@@ -9,6 +9,7 @@ TODO:
 - Add Dragon #170's Advanced Rules in "settings" - Intercept and supply done, winter turns missing.
 - Review country colors and unit icons to make them more distinguishable (Partially done).
 - I18n (Partially)
+- Simplify GameState.resolve_combat()
 
 TODO BUGFIX:
 
