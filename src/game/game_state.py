@@ -1655,8 +1655,13 @@ class GameState:
     def _resolve_add_units(self, unit_key: str, allegiance: str):
         self.event_system._resolve_add_units(unit_key, allegiance)
 
-    def apply_event_effect(self, spec):
-        return self.event_system.apply_event_effect(spec)
+    def apply_event_effect(self, event):
+        """Applies the effects of an event. Accepts Event object for occurrence tracking."""
+        return self.event_system.apply_event_effect(event)
+
+    def apply_event_effect_by_spec(self, spec):
+        """Applies the effects of an event given its spec. Looks up Event for occurrence tracking."""
+        return self.event_system.apply_event_effect_by_spec(spec)
 
     def draw_strategic_event(self, allegiance):
         return self.event_system.draw_strategic_event(allegiance)

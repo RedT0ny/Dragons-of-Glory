@@ -13,7 +13,7 @@ def test_combat_bonus_event_is_applied_to_drawing_player():
         HL: SimpleNamespace(allegiance=HL, grant_asset=lambda asset_id, game_state: None),
     }
 
-    gs.apply_event_effect(SimpleNamespace(effects={"combat_bonus": 1}))
+    gs.apply_event_effect(SimpleNamespace(effects={"combat_bonus": 1}, occurrence_count=1))
     assert gs.get_combat_bonus(WS) == 1
     assert gs.get_combat_bonus(HL) == 0
 

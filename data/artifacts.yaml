@@ -173,7 +173,7 @@ plate_of_solamnus:
   picture: "solamnus_plate.svg"
   effect: "+1 Tactical Rating. Armor bonus."
   requirements:
-    - { type: "unit_type", value: "army" }
+    - { type: "unit_type", value: "leader" }
     - { type: "race", value: "solamnic" }
   bonus:
     tactical_rating: 1

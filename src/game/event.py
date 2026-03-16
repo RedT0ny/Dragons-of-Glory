@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 from ..content.specs import (
     RequirementType,
     ASSET_REQUIREMENTS,
@@ -40,9 +40,10 @@ class Event:
         self.is_active = False
 
 class Asset:
-    def __init__(self, spec):
+    def __init__(self, spec, instance_id: Optional[str] = None):
         self.spec = spec
-        self.id = spec.id
+        self.id = instance_id if instance_id else spec.id
+        self.base_id = spec.id  # The original spec ID for type checking
         self.description = spec.description
         self.bonus = spec.bonus
         self.requirements = spec.requirements

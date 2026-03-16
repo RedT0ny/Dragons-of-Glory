@@ -104,14 +104,18 @@ def create_units_from_specs(specs: List[UnitSpec], allegiance: Optional[str] = N
     return created
 
 
-def create_asset_from_spec(spec: AssetSpec) -> Asset:
+def create_asset_from_spec(spec: AssetSpec, instance_id: Optional[str] = None) -> Asset:
     """
     Creates a live Asset instance from an AssetSpec blueprint.
     Supports dynamic placeholder materialization such as:
     {random:option 1|option 2|...}
+    
+    :param spec: The AssetSpec blueprint
+    :param instance_id: Optional unique identifier for this instance (e.g., "dragonarmor_1")
+                        If not provided, uses the spec.id
     """
     materialized_spec = _materialize_asset_spec_random_fields(spec)
-    return Asset(materialized_spec)
+    return Asset(materialized_spec, instance_id=instance_id)
 
 
 def _materialize_asset_spec_random_fields(spec: AssetSpec) -> AssetSpec:
@@ -202,9 +206,11 @@ class ScenarioBuilder:
         game_state.strategic_event_pool = []
         for s in event_specs:
             # We pass generic lambdas that delegate back to GameState logic
+            # Pass the event object (not just spec) so occurrence_count is available for instance IDs
+            # Note: Create Event first, then set lambdas to avoid closure capture issues
             evt = Event(s,
-                        trigger_func=lambda gs, s=s: gs.check_event_trigger_conditions(s.trigger_conditions),
-                        effect_func=lambda gs, s=s: gs.apply_event_effect(s))
+                        trigger_func=lambda gs, spec=s: gs.check_event_trigger_conditions(spec.trigger_conditions),
+                        effect_func=lambda gs, spec=s: gs.apply_event_effect_by_spec(spec))
             game_state.strategic_event_pool.append(evt)
 
         # Register existing units on the map if they have positions

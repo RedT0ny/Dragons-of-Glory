@@ -1,4 +1,5 @@
 import os
+import re
 from time import perf_counter
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -107,7 +108,15 @@ class AssetDetails(QFrame):
             self.desc_field.clear()
             return
 
-        self.name_label.setText(asset.spec.id.replace("_", " ").title())
+        # Show instance number in name if it's a multi-instance asset
+        display_name = asset.spec.id.replace("_", " ").title()
+        if asset.id != asset.base_id:
+            match = re.match(r'^.+_(\d+)$', asset.id)
+            if match:
+                instance_num = match.group(1)
+                display_name = f"{display_name} #{instance_num}"
+        
+        self.name_label.setText(display_name)
         self.desc_field.setText(asset.description)
 
         # Bonus Text
@@ -311,7 +320,18 @@ class AssetsTab(QWidget):
             self.asset_tree.addTopLevelItem(c)
 
         for asset_id, asset in player.assets.items():
-            node = QTreeWidgetItem([asset.spec.id.replace("_", " ").title()])
+            # Display name: Use instance ID for artifacts with multiple instances, otherwise use base name
+            display_name = asset.spec.id.replace("_", " ").title()
+            
+            # Add instance number suffix for artifacts that have multiple instances
+            if asset.id != asset.base_id:
+                # Extract instance number from asset.id (e.g., "dragonarmor_2" -> " #2")
+                match = re.match(r'^.+_(\d+)$', asset.id)
+                if match:
+                    instance_num = match.group(1)
+                    display_name = f"{display_name} #{instance_num}"
+            
+            node = QTreeWidgetItem([display_name])
             node.setData(0, Qt.UserRole, asset) # Store asset object
 
             # Add to category

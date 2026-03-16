@@ -13,7 +13,6 @@ TODO:
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Cannot allocate multiple artifacts (dragonarmor, dragonlance, etc.), only the first can be removed and reassigned.
 - If a Dragon unit is eliminated and sent to reserve, its passenger shall also be eliminated.
 
 Notes:

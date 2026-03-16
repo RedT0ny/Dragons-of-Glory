@@ -87,8 +87,32 @@ class EventSystem:
         for u in created:
             print(f"Unit {u.id} added/ready for {allegiance}")
 
-    def apply_event_effect(self, spec):
+    def apply_event_effect_by_spec(self, spec):
+        """
+        Applies the effects of an event given its spec.
+        Looks up the corresponding Event object to get occurrence_count.
+        """
+        # Find the Event object that matches this spec
+        for event in self.game_state.strategic_event_pool:
+            if event.spec is spec:
+                self.apply_event_effect(event)
+                return
+        # Fallback: if event not found in pool, create a temporary one
+        # This shouldn't happen in normal gameplay
+        temp_event = type('TempEvent', (), {'spec': spec, 'occurrence_count': 1})()
+        self.apply_event_effect(temp_event)
+
+    def apply_event_effect(self, event):
         """Applies the effects of an event."""
+        # Handle both Event objects and simple objects with spec/effects attributes
+        if hasattr(event, 'spec'):
+            spec = event.spec
+            occurrence_count = getattr(event, 'occurrence_count', 1)
+        else:
+            # Fallback for direct spec-like objects (used in tests)
+            spec = event
+            occurrence_count = getattr(event, 'occurrence_count', 1)
+            
         if not spec.effects:
             return
 
@@ -106,10 +130,13 @@ class EventSystem:
             self._resolve_add_units(unit_key, player.allegiance)
 
         # 3. Grant Asset: Processed last
+        # Generate unique instance ID based on occurrence count for assets with max_occurrences > 1
         if "grant_asset" in effects:
             asset_id = effects["grant_asset"]
+            # Use occurrence_count to generate unique instance ID (e.g., dragonarmor_1, dragonarmor_2)
+            instance_id = f"{asset_id}_{occurrence_count}"
             # Delegate to Player class to ensure consistent asset creation and storage
-            player.grant_asset(asset_id, self.game_state)
+            player.grant_asset(asset_id, self.game_state, instance_id=instance_id)
 
         # 4. Activation bonus (applies to this turn's Step 3 roll for the drawing player)
         if "activation_bonus" in effects:

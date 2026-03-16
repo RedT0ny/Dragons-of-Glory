@@ -1089,7 +1089,7 @@ class TacticalPlanner:
                         if any(Hex.offset_to_axial(int(c[0]), int(c[1])) == h for c in valid):
                             army_legal_count += 1
 
-                if not fleet_legal and army_legal_count == 0:
+                if not fleet_legal or army_legal_count < 1:
                     continue
 
                 # Score: coastal/port bonus, proximity to objective, army capacity
@@ -1097,7 +1097,7 @@ class TacticalPlanner:
                 if is_coastal:
                     score += 20.0
                 if is_port:
-                    score += 15.0
+                    score += 50.0  # Strongly prefer ports over generic coastal hexes
                 score -= h.distance_to(main_hex) * 1.5
                 score += army_legal_count * 3.0
 
@@ -1110,7 +1110,7 @@ class TacticalPlanner:
         # Choose best anchor
         candidates.sort(key=lambda x: x[1], reverse=True)
         anchor_hex = candidates[0][0]
-        print(f"[TRANSPORT] Selected embark anchor: {anchor_hex.axial_to_offset()} (score={candidates[0][1]:.1f})")
+        print(f"[TRANSPORT] Anchor: {anchor_hex.axial_to_offset()} fleet_legal={fleet_legal} army_legal_count={army_legal_count}")
 
         deployed = 0
 
@@ -1145,7 +1145,7 @@ class TacticalPlanner:
             if anchor_legal:
                 target = anchor_hex
             else:
-                # Find nearest legal hex to anchor
+                # Find nearest legal hex to anchor - but only if within distance 1
                 best = None
                 best_dist = float("inf")
                 for c in valid:
@@ -1154,8 +1154,8 @@ class TacticalPlanner:
                     if d < best_dist:
                         best_dist = d
                         best = h
-                if best is None:
-                    continue
+                if best is None or best_dist > 1:
+                    continue  # Skip this army - leave for generic deployment
                 target = best
 
             result = ctx.game_state.deployment_service.deploy_unit(
@@ -1713,6 +1713,40 @@ class TacticalPlanner:
         # Stage 2: Board dragon commanders onto wings lacking them (CRITICAL for HL)
         if self._board_dragon_commanders(ctx):
             return True
+
+        # Stage 3: Same-hex fleet boarding for transport campaigns
+        if plan.transport_campaign:
+            board = ctx.game_state.map
+            for fleet in ctx.friendly_units:
+                if getattr(fleet, "unit_type", None) != UnitType.FLEET:
+                    continue
+                if not getattr(fleet, "position", None) or fleet.position[0] is None:
+                    continue
+                fleet_hex = Hex.offset_to_axial(*fleet.position)
+                stack = board.unit_map.get((fleet_hex.q, fleet_hex.r)) or []
+                # Collect co-located friendly passengers, prioritizing ground armies
+                candidates = []
+                for unit in stack:
+                    if unit is fleet:
+                        continue
+                    if getattr(unit, "allegiance", None) != ctx.side:
+                        continue
+                    if getattr(unit, "transport_host", None) is not None:
+                        continue
+                    # First priority: ground armies
+                    if getattr(unit, "is_army", lambda: False)() and getattr(unit, "unit_type", None) not in (UnitType.WING, UnitType.FLEET):
+                        candidates.append((unit, 0, -float(getattr(unit, "combat_rating", 0) or 0)))
+                    # Second priority: leaders (if fleet can carry)
+                    elif hasattr(unit, "is_leader") and unit.is_leader():
+                        if getattr(fleet, "can_carry", lambda x: True)(unit):
+                            candidates.append((unit, 1, 0))
+                # Sort: armies first (priority 0), then by combat rating (stronger first)
+                candidates.sort(key=lambda x: (x[1], x[2]))
+                for passenger, _, _ in candidates:
+                    if ctx.game_state.board_unit(fleet, passenger):
+                        print(f"[TRANSPORT] Boarded {getattr(passenger, 'id', '?')} onto {getattr(fleet, 'id', '?')}")
+                        return True
+
         return False
 
     @staticmethod

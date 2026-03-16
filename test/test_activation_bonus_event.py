@@ -31,7 +31,7 @@ def test_activation_bonus_event_subtracts_from_roll_for_current_turn():
     }
     gs.countries = {"palanthas": _country("palanthas", alignment=(5, -1))}
 
-    gs.apply_event_effect(SimpleNamespace(effects={"activation_bonus": 2}))
+    gs.apply_event_effect(SimpleNamespace(effects={"activation_bonus": 2}, occurrence_count=1))
     svc = DiplomacyActivationService(gs)
     attempt = svc.build_activation_attempt("palanthas")
 
