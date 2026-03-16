@@ -60,16 +60,26 @@ class AssetDetails(QFrame):
         # --- Right Column: Info + Desc + Buttons ---
         right_col = QVBoxLayout()
 
+        # Bonus
         self.bonus_field = QLineEdit()
         self.bonus_field.setReadOnly(True)
+        self.bonus_field.setMinimumHeight(120)
         self.bonus_field.setPlaceholderText("Asset Bonus")
         right_col.addWidget(self.bonus_field)
 
         # Description
         self.desc_field = QTextEdit()
         self.desc_field.setReadOnly(True)
-        self.desc_field.setMaximumHeight(80)
+        self.desc_field.setPlaceholderText("Asset Description")
+        #self.desc_field.setMaximumHeight(80)
         right_col.addWidget(self.desc_field)
+
+        # Increase font size
+        font = self.bonus_field.font()  # Get default font
+        font.setPointSize(font.pointSize() + 6)  # Increase by 4 points
+        # or font.setPointSize(14)  # Set specific size
+        self.bonus_field.setFont(font)
+        self.desc_field.setFont(font)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -187,6 +197,11 @@ class AssetsTab(QWidget):
         # 2. Asset Tree (Right - 1/3)
         self.asset_tree = QTreeWidget()
         self.asset_tree.setHeaderLabel("Player Assets")
+        # Increase font size
+        tree_font = self.asset_tree.font()  # Get current font
+        tree_font.setPointSize(tree_font.pointSize() + 6)  # Increase by 2 points
+        # or font.setPointSize(12)  # Set specific size
+        self.asset_tree.setFont(tree_font)
         upper_layout.addWidget(self.asset_tree, stretch=1)
 
         main_layout.addWidget(upper_widget, stretch=1)

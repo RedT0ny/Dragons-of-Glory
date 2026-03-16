@@ -13,9 +13,8 @@ TODO:
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Fix being able to select only individual units in stacks for attack. When e.g. a unit that can cross mountain hexsides and a unit that can't are in the same stack, only the more restrictive unit's movement possibilities are shown. This is good for movement, but for attack it should be possible to select the more mobile unit and attack with it, even if the less mobile unit is in the same stack.
-- Minimap not refreshing when AI plays
 - Cannot allocate multiple artifacts (dragonarmor, dragonlance, etc.), only the first can be removed and reassigned.
+- If a Dragon unit is eliminated and sent to reserve, its passenger shall also be eliminated.
 
 Notes:
 

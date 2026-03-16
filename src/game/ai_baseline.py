@@ -258,7 +258,7 @@ class StrategicPlanner:
     def build_plan(self, ctx: AIContext) -> StrategicPlan:
         posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category = self._choose_posture(ctx)
         objectives = self._prioritize_objectives(ctx)
-        transport_campaign = self._should_use_transport(ctx, objectives)
+        transport_campaign = self._should_use_transport(ctx, objectives, offensive_side, main_objective)
         invasion_target = self._choose_invasion_target(ctx, objectives)
         return StrategicPlan(
             posture=posture,
@@ -425,17 +425,100 @@ class StrategicPlanner:
         objectives.sort(key=lambda o: (o.value, o.owner != ctx.side, o.is_capital), reverse=True)
         return objectives
 
-    def _should_use_transport(self, ctx: AIContext, objectives: List[Objective]) -> bool:
-        fleets = [u for u in ctx.friendly_units if getattr(u, "unit_type", None) == UnitType.FLEET]
+    def _should_use_transport(
+        self,
+        ctx: AIContext,
+        objectives: List[Objective],
+        offensive_side: Optional[str],
+        main_objective: Optional[Objective],
+    ) -> bool:
+        if offensive_side != ctx.side:
+            return False
+        fleets = [
+            u for u in ctx.game_state.units
+            if getattr(u, "allegiance", None) == ctx.side
+            and getattr(u, "unit_type", None) == UnitType.FLEET
+            and (
+                getattr(u, "is_on_map", False)
+                or getattr(u, "status", None) == UnitState.READY
+            )
+        ]
         if not fleets:
             return False
         if not objectives:
             return False
-        for obj in objectives:
-            if obj.owner != ctx.side:
-                hex_obj = Hex.offset_to_axial(obj.coords[0], obj.coords[1])
-                if ctx.game_state.map.is_coastal(hex_obj):
+
+        target_objectives = []
+        if main_objective:
+            target_objectives.append(main_objective)
+        target_objectives.extend([o for o in objectives if o.owner != ctx.side and o is not main_objective][:3])
+        if not target_objectives:
+            return False
+
+        ground_units = [
+            u for u in ctx.game_state.units
+            if getattr(u, "allegiance", None) == ctx.side
+            and getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            and (
+                getattr(u, "is_on_map", False)
+                or getattr(u, "status", None) == UnitState.READY
+            )
+        ]
+        if not ground_units:
+            return False
+
+        starts: List[Hex] = []
+        for u in ground_units:
+            if getattr(u, "is_on_map", False) and getattr(u, "position", None) and u.position[0] is not None:
+                starts.append(Hex.offset_to_axial(*u.position))
+                continue
+            valid = ctx.game_state.get_valid_deployment_hexes(u, allow_territory_wide=False) or []
+            for col, row in sorted(valid)[:6]:
+                starts.append(Hex.offset_to_axial(int(col), int(row)))
+        if not starts:
+            return False
+        all_start_coastal = all(ctx.game_state.map.is_coastal(h) or ctx.game_state.map.get_location(h) for h in starts)
+
+        for obj in target_objectives:
+            target_hex = Hex.offset_to_axial(obj.coords[0], obj.coords[1])
+            reachable = any(self._is_plausibly_land_reachable(ctx, s, target_hex, max_depth=18) for s in starts[:10])
+            if not reachable:
+                return True
+            if all_start_coastal and ctx.game_state.map.is_coastal(target_hex):
+                min_land_dist = min(s.distance_to(target_hex) for s in starts)
+                if min_land_dist >= 12:
                     return True
+        return False
+
+    @staticmethod
+    def _is_plausibly_land_reachable(ctx: AIContext, start_hex: Hex, target_hex: Hex, max_depth: int = 18) -> bool:
+        if start_hex == target_hex:
+            return True
+        board = ctx.game_state.map
+        from collections import deque
+
+        frontier = deque([(start_hex, 0)])
+        visited = {(start_hex.q, start_hex.r)}
+        while frontier:
+            current, depth = frontier.popleft()
+            if depth >= max_depth:
+                continue
+            for neighbor in current.neighbors():
+                key = (neighbor.q, neighbor.r)
+                if key in visited:
+                    continue
+                col, row = neighbor.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(col, row):
+                    continue
+                if not ctx.game_state.can_control_probe_project_across_hexside(current, neighbor, allegiance=ctx.side):
+                    continue
+                if board.has_enemy_army(neighbor, ctx.side):
+                    continue
+                if neighbor == target_hex:
+                    return True
+                visited.add(key)
+                frontier.append((neighbor, depth + 1))
         return False
 
     def _choose_invasion_target(self, ctx: AIContext, objectives: List[Objective]) -> Optional[str]:
@@ -577,6 +660,28 @@ class OperationalPlanner:
             local_threat = _overlay_value(threat, col, row, 0.0)
             group_key = _task_group_key(group)
 
+            if offensive and plan.transport_campaign and main_hex:
+                if group.has_fleet:
+                    landing_hex = self._best_landing_hex_for_objective(ctx, main_hex, fallback=group.hex)
+                    missions.append(Mission(
+                        group=group,
+                        mission_type="transport_main_effort",
+                        target_hex=landing_hex,
+                        objective=main_objective,
+                        priority=95 + plan.urgency_score * 20 + group.power * 0.5,
+                    ))
+                    continue
+                if group.has_army and self._group_needs_embarkation(ctx, group, main_hex):
+                    embark_hex = self._best_embark_hex(ctx, group, main_hex)
+                    missions.append(Mission(
+                        group=group,
+                        mission_type="embark_main_effort",
+                        target_hex=embark_hex,
+                        objective=main_objective,
+                        priority=145 + plan.urgency_score * 30 + group.power * 0.8,
+                    ))
+                    continue
+
             # Priority 1: Main effort and support missions (offensive only)
             if offensive and main_hex:
                 if group_key in main_effort_group_keys:
@@ -667,6 +772,73 @@ class OperationalPlanner:
         return missions
 
     @staticmethod
+    def _group_needs_embarkation(ctx: AIContext, group: TaskGroup, target_hex: Hex) -> bool:
+        if group.has_fleet or not group.has_army:
+            return False
+        # bounded land reachability probe from current group hex
+        from collections import deque
+
+        frontier = deque([(group.hex, 0)])
+        visited = {(group.hex.q, group.hex.r)}
+        while frontier:
+            current, depth = frontier.popleft()
+            if depth >= 14:
+                continue
+            for nxt in current.neighbors():
+                key = (nxt.q, nxt.r)
+                if key in visited:
+                    continue
+                col, row = nxt.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(col, row):
+                    continue
+                if not ctx.game_state.can_control_probe_project_across_hexside(current, nxt, allegiance=ctx.side):
+                    continue
+                if ctx.game_state.map.has_enemy_army(nxt, ctx.side):
+                    continue
+                if nxt == target_hex:
+                    return False
+                visited.add(key)
+                frontier.append((nxt, depth + 1))
+        return True
+
+    @staticmethod
+    def _best_landing_hex_for_objective(ctx: AIContext, main_hex: Hex, fallback: Hex) -> Hex:
+        board = ctx.game_state.map
+        best = None
+        best_score = float("-inf")
+        for col in range(int(getattr(board, "width", 0) or 0)):
+            for row in range(int(getattr(board, "height", 0) or 0)):
+                h = Hex.offset_to_axial(col, row)
+                if not board.is_coastal(h) and not board.get_location(h):
+                    continue
+                score = -h.distance_to(main_hex) * 2.0
+                territory = ctx.overlays.get("territory")
+                tval = territory.values.get((col, row)) if territory else None
+                if tval == ctx.enemy:
+                    score += 8.0
+                elif tval == ctx.side:
+                    score += 3.0
+                if best is None or score > best_score:
+                    best = h
+                    best_score = score
+        return best or fallback
+
+    @staticmethod
+    def _best_embark_hex(ctx: AIContext, group: TaskGroup, main_hex: Hex) -> Hex:
+        fleet_hexes = []
+        for u in ctx.friendly_units:
+            if getattr(u, "unit_type", None) != UnitType.FLEET:
+                continue
+            if not getattr(u, "is_on_map", False):
+                continue
+            if not getattr(u, "position", None) or u.position[0] is None:
+                continue
+            fleet_hexes.append(Hex.offset_to_axial(*u.position))
+        if not fleet_hexes:
+            return group.hex
+        return min(fleet_hexes, key=lambda h: (group.hex.distance_to(h), h.distance_to(main_hex)))
+
+    @staticmethod
     def _should_prepare_assault(ctx: AIContext, plan: StrategicPlan, group: TaskGroup, objective: Objective) -> bool:
         target_hex = Hex.offset_to_axial(objective.coords[0], objective.coords[1])
         distance = group.hex.distance_to(target_hex)
@@ -724,6 +896,9 @@ class TacticalPlanner:
     MOVE_WEIGHTS = {
         "push_objective": {"objective": 12, "threat": -4, "support": 2, "capture": 8},
         "prepare_assault": {"objective": 11, "threat": -5, "support": 5, "capture": 3},
+        "embark_main_effort": {"objective": 12, "threat": -5, "support": 5, "capture": 3},
+        "transport_main_effort": {"objective": 14, "threat": -4, "support": 4, "capture": 7},
+        "move_to_landing_area": {"objective": 12, "threat": -4, "support": 3, "capture": 6},
         "main_effort_attack": {"objective": 16, "threat": -5, "support": 4, "capture": 10},
         "support_main_effort": {"objective": 10, "threat": -4, "support": 5, "capture": 6},
         "secure": {"objective": 8, "threat": -5, "support": 3, "capture": 3},
@@ -767,6 +942,16 @@ class TacticalPlanner:
                 invasion_deployment_active,
                 invasion_deployment_allegiance,
                 invasion_deployment_country_id,
+            )
+
+        # Transport deployment for sea-dependent offensive plans
+        if (
+            plan.transport_campaign
+            and plan.offensive_side == ctx.side
+        ):
+            deployed += self._deploy_transport_wave(
+                ctx, plan, ready_units, allow_territory_wide,
+                invasion_deployment_active, invasion_deployment_allegiance, invasion_deployment_country_id,
             )
 
         for unit in list(ready_units):
@@ -847,6 +1032,152 @@ class TacticalPlanner:
                     leaders.remove(commander)
         return deployed
 
+    def _deploy_transport_wave(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        ready_units: List[object],
+        allow_territory_wide: bool,
+        invasion_deployment_active: bool,
+        invasion_deployment_allegiance: Optional[str],
+        invasion_deployment_country_id: Optional[str],
+    ) -> int:
+        """Deploy fleets and armies to a common embark anchor for transport campaign."""
+        if not plan.main_objective:
+            return 0
+
+        main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+
+        # Separate ready fleets and ground armies
+        ready_fleets = [
+            u for u in ready_units
+            if getattr(u, "unit_type", None) == UnitType.FLEET
+        ]
+        ready_armies = [
+            u for u in ready_units
+            if getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        ]
+
+        if not ready_fleets and not ready_armies:
+            return 0
+
+        # Score candidate embark hexes
+        board = ctx.game_state.map
+        candidates: List[Tuple[Hex, float]] = []
+        for col in range(int(getattr(board, "width", 0) or 0)):
+            for row in range(int(getattr(board, "height", 0) or 0)):
+                h = Hex.offset_to_axial(col, row)
+                is_coastal = board.is_coastal(h)
+                loc = board.get_location(h)
+                is_port = bool(loc and getattr(loc, "loc_type", None) == LocType.PORT.value)
+
+                # Check legality for at least one ready fleet
+                fleet_legal = False
+                if ready_fleets:
+                    for f in ready_fleets:
+                        valid = ctx.game_state.get_valid_deployment_hexes(f, allow_territory_wide=allow_territory_wide) or []
+                        if any(Hex.offset_to_axial(int(c[0]), int(c[1])) == h for c in valid):
+                            fleet_legal = True
+                            break
+
+                # Check legality for multiple ready armies
+                army_legal_count = 0
+                if ready_armies:
+                    for a in ready_armies:
+                        valid = ctx.game_state.get_valid_deployment_hexes(a, allow_territory_wide=allow_territory_wide) or []
+                        if any(Hex.offset_to_axial(int(c[0]), int(c[1])) == h for c in valid):
+                            army_legal_count += 1
+
+                if not fleet_legal and army_legal_count == 0:
+                    continue
+
+                # Score: coastal/port bonus, proximity to objective, army capacity
+                score = 0.0
+                if is_coastal:
+                    score += 20.0
+                if is_port:
+                    score += 15.0
+                score -= h.distance_to(main_hex) * 1.5
+                score += army_legal_count * 3.0
+
+                if fleet_legal or army_legal_count > 0:
+                    candidates.append((h, score))
+
+        if not candidates:
+            return 0
+
+        # Choose best anchor
+        candidates.sort(key=lambda x: x[1], reverse=True)
+        anchor_hex = candidates[0][0]
+        print(f"[TRANSPORT] Selected embark anchor: {anchor_hex.axial_to_offset()} (score={candidates[0][1]:.1f})")
+
+        deployed = 0
+
+        # Deploy up to 2 ready fleets to anchor
+        fleets_deployed = 0
+        for fleet in list(ready_fleets)[:2]:
+            valid = ctx.game_state.get_valid_deployment_hexes(fleet, allow_territory_wide=allow_territory_wide) or []
+            if not any(Hex.offset_to_axial(int(c[0]), int(c[1])) == anchor_hex for c in valid):
+                continue
+            result = ctx.game_state.deployment_service.deploy_unit(
+                fleet, anchor_hex,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if result.success:
+                fleets_deployed += 1
+                deployed += 1
+                ready_units.remove(fleet)
+                print(f"[TRANSPORT] Deployed fleet {getattr(fleet, 'id', '?')} to anchor")
+
+        if fleets_deployed > 0:
+            print(f"[TRANSPORT] Fleets deployed to anchor: {fleets_deployed}")
+
+        # Deploy up to 4 strongest ready armies
+        ready_armies.sort(key=lambda u: float(getattr(u, "combat_rating", 0) or 0), reverse=True)
+        armies_deployed = 0
+        for army in list(ready_armies)[:4]:
+            valid = ctx.game_state.get_valid_deployment_hexes(army, allow_territory_wide=allow_territory_wide) or []
+            anchor_legal = any(Hex.offset_to_axial(int(c[0]), int(c[1])) == anchor_hex for c in valid)
+
+            if anchor_legal:
+                target = anchor_hex
+            else:
+                # Find nearest legal hex to anchor
+                best = None
+                best_dist = float("inf")
+                for c in valid:
+                    h = Hex.offset_to_axial(int(c[0]), int(c[1]))
+                    d = h.distance_to(anchor_hex)
+                    if d < best_dist:
+                        best_dist = d
+                        best = h
+                if best is None:
+                    continue
+                target = best
+
+            result = ctx.game_state.deployment_service.deploy_unit(
+                army, target,
+                invasion_deployment_active=invasion_deployment_active,
+                invasion_deployment_allegiance=invasion_deployment_allegiance,
+                invasion_deployment_country_id=invasion_deployment_country_id,
+            )
+            if result.success:
+                armies_deployed += 1
+                deployed += 1
+                ready_units.remove(army)
+                if target == anchor_hex:
+                    print(f"[TRANSPORT] Deployed army {getattr(army, 'id', '?')} to anchor")
+                else:
+                    print(f"[TRANSPORT] Deployed army {getattr(army, 'id', '?')} to nearest embark hex {target.axial_to_offset()}")
+
+        if armies_deployed > 0:
+            print(f"[TRANSPORT] Armies deployed: {armies_deployed} (anchor={anchor_hex.axial_to_offset()})")
+
+        return deployed
+
     @staticmethod
     def _select_hl_dragon_commander(wing, leaders: List[object]) -> Optional[object]:
         flight = str(getattr(getattr(wing, "spec", None), "dragonflight", "") or "").strip().lower()
@@ -881,9 +1212,38 @@ class TacticalPlanner:
 
         # Offensive forward staging: DOMINATE the score when offensive side
         offensive = plan.offensive_side == ctx.side
+        transport_offense = offensive and plan.transport_campaign
+        deploy_hex = Hex.offset_to_axial(col, row)
+
+        if transport_offense:
+            is_ground_army = getattr(unit, "is_army", lambda: False)() and getattr(unit, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            is_fleet = getattr(unit, "unit_type", None) == UnitType.FLEET
+            loc = ctx.game_state.map.get_location(deploy_hex)
+            is_coastal = ctx.game_state.map.is_coastal(deploy_hex)
+            is_port = bool(loc and getattr(loc, "loc_type", None) == LocType.PORT.value)
+
+            if is_ground_army:
+                if is_coastal:
+                    score += 14.0
+                if is_port:
+                    score += 18.0
+                fleet_hexes = TacticalPlanner._transport_embark_reference_hexes(ctx)
+                if fleet_hexes:
+                    nearest_fleet = min(deploy_hex.distance_to(h) for h in fleet_hexes)
+                    score += max(0.0, 14.0 - nearest_fleet * 2.0)
+
+            if is_fleet:
+                if is_coastal:
+                    score += 10.0
+                if is_port:
+                    score += 15.0
+                army_hexes = TacticalPlanner._transport_army_reference_hexes(ctx)
+                if army_hexes:
+                    nearest_army = min(deploy_hex.distance_to(h) for h in army_hexes)
+                    score += max(0.0, 12.0 - nearest_army * 2.0)
+
         if offensive and plan.main_objective:
             main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
-            deploy_hex = Hex.offset_to_axial(col, row)
             dist_to_objective = deploy_hex.distance_to(main_hex)
 
             # Primary scoring: distance to main objective (dominates all other factors)
@@ -927,8 +1287,81 @@ class TacticalPlanner:
                     score += 5  # Reduced capital bias (was +8)
         return score
 
+    @staticmethod
+    def _transport_embark_reference_hexes(ctx: AIContext) -> List[Hex]:
+        refs: List[Hex] = []
+        seen = set()
+        for fu in ctx.friendly_units:
+            if getattr(fu, "unit_type", None) != UnitType.FLEET or not getattr(fu, "is_on_map", False):
+                continue
+            if not getattr(fu, "position", None) or fu.position[0] is None:
+                continue
+            h = Hex.offset_to_axial(*fu.position)
+            key = (h.q, h.r)
+            if key not in seen:
+                refs.append(h)
+                seen.add(key)
+
+        ready_fleets = [
+            u for u in ctx.game_state.units
+            if getattr(u, "allegiance", None) == ctx.side
+            and getattr(u, "unit_type", None) == UnitType.FLEET
+            and getattr(u, "status", None) == UnitState.READY
+            and not getattr(u, "is_on_map", False)
+        ]
+        for fleet in ready_fleets[:4]:
+            valid = ctx.game_state.get_valid_deployment_hexes(fleet, allow_territory_wide=False) or []
+            valid = sorted(valid)[:8]
+            for col, row in valid:
+                h = Hex.offset_to_axial(int(col), int(row))
+                key = (h.q, h.r)
+                if key not in seen:
+                    refs.append(h)
+                    seen.add(key)
+        return refs
+
+    @staticmethod
+    def _transport_army_reference_hexes(ctx: AIContext) -> List[Hex]:
+        refs: List[Hex] = []
+        seen = set()
+        for fu in ctx.friendly_units:
+            if not getattr(fu, "is_on_map", False):
+                continue
+            if getattr(fu, "transport_host", None) is not None:
+                continue
+            if not getattr(fu, "is_army", lambda: False)() or getattr(fu, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                continue
+            if not getattr(fu, "position", None) or fu.position[0] is None:
+                continue
+            h = Hex.offset_to_axial(*fu.position)
+            key = (h.q, h.r)
+            if key not in seen:
+                refs.append(h)
+                seen.add(key)
+
+        ready_armies = [
+            u for u in ctx.game_state.units
+            if getattr(u, "allegiance", None) == ctx.side
+            and getattr(u, "status", None) == UnitState.READY
+            and not getattr(u, "is_on_map", False)
+            and getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        ]
+        for army in ready_armies[:6]:
+            valid = ctx.game_state.get_valid_deployment_hexes(army, allow_territory_wide=False) or []
+            valid = sorted(valid)[:6]
+            for col, row in valid:
+                h = Hex.offset_to_axial(int(col), int(row))
+                key = (h.q, h.r)
+                if key not in seen:
+                    refs.append(h)
+                    seen.add(key)
+        return refs
+
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
         if self._maybe_execute_transport_action(ctx, plan):
+            return True
+        if self._execute_transport_campaign(ctx, plan):
             return True
 
         actions = []
@@ -968,7 +1401,12 @@ class TacticalPlanner:
             ctx.moved_task_groups.add(_task_group_key(best.group))
         return True
 
-    def _best_move_for_mission(self, ctx: AIContext, plan: StrategicPlan, mission: Mission) -> Optional[TacticalAction]:
+    def _best_move_for_mission(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        mission: Mission,
+    ) -> Optional[TacticalAction]:
         group = mission.group
         move_range = ctx.movement_service.get_reachable_hexes(group.units)
         candidates = list(move_range.reachable_coords)
@@ -995,6 +1433,104 @@ class TacticalPlanner:
                 )
         return best_action
 
+    @staticmethod
+    def _fleet_has_embarked_ground(fleet) -> bool:
+        passengers = list(getattr(fleet, "passengers", []) or [])
+        return any(
+            getattr(p, "is_army", lambda: False)()
+            and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            for p in passengers
+        )
+
+    def _execute_transport_campaign(self, ctx: AIContext, plan: StrategicPlan) -> bool:
+        if not plan.transport_campaign or not plan.main_objective:
+            return False
+
+        main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+        fleets = [
+            u for u in ctx.friendly_units
+            if getattr(u, "unit_type", None) == UnitType.FLEET
+            and getattr(u, "is_on_map", False)
+            and getattr(u, "transport_host", None) is None
+            and getattr(u, "position", None)
+            and u.position[0] is not None
+            and float(getattr(u, "movement_points", 0) or 0) > 0
+        ]
+        if not fleets:
+            return False
+        embark_fleet = min(fleets, key=lambda f: Hex.offset_to_axial(*f.position).distance_to(main_hex))
+        fleet_hex = Hex.offset_to_axial(*embark_fleet.position)
+
+        armies = [
+            u for u in ctx.friendly_units
+            if getattr(u, "is_on_map", False)
+            and getattr(u, "transport_host", None) is None
+            and getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            and getattr(u, "position", None)
+            and u.position[0] is not None
+            and float(getattr(u, "movement_points", 0) or 0) > 0
+        ]
+        if not armies:
+            return False
+
+        candidates = []
+        for army in armies:
+            army_hex = Hex.offset_to_axial(*army.position)
+            pseudo_group = TaskGroup(
+                units=[army],
+                hex=army_hex,
+                power=float(getattr(army, "combat_rating", 0) or 0),
+                has_army=True,
+                has_wing=False,
+                has_fleet=False,
+                mobile_units=[army],
+            )
+            if not OperationalPlanner._group_needs_embarkation(ctx, pseudo_group, main_hex):
+                continue
+            strength = float(getattr(army, "combat_rating", 0) or 0)
+            land_dist = army_hex.distance_to(main_hex)
+            candidates.append((strength, land_dist, army))
+        if not candidates:
+            return False
+        candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        selected = [a for _, _, a in candidates[:2]]
+
+        for army in selected:
+            army_hex = Hex.offset_to_axial(*army.position)
+            if army_hex.q == fleet_hex.q and army_hex.r == fleet_hex.r:
+                continue
+            move_range = ctx.movement_service.get_reachable_hexes([army])
+            reachable = list(move_range.reachable_coords)
+            if not reachable:
+                continue
+            best = min(reachable, key=lambda c: Hex.offset_to_axial(c[0], c[1]).distance_to(fleet_hex))
+            best_hex = Hex.offset_to_axial(best[0], best[1])
+            if best_hex.distance_to(fleet_hex) < army_hex.distance_to(fleet_hex):
+                result = ctx.movement_service.move_units_to_hex([army], best_hex)
+                if not result.errors:
+                    return True
+
+        for army in selected:
+            army_hex = Hex.offset_to_axial(*army.position)
+            if army_hex.q == fleet_hex.q and army_hex.r == fleet_hex.r:
+                if ctx.game_state.board_unit(embark_fleet, army):
+                    return True
+
+        if self._fleet_has_embarked_ground(embark_fleet):
+            landing_hex = OperationalPlanner._best_landing_hex_for_objective(ctx, main_hex, fallback=fleet_hex)
+            move_range = ctx.movement_service.get_reachable_hexes([embark_fleet])
+            reachable = list(move_range.reachable_coords)
+            if not reachable:
+                return False
+            best = min(reachable, key=lambda c: Hex.offset_to_axial(c[0], c[1]).distance_to(landing_hex))
+            best_hex = Hex.offset_to_axial(best[0], best[1])
+            if best_hex.q != fleet_hex.q or best_hex.r != fleet_hex.r:
+                result = ctx.movement_service.move_units_to_hex([embark_fleet], best_hex)
+                if not result.errors:
+                    return True
+        return False
+
     def _score_move(self, ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
         weights = self.MOVE_WEIGHTS.get(mission.mission_type, self.MOVE_WEIGHTS["screen"])
         col, row = target_hex.axial_to_offset()
@@ -1018,6 +1554,25 @@ class TacticalPlanner:
         loc = ctx.game_state.map.get_location(Hex.offset_to_axial(col, row))
         if loc and loc.occupier != ctx.side:
             score += 10
+
+        amphibious_types = {"embark_main_effort", "transport_main_effort", "move_to_landing_area"}
+        if mission.mission_type in amphibious_types and plan.main_objective:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            current_dist = mission.group.hex.distance_to(main_hex)
+            next_dist = target_hex.distance_to(main_hex)
+            if next_dist < current_dist:
+                score += (current_dist - next_dist) * 10
+            if mission.group.has_fleet:
+                if ctx.game_state.map.is_coastal(target_hex):
+                    score += 8
+                if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
+                    score += 10
+            if mission.group.has_army and not mission.group.has_fleet:
+                if ctx.game_state.map.is_coastal(target_hex):
+                    score += 10
+                stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+                if any(getattr(u, "allegiance", None) == ctx.side and getattr(u, "unit_type", None) == UnitType.FLEET for u in stack):
+                    score += 16
 
         if mission.mission_type == "prepare_assault" and mission.target_hex is not None:
             front_dist = target_hex.distance_to(mission.target_hex)
@@ -1130,7 +1685,7 @@ class TacticalPlanner:
         return 0.0
 
     def _maybe_execute_transport_action(self, ctx: AIContext, plan: StrategicPlan) -> bool:
-        """Execute transport actions in priority order: unboard, board commanders, fleet transport."""
+        """Execute transport actions in priority order: unboard, board commanders."""
         # Stage 1: Unboard passengers where appropriate.
         # Keep valid dragon commanders boarded on wings/citadels.
         for unit in ctx.friendly_units:
@@ -1147,6 +1702,10 @@ class TacticalPlanner:
                 ]
                 if self._unboard_all(ctx, unit, ground_passengers):
                     return True
+            elif getattr(unit, "unit_type", None) == UnitType.FLEET and plan.transport_campaign and plan.main_objective:
+                selected = self._select_fleet_unboard_passengers(ctx, plan, unit, passengers)
+                if selected and self._unboard_all(ctx, unit, selected):
+                    return True
             elif ctx.game_state.map.is_coastal(carrier_hex) or ctx.game_state.map.get_location(carrier_hex):
                 if self._unboard_all(ctx, unit, passengers):
                     return True
@@ -1154,20 +1713,41 @@ class TacticalPlanner:
         # Stage 2: Board dragon commanders onto wings lacking them (CRITICAL for HL)
         if self._board_dragon_commanders(ctx):
             return True
-
-        # Stage 3: Fleet transport campaign (armies boarding fleets)
-        if plan.transport_campaign:
-            for unit in ctx.friendly_units:
-                if getattr(unit, "unit_type", None) != UnitType.FLEET:
-                    continue
-                if not getattr(unit, "position", None) or unit.position[0] is None:
-                    continue
-                stack = ctx.game_state.map.get_units_in_hex(unit.position[0], unit.position[1])
-                armies = [u for u in stack if getattr(u, "is_army", lambda: False)()]
-                for army in armies:
-                    if ctx.game_state.board_unit(unit, army):
-                        return True
         return False
+
+    @staticmethod
+    def _select_fleet_unboard_passengers(ctx: AIContext, plan: StrategicPlan, fleet, passengers: List[object]) -> List[object]:
+        if not plan.main_objective or not getattr(fleet, "position", None) or fleet.position[0] is None:
+            return []
+        fleet_hex = Hex.offset_to_axial(*fleet.position)
+        if not (ctx.game_state.map.is_coastal(fleet_hex) or ctx.game_state.map.get_location(fleet_hex)):
+            return []
+
+        main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+        dist = fleet_hex.distance_to(main_hex)
+        if dist > 10 and not plan.must_act and plan.urgency_score < 0.6:
+            return []
+
+        adj_friendly = 0
+        adj_enemy = 0
+        for neighbor in fleet_hex.neighbors():
+            stack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
+            if any(getattr(u, "allegiance", None) == ctx.side and ctx.game_state.is_combat_unit(u) for u in stack):
+                adj_friendly += 1
+            if any(getattr(u, "allegiance", None) == ctx.enemy and ctx.game_state.is_combat_unit(u) for u in stack):
+                adj_enemy += 1
+        if adj_enemy > adj_friendly + 1 and dist > 3:
+            return []
+
+        selected = [
+            p for p in passengers
+            if getattr(p, "allegiance", None) == ctx.side
+            and getattr(p, "is_on_map", False)
+            and getattr(p, "is_army", lambda: False)()
+            and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        ]
+        selected.sort(key=lambda u: (float(getattr(u, "combat_rating", 0) or 0), _unit_key(u)), reverse=True)
+        return selected[:2]
 
     def _board_dragon_commanders(self, ctx: AIContext) -> bool:
         """Board eligible leaders onto dragon wings that lack a commander.
