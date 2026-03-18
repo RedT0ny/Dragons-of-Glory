@@ -129,6 +129,7 @@ class PhaseManager:
             return
 
         self.game_state.turn += 1
+        print(f"Battle Turn: {self.game_state.turn}")
         self.game_state.phase = GamePhase.REPLACEMENTS
         # Change active_player to the one that lost initiative roll, so they go first in replacements
         self.game_state.active_player = WS if self.game_state.initiative_winner == HL else HL

@@ -2610,20 +2610,14 @@ class GameState:
         self._normalize_transport_state()
         return True
 
-    def unboard_unit(self, unit, target_hex=None):
-        """Unboards `unit` from its transport_host into target_hex (axial Hex) or the carrier's hex if None.
-        Validates stacking limits using Board.can_stack_move_to. Returns True on success.
-        """
+    def can_unboard_unit_to_hex(self, unit, dest_hex) -> bool:
+        """Non-mutating legality check for unboarding `unit` into `dest_hex`."""
         carrier = getattr(unit, 'transport_host', None)
         if not carrier:
             return False
 
-        # Determine destination axial hex
-        dest_hex = target_hex
         if dest_hex is None and carrier.position:
-            # Use carrier's current axial position
             dest_hex = Hex.offset_to_axial(*carrier.position)
-
         if dest_hex is None:
             return False
 
@@ -2648,6 +2642,48 @@ class GameState:
         # Validate stacking limits
         moving_units = [unit]
         if not self.map.can_stack_move_to(moving_units, dest_hex):
+            return False
+        return True
+
+    def get_valid_unboard_hexes(self, carrier, passenger=None) -> List[Hex]:
+        """Returns legal unboard destinations for a carrier/passenger using engine legality checks."""
+        if not carrier or not getattr(carrier, "position", None) or carrier.position[0] is None:
+            return []
+
+        carrier_hex = Hex.offset_to_axial(*carrier.position)
+        candidates = [carrier_hex]
+        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+            candidates.extend(carrier_hex.neighbors())
+
+        if passenger is not None:
+            passengers = [passenger]
+        else:
+            passengers = list(getattr(carrier, "passengers", []) or [])
+        if not passengers:
+            return []
+
+        valid: List[Hex] = []
+        seen = set()
+        for h in candidates:
+            if (h.q, h.r) in seen:
+                continue
+            seen.add((h.q, h.r))
+            if any(self.can_unboard_unit_to_hex(p, h) for p in passengers):
+                valid.append(h)
+        return valid
+
+    def unboard_unit(self, unit, target_hex=None):
+        """Unboards `unit` from its transport_host into target_hex (axial Hex) or the carrier's hex if None.
+        Validates stacking limits using Board.can_stack_move_to. Returns True on success.
+        """
+        carrier = getattr(unit, 'transport_host', None)
+        if not carrier:
+            return False
+
+        dest_hex = target_hex
+        if dest_hex is None and carrier.position:
+            dest_hex = Hex.offset_to_axial(*carrier.position)
+        if not self.can_unboard_unit_to_hex(unit, dest_hex):
             return False
 
         # Perform unboard: remove stale passenger refs, clear transport flags, add to spatial map
