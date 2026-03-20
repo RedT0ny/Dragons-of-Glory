@@ -49,8 +49,7 @@ class PhaseManager:
         elif self.game_state.phase == GamePhase.REPLACEMENTS:
             # Logic: The player that lost initiative roll goes first in replacements (Handled in nex_turn).
             # First check if active_player is HL, to process draconian production
-            if self.game_state.active_player == HL:
-                self.game_state.process_draconian_production()
+            self.game_state.on_finish_replacements_round_for_player(self.game_state.active_player)
             # Now check if we are in the first or second player replacement round
             if self.game_state.active_player != self.game_state.initiative_winner:
                 # That means it's the first player replacing
@@ -76,35 +75,27 @@ class PhaseManager:
                 # Phase remains ACTIVATION for the second player
             else:
                 # Activation bonuses are only valid during Step 3 of the current battle turn.
-                self.game_state.clear_activation_bonuses()
+                self.game_state.finalize_activation_phase()
                 self.game_state.phase = GamePhase.INITIATIVE
 
         elif self.game_state.phase == GamePhase.INITIATIVE:
             # Controller must have set_initiative() before calling this
             self.game_state.phase = GamePhase.MOVEMENT
             self.game_state.second_player_has_acted = False
+            self.game_state.prepare_for_movement_phase()
 
         elif self.game_state.phase == GamePhase.MOVEMENT:
-            for unit in self.game_state.units:
-                unit.movement_points = getattr(unit, "movement", 0)
-                unit.moved_this_turn = False
-                unit.carried_by_citadel_this_turn = False
-                unit._healed_this_combat_turn = False
             self.game_state.phase = GamePhase.COMBAT
 
         elif self.game_state.phase == GamePhase.COMBAT:
-            self.game_state.resolve_end_of_combat_conquest()
-            self.game_state.clear_leader_tactical_overrides()
-            # Combat bonuses apply only during the active player's Step 6 of this turn.
-            self.game_state.clear_combat_bonus(self.game_state.active_player)
-            for unit in self.game_state.units:
-                unit.attacked_this_turn = False
+            self.game_state.finalize_combat_phase()
             if not self.game_state.second_player_has_acted:
                 # End of First Player's turn (Step 6 done).
                 # Start Second Player's turn (Step 7).
                 self.game_state.phase = GamePhase.MOVEMENT
                 self.game_state.active_player = WS if self.game_state.active_player == HL else HL
                 self.game_state.second_player_has_acted = True
+                self.game_state.prepare_for_movement_phase()
             else:
                 # End of Second Player's turn. Supply phase (Step 8).
                 supply_mode = str(getattr(self.game_state, "supply", "standard")).strip().lower()
@@ -114,7 +105,7 @@ class PhaseManager:
                     self.next_turn()
 
         elif self.game_state.phase == GamePhase.SUPPLY:
-            self.game_state.resolve_supply_phase()
+            self.game_state.execute_supply_phase()
             self.next_turn()
 
         try:
@@ -127,23 +118,4 @@ class PhaseManager:
         """Advances the game to the next turn (Step 9)."""
         if getattr(self.game_state, "game_over", False):
             return
-
-        self.game_state.turn += 1
-        print(f"Battle Turn: {self.game_state.turn}")
-        self.game_state.phase = GamePhase.REPLACEMENTS
-        # Change active_player to the one that lost initiative roll, so they go first in replacements
-        self.game_state.active_player = WS if self.game_state.initiative_winner == HL else HL
-        self.game_state.process_delayed_fleet_replacements()
-
-        # Reset unit flags
-        for unit in self.game_state.units:
-            unit.movement_points = getattr(unit, 'movement', 0)  # Reset MPs
-            unit.attacked_this_turn = False
-            unit.moved_this_turn = False
-            unit.carried_by_citadel_this_turn = False
-            unit._healed_this_combat_turn = False
-            # Handle status recovery/exhaustion here if needed
-
-        # Check events
-        self.game_state.check_events()
-        self.game_state.evaluate_victory_conditions()
+        self.game_state.begin_next_turn()

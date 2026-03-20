@@ -30,9 +30,7 @@ DECISION: Use a different icon, border and font/text color. White for Whitestone
 
 Moving units QoL improvements needed:
 
-1. First click selects the stack, movement possibility (highlighted hex) is shown for the more restrictive unit in the stack. (Done)
-2. Second click selects the top unit, third click would select the next unit in the stack, etc.
-3. (UNSURE) Once the unit or stack is selected, it can be dragged to a new Hex. How to distinguish between dragging and clicking? Maybe a long click (click and hold for 0.5s) could trigger the drag mode?
+(UNSURE) Once the unit or stack is selected, it can be dragged to a new Hex. How to distinguish between dragging and clicking? Maybe a long click (click and hold for 0.5s) could trigger the drag mode?
 
 Events and artifacts:
 

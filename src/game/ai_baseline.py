@@ -452,18 +452,11 @@ class StrategicPlanner:
     def _compute_landing_plan(self, ctx: AIContext, main_objective: Objective, fallback_anchor: Optional[Hex]) -> Tuple[Optional[Hex], List[Hex]]:
         state = ctx.invasion_state or {}
         objective_graph = ctx.objective_graph or {}
-        objective_id = str(getattr(main_objective, "id", "") or "")
-        recompute_reason = "objective_changed"
-        if not self._should_recompute_landing_plan(ctx, main_objective, state):
-            valid_slots = self._validate_existing_landing_slots(ctx, state, main_objective)
-            if valid_slots:
-                anchor = valid_slots[0]
-                print(f"[TRANSPORT] reusing_landing_plan anchor={anchor.axial_to_offset()} slots={[h.axial_to_offset() for h in valid_slots]}")
-                return anchor, valid_slots
-            recompute_reason = "slots_invalid"
-        else:
-            if str(state.get("primary_objective_id") or "") == objective_id:
-                recompute_reason = "material_invalidity"
+        needs_recompute, valid_slots, recompute_reason = self._evaluate_existing_landing_plan(ctx, main_objective, state)
+        if not needs_recompute and valid_slots:
+            anchor = valid_slots[0]
+            print(f"[TRANSPORT] reusing_landing_plan anchor={anchor.axial_to_offset()} slots={[h.axial_to_offset() for h in valid_slots]}")
+            return anchor, valid_slots
         print(f"[TRANSPORT] recompute_landing_plan reason={recompute_reason}")
 
         anchor = fallback_anchor if fallback_anchor is not None else self._simple_beachhead_choice(ctx, main_objective)
@@ -493,6 +486,22 @@ class StrategicPlanner:
             anchor = new_anchor
         return anchor, slots
 
+    def _evaluate_existing_landing_plan(
+        self,
+        ctx: AIContext,
+        main_objective: Objective,
+        state: Dict[str, Any],
+    ) -> Tuple[bool, List[Hex], str]:
+        objective_id = str(getattr(main_objective, "id", "") or "")
+        if str(state.get("primary_objective_id") or "") != objective_id:
+            return True, [], "objective_changed"
+        if not state.get("anchor_hex") or not state.get("landing_slots"):
+            return True, [], "no_stored_plan"
+        valid_slots = self._validate_existing_landing_slots(ctx, state, main_objective)
+        if not valid_slots:
+            return True, [], "slots_invalid"
+        return False, valid_slots, "reuse"
+
     def _should_recompute_landing_plan(self, ctx: AIContext, main_objective: Objective, state: Dict[str, Any]) -> bool:
         objective_id = str(getattr(main_objective, "id", "") or "")
         if str(state.get("primary_objective_id") or "") != objective_id:
@@ -505,7 +514,8 @@ class StrategicPlanner:
         return False
 
     def _validate_existing_landing_slots(self, ctx: AIContext, state: Dict[str, Any], main_objective: Objective) -> List[Hex]:
-        existing = []
+        board = ctx.game_state.map
+        existing: List[Hex] = []
         for item in list(state.get("landing_slots", []) or []):
             try:
                 existing.append(Hex.offset_to_axial(int(item[0]), int(item[1])))
@@ -513,14 +523,33 @@ class StrategicPlanner:
                 continue
         if not existing:
             return []
-        refreshed = self._build_beachhead_slots(ctx, existing[0], main_objective)
-        refreshed_set = {(h.q, h.r): h for h in refreshed}
-        kept = [refreshed_set[(h.q, h.r)] for h in existing if (h.q, h.r) in refreshed_set]
-        if not kept:
+        embarked_ground = []
+        for u in ctx.friendly_units:
+            if getattr(u, "unit_type", None) != UnitType.FLEET:
+                continue
+            for p in list(getattr(u, "passengers", []) or []):
+                if getattr(p, "allegiance", None) != ctx.side:
+                    continue
+                if not getattr(p, "is_army", lambda: False)():
+                    continue
+                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                    continue
+                embarked_ground.append(p)
+        if not embarked_ground:
             return []
-        for h in refreshed:
-            if (h.q, h.r) not in {(k.q, k.r) for k in kept}:
-                kept.append(h)
+
+        kept: List[Hex] = []
+        for h in existing:
+            col, row = h.axial_to_offset()
+            if not ctx.game_state.is_hex_in_bounds(col, row):
+                continue
+            if not board.is_coastal(h):
+                continue
+            if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
+                continue
+            if not any(ctx.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                continue
+            kept.append(h)
         return kept[:4]
 
     def _score_anchor_improvement(self, ctx: AIContext, new_anchor: Hex, old_anchor: Hex, main_objective: Objective) -> float:
@@ -975,6 +1004,17 @@ class StrategicPlanner:
         return best
 
 class OperationalPlanner:
+    @staticmethod
+    def _fleet_has_embarked_ground_for_transport(fleet) -> bool:
+        if fleet is None:
+            return False
+        passengers = list(getattr(fleet, "passengers", []) or [])
+        return any(
+            getattr(p, "is_army", lambda: False)()
+            and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            for p in passengers
+        )
+
     def build_task_groups(self, ctx: AIContext) -> List[TaskGroup]:
         board = ctx.game_state.map
         groups = []
@@ -1037,12 +1077,35 @@ class OperationalPlanner:
         offensive = plan.offensive_side == ctx.side
         main_objective = plan.main_objective
         main_hex = Hex.offset_to_axial(main_objective.coords[0], main_objective.coords[1]) if main_objective else None
+        ashore_committed = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
 
         main_effort_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         support_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        loaded_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        empty_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         if offensive and plan.transport_campaign and plan.beachhead_slots:
-            fleet_groups = [g for g in groups if g.has_fleet]
-            fleet_assignments = self._assign_fleet_slots(ctx, plan, fleet_groups, ctx.transport_actions_in_phase)
+            loaded_fleet_groups: List[TaskGroup] = []
+            for g in [x for x in groups if x.has_fleet]:
+                fleet_unit = next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
+                if self._fleet_has_embarked_ground_for_transport(fleet_unit):
+                    loaded_fleet_groups.append(g)
+                    loaded_fleet_group_keys.add(_task_group_key(g))
+                else:
+                    empty_fleet_group_keys.add(_task_group_key(g))
+                    print(f"[TRANSPORT] skip_slot_assignment empty_fleet={getattr(fleet_unit, 'id', '?')}")
+            needed_loaded_keys = {
+                _unit_key(next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None))
+                for g in loaded_fleet_groups
+                if next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None) is not None
+            }
+            existing_assignments = dict(plan.fleet_slot_assignments or {})
+            reusable_assignments = {
+                fk: slot for fk, slot in existing_assignments.items() if fk in needed_loaded_keys
+            }
+            if len(reusable_assignments) == len(needed_loaded_keys):
+                fleet_assignments = reusable_assignments
+            else:
+                fleet_assignments = self._assign_fleet_slots(ctx, plan, loaded_fleet_groups, ctx.transport_actions_in_phase)
             plan.fleet_slot_assignments = dict(fleet_assignments)
             if ctx.invasion_state is not None:
                 ctx.invasion_state["fleet_assignments"] = dict(fleet_assignments)
@@ -1093,7 +1156,23 @@ class OperationalPlanner:
             group_key = _task_group_key(group)
 
             if offensive and plan.transport_campaign and main_hex:
+                group_has_ashore_committed = any(
+                    _unit_key(u) in ashore_committed
+                    for u in group.units
+                    if getattr(u, "is_army", lambda: False)()
+                    and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                )
                 if group.has_fleet:
+                    if group_key in empty_fleet_group_keys:
+                        target = group.hex
+                        missions.append(Mission(
+                            group=group,
+                            mission_type="fleet_support",
+                            target_hex=target,
+                            objective=main_objective,
+                            priority=66 + plan.urgency_score * 8 + group.power * 0.2,
+                        ))
+                        continue
                     assigned_slot = None
                     fleet_unit = next((u for u in group.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
                     assigned_offset = plan.fleet_slot_assignments.get(_unit_key(fleet_unit)) if (fleet_unit and plan.fleet_slot_assignments) else None
@@ -1110,19 +1189,7 @@ class OperationalPlanner:
                     assigned_dbg = assigned_slot.axial_to_offset() if assigned_slot is not None else None
                     print(f"[TRANSPORT] fleet_target={target.axial_to_offset()} assigned_slot={assigned_dbg}")
                     continue
-            if (not offensive) and loc and getattr(loc, "loc_type", None) == LocType.PORT.value and loc.occupier == ctx.side:
-                og = ctx.objective_graph or {}
-                danger_countries = set(og.get("enemy_offensive_countries", set()) or set())
-                if getattr(loc, "country_id", None) in danger_countries:
-                    missions.append(Mission(
-                        group=group,
-                        mission_type="defend_key_location",
-                        target_hex=group.hex,
-                        objective=None,
-                        priority=120 + local_threat * 12,
-                    ))
-                    continue
-                if group.has_army and self._group_needs_embarkation(ctx, group, main_hex):
+                if group.has_army and (not group_has_ashore_committed) and self._group_needs_embarkation(ctx, group, main_hex):
                     embark_hex = self._best_embark_hex(ctx, group, main_hex)
                     missions.append(Mission(
                         group=group,
@@ -1133,7 +1200,10 @@ class OperationalPlanner:
                     ))
                     continue
                 beach_slots = list(plan.beachhead_slots or ([] if plan.beachhead_hex is None else [plan.beachhead_hex]))
-                if group.has_army and not group.has_fleet and beach_slots and any(group.hex.distance_to(s) <= 1 for s in beach_slots):
+                if group.has_army and not group.has_fleet and (
+                    (beach_slots and any(group.hex.distance_to(s) <= 1 for s in beach_slots))
+                    or group_has_ashore_committed
+                ):
                     nearby_enemy = 0
                     for neighbor in group.hex.neighbors():
                         nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
@@ -1165,6 +1235,18 @@ class OperationalPlanner:
                         ))
                         print(f"[TRANSPORT] {mission_type} group={group_key} target={push_hex.axial_to_offset()}")
                         continue
+            if (not offensive) and loc and getattr(loc, "loc_type", None) == LocType.PORT.value and loc.occupier == ctx.side:
+                og = ctx.objective_graph or {}
+                danger_countries = set(og.get("enemy_offensive_countries", set()) or set())
+                if getattr(loc, "country_id", None) in danger_countries:
+                    missions.append(Mission(
+                        group=group,
+                        mission_type="defend_key_location",
+                        target_hex=group.hex,
+                        objective=None,
+                        priority=120 + local_threat * 12,
+                    ))
+                    continue
                 
             # Priority 1: Main effort and support missions (offensive only)
             if offensive and main_hex:
@@ -1563,6 +1645,7 @@ class TacticalPlanner:
         "main_effort_attack": {"objective": 16, "threat": -5, "support": 4, "capture": 10},
         "support_main_effort": {"objective": 10, "threat": -4, "support": 5, "capture": 6},
         "secure": {"objective": 8, "threat": -5, "support": 3, "capture": 3},
+        "fleet_support": {"objective": 7, "threat": -5, "support": 4, "capture": 2},
         "defend": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
         "defend_key_location": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
         "reinforce": {"objective": 9, "threat": -6, "support": 3, "capture": 2},
@@ -2499,6 +2582,7 @@ class TacticalPlanner:
         beachhead_slots = list(plan.beachhead_slots or ([] if plan.beachhead_hex is None else [plan.beachhead_hex]))
         beachhead_slot_offsets = {h.axial_to_offset() for h in beachhead_slots}
         landed_state = set((ctx.invasion_state or {}).get("landed_armies", set()) or set())
+        ashore_state = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
         
         # Stage 1: Batch fleet unloading wave.
         if plan.transport_campaign:
@@ -2553,6 +2637,9 @@ class TacticalPlanner:
                     if getattr(unit, "is_army", lambda: False)() and getattr(unit, "unit_type", None) not in (
                             UnitType.WING, UnitType.FLEET):
                         ukey = _unit_key(unit)
+                        if ukey in ashore_state:
+                            print(f"[TRANSPORT] skip_reboard ashore_committed={getattr(unit, 'id', '?')}")
+                            continue
                         if transport_actions and ("landed_army", ukey) in transport_actions:
                             print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
                             continue
@@ -2704,6 +2791,7 @@ class TacticalPlanner:
             return False
         transport_actions = ctx.transport_actions_in_phase
         landed_state = set((ctx.invasion_state or {}).get("landed_armies", set()) or set())
+        ashore_state = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
         unloaded = 0
         for fleet, selected, _score in actions:
             if unloaded >= max_actions:
@@ -2723,8 +2811,11 @@ class TacticalPlanner:
                     transport_actions.add(("landing_unload", _unit_key(fleet), (col, row)))
                     transport_actions.add(("landed_army", _unit_key(p)))
                     landed_state.add(_unit_key(p))
+                    ashore_state.add(_unit_key(p))
+                    print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
             if ctx.invasion_state is not None:
                 ctx.invasion_state["landed_armies"] = set(landed_state)
+                ctx.invasion_state["ashore_committed_armies"] = set(ashore_state)
         return unloaded > 0
 
     @staticmethod
@@ -3189,6 +3280,7 @@ class BaselineAIPlayer:
         self._beachhead_by_side_in_phase = {}
         self._transport_actions_in_phase = set()
         self._invasion_state_by_side: Dict[str, Dict[str, Any]] = {}
+        self._movement_phase_plan_cache_by_side: Dict[str, Dict[str, Any]] = {}
         self._unit_last_position: Dict[Tuple[str, int], Tuple[int, int]] = {}
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
@@ -3397,9 +3489,57 @@ class BaselineAIPlayer:
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
         moved_groups = self._ensure_movement_phase_memory()
         ctx = self._build_context(side, moved_task_groups=moved_groups)
-        beachhead_memory = self._ensure_beachhead_phase_memory()
-        plan = self._strategic.build_plan(ctx, beachhead_memory=beachhead_memory)
-        self._update_invasion_state_from_plan(side, plan)
+        phase_key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+            side,
+        )
+        cache = self._movement_phase_plan_cache_by_side.get(side)
+        state = ctx.invasion_state or {}
+        state_objective_id = str(state.get("primary_objective_id") or "")
+        state_version = int(state.get("version", 0) or 0)
+        transport_signature = self._compute_transport_signature(ctx)
+        transport_actions_count = len(ctx.transport_actions_in_phase or set())
+
+        reuse_cached = False
+        recompute_reason = "no_cache"
+        if cache and cache.get("phase_key") == phase_key:
+            if str(cache.get("objective_id") or "") != state_objective_id:
+                recompute_reason = "objective_changed"
+            elif int(cache.get("invasion_version", 0) or 0) != state_version:
+                recompute_reason = "landing_version_changed"
+            elif cache.get("transport_signature") != transport_signature:
+                recompute_reason = "transport_state_changed"
+            elif int(cache.get("transport_actions_count", -1)) != transport_actions_count:
+                recompute_reason = "transport_actions_changed"
+            elif not self._cached_slots_still_valid(ctx, cache):
+                recompute_reason = "slots_invalid"
+            else:
+                reuse_cached = True
+        else:
+            recompute_reason = "phase_or_cache_miss"
+
+        if reuse_cached:
+            plan = cache.get("plan")
+            print(f"[TRANSPORT] phase_plan_reused side={side} objective={cache.get('objective_id')}")
+        else:
+            beachhead_memory = self._ensure_beachhead_phase_memory()
+            plan = self._strategic.build_plan(ctx, beachhead_memory=beachhead_memory)
+            self._update_invasion_state_from_plan(side, plan)
+            updated_state = self._get_invasion_state(side)
+            self._movement_phase_plan_cache_by_side[side] = {
+                "phase_key": phase_key,
+                "plan": plan,
+                "objective_id": str(getattr(plan.main_objective, "id", "") or ""),
+                "invasion_version": int(updated_state.get("version", 0) or 0),
+                "beachhead_hex": plan.beachhead_hex.axial_to_offset() if plan.beachhead_hex is not None else None,
+                "beachhead_slots": [h.axial_to_offset() for h in (plan.beachhead_slots or [])],
+                "fleet_slot_assignments": dict(plan.fleet_slot_assignments or {}),
+                "transport_signature": transport_signature,
+                "transport_actions_count": transport_actions_count,
+            }
+            print(f"[TRANSPORT] phase_plan_recomputed reason={recompute_reason}")
         groups = self._operational.build_task_groups(ctx)
         missions = self._operational.build_missions(ctx, plan, groups)
         
@@ -3469,8 +3609,10 @@ class BaselineAIPlayer:
         objectives = self._collect_objectives(side, objective_graph=objective_graph)
         friendly_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == side and getattr(u, "is_on_map", False)]
         enemy_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == enemy and getattr(u, "is_on_map", False)]
+        self._prune_ashore_committed_state(side)
         for u in friendly_units:
             self._clear_landed_flag_if_inland(side, u)
+            self._clear_ashore_committed_flag_if_explicitly_retasked(side, u)
         
         return AIContext(
             game_state=self.game_state,
@@ -3501,6 +3643,7 @@ class BaselineAIPlayer:
         if self._movement_phase_key != key:
             self._movement_phase_key = key
             self._moved_task_groups_in_phase = set()
+            self._movement_phase_plan_cache_by_side = {}
         return self._moved_task_groups_in_phase
 
     def _ensure_transport_phase_memory(self) -> set:
@@ -3528,6 +3671,56 @@ class BaselineAIPlayer:
             self._beachhead_phase_key = key
             self._beachhead_by_side_in_phase = {}
         return self._beachhead_by_side_in_phase
+
+    def _compute_transport_signature(self, ctx: AIContext) -> Tuple[Tuple[Any, ...], ...]:
+        rows: List[Tuple[Any, ...]] = []
+        for u in sorted(ctx.friendly_units, key=_unit_key):
+            if getattr(u, "unit_type", None) != UnitType.FLEET:
+                continue
+            if not getattr(u, "is_on_map", False):
+                continue
+            pos = tuple(getattr(u, "position", (None, None)) or (None, None))
+            embarked_ground = sum(
+                1 for p in list(getattr(u, "passengers", []) or [])
+                if getattr(p, "allegiance", None) == ctx.side
+                and getattr(p, "is_army", lambda: False)()
+                and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            )
+            rows.append((_unit_key(u), pos, embarked_ground))
+        return tuple(rows)
+
+    def _cached_slots_still_valid(self, ctx: AIContext, cache: Dict[str, Any]) -> bool:
+        slots = list(cache.get("beachhead_slots", []) or [])
+        if not slots:
+            return True
+        board = self.game_state.map
+        embarked_ground = []
+        for u in ctx.friendly_units:
+            if getattr(u, "unit_type", None) != UnitType.FLEET:
+                continue
+            for p in list(getattr(u, "passengers", []) or []):
+                if getattr(p, "allegiance", None) != ctx.side:
+                    continue
+                if not getattr(p, "is_army", lambda: False)():
+                    continue
+                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                    continue
+                embarked_ground.append(p)
+        for item in slots:
+            try:
+                col, row = int(item[0]), int(item[1])
+                h = Hex.offset_to_axial(col, row)
+            except Exception:
+                continue
+            if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            if not board.is_coastal(h):
+                continue
+            if not embarked_ground:
+                return True
+            if any(self.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                return True
+        return False
 
     def _collect_objectives(self, side: str, objective_graph: Optional[Dict[str, Any]] = None) -> List[Objective]:
         objective_graph = objective_graph or {}
@@ -3584,6 +3777,7 @@ class BaselineAIPlayer:
                 "landing_slots": [],
                 "fleet_assignments": {},
                 "landed_armies": set(),
+                "ashore_committed_armies": set(),
                 "committed_fleets": set(),
                 "version": 1,
             }
@@ -3615,6 +3809,42 @@ class BaselineAIPlayer:
 
     def _is_army_landed(self, side: str, unit) -> bool:
         return _unit_key(unit) in self._get_invasion_state(side).get("landed_armies", set())
+
+    def _mark_army_ashore_committed(self, side: str, unit):
+        self._get_invasion_state(side)["ashore_committed_armies"].add(_unit_key(unit))
+
+    def _is_army_ashore_committed(self, side: str, unit) -> bool:
+        return _unit_key(unit) in self._get_invasion_state(side).get("ashore_committed_armies", set())
+
+    def _clear_ashore_committed_flag_if_explicitly_retasked(self, side: str, unit):
+        # Conservative by default: only clear if unit is no longer a valid on-map friendly ground army.
+        if unit is None:
+            return
+        if not getattr(unit, "is_army", lambda: False)():
+            return
+        if getattr(unit, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+            return
+        state = self._get_invasion_state(side)
+        key = _unit_key(unit)
+        if key not in state.get("ashore_committed_armies", set()):
+            return
+        if getattr(unit, "allegiance", None) != side or not getattr(unit, "is_on_map", False):
+            state["ashore_committed_armies"].discard(key)
+
+    def _prune_ashore_committed_state(self, side: str):
+        state = self._get_invasion_state(side)
+        committed = set(state.get("ashore_committed_armies", set()) or set())
+        if not committed:
+            return
+        valid = {
+            _unit_key(u)
+            for u in self.game_state.units
+            if getattr(u, "allegiance", None) == side
+            and getattr(u, "is_on_map", False)
+            and getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        }
+        state["ashore_committed_armies"] = committed.intersection(valid)
 
     def _clear_landed_flag_if_inland(self, side: str, unit):
         if not getattr(unit, "is_army", lambda: False)():

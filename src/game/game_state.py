@@ -878,6 +878,51 @@ class GameState:
     def next_turn(self):
         return self.phase_manager.next_turn()
 
+    def on_finish_replacements_round_for_player(self, allegiance: str):
+        # Preserve existing behavior: only HL replacement round triggers draconian production.
+        if allegiance == HL:
+            self.process_draconian_production()
+
+    def finalize_activation_phase(self):
+        # Activation bonuses are valid only during the current battle turn activation step.
+        self.clear_activation_bonuses()
+
+    def prepare_for_movement_phase(self):
+        for unit in self.units:
+            unit.movement_points = getattr(unit, "movement", 0)
+            unit.moved_this_turn = False
+            unit.carried_by_citadel_this_turn = False
+            unit._healed_this_combat_turn = False
+
+    def finalize_combat_phase(self):
+        # Keep end-of-combat rule ordering identical to previous PhaseManager logic.
+        self.resolve_end_of_combat_conquest()
+        self.clear_leader_tactical_overrides()
+        self.clear_combat_bonus(self.active_player)
+        for unit in self.units:
+            unit.attacked_this_turn = False
+
+    def execute_supply_phase(self):
+        return self.resolve_supply_phase()
+
+    def begin_next_turn(self):
+        self.turn += 1
+        print(f"Battle Turn: {self.turn}")
+        self.phase = GamePhase.REPLACEMENTS
+        # Player that lost initiative acts first in replacements.
+        self.active_player = WS if self.initiative_winner == HL else HL
+        self.process_delayed_fleet_replacements()
+
+        for unit in self.units:
+            unit.movement_points = getattr(unit, "movement", 0)
+            unit.attacked_this_turn = False
+            unit.moved_this_turn = False
+            unit.carried_by_citadel_this_turn = False
+            unit._healed_this_combat_turn = False
+
+        self.check_events()
+        self.evaluate_victory_conditions()
+
     def resolve_supply_phase(self):
         """
         Rule 12 (advanced supply):
