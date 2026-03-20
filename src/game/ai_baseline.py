@@ -2819,13 +2819,22 @@ class TacticalPlanner:
         return unloaded > 0
 
     @staticmethod
-    def _select_fleet_unboard_passengers(ctx: AIContext, plan: StrategicPlan, fleet, passengers: List[object]) -> List[object]:
-        """Select passengers to unboard from fleet on assigned/approved beachhead slots with density control."""
+    def _select_fleet_unboard_passengers(ctx: AIContext, plan: StrategicPlan, fleet, passengers: List[object]) -> List[
+        object]:
+        """Select passengers to unboard from fleet on assigned/approved beachhead slots.
+
+        Ground armies drive the landing decision and count against the landing density cap.
+        Friendly leaders on the same fleet are treated as companion passengers:
+        - they unload together with the selected army/armies when legal
+        - they do NOT count against the army landing density cap
+        - they do NOT unload alone if no army is unloading
+        """
         if not plan.main_objective or not getattr(fleet, "position", None) or fleet.position[0] is None:
             return []
-        fleet_hex = Hex.offset_to_axial(*fleet.position)
 
+        fleet_hex = Hex.offset_to_axial(*fleet.position)
         col, row = fleet_hex.axial_to_offset()
+
         assigned_slot = None
         fleet_id_key = _unit_key(fleet)
         offset = (plan.fleet_slot_assignments or {}).get(fleet_id_key)
@@ -2838,50 +2847,78 @@ class TacticalPlanner:
         elif not approved_slots and plan.beachhead_hex is not None:
             approved_slots = [plan.beachhead_hex]
 
+        # Fleet must already be on its assigned/approved unload slot.
         if not approved_slots or not any(fleet_hex == h for h in approved_slots):
             return []
 
-        candidate_passengers = [
+        # 1) Select candidate ground armies only (they drive landing legality / density).
+        candidate_armies = [
             p for p in passengers
             if getattr(p, "allegiance", None) == ctx.side
-            and getattr(p, "is_army", lambda: False)()
-            and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+               and getattr(p, "is_army", lambda: False)()
+               and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
         ]
-        if not candidate_passengers:
+        if not candidate_armies:
             return []
 
         legal_hexes = []
         seen_hexes = set()
-        for p in candidate_passengers:
+        for p in candidate_armies:
             for h in ctx.game_state.get_valid_unboard_hexes(fleet, p):
                 key = (h.q, h.r)
                 if key in seen_hexes:
                     continue
                 seen_hexes.add(key)
                 legal_hexes.append(h)
+
         if not any(h == fleet_hex for h in legal_hexes):
             print(f"[TRANSPORT] no_legal_unload_hex at ({col},{row})")
             return []
-        legal_now = [p for p in candidate_passengers if ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex)]
-        if not legal_now:
+
+        legal_now_armies = [
+            p for p in candidate_armies
+            if ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex)
+        ]
+        if not legal_now_armies:
             print(f"[TRANSPORT] unload_illegal at ({col},{row})")
             return []
-        
-        # Density control: check current friendly ground armies already on hex
-        existing_ground = sum(1 for u in ctx.game_state.map.get_units_in_hex(col, row)
-                              if getattr(u, "allegiance", None) == ctx.side
-                              and getattr(u, "is_on_map", False)
-                              and getattr(u, "is_army", lambda: False)())
-        
-        # If already >= 2, do not unboard here
+
+        # 2) Landing density cap applies to GROUND ARMIES only.
+        existing_ground = sum(
+            1 for u in ctx.game_state.map.get_units_in_hex(col, row)
+            if getattr(u, "allegiance", None) == ctx.side
+            and getattr(u, "is_on_map", False)
+            and getattr(u, "is_army", lambda: False)()
+            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        )
         if existing_ground >= 2:
             return []
-        
-        # Select armies from passengers (trust carrier passenger list)
-        max_unload = 2 - existing_ground
-        selected = list(legal_now)
-        selected.sort(key=lambda u: (float(getattr(u, "combat_rating", 0) or 0), _unit_key(u)), reverse=True)
-        return selected[:max_unload]
+
+        max_unload_armies = 2 - existing_ground
+        selected_armies = list(legal_now_armies)
+        selected_armies.sort(
+            key=lambda u: (float(getattr(u, "combat_rating", 0) or 0), _unit_key(u)),
+            reverse=True,
+        )
+        selected_armies = selected_armies[:max_unload_armies]
+
+        # IMPORTANT: never unload leaders alone.
+        if not selected_armies:
+            return []
+
+        # 3) Add companion leaders from the same fleet if they can legally unboard here.
+        companion_leaders = [
+            p for p in passengers
+            if getattr(p, "allegiance", None) == ctx.side
+               and hasattr(p, "is_leader")
+               and p.is_leader()
+               and ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex)
+        ]
+
+        for leader in companion_leaders:
+            print(f"[TRANSPORT] companion_leader_unload={getattr(leader, 'id', '?')} fleet={getattr(fleet, 'id', '?')}")
+
+        return selected_armies + companion_leaders
 
     def _board_dragon_commanders(self, ctx: AIContext) -> bool:
         """Board eligible leaders onto dragon wings that lack a commander.
