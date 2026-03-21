@@ -1195,15 +1195,9 @@ class OperationalPlanner:
         seen: Set[Tuple[int, int]] = set()
         country_hex_set = {(h.q, h.r) for h in country_hexes}
 
-        for neutral_hex in country_hexes:
-            decision = ctx.movement_service.evaluate_neutral_entry(neutral_hex)
-            if not decision or not getattr(decision, "is_neutral_entry", False):
-                continue
-            if getattr(decision, "blocked_message", None):
-                continue
-            if getattr(decision, "country_id", None) != country_id:
-                continue
-            for h in neutral_hex.neighbors():
+        # Geography-only staging: neighbors around target-country border.
+        for border_hex in country_hexes:
+            for h in border_hex.neighbors():
                 if (h.q, h.r) in country_hex_set:
                     continue
                 col, row = h.axial_to_offset()
@@ -1233,6 +1227,9 @@ class OperationalPlanner:
         adjacent_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         adjacent_unit_count = 0
         adjacent_power = 0.0
+        target_hexes = set((h.q, h.r) for h in (ctx.country_hexes_by_id or {}).get(country_id, []))
+        if not target_hexes:
+            return adjacent_group_keys, adjacent_unit_count, adjacent_power
 
         for group in groups:
             if not group.has_army:
@@ -1256,13 +1253,7 @@ class OperationalPlanner:
                     ncol, nrow = neighbor.axial_to_offset()
                     if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
                         continue
-
-                    decision = ctx.movement_service.evaluate_neutral_entry(neighbor)
-                    if not decision or not getattr(decision, "is_neutral_entry", False):
-                        continue
-                    if getattr(decision, "blocked_message", None):
-                        continue
-                    if getattr(decision, "country_id", None) != country_id:
+                    if (neighbor.q, neighbor.r) not in target_hexes:
                         continue
 
                     group_adjacent = True
@@ -3859,6 +3850,10 @@ class BaselineAIPlayer:
         border_groups = []
         adjacent_unit_count = 0
         adjacent_power = 0.0
+        target_hexes = list((ctx.country_hexes_by_id or {}).get(target_country_id, []))
+        target_hex_set = set((h.q, h.r) for h in target_hexes)
+        if not target_hex_set:
+            return False
 
         for group in self._operational.build_task_groups(ctx):
             if not group.has_army or not group.mobile_units:
@@ -3882,12 +3877,7 @@ class BaselineAIPlayer:
                     col, row = neighbor.axial_to_offset()
                     if not ctx.game_state.is_hex_in_bounds(col, row):
                         continue
-                    decision = ctx.movement_service.evaluate_neutral_entry(neighbor)
-                    if not decision or not getattr(decision, "is_neutral_entry", False):
-                        continue
-                    if getattr(decision, "blocked_message", None):
-                        continue
-                    if getattr(decision, "country_id", None) != target_country_id:
+                    if (neighbor.q, neighbor.r) not in target_hex_set:
                         continue
                     group_adjacent = True
                     break
@@ -3921,6 +3911,14 @@ class BaselineAIPlayer:
                 f"adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f} "
                 f"required_units>={min_adjacent_units} required_power>={min_adjacent_power:.1f}"
             )
+            return False
+
+        probe_hex = target_hexes[0]
+        probe = ctx.movement_service.evaluate_neutral_entry(probe_hex)
+        if not probe or not getattr(probe, "is_neutral_entry", False):
+            return False
+        if getattr(probe, "blocked_message", None):
+            print(f"[INVASION] Delaying invasion of {target_country_id}: {probe.blocked_message}")
             return False
 
         best_group_power, best_hex, _ = max(border_groups, key=lambda item: item[0])
@@ -4002,7 +4000,8 @@ class BaselineAIPlayer:
         if self._try_neutral_invasion(ctx, plan, attempt_invasion):
             return True
         
-        moved = self._tactical.execute_best_movement(ctx, plan, missions, attempt_invasion=attempt_invasion)
+        # Keep neutral invasion centralized in _try_neutral_invasion to avoid invalid popup churn.
+        moved = self._tactical.execute_best_movement(ctx, plan, missions, attempt_invasion=None)
         if moved:
             self._log(f"movement: executed ({plan.posture})")
         return moved

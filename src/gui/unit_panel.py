@@ -1,6 +1,8 @@
 import sys
+from collections import defaultdict
 from types import SimpleNamespace
 from time import perf_counter
+from typing import Optional, Dict, Any
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTableWidget,
                                QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle, QGraphicsScene)
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
@@ -360,6 +362,8 @@ class AllegiancePanel(QWidget):
         self.game_state = game_state
         self.allegiance = allegiance
         self.columns = columns
+        self.base_title = title or str(allegiance)
+        self.title_label = None
         self.tables = [] # Keep track of created tables
         self._group_order = []
         self._group_widgets = {}  # group_name -> (label_widget, table_widget)
@@ -384,6 +388,7 @@ class AllegiancePanel(QWidget):
                 lbl.setFont(f)
             
             self.main_layout.addWidget(lbl)
+            self.title_label = lbl
         
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -397,11 +402,15 @@ class AllegiancePanel(QWidget):
         
         self.refresh()
 
-    def refresh(self):
+    def set_title_text(self, text: str):
+        if self.title_label is not None:
+            self.title_label.setText(str(text or self.base_title))
+
+    def refresh(self, preindexed: Optional[Dict[str, Any]] = None):
         t0 = perf_counter()
         if not self.game_state:
             return
-        groups_data = self._build_groups_data()
+        groups_data = self._build_groups_data(preindexed=preindexed)
         new_order = [name for name, _units, _style in groups_data]
 
         if new_order != self._group_order:
@@ -418,15 +427,24 @@ class AllegiancePanel(QWidget):
                 f"tables={len(self.tables)} mode={phase} time_ms={dt_ms:.1f}"
             )
 
-    def _build_groups_data(self):
+    def _build_groups_data(self, preindexed: Optional[Dict[str, Any]] = None):
         processed_units = set()
         groups_data = []
 
         countries = [c for c in self.game_state.countries.values() if c.allegiance == self.allegiance]
         countries.sort(key=lambda x: x.id)
 
+        units_by_land = (preindexed or {}).get("units_by_land") if preindexed else None
+        if units_by_land is None:
+            units_by_land = defaultdict(list)
+            for u in self.game_state.units:
+                units_by_land[getattr(u, "land", None)].append(u)
+        allegiance_units = (preindexed or {}).get("units_by_allegiance", {}).get(self.allegiance) if preindexed else None
+        if allegiance_units is None:
+            allegiance_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == self.allegiance]
+
         for country in countries:
-            units = [u for u in self.game_state.units if u.land == country.id]
+            units = list(units_by_land.get(country.id, []))
             processed_units.update(units)
             groups_data.append((
                 country.id.title(),
@@ -434,7 +452,7 @@ class AllegiancePanel(QWidget):
                 "font-weight: bold; background-color: #EEE; border: 1px solid #CCC;",
             ))
 
-        remaining_units = [u for u in self.game_state.units if u.allegiance == self.allegiance and u not in processed_units]
+        remaining_units = [u for u in allegiance_units if u not in processed_units]
         if remaining_units:
             grouped = {}
             for unit in remaining_units:

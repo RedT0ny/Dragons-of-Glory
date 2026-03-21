@@ -16,6 +16,7 @@ TODO BUGFIX:
 - Fix map subset not working correctly (use full map for now).
 - If a Dragon unit is eliminated and sent to reserve, its passenger shall also be eliminated.
 - Ground armies should not be counted for interceptions.
+- Destroy fleets when they do not have a valid displacement hex?
 
 Notes:
 
