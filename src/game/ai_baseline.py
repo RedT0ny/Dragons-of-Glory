@@ -14,11 +14,18 @@ from src.game.combat_reporting import show_combat_result_popup
 
 
 def _enemy_of(side: str) -> Optional[str]:
-    if side == HL:
-        return WS
-    if side == WS:
-        return HL
+    if side == HL: return WS
+    if side == WS: return HL
     return None
+
+
+def _country_alignment_for_side(country, side: str) -> float:
+    alignment = getattr(country, "alignment", (0, 0)) or (0, 0)
+    if side == HL:
+        return float(alignment[1] if len(alignment) > 1 else 0)
+    if side == WS:
+        return float(alignment[0] if len(alignment) > 0 else 0)
+    return 0.0
 
 
 def _unit_key(unit) -> Tuple[str, int]:
@@ -259,6 +266,9 @@ class AIContext:
     transport_actions_in_phase: Optional[Set[Tuple]] = None
     objective_graph: Optional[Dict[str, Any]] = None
     invasion_state: Optional[Dict[str, Any]] = None
+    country_hexes_by_id: Optional[Dict[str, List[Hex]]] = None
+    country_port_counts: Optional[Dict[str, int]] = None
+    neutral_front_cache: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -403,35 +413,53 @@ class GeographyAnalyzer:
 
 
 class StrategicPlanner:
+
     def build_plan(self, ctx: AIContext, beachhead_memory: Optional[Dict[str, Optional[Hex]]] = None) -> StrategicPlan:
-        posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category = self._choose_posture(ctx)
+        posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category = self._choose_posture(
+            ctx)
         objectives = self._prioritize_objectives(ctx)
-        transport_campaign = self._should_use_transport(ctx, objectives, offensive_side, main_objective)
+
+        # Choose a neutral expansion country first for generic control campaigns.
         invasion_target = self._choose_invasion_target(ctx, objectives)
-        
+
+        # IMPORTANT:
+        # In campaigns like campaign 0 (control_n_countries, no authored offensive targets),
+        # do NOT keep a remote generic objective like Icewall Castle.
+        # Instead, anchor the main objective inside the selected expansion country.
+        if (
+                offensive_side == ctx.side
+                and self._is_generic_control_expansion_plan(ctx, victory_category)
+                and invasion_target
+        ):
+            country_objective = self._best_objective_in_country(objectives, invasion_target, ctx.side)
+            if country_objective is not None:
+                main_objective = country_objective
+                notes.append(f"country_focus={invasion_target}")
+                notes.append(f"main_objective_override={country_objective.id}")
+
+        transport_campaign = self._should_use_transport(ctx, objectives, offensive_side, main_objective)
+
         # Beachhead selection for transport campaigns - reuse stored beachhead if available
         beachhead_hex = None
         if transport_campaign and offensive_side == ctx.side and main_objective:
-            # Check if beachhead already stored for this side in current phase
             if beachhead_memory and ctx.side in beachhead_memory:
                 beachhead_hex = beachhead_memory[ctx.side]
                 if beachhead_hex:
-                    # Reuse stored beachhead
                     pass
                 else:
-                    # Compute and store beachhead
                     beachhead_hex = self._simple_beachhead_choice(ctx, main_objective)
                     beachhead_memory[ctx.side] = beachhead_hex
             else:
-                # No memory provided - compute fresh beachhead
                 beachhead_hex = self._simple_beachhead_choice(ctx, main_objective)
+
         if transport_campaign and offensive_side == ctx.side and main_objective:
             beachhead_hex, beachhead_slots = self._compute_landing_plan(ctx, main_objective, beachhead_hex)
         else:
             beachhead_slots = []
+
         if beachhead_slots:
             print(f"[TRANSPORT] beachhead_slots={[h.axial_to_offset() for h in beachhead_slots]}")
-        
+
         return StrategicPlan(
             posture=posture,
             objectives=objectives,
@@ -447,6 +475,129 @@ class StrategicPlanner:
             beachhead_hex=beachhead_hex,
             beachhead_slots=beachhead_slots,
             fleet_slot_assignments=dict((ctx.invasion_state or {}).get("fleet_assignments", {})),
+        )
+
+    @staticmethod
+    def _is_generic_control_expansion_plan(ctx: AIContext, victory_category: Optional[str]) -> bool:
+        """True for campaigns like campaign 0: generic control victory, no explicit authored offensive targets."""
+        if str(victory_category or "").lower() != "control":
+            return False
+
+        og = ctx.objective_graph or {}
+        if og.get("offensive_target_countries") or og.get("offensive_target_locations"):
+            return False
+
+        return True
+
+    @staticmethod
+    def _country_frontier_metrics(ctx: AIContext, country_id: str) -> Tuple[int, int]:
+        """Return:
+        - number of friendly-controlled hexes adjacent to a hex in the target country
+        - minimum hex distance from any friendly on-map ground unit to any hex in the target country
+        """
+        target_hexes: List[Hex] = list((ctx.country_hexes_by_id or {}).get(country_id, []))
+
+        if not target_hexes:
+            return 0, 999
+
+        territory = ctx.overlays.get("territory")
+        adjacent_friendly_border_hexes = 0
+        seen_border: Set[Tuple[int, int]] = set()
+
+        for th in target_hexes:
+            for nb in th.neighbors():
+                ncol, nrow = nb.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
+                    continue
+                if territory and territory.values.get((ncol, nrow)) == ctx.side:
+                    key = (nb.q, nb.r)
+                    if key not in seen_border:
+                        seen_border.add(key)
+                        adjacent_friendly_border_hexes += 1
+
+        friendly_ground_hexes: List[Hex] = []
+        for u in ctx.friendly_units:
+            if not getattr(u, "is_on_map", False):
+                continue
+            if getattr(u, "transport_host", None) is not None:
+                continue
+            if not getattr(u, "is_army", lambda: False)():
+                continue
+            if getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                continue
+            if not getattr(u, "position", None) or u.position[0] is None:
+                continue
+            friendly_ground_hexes.append(Hex.offset_to_axial(*u.position))
+
+        if not friendly_ground_hexes:
+            return adjacent_friendly_border_hexes, 999
+
+        min_dist = min(
+            fh.distance_to(th)
+            for fh in friendly_ground_hexes
+            for th in target_hexes
+        )
+        return adjacent_friendly_border_hexes, min_dist
+
+    def _score_hl_expansion_country(self, ctx: AIContext, country) -> float:
+        """Front-aware country score for generic control campaigns."""
+        side_alignment = _country_alignment_for_side(country, ctx.side)
+        if side_alignment <= -10:
+            return float("-inf")
+
+        frontier_count, min_dist = self._country_frontier_metrics(ctx, country.id)
+
+        score = 0.0
+
+        # Strongly prefer adjacent/frontier countries for early conquest.
+        score += frontier_count * 35.0
+        score += max(0.0, 14.0 - float(min_dist)) * 8.0
+
+        # Alignment still matters a lot.
+        score += side_alignment * 14.0
+
+        # Slight preference for countries that can be attacked/expanded from current position.
+        if frontier_count > 0:
+            score += 40.0
+
+        # Strength matters, but should not outweigh frontier + alignment.
+        score += float(getattr(country, "strength", 0) or 0) * 0.8
+
+        # Ports/capitals add some value, but do not dominate.
+        port_count = int((ctx.country_port_counts or {}).get(country.id, 0))
+        capital_count = sum(
+            1 for loc in country.locations.values()
+            if getattr(loc, "is_capital", False)
+        )
+        score += port_count * 4.0 + capital_count * 6.0
+
+        return score
+
+    @staticmethod
+    def _best_objective_in_country(
+            objectives: List[Objective],
+            country_id: Optional[str],
+            side: str,
+    ) -> Optional[Objective]:
+        if not country_id:
+            return None
+
+        candidates = [
+            o for o in objectives
+            if getattr(o, "country_id", None) == country_id
+               and getattr(o, "owner", None) != side
+        ]
+        if not candidates:
+            return None
+
+        return max(
+            candidates,
+            key=lambda o: (
+                o.is_capital,
+                o.loc_type == LocType.PORT.value,
+                o.loc_type == LocType.FORTRESS.value,
+                o.value,
+            ),
         )
 
     def _compute_landing_plan(self, ctx: AIContext, main_objective: Objective, fallback_anchor: Optional[Hex]) -> Tuple[Optional[Hex], List[Hex]]:
@@ -809,8 +960,22 @@ class StrategicPlanner:
             obj for obj in objectives
             if obj.id in location_targets or (obj.country_id and obj.country_id in country_targets)
         ]
+
+        used_generic_offensive_fallback = False
         if not candidates and offensive_side == ctx.side:
+            used_generic_offensive_fallback = True
             candidates = [obj for obj in objectives if obj.owner != ctx.side]
+
+            # Exclude strongly hostile neutral countries from generic offensive focus.
+            filtered = []
+            for obj in candidates:
+                country = ctx.game_state.countries.get(obj.country_id) if getattr(obj, "country_id", None) else None
+                if country and getattr(country, "allegiance", None) == NEUTRAL:
+                    if _country_alignment_for_side(country, ctx.side) <= -10:
+                        continue
+                filtered.append(obj)
+            candidates = filtered
+
         if not candidates:
             candidates = objectives
 
@@ -821,10 +986,14 @@ class StrategicPlanner:
             candidates,
             key=lambda o: (o.owner != ctx.side, o.value, o.is_capital),
         )
+
         if main_objective.id in location_deadlines:
-            deadline_turn = min(deadline_turn, location_deadlines[main_objective.id]) if deadline_turn else location_deadlines[main_objective.id]
+            deadline_turn = min(deadline_turn, location_deadlines[main_objective.id]) if deadline_turn else \
+            location_deadlines[main_objective.id]
         elif main_objective.country_id in country_deadlines:
-            deadline_turn = min(deadline_turn, country_deadlines[main_objective.country_id]) if deadline_turn else country_deadlines[main_objective.country_id]
+            deadline_turn = min(deadline_turn, country_deadlines[main_objective.country_id]) if deadline_turn else \
+            country_deadlines[main_objective.country_id]
+
         return main_objective, deadline_turn
 
     def _compute_urgency(self, ctx: AIContext, deadline_turn: Optional[int], is_offensive_side: bool) -> float:
@@ -976,31 +1145,27 @@ class StrategicPlanner:
         return False
 
     def _choose_invasion_target(self, ctx: AIContext, objectives: List[Objective]) -> Optional[str]:
+        cache = ctx.neutral_front_cache if isinstance(ctx.neutral_front_cache, dict) else None
+        if cache and cache.get("invasion_target") is not None:
+            return cache.get("invasion_target")
         if ctx.side != HL:
             return None
+
         neutrals = [c for c in ctx.game_state.countries.values() if c.allegiance == NEUTRAL]
         if not neutrals:
             return None
+
         best = None
         best_score = float("-inf")
-        obj_hexes = [Hex.offset_to_axial(o.coords[0], o.coords[1]) for o in objectives]
+
         for country in neutrals:
-            score = 0.0
-            alignment = getattr(country, "alignment", (0, 0))
-            score += float(alignment[1] if len(alignment) > 1 else 0) * 10
-            score += float(getattr(country, "strength", 0) or 0)
-            if obj_hexes:
-                distances = []
-                for loc in country.locations.values():
-                    if not loc.coords:
-                        continue
-                    loc_hex = Hex.offset_to_axial(*loc.coords)
-                    distances.append(min(loc_hex.distance_to(h) for h in obj_hexes))
-                if distances:
-                    score += max(0.0, 20.0 - (sum(distances) / len(distances)))
+            score = self._score_hl_expansion_country(ctx, country)
             if score > best_score:
                 best_score = score
                 best = country.id
+        if cache is not None:
+            cache["invasion_target"] = best
+            cache["staging_hexes"] = None
         return best
 
 class OperationalPlanner:
@@ -1014,6 +1179,109 @@ class OperationalPlanner:
             and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
             for p in passengers
         )
+
+    @staticmethod
+    def _neutral_border_staging_hexes(ctx: AIContext, country_id: str) -> List[Hex]:
+        """Friendly-side hexes adjacent to a legal neutral-entry hex for the chosen country."""
+        cache = ctx.neutral_front_cache if isinstance(ctx.neutral_front_cache, dict) else None
+        if cache and cache.get("invasion_target") == country_id and isinstance(cache.get("staging_hexes"), list):
+            return list(cache.get("staging_hexes") or [])
+
+        country_hexes = list((ctx.country_hexes_by_id or {}).get(country_id, []))
+        if not country_hexes:
+            return []
+
+        out: List[Hex] = []
+        seen: Set[Tuple[int, int]] = set()
+        country_hex_set = {(h.q, h.r) for h in country_hexes}
+
+        for neutral_hex in country_hexes:
+            decision = ctx.movement_service.evaluate_neutral_entry(neutral_hex)
+            if not decision or not getattr(decision, "is_neutral_entry", False):
+                continue
+            if getattr(decision, "blocked_message", None):
+                continue
+            if getattr(decision, "country_id", None) != country_id:
+                continue
+            for h in neutral_hex.neighbors():
+                if (h.q, h.r) in country_hex_set:
+                    continue
+                col, row = h.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(col, row):
+                    continue
+                key = (h.q, h.r)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(h)
+
+        if cache is not None and cache.get("invasion_target") == country_id:
+            cache["staging_hexes"] = list(out)
+        return out
+
+    @staticmethod
+    def _neutral_invasion_border_force(
+            ctx: AIContext,
+            groups: List[TaskGroup],
+            country_id: str,
+    ) -> Tuple[Set[Tuple[Tuple[str, int], ...]], int, float]:
+        """Return:
+        - task-group keys already adjacent to the chosen neutral target,
+        - total adjacent ground-unit count,
+        - total adjacent combat power.
+        """
+        adjacent_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        adjacent_unit_count = 0
+        adjacent_power = 0.0
+
+        for group in groups:
+            if not group.has_army:
+                continue
+
+            ground_units = [
+                u for u in group.mobile_units
+                if getattr(u, "is_on_map", False)
+                   and getattr(u, "is_army", lambda: False)()
+                   and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                   and getattr(u, "position", None)
+                   and u.position[0] is not None
+            ]
+            if not ground_units:
+                continue
+
+            group_adjacent = False
+            for unit in ground_units:
+                unit_hex = Hex.offset_to_axial(*unit.position)
+                for neighbor in unit_hex.neighbors():
+                    ncol, nrow = neighbor.axial_to_offset()
+                    if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
+                        continue
+
+                    decision = ctx.movement_service.evaluate_neutral_entry(neighbor)
+                    if not decision or not getattr(decision, "is_neutral_entry", False):
+                        continue
+                    if getattr(decision, "blocked_message", None):
+                        continue
+                    if getattr(decision, "country_id", None) != country_id:
+                        continue
+
+                    group_adjacent = True
+                    break
+                if group_adjacent:
+                    break
+
+            if not group_adjacent:
+                continue
+
+            adjacent_group_keys.add(_task_group_key(group))
+            adjacent_unit_count += len(ground_units)
+            adjacent_power += sum(
+                float(getattr(u, "combat_rating", 0) or 0)
+                for u in ground_units
+                if ctx.game_state.is_combat_unit(u)
+            )
+
+        return adjacent_group_keys, adjacent_unit_count, adjacent_power
 
     def build_task_groups(self, ctx: AIContext) -> List[TaskGroup]:
         board = ctx.game_state.map
@@ -1077,6 +1345,26 @@ class OperationalPlanner:
         offensive = plan.offensive_side == ctx.side
         main_objective = plan.main_objective
         main_hex = Hex.offset_to_axial(main_objective.coords[0], main_objective.coords[1]) if main_objective else None
+        invasion_stage_hexes: List[Hex] = []
+        invasion_adjacent_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        invasion_force_ready = False
+
+        if offensive and ctx.side == HL and getattr(plan, "invasion_target", None):
+            target_country = ctx.game_state.countries.get(plan.invasion_target)
+            if target_country and _country_alignment_for_side(target_country, ctx.side) > -10:
+                invasion_stage_hexes = self._neutral_border_staging_hexes(ctx, plan.invasion_target)
+                invasion_adjacent_group_keys, invasion_adjacent_units, invasion_adjacent_power = (
+                    self._neutral_invasion_border_force(ctx, groups, plan.invasion_target)
+                )
+                invasion_required_power = max(
+                    8.0,
+                    float(getattr(target_country, "strength", 0) or 0),
+                )
+                invasion_force_ready = (
+                        invasion_adjacent_units >= 3
+                        and invasion_adjacent_power >= invasion_required_power
+                )
+
         ashore_committed = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
 
         main_effort_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
@@ -1154,6 +1442,42 @@ class OperationalPlanner:
             loc = locations.get((col, row))
             local_threat = _overlay_value(threat, col, row, 0.0)
             group_key = _task_group_key(group)
+
+            # HL neutral-invasion staging:
+            # If a neutral target has been selected but border concentration is not yet sufficient,
+            # use ground armies to assemble on that specific frontier before normal objective push.
+            if (
+                    offensive
+                    and ctx.side == HL
+                    and invasion_stage_hexes
+                    and not invasion_force_ready
+                    and group.has_army
+                    and not group.has_fleet
+            ):
+                if group_key in invasion_adjacent_group_keys:
+                    # Already on the chosen border: hold/stay concentrated.
+                    target = group.hex
+                    priority = 172 + plan.urgency_score * 20 + group.power * 0.6
+                else:
+                    # Move toward the nearest good staging hex on the selected neutral frontier.
+                    target = min(
+                        invasion_stage_hexes,
+                        key=lambda h: (
+                            group.hex.distance_to(h),
+                            h.distance_to(main_hex) if main_hex is not None else 0,
+                        ),
+                    )
+                    dist = group.hex.distance_to(target)
+                    priority = 185 + plan.urgency_score * 25 + group.power * 0.7 - dist * 2.0
+
+                missions.append(Mission(
+                    group=group,
+                    mission_type="stage_neutral_invasion",
+                    target_hex=target,
+                    objective=None,
+                    priority=priority,
+                ))
+                continue
 
             if offensive and plan.transport_campaign and main_hex:
                 group_has_ashore_committed = any(
@@ -1644,6 +1968,7 @@ class TacticalPlanner:
         "move_to_landing_area": {"objective": 12, "threat": -4, "support": 3, "capture": 6},
         "main_effort_attack": {"objective": 16, "threat": -5, "support": 4, "capture": 10},
         "support_main_effort": {"objective": 10, "threat": -4, "support": 5, "capture": 6},
+        "stage_neutral_invasion": {"objective": 15, "threat": -4, "support": 4, "capture": 4},
         "secure": {"objective": 8, "threat": -5, "support": 3, "capture": 3},
         "fleet_support": {"objective": 7, "threat": -5, "support": 4, "capture": 2},
         "defend": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
@@ -3318,6 +3643,10 @@ class BaselineAIPlayer:
         self._transport_actions_in_phase = set()
         self._invasion_state_by_side: Dict[str, Dict[str, Any]] = {}
         self._movement_phase_plan_cache_by_side: Dict[str, Dict[str, Any]] = {}
+        self._neutral_front_cache_by_side: Dict[str, Dict[str, Any]] = {}
+        self._static_geo_cache_scenario_id: Optional[str] = None
+        self._country_hexes_by_id_cache: Optional[Dict[str, List[Hex]]] = None
+        self._country_port_counts_cache: Optional[Dict[str, int]] = None
         self._unit_last_position: Dict[Tuple[str, int], Tuple[int, int]] = {}
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
@@ -3405,23 +3734,43 @@ class BaselineAIPlayer:
     def perform_activation(self, side: str) -> tuple[bool, str | None]:
         ctx = self._build_context(side)
         plan = self._strategic.build_plan(ctx)
+
         neutrals = [c for c in self.game_state.countries.values() if getattr(c, "allegiance", None) == NEUTRAL]
         if not neutrals:
             return False, None
 
         best = None
         best_score = float("-inf")
+
         for country in neutrals:
             attempt = self.diplomacy_service.build_activation_attempt(country.id)
             if not attempt:
                 continue
-            alignment = getattr(country, "alignment", (0, 0))
-            align_score = float(alignment[1] if side == HL else alignment[0]) * 10
+
+            align_score = _country_alignment_for_side(country, side) * 10.0
             objective_score = 0.0
             for obj in plan.objectives[:8]:
                 if obj.country_id == country.id:
                     objective_score += obj.value
-            score = attempt.target_rating * 12 + align_score + objective_score
+
+            frontier_count, min_dist = self._strategic._country_frontier_metrics(ctx, country.id)
+
+            score = 0.0
+            score += attempt.target_rating * 12.0
+            score += align_score
+            score += objective_score
+
+            # Prefer activation for countries that are NOT the immediate conquest front.
+            if side == HL:
+                if country.id == getattr(plan, "invasion_target", None):
+                    score -= 140.0
+                elif frontier_count > 0:
+                    score -= 80.0
+                else:
+                    # Favor non-frontline but diplomatically promising countries.
+                    score += max(0.0, 12.0 - float(min_dist)) * 2.0
+                    score += 20.0
+
             if score > best_score:
                 best_score = score
                 best = country
@@ -3432,8 +3781,10 @@ class BaselineAIPlayer:
         attempt = self.diplomacy_service.build_activation_attempt(best.id)
         if not attempt:
             return False, None
+
         bonus = int(getattr(attempt, "event_activation_bonus", 0) or 0)
         roll = self.diplomacy_service.roll_activation(attempt.target_rating, roll_bonus=bonus)
+
         if not roll.success:
             return False, best.id
 
@@ -3488,39 +3839,97 @@ class BaselineAIPlayer:
         return score
 
     def _try_neutral_invasion(self, ctx, plan, attempt_invasion) -> bool:
-        """Trigger immediate neutral invasion when a mobile ground group is already adjacent."""
+        """Trigger neutral invasion only for the selected target, and only after
+        meaningful force concentration on that border."""
         if not attempt_invasion:
             return False
+
+        target_country_id = getattr(plan, "invasion_target", None)
+        if not target_country_id:
+            return False
+
+        target_country = ctx.game_state.countries.get(target_country_id)
+        if not target_country:
+            return False
+
+        # Hard ban strongly hostile neutral countries.
+        if _country_alignment_for_side(target_country, ctx.side) <= -10:
+            return False
+
+        border_groups = []
+        adjacent_unit_count = 0
+        adjacent_power = 0.0
 
         for group in self._operational.build_task_groups(ctx):
             if not group.has_army or not group.mobile_units:
                 continue
 
-            for unit in group.mobile_units:
-                if not getattr(unit, "is_on_map", False):
-                    continue
-                if not getattr(unit, "position", None) or unit.position[0] is None:
-                    continue
+            ground_units = [
+                u for u in group.mobile_units
+                if getattr(u, "is_on_map", False)
+                   and getattr(u, "is_army", lambda: False)()
+                   and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                   and getattr(u, "position", None)
+                   and u.position[0] is not None
+            ]
+            if not ground_units:
+                continue
 
+            group_adjacent = False
+            for unit in ground_units:
                 unit_hex = Hex.offset_to_axial(*unit.position)
                 for neighbor in unit_hex.neighbors():
                     col, row = neighbor.axial_to_offset()
                     if not ctx.game_state.is_hex_in_bounds(col, row):
                         continue
-
                     decision = ctx.movement_service.evaluate_neutral_entry(neighbor)
                     if not decision or not getattr(decision, "is_neutral_entry", False):
                         continue
                     if getattr(decision, "blocked_message", None):
                         continue
-                    if not getattr(decision, "country_id", None):
+                    if getattr(decision, "country_id", None) != target_country_id:
                         continue
+                    group_adjacent = True
+                    break
+                if group_adjacent:
+                    break
 
-                    print(f"[INVASION] Triggering invasion of {decision.country_id} from {unit_hex.axial_to_offset()}")
-                    attempt_invasion(decision.country_id)
-                    return True
+            if not group_adjacent:
+                continue
 
-        return False
+            group_power = sum(
+                float(getattr(u, "combat_rating", 0) or 0)
+                for u in ground_units
+                if self.game_state.is_combat_unit(u)
+            )
+
+            adjacent_unit_count += len(ground_units)
+            adjacent_power += group_power
+            border_groups.append((group_power, group.hex, ground_units))
+
+        if not border_groups:
+            return False
+
+        # Require real concentration before invading.
+        # Tune these two numbers if needed.
+        min_adjacent_units = 3
+        min_adjacent_power = max(8.0, float(getattr(target_country, "strength", 0) or 0))
+
+        if adjacent_unit_count < min_adjacent_units or adjacent_power < min_adjacent_power:
+            print(
+                f"[INVASION] Delaying invasion of {target_country_id}: "
+                f"adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f} "
+                f"required_units>={min_adjacent_units} required_power>={min_adjacent_power:.1f}"
+            )
+            return False
+
+        best_group_power, best_hex, _ = max(border_groups, key=lambda item: item[0])
+        print(
+            f"[INVASION] Triggering invasion of {target_country_id} from {best_hex.axial_to_offset()} "
+            f"with adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f}"
+        )
+        attempt_invasion(target_country_id)
+        return True
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
@@ -3643,6 +4052,9 @@ class BaselineAIPlayer:
             "deadline_turn": objective_graph_obj.deadline_turn,
         }
         invasion_state = self._get_invasion_state(side)
+        country_hexes_by_id = self._get_country_hexes_by_id()
+        country_port_counts = self._get_country_port_counts()
+        neutral_front_cache = self._get_neutral_front_cache(side)
         objectives = self._collect_objectives(side, objective_graph=objective_graph)
         friendly_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == side and getattr(u, "is_on_map", False)]
         enemy_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == enemy and getattr(u, "is_on_map", False)]
@@ -3669,7 +4081,61 @@ class BaselineAIPlayer:
             transport_actions_in_phase=self._ensure_transport_phase_memory(),
             objective_graph=objective_graph,
             invasion_state=invasion_state,
+            country_hexes_by_id=country_hexes_by_id,
+            country_port_counts=country_port_counts,
+            neutral_front_cache=neutral_front_cache,
         )
+
+    def _current_scenario_id(self) -> str:
+        return str(getattr(getattr(self.game_state, "scenario_spec", None), "id", "") or "")
+
+    def _ensure_static_geo_cache(self):
+        scenario_id = self._current_scenario_id()
+        if self._static_geo_cache_scenario_id == scenario_id and self._country_hexes_by_id_cache is not None:
+            return
+        board = self.game_state.map
+        country_hexes: Dict[str, List[Hex]] = defaultdict(list)
+        for col in range(int(getattr(board, "width", 0) or 0)):
+            for row in range(int(getattr(board, "height", 0) or 0)):
+                country = self.game_state.get_country_by_hex(col, row)
+                if country is None or not getattr(country, "id", None):
+                    continue
+                country_hexes[str(country.id)].append(Hex.offset_to_axial(col, row))
+        port_counts: Dict[str, int] = {}
+        for cid, country in self.game_state.countries.items():
+            port_counts[cid] = sum(
+                1 for loc in country.locations.values()
+                if getattr(loc, "loc_type", None) == LocType.PORT.value
+            )
+        self._static_geo_cache_scenario_id = scenario_id
+        self._country_hexes_by_id_cache = dict(country_hexes)
+        self._country_port_counts_cache = dict(port_counts)
+
+    def _get_country_hexes_by_id(self) -> Dict[str, List[Hex]]:
+        self._ensure_static_geo_cache()
+        return self._country_hexes_by_id_cache or {}
+
+    def _get_country_port_counts(self) -> Dict[str, int]:
+        self._ensure_static_geo_cache()
+        return self._country_port_counts_cache or {}
+
+    def _get_neutral_front_cache(self, side: str) -> Dict[str, Any]:
+        phase_key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+            side,
+        )
+        cache = self._neutral_front_cache_by_side.get(side)
+        if cache and cache.get("phase_key") == phase_key:
+            return cache
+        cache = {
+            "phase_key": phase_key,
+            "invasion_target": None,
+            "staging_hexes": None,
+        }
+        self._neutral_front_cache_by_side[side] = cache
+        return cache
 
     def _ensure_movement_phase_memory(self) -> set:
         key = (
@@ -3681,6 +4147,7 @@ class BaselineAIPlayer:
             self._movement_phase_key = key
             self._moved_task_groups_in_phase = set()
             self._movement_phase_plan_cache_by_side = {}
+            self._neutral_front_cache_by_side = {}
         return self._moved_task_groups_in_phase
 
     def _ensure_transport_phase_memory(self) -> set:
