@@ -3,8 +3,6 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
-from src.content import loader
-from src.content.config import CALENDAR_DATA
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyActivationService
@@ -60,7 +58,6 @@ class GameController(QObject):
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
         self.ai_baseline = BaselineAIPlayer(self.game_state, self.movement_service, self.diplomacy_service)
         self._movement_undo_context = None
-        self._calendar_by_turn = self._load_calendar()
         self._deferred_epoch = 0
         self._end_phase_transition_pending = False
         self._last_end_phase_request_at = 0.0
@@ -214,13 +211,6 @@ class GameController(QObject):
 
         self._schedule_deferred(_deferred_redeploy_sync)
         print(f"Unit {unit.id} returned to READY for redeployment.")
-
-    def _load_calendar(self):
-        try:
-            return loader.load_calendar_csv(CALENDAR_DATA)
-        except Exception as exc:
-            print(f"Failed to load calendar data: {exc}")
-            return {}
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -535,8 +525,7 @@ class GameController(QObject):
             return
 
         turn = self.game_state.turn
-        calendar_spec = self._calendar_by_turn.get(turn)
-        calendar_upper = calendar_spec.upper_label if calendar_spec else ""
+        calendar_upper = self.game_state.calendar.upper_label(turn)
 
         main_window.update_turn_panel(
             active_player=self.game_state.active_player,

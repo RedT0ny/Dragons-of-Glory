@@ -14,7 +14,7 @@ TODO:
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Ground armies should not be counted for interceptions.
+- Ground armies should not be counted for interceptions. Double check that this is happening.
 
 Notes:
 

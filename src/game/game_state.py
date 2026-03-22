@@ -20,7 +20,7 @@ from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
 from src.game.movement import evaluate_unit_move, effective_movement_points
-from src.game.phase_manager import PhaseManager
+from src.game.phase_manager import PhaseManager, CalendarService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
 from src.game.overlay_maps import (
@@ -61,6 +61,7 @@ class GameState:
         self.event_system = EventSystem(self)
         self.phase_manager = PhaseManager(self)
         self.deployment_service = DeploymentService(self)
+        self.calendar = CalendarService()
 
         # Battle Turn State
         self.phase = GamePhase.REPLACEMENTS

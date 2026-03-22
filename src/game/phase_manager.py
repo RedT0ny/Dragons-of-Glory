@@ -1,5 +1,41 @@
+from src.content import loader
+from src.content.config import CALENDAR_DATA
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase
+
+
+class CalendarService:
+    """
+    Lazy-loading calendar data service.
+    Calendar is global (same mapping for all scenarios).
+    Scenarios may start at different turns but mapping is constant.
+    """
+    _instance = None
+    _calendar_data = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def _load_calendar(self):
+        """Lazy load calendar CSV once and cache it."""
+        if self._calendar_data is None:
+            try:
+                self._calendar_data = loader.load_calendar_csv(CALENDAR_DATA)
+            except Exception as exc:
+                print(f"Failed to load calendar data: {exc}")
+                self._calendar_data = {}
+        return self._calendar_data
+
+    def get_spec(self, turn: int):
+        """Returns calendar spec for turn or None if missing."""
+        return self._load_calendar().get(turn)
+
+    def upper_label(self, turn: int) -> str:
+        """Returns upper_label for turn or empty string if missing."""
+        spec = self.get_spec(turn)
+        return spec.upper_label if spec else ""
 
 
 class PhaseManager:
