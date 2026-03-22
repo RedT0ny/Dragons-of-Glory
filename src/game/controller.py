@@ -973,8 +973,7 @@ class GameController(QObject):
         if not asset or not unit:
             return
         if hasattr(asset, "apply_to"):
-            asset.apply_to(unit)
-        self._refresh_assets_tab()
+            asset.apply_to(unit, on_assign_callback=self._on_asset_assigned)
 
     def on_asset_remove_requested(self, asset, unit):
         if self.game_state.current_player and self.game_state.current_player.is_ai:
@@ -983,6 +982,10 @@ class GameController(QObject):
             return
         if hasattr(asset, "remove_from"):
             asset.remove_from(unit)
+        self._refresh_assets_tab()
+
+    def _on_asset_assigned(self, asset):
+        """Callback invoked after an asset is assigned to a unit."""
         self._refresh_assets_tab()
 
     def _refresh_assets_tab(self):

@@ -112,7 +112,7 @@ class Asset:
 
         return False
 
-    def apply_to(self, unit):
+    def apply_to(self, unit, on_assign_callback=None):
         """Apply asset effects to a unit."""
         if self.can_equip(unit, log_reason=True):
             if not hasattr(unit, 'equipment'):
@@ -122,6 +122,8 @@ class Asset:
             unit.equipment.append(self)
             self.assigned_to = unit
             self._apply_runtime_effects(unit)
+            if on_assign_callback is not None:
+                on_assign_callback(self)
             print(f"'{unit.id}' equipped '{self.id}'!")
 
     def remove_from(self, unit):

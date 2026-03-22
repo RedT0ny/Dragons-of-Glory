@@ -322,7 +322,7 @@ class AssetsTab(QWidget):
         for asset_id, asset in player.assets.items():
             # Display name: Use instance ID for artifacts with multiple instances, otherwise use base name
             display_name = asset.spec.id.replace("_", " ").title()
-            
+
             # Add instance number suffix for artifacts that have multiple instances
             if asset.id != asset.base_id:
                 # Extract instance number from asset.id (e.g., "dragonarmor_2" -> " #2")
@@ -330,7 +330,15 @@ class AssetsTab(QWidget):
                 if match:
                     instance_num = match.group(1)
                     display_name = f"{display_name} #{instance_num}"
-            
+
+            # For artifact assets, show assigned_to info
+            if asset.asset_type == AssetType.ARTIFACT:
+                if asset.assigned_to is not None:
+                    unit_name = asset.assigned_to.id.replace("_", " ").title()
+                    display_name += f" ({unit_name})"
+                else:
+                    display_name += " (Unassigned)"
+
             node = QTreeWidgetItem([display_name])
             node.setData(0, Qt.UserRole, asset) # Store asset object
 
