@@ -953,11 +953,8 @@ class Board:
         cost = 1
 
         # Mountains are impassable, unless there is a pass
-        if terrain == TerrainType.MOUNTAIN:
-            if not self._hexside_is(hexside_type, HexsideType.PASS):
+        if terrain == TerrainType.MOUNTAIN and not self._hexside_is(hexside_type, HexsideType.PASS):
                 return float('inf')
-            else:
-                cost += 1
 
         # Jungle costs 2
         if terrain == TerrainType.JUNGLE:
@@ -965,9 +962,7 @@ class Board:
 
         # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
         if terrain == TerrainType.FOREST:
-            if unit.terrain_affinity == TerrainType.FOREST:
-                pass
-            else:
+            if not unit.terrain_affinity == terrain:
                 cost += 1
 
         # Rule 5: Hexside Barriers

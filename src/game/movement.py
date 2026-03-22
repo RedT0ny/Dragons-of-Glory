@@ -617,6 +617,10 @@ class MovementService:
         return start.distance_to(target_hex)
 
     def _resolve_interception_attack(self, interceptors, moving_units, moving_hex, origin_offset):
+        """
+        Resolves interception combat. Only air units (Wings/Fleets) participate as defenders.
+        Ground units at the hex do not participate in interception combat.
+        """
         origin_hex = Hex.offset_to_axial(*origin_offset)
         original_states = {}
         for interceptor in interceptors:
@@ -641,9 +645,15 @@ class MovementService:
         try:
             live_interceptors = [u for u in interceptors if getattr(u, "is_on_map", False)]
             if live_interceptors:
+                # Filter defenders to only air units - ground units don't participate in interception
+                air_defenders = [
+                    u for u in moving_units
+                    if getattr(u, "is_on_map", False)
+                    and getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET)
+                ]
                 resolution = self.game_state.resolve_combat(live_interceptors, moving_hex)
                 defenders_after = [
-                    u for u in self.game_state.get_units_at(moving_hex)
+                    u for u in air_defenders
                     if getattr(u, "is_on_map", False)
                     and getattr(u, "allegiance", None) != getattr(live_interceptors[0], "allegiance", None)
                 ]

@@ -350,7 +350,8 @@ class GameController(QObject):
                             self._handle_deployment_from_event(effects, active_player)
                             self._refresh_turn_panel()
                             return
-                        if event.spec.event_type == "artifact" or "grant_asset" in event.spec.effects:
+                        #If it is an artifact, change to assets tab and let the human player assign it.
+                        if event.spec.event_type == "artifact":
                             asset_id = event.spec.effects.get("grant_asset")
                             self.open_assets_tab_for_assignment(asset_id)
                             self._refresh_turn_panel()
