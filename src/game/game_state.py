@@ -10,7 +10,7 @@ from src.game.combat import (
     apply_dragon_orb_bonus,
     apply_gnome_tech_bonus,
 )
-from src.game.leader_escape_handler import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
+from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
@@ -1152,6 +1152,12 @@ class GameState:
                 passenger.transport_host = fleet
 
     def _displace_enemy_fleets_in_hex(self, invading_unit, target_hex):
+        """
+        If an invading unit can force fleet displacement:
+        identify enemy fleets in the target hex
+        and attempt to displace them to the nearest legal hex.
+        If no legal hex found, eliminate the fleet.
+        """
         units_in_hex = list(self.map.get_units_in_hex(target_hex.q, target_hex.r))
         enemy_fleets = [
             u for u in units_in_hex
@@ -1169,7 +1175,8 @@ class GameState:
             start_hex = Hex.offset_to_axial(*fleet.position)
             retreat_state = self.map.find_nearest_safe_fleet_state(fleet, start_hex)
             if retreat_state is None:
-                print(f"No legal displacement hex found for fleet {fleet.id}.")
+                print(f"No legal displacement hex found for fleet {fleet.id}. Fleet eliminated")
+                fleet.eliminate()
                 continue
             self._force_move_fleet_to_state(fleet, retreat_state)
 
@@ -1202,14 +1209,9 @@ class GameState:
 
     @staticmethod
     def _unit_can_force_fleet_displacement(unit):
-        if unit is None:
-            return False
-        if unit.is_wing():
+        if unit and unit.is_control_unit():
             return True
-        return bool(
-            unit.is_army()
-            and getattr(unit, "unit_type", None) != UnitType.FLEET
-        )
+        return False
 
     def move_unit(
         self,
@@ -2605,6 +2607,21 @@ class GameState:
             and getattr(unit, "status", None) == UnitState.DESTROYED
             for unit in units
         )
+        
+        # Collect pending leader escapes from destroyed carriers
+        all_leader_escapes = []
+        for unit in units:
+            pending = getattr(unit, "_pending_leader_escapes", None)
+            if pending:
+                all_leader_escapes.extend(pending)
+                unit._pending_leader_escapes = None
+        
+        # Process leader escapes
+        if all_leader_escapes:
+            from src.game.leader_escape import LeaderEscapeHandler
+            escape_handler = LeaderEscapeHandler(self, roll_d6_fn=lambda: random.randint(1, 6))
+            escape_handler.handle_leader_escapes(all_leader_escapes, auto_resolve_ai=True)
+        
         for unit in units:
             if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
                 self.map.remove_unit_from_spatial_map(unit)

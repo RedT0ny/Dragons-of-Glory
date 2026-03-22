@@ -89,6 +89,15 @@ class LeaderEscapeHandler:
         return requests
 
     def choose_escape_destination(self, leader, options):
+        """
+        Chooses leader escape destination.
+
+        Given a list of hex options, prioritize:
+        1. those with friendly combat stacks,
+        2. then locations,
+        3. then by highest total combat rating of friendly units.
+        4. Break ties randomly.
+        """
         if not options:
             return None
 

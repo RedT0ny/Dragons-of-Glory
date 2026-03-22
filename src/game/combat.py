@@ -4,7 +4,7 @@ from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitS
 from src.content.constants import MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, WS
 from src.content.loader import load_data
 from src.game.combat_reporting import show_combat_result_popup
-from src.game.leader_escape_handler import LeaderEscapeCheck, LeaderEscapeHandler
+from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
 
 
 def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
@@ -730,47 +730,13 @@ class NavalCombatResolver:
             self._sink_fleet(fleet)
 
     def _sink_fleet(self, fleet):
+        """Sink a fleet unit. Passenger handling is done by Fleet.eliminate()."""
         if not getattr(fleet, "position", None) or fleet.position[0] is None or fleet.position[1] is None:
             fleet.eliminate()
             return
 
-        origin_hex = None
-        from src.game.map import Hex
-        origin_hex = Hex.offset_to_axial(*fleet.position)
-
-        passengers = list(getattr(fleet, "passengers", []) or [])
         fleet.eliminate()
-        fleet.river_hexside = None
-        if hasattr(fleet, "passengers"):
-            fleet.passengers = []
         self.game_state.map.remove_unit_from_spatial_map(fleet)
-
-        for passenger in passengers:
-            passenger.transport_host = None
-            passenger.is_transported = False
-            passenger.position = (None, None)
-
-            if hasattr(passenger, "is_leader") and passenger.is_leader():
-                allow_fleet = passenger.unit_type == UnitType.WIZARD
-                self._leader_escape_handler.handle_leader_escapes(
-                    [
-                        LeaderEscapeCheck(
-                            leader=passenger,
-                            origin_hex=origin_hex,
-                            allow_fleet_destinations=allow_fleet,
-                            roll_required=not allow_fleet,
-                            skip_if_allied_combat_present=False,
-                            auto_place_on_success=True,
-                            require_leader_on_map=False,
-                        )
-                    ],
-                    auto_resolve_ai=True,
-                )
-                continue
-
-            if hasattr(passenger, "eliminate"):
-                passenger.eliminate()
-                self.game_state.map.remove_unit_from_spatial_map(passenger)
 
     def _withdraw_all(self, side_fleets):
         for fleet in list(side_fleets):

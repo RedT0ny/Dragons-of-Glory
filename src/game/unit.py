@@ -225,6 +225,9 @@ class Unit:
     def is_control_unit(self) -> bool:
         return self.is_army() or self.is_wing() or self.is_citadel()
 
+    def is_carrier(self) -> bool:
+        return self.is_fleet() or self.is_wing() or self.is_citadel()
+
     # --- State Logic ---
 
     def apply_combat_loss(self, dmg_type: str, must_retreat: bool = False):
@@ -256,6 +259,9 @@ class Unit:
 
     def eliminate(self):
         """Moves to Reserve (can be rebuilt)."""
+        if self.is_carrier():
+            self.eliminate_carrier()
+
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:
             self.status = UnitState.RESERVE
             self.position = (None, None)
@@ -315,6 +321,52 @@ class Unit:
         self.attacked_this_turn = state_data.get("attacked_this_turn", False)
         self.moved_this_turn = state_data.get("moved_this_turn", False)
 
+    def eliminate_carrier(self):
+        # Eliminate carrier and handle passengers (leaders escape, others eliminated).
+        from src.game.leader_escape import LeaderEscapeCheck
+
+        passengers = list(self.passengers)
+        self.passengers = []
+        self.river_hexside = None
+
+        # Clear passenger transport state
+        for passenger in passengers:
+            passenger.transport_host = None
+            passenger.is_transported = False
+            passenger.position = (None, None)
+
+        # Process passengers: leaders escape, non-leaders eliminated
+        leader_escapes = []
+        for passenger in passengers:
+            if hasattr(passenger, "is_leader") and passenger.is_leader():
+                allow_fleet = passenger.unit_type == UnitType.WIZARD
+                leader_escapes.append(
+                    LeaderEscapeCheck(
+                        leader=passenger,
+                        origin_hex=self._get_origin_hex(),
+                        allow_fleet_destinations=allow_fleet,
+                        roll_required=not allow_fleet,
+                        skip_if_allied_combat_present=False,
+                        auto_place_on_success=True,
+                        require_leader_on_map=False,
+                    )
+                )
+            else:
+                if hasattr(passenger, "eliminate"):
+                    passenger.eliminate()
+
+        # Handle leader escapes
+        if leader_escapes:
+            self._pending_leader_escapes = leader_escapes
+
+    def _get_origin_hex(self):
+        """Get hex for leader escape calculations."""
+        if not self.position or self.position[0] is None or self.position[1] is None:
+            return None
+        from src.game.map import Hex
+        return Hex.offset_to_axial(*self.position)
+
+
 class Leader(Unit):
     """
     Leader unit class.
@@ -346,7 +398,7 @@ class Fleet(Unit):
     def can_carry(self, unit):
         """Ships carry one ground army and any number of leaders."""
         if unit.is_leader(): return True
-    
+
         # Check if an army is already aboard
         has_army = any(not p.is_leader() for p in self.passengers)
         return not unit.is_leader() and not has_army
