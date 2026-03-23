@@ -564,7 +564,6 @@ class GameController(QObject):
         QMessageBox.information(main_window, "New Artifact",
                                 "You have received an artifact!\n\n"
                                 "Assign it to an unequipped unit using the panel.\n"
-                                "You may also manage other assets.\n"
                                 "Click 'End Turn' (End Phase) when ready.")
 
         # 3. Stop Timer (if it was running)

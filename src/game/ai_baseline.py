@@ -3930,7 +3930,11 @@ class BaselineAIPlayer:
             f"with adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f}"
         )
         attempt_invasion(target_country_id)
-        return True
+        post_country = ctx.game_state.countries.get(target_country_id)
+        if post_country and getattr(post_country, "allegiance", None) != NEUTRAL:
+            return True
+        print(f"[INVASION] Invasion of {target_country_id} did not change allegiance; falling through to movement.")
+        return False
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:

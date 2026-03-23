@@ -1,8 +1,7 @@
 # Dragons-of-Glory
-A python implementation of Dragonlance classic "Dragons of Glory".
 
 <div style="font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #0f1115;">
-  <p>Version 1.0.0</p>
+  <p>A python & Qt implementation of Dragonlance classic "Dragons of Glory".</p>
 
   <p style="font-family: 'Courier New', monospace; font-size: 10pt;">
     Dragons of Glory is a fan-made, non-profit adaptation of the classic Dragonlance module
