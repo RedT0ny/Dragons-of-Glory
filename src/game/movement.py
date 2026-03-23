@@ -7,12 +7,11 @@ It includes pathfinding, cost calculations, and special rules for fleets, wings,
 
 from dataclasses import dataclass
 from collections import defaultdict
-import heapq
 import random
 from typing import List, Tuple
 
 from src.content.constants import HL, NEUTRAL, WS
-from src.content.specs import GamePhase, HexsideType, LocType, UnitRace, UnitType
+from src.content.specs import GamePhase, LocType, UnitRace, UnitType
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
@@ -673,8 +672,7 @@ class MovementService:
         if not units:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
         if all(u.is_fleet() for u in units):
-            start_hex, _ = self._get_stack_start_and_min_mp(units)
-            # A selected "stack" of fleets must be co-located.
+            start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
             if not start_hex:
                 return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
             most_restrictive_fleet = min(units, key=effective_movement_points)
@@ -682,14 +680,23 @@ class MovementService:
                 self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
             )
 
-        start_hex, min_mp = self._get_stack_start_and_min_mp(units)
-        if not start_hex or min_mp <= 0:
+        start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
+        if not start_hex:
             return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
 
         if self._is_neutral_hex(start_hex):
             return self._range_result_from_hexes(self.game_state.map.get_reachable_hexes(units))
 
-        return self._get_neutral_limited_range(units, start_hex, min_mp)
+        reachable, warnings = self.game_state.map.get_reachable_hexes(
+            units,
+            stop_on_neutral=True,
+            neutral_predicate=self._is_neutral_hex,
+            split_neutral=True,
+        )
+        return MovementRangeResult(
+            reachable_coords=[h.axial_to_offset() for h in reachable],
+            neutral_warning_coords=[h.axial_to_offset() for h in warnings],
+        )
 
     @staticmethod
     def _range_result_from_hexes(reachable_hexes):
@@ -1141,7 +1148,7 @@ class MovementService:
 
     def _can_stack_reach_target(self, units, target_hex):
         """Checks if a stack of units can reach a target hex, considering movement points and terrain."""
-        start_hex, _ = self._get_stack_start_and_min_mp(units)
+        start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
         if not start_hex:
             return False, "Selected units are not in the same hex."
         if start_hex == target_hex:
@@ -1160,118 +1167,10 @@ class MovementService:
     def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:
         return self.invasion_handler.evaluate_unboard_neutral_entry(selected_units)
 
-    def _get_stack_start_and_min_mp(self, units):
-        start_hex = None
-        min_mp = 999
-
-        for unit in units:
-            if not getattr(unit, 'is_on_map', True):
-                continue
-            if hasattr(unit, 'position') and unit.position:
-                col, row = unit.position
-                h = Hex.offset_to_axial(col, row)
-                if start_hex is None:
-                    start_hex = h
-                elif start_hex != h:
-                    return None, 0
-
-            m = self._unit_movement_points(unit)
-            min_mp = min(min_mp, m)
-
-        return start_hex, min_mp
-
     def _is_neutral_hex(self, hex_obj):
         col, row = hex_obj.axial_to_offset()
         country = self.game_state.get_country_by_hex(col, row)
         return bool(country and country.allegiance == NEUTRAL)
-
-    def _get_neutral_limited_range(self, units, start_hex, min_mp):
-        board = self.game_state.map
-        frontier = []
-        heapq.heappush(frontier, (0, start_hex, False))
-        cost_so_far = {(start_hex, False): 0}
-
-        reachable_hexes = []
-        warning_hexes = []
-        neutral_cache = {}
-
-        def is_neutral_cached(hex_obj):
-            key = (hex_obj.q, hex_obj.r)
-            if key not in neutral_cache:
-                neutral_cache[key] = self._is_neutral_hex(hex_obj)
-            return neutral_cache[key]
-
-        while frontier:
-            current_cost, current_hex, entered_neutral = heapq.heappop(frontier)
-
-            if current_cost > min_mp:
-                continue
-
-            if current_cost > cost_so_far.get((current_hex, entered_neutral), float('inf')):
-                continue
-
-            if current_hex != start_hex:
-                if board.can_stack_move_to(units, current_hex) and all(
-                    board.can_unit_land_on_hex(u, current_hex) for u in units
-                ):
-                    if is_neutral_cached(current_hex):
-                        warning_hexes.append(current_hex)
-                    else:
-                        reachable_hexes.append(current_hex)
-
-            if entered_neutral:
-                continue
-
-            for next_hex in current_hex.neighbors():
-                # 1. Bounds check
-                c, r = next_hex.axial_to_offset()
-                if not (0 <= c < board.width and 0 <= r < board.height):
-                    continue
-
-                stack_cost = self._stack_step_cost(units, current_hex, next_hex, board)
-                if stack_cost is None:
-                    continue
-
-                new_cost = current_cost + stack_cost
-                if new_cost <= min_mp:
-                    next_entered_neutral = is_neutral_cached(next_hex)
-                    key = (next_hex, next_entered_neutral)
-                    if next_hex == start_hex:
-                        continue
-                    if key not in cost_so_far or new_cost < cost_so_far[key]:
-                        cost_so_far[key] = new_cost
-                        heapq.heappush(frontier, (new_cost, next_hex, next_entered_neutral))
-
-        return MovementRangeResult(
-            reachable_coords=[h.axial_to_offset() for h in reachable_hexes],
-            neutral_warning_coords=[h.axial_to_offset() for h in warning_hexes]
-        )
-
-    def _stack_step_cost(self, units, current_hex, next_hex, board):
-        # Check 1: Enemy occupancy based on stack composition.
-        if not board.can_stack_enter_enemy_occupied_hex(units, next_hex):
-            return None
-
-        stack_cost = 0
-        for unit in units:
-            # Check 2: Sea Barrier
-            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
-                hexside = board.get_effective_hexside(current_hex, next_hex)
-                if hexside in (HexsideType.SEA, HexsideType.SEA.value):
-                    return None
-
-            # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
-            zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
-            if zoc_restricted and board.is_adjacent_to_enemy(current_hex, unit) and board.is_adjacent_to_enemy(next_hex, unit):
-                return None
-
-            # Check 4: Movement Cost
-            cost = board.get_movement_cost(unit, current_hex, next_hex)
-            if cost == float('inf') or cost is None:
-                return None
-
-            stack_cost = max(stack_cost, cost)
-        return stack_cost
 
     def get_invasion_force(self, country_id, extra_units=None):
         return self.invasion_handler.get_invasion_force(country_id, extra_units=extra_units)
@@ -1363,10 +1262,12 @@ class MovementService:
                 return False
             return self.game_state.map.can_stack_move_to([unit], target_hex)
 
-        cost = self.game_state.map.get_movement_cost(unit, from_hex, target_hex)
-        if cost == float('inf') or cost is None:
-            return False
-        return self._unit_movement_points(unit) >= cost
+        return self.game_state.map.can_unit_enter_from_hex(
+            unit,
+            from_hex,
+            target_hex,
+            available_mp=self._unit_movement_points(unit),
+        )
 
     def _unit_has_movement(self, unit):
         return self._unit_movement_points(unit) > 0

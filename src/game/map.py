@@ -732,6 +732,18 @@ class Board:
         """
         return self.can_stack_move_to([unit], target_hex)
 
+    def can_unit_enter_from_hex(self, unit, from_hex, target_hex, available_mp=None):
+        """
+        Single-step movement legality for a concrete unit from `from_hex` to `target_hex`.
+        Uses board movement rules/costs and optional movement-point cap.
+        """
+        cost = self.get_movement_cost(unit, from_hex, target_hex)
+        if cost == float('inf') or cost is None:
+            return False
+        if available_mp is None:
+            available_mp = getattr(unit, "movement_points", getattr(unit, "movement", 0))
+        return available_mp >= cost
+
     def can_unit_land_on_hex(self, unit, target_hex):
         """
         Checks if a unit can be placed on a given hex, for unboarding or deployment.
@@ -1056,17 +1068,7 @@ class Board:
         path.reverse()
         return path
 
-    def get_reachable_hexes(self, units):
-        """
-        Calculates all reachable hexes for a stack of units.
-        Returns a list of Hex objects.
-        """
-        if not units:
-            return []
-        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
-            return self.get_reachable_hexes_for_fleet(units[0])
-
-        # 1. Determine Stack Constraints
+    def _get_stack_start_and_min_mp(self, units):
         start_hex = None
         min_mp = 999
 
@@ -1075,34 +1077,97 @@ class Board:
                 continue
             if hasattr(unit, 'position') and unit.position:
                 col, row = unit.position
-                # Assuming unit.position is (col, row)
                 h = Hex.offset_to_axial(col, row)
                 if start_hex is None:
                     start_hex = h
                 elif start_hex != h:
-                    # Units in different locations cannot move as a stack
-                    return []
+                    return None, 0
 
             m = getattr(unit, "movement_points", unit.movement)
             min_mp = min(min_mp, m)
 
+        return start_hex, min_mp
+
+    def get_stack_start_and_min_mp(self, units):
+        """Public accessor for stack origin + most restrictive movement points."""
+        return self._get_stack_start_and_min_mp(units)
+
+    def _stack_step_cost(self, units, current_hex, next_hex):
+        # Check 1: Enemy occupancy based on stack composition.
+        if not self.can_stack_enter_enemy_occupied_hex(units, next_hex):
+            return None
+
+        stack_cost = 0
+        for unit in units:
+            # Check 2: Sea Barrier
+            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
+                hexside = self.get_effective_hexside(current_hex, next_hex)
+                if self._hexside_is(hexside, HexsideType.SEA):
+                    return None
+
+            # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
+            zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
+            if zoc_restricted and self.is_adjacent_to_enemy(current_hex, unit) and self.is_adjacent_to_enemy(next_hex, unit):
+                return None
+
+            # Check 4: Movement Cost
+            cost = self.get_movement_cost(unit, current_hex, next_hex)
+            if cost == float('inf') or cost is None:
+                return None
+
+            stack_cost = max(stack_cost, cost)
+        return stack_cost
+
+    def get_reachable_hexes(
+        self,
+        units,
+        *,
+        stop_on_neutral=False,
+        neutral_predicate=None,
+        split_neutral=False,
+    ):
+        """
+        Calculates all reachable hexes for a stack of units.
+        Returns a list of Hex objects by default.
+        If split_neutral=True, returns (reachable_hexes, neutral_warning_hexes).
+        """
+        if not units:
+            return ([], []) if split_neutral else []
+        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
+            fleet_reachable = self.get_reachable_hexes_for_fleet(units[0])
+            return (fleet_reachable, []) if split_neutral else fleet_reachable
+
+        start_hex, min_mp = self._get_stack_start_and_min_mp(units)
+
         if not start_hex or min_mp <= 0:
-            return []
+            return ([], []) if split_neutral else []
 
         frontier = []
-        heapq.heappush(frontier, (0, start_hex))
-        cost_so_far = {start_hex: 0}
+        heapq.heappush(frontier, (0, start_hex, False))
+        cost_so_far = {(start_hex, False): 0}
 
         reachable_hexes = []
+        warning_hexes = []
+        neutral_cache = {}
+
+        def is_neutral(hex_obj):
+            if not stop_on_neutral:
+                return False
+            if neutral_predicate is None:
+                return False
+            key = (hex_obj.q, hex_obj.r)
+            if key not in neutral_cache:
+                neutral_cache[key] = bool(neutral_predicate(hex_obj))
+            return neutral_cache[key]
 
         while frontier:
-            current_cost, current_hex = heapq.heappop(frontier)
+            current_cost, current_hex, entered_neutral = heapq.heappop(frontier)
 
             if current_cost > min_mp:
                 continue
 
             # Optimization check
-            if current_cost > cost_so_far.get(current_hex, float('inf')):
+            if current_cost > cost_so_far.get((current_hex, entered_neutral), float('inf')):
                 continue
 
             # VALID DESTINATION CHECK
@@ -1111,7 +1176,14 @@ class Board:
                 if self.can_stack_move_to(units, current_hex) and all(
                     self.can_unit_land_on_hex(u, current_hex) for u in units
                 ):
-                    reachable_hexes.append(current_hex)
+                    if entered_neutral:
+                        warning_hexes.append(current_hex)
+                    else:
+                        reachable_hexes.append(current_hex)
+
+            # Optional policy: do not expand beyond first neutral-entering step.
+            if stop_on_neutral and entered_neutral:
+                continue
 
             # Explore neighbors using stack movement rules
             for next_hex in current_hex.neighbors():
@@ -1120,47 +1192,21 @@ class Board:
                 if not (0 <= c < self.width and 0 <= r < self.height):
                     continue
 
-                stack_cost = 0
-                possible = True
-
-                # Check 1: Is hex occupied by enemy?
-                if not self.can_stack_enter_enemy_occupied_hex(units, next_hex):
-                    possible = False
+                if next_hex == start_hex:
                     continue
 
-                for unit in units:
-
-                    # Check 2: Sea Barrier (if not handled by cost)
-                    # Note: get_movement_cost usually returns inf for ground vs sea,
-                    # but explicit hexside check mimics get_neighbors behavior.
-                    if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
-                        hexside = self.get_effective_hexside(current_hex, next_hex)
-                        if self._hexside_is(hexside, HexsideType.SEA):
-                            possible = False
-                            break
-
-                    # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.
-                    zoc_restricted = bool(unit.is_army() and unit.unit_type != UnitType.CAVALRY)
-                    if zoc_restricted:
-                        if self.is_adjacent_to_enemy(current_hex, unit) and self.is_adjacent_to_enemy(next_hex, unit):
-                            possible = False
-                            break
-
-                    # Check 4: Movement Cost
-                    cost = self.get_movement_cost(unit, current_hex, next_hex)
-                    if cost == float('inf') or cost is None:
-                        possible = False
-                        break
-
-                    stack_cost = max(stack_cost, cost)
-
-                if not possible:
+                stack_cost = self._stack_step_cost(units, current_hex, next_hex)
+                if stack_cost is None:
                     continue
 
                 new_cost = current_cost + stack_cost
                 if new_cost <= min_mp:
-                    if next_hex not in cost_so_far or new_cost < cost_so_far[next_hex]:
-                        cost_so_far[next_hex] = new_cost
-                        heapq.heappush(frontier, (new_cost, next_hex))
+                    next_entered_neutral = entered_neutral or is_neutral(next_hex)
+                    key = (next_hex, next_entered_neutral)
+                    if key not in cost_so_far or new_cost < cost_so_far[key]:
+                        cost_so_far[key] = new_cost
+                        heapq.heappush(frontier, (new_cost, next_hex, next_entered_neutral))
 
+        if split_neutral:
+            return reachable_hexes, warning_hexes
         return reachable_hexes
