@@ -33,11 +33,15 @@ def caption_id(unit_id: str):
         if parts[-1].isdigit():
             if parts[0] == 'dtemple':
                 # If it's a Draconian
-                return f"{to_roman(int(parts[-1]))} {parts[1].capitalize()}"
+                parts[0] = parts[1]
             elif parts[0] == 'taman':
-                return f"{to_roman(int(parts[-1]))} Neraka"
+                parts[0] = 'Neraka'
             elif parts[0] == 'nergoth':
-                return f"{to_roman(int(parts[-1]))} N.Ergoth"
+                parts[0] = "N.Ergoth"
+            elif parts[0] == 'sikket':
+                parts[0] = "Sikk'et"
+            elif parts[0] == 'thank':
+                parts[0] = 'Than-Khal'
             return f"{to_roman(int(parts[-1]))} {parts[0].capitalize()}"
         elif len(parts) > 2:
             # If more than 2 parts and no number at end, return first part capitalized

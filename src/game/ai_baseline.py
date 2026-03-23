@@ -2912,21 +2912,10 @@ class TacticalPlanner:
             if any_embarked:
                 unload_actions = self._collect_fleet_unload_actions(ctx, plan)
                 if unload_actions:
-                    _tlog(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
+                    print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
                     unloaded_any = self._execute_fleet_unload_actions(ctx, plan, unload_actions, max_actions=4)
                     if unloaded_any:
                         return True
-
-            if unload_actions:
-                print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
-            unloaded_any = self._execute_fleet_unload_actions(
-                ctx,
-                plan,
-                unload_actions,
-                max_actions=4,
-            )
-            if unloaded_any:
-                return True
 
         # Stage 2: Board dragon commanders onto wings lacking them (CRITICAL for HL)
         if self._board_dragon_commanders(ctx):
