@@ -209,8 +209,8 @@ class ScenarioBuilder:
             # Pass the event object (not just spec) so occurrence_count is available for instance IDs
             # Note: Create Event first, then set lambdas to avoid closure capture issues
             evt = Event(s,
-                        trigger_func=lambda gs, spec=s: gs.check_event_trigger_conditions(spec.trigger_conditions),
-                        effect_func=lambda gs, spec=s: gs.apply_event_effect_by_spec(spec))
+                        trigger_func=lambda gs, spec=s: gs.event_system.check_event_trigger_conditions(spec.trigger_conditions),
+                        effect_func=lambda gs, spec=s: gs.event_system.apply_event_effect_by_spec(spec))
             game_state.strategic_event_pool.append(evt)
 
         # Register existing units on the map if they have positions

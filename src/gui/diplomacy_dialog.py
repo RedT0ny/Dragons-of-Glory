@@ -17,7 +17,8 @@ class DiplomacyMapView(AnsalonMapView):
 
     def should_draw_country(self, country_id):
         """Returns neutral countries to be drawn"""
-        return self.game_state.is_country_neutral(country_id)
+        country = self.game_state.countries.get(country_id)
+        return bool(country and country.allegiance == "neutral")
 
     def mousePressEvent(self, event):
         """Emits country ID on click if neutral"""

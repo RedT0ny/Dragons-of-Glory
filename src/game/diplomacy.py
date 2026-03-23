@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from src.content.constants import HL, WS
+from src.content.specs import LocType, UnitState, UnitType
+from src.game.map import Hex
 
 
 @dataclass(frozen=True)
@@ -208,3 +210,128 @@ class DiplomacyActivationService:
         if ratio < 5.0: return 4
         if ratio < 6.0: return 5
         return 6
+
+
+class ConquestService:
+    """Rule 9 conquest/libration domain logic."""
+
+    def __init__(self, game_state):
+        self.game_state = game_state
+
+    def _update_location_occupiers(self):
+        gs = self.game_state
+        for map_loc in gs.map.locations.values():
+            if not map_loc or not map_loc.coords:
+                continue
+            hex_obj = Hex.offset_to_axial(*map_loc.coords)
+            for unit in gs.map.get_units_in_hex(hex_obj.q, hex_obj.r):
+                if (
+                    unit.is_on_map
+                    and unit.allegiance != map_loc.occupier
+                    and (unit.is_army() or (unit.is_wing() and map_loc.loc_type != LocType.UNDERCITY.value))
+                ):
+                    map_loc.occupier = unit.allegiance
+                    break
+
+    def _is_country_fully_occupied_by_enemy(self, country) -> bool:
+        gs = self.game_state
+        enemy = gs.get_enemy_allegiance(country.allegiance)
+        if not enemy:
+            return False
+        if not country.locations:
+            return False
+        return all(loc.occupier == enemy for loc in country.locations.values())
+
+    def _destroy_country_upon_conquest(self, country, conqueror: str):
+        gs = self.game_state
+        destroyed_count = 0
+        for unit in gs.units:
+            if unit.land != country.id:
+                continue
+
+            if unit.is_fleet():
+                if unit.status not in UnitState.on_map_states() and unit.status != UnitState.DESTROYED:
+                    unit.destroy()
+                    gs.map.remove_unit_from_spatial_map(unit)
+                    destroyed_count += 1
+                continue
+
+            is_army = hasattr(unit, "is_army") and unit.is_army()
+            is_wing = hasattr(unit, "is_wing") and unit.is_wing()
+            is_leader = hasattr(unit, "is_leader") and unit.is_leader()
+            if not (is_army or is_wing or is_leader):
+                continue
+            if unit.status == UnitState.DESTROYED:
+                continue
+
+            unit.destroy()
+            gs.map.remove_unit_from_spatial_map(unit)
+            destroyed_count += 1
+
+        country.allegiance = conqueror
+        country.conquered = True
+        print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
+
+    def _apply_country_conquest_or_liberation(self, country, conqueror: str):
+        if country.conquered:
+            country.allegiance = conqueror
+            country.conquered = False
+            print(f"Country {country.id} liberated for {conqueror}.")
+            return
+        self._destroy_country_upon_conquest(country, conqueror)
+
+    def _enforce_conquered_fleet_replacement_rule(self):
+        gs = self.game_state
+        any_knight_unconquered = any(
+            (not c.conquered) for c in gs._countries_with_tag(gs.tag_knight_countries)
+        )
+
+        for unit in gs.units:
+            if unit.unit_type != UnitType.FLEET or unit.status != UnitState.RESERVE:
+                continue
+            country = gs.countries.get(unit.land)
+            if not country or not country.conquered:
+                continue
+
+            is_knight_country = gs._country_has_tag(country, gs.tag_knight_countries)
+            if is_knight_country and any_knight_unconquered:
+                continue
+
+            unit.destroy()
+            gs.map.remove_unit_from_spatial_map(unit)
+
+    def _apply_standard_country_conquests(self):
+        gs = self.game_state
+        for country in gs.countries.values():
+            if country.allegiance not in (HL, WS):
+                continue
+            if gs._country_has_tag(country, gs.tag_knight_countries) and country.allegiance == WS:
+                continue
+            if self._is_country_fully_occupied_by_enemy(country):
+                conqueror = gs.get_enemy_allegiance(country.allegiance)
+                if conqueror:
+                    self._apply_country_conquest_or_liberation(country, conqueror)
+
+    def _apply_solamnic_group_conquest(self):
+        gs = self.game_state
+        group = [c for c in gs._countries_with_tag(gs.tag_knight_countries) if c.allegiance == WS]
+        if not group:
+            return
+        fully_occupied = all(self._is_country_fully_occupied_by_enemy(c) for c in group)
+        if not fully_occupied:
+            return
+        for country in group:
+            conqueror = gs.get_enemy_allegiance(country.allegiance)
+            if conqueror:
+                self._apply_country_conquest_or_liberation(country, conqueror)
+
+    def resolve_end_of_combat_conquest(self):
+        gs = self.game_state
+        if not gs.map:
+            return
+        self._update_location_occupiers()
+        self._apply_standard_country_conquests()
+        self._apply_solamnic_group_conquest()
+        self._enforce_conquered_fleet_replacement_rule()
+        gs.update_territory_overrides()
+        gs.invalidate_overlays({"control", "territory", "supply"})

@@ -398,7 +398,7 @@ class GeographyAnalyzer:
         for h in GeographyAnalyzer.get_country_coastal_hexes(ctx.game_state, country_id):
             if h.distance_to(objective_hex) > 6:
                 continue
-            if not any(ctx.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                 continue
             if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
                 continue
@@ -698,7 +698,7 @@ class StrategicPlanner:
                 continue
             if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
                 continue
-            if not any(ctx.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                 continue
             kept.append(h)
         return kept[:4]
@@ -752,7 +752,7 @@ class StrategicPlanner:
                     country = ctx.game_state.get_country_by_hex(col, row)
                     if country is not None and getattr(country, "id", None) not in target_countries and h.distance_to(objective_hex) > 4:
                         continue
-                if not any(ctx.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                     continue
                 if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
                     continue
@@ -854,7 +854,7 @@ class StrategicPlanner:
                     continue
                 
                 # Authoritative legality from game rules.
-                if not any(ctx.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                     continue
                 
                 score = 0.0
@@ -1096,7 +1096,7 @@ class StrategicPlanner:
             if getattr(u, "is_on_map", False) and getattr(u, "position", None) and u.position[0] is not None:
                 starts.append(Hex.offset_to_axial(*u.position))
                 continue
-            valid = ctx.game_state.get_valid_deployment_hexes(u, allow_territory_wide=False) or []
+            valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(u, allow_territory_wide=False) or []
             for col, row in sorted(valid)[:6]:
                 starts.append(Hex.offset_to_axial(int(col), int(row)))
         if not starts:
@@ -2107,7 +2107,7 @@ class TacticalPlanner:
         for unit in list(ready_units):
             if getattr(unit, "is_on_map", False):
                 continue
-            valid = ctx.game_state.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide) or []
+            valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide) or []
             if not valid:
                 continue
             best_hex = max(
@@ -2146,8 +2146,8 @@ class TacticalPlanner:
             commander = self._select_hl_dragon_commander(wing, leaders)
             if not commander:
                 continue
-            wing_valid = ctx.game_state.get_valid_deployment_hexes(wing, allow_territory_wide=allow_territory_wide) or []
-            cmd_valid = ctx.game_state.get_valid_deployment_hexes(commander, allow_territory_wide=allow_territory_wide) or []
+            wing_valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(wing, allow_territory_wide=allow_territory_wide) or []
+            cmd_valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(commander, allow_territory_wide=allow_territory_wide) or []
             if not wing_valid or not cmd_valid:
                 continue
             cmd_set = {tuple(c) for c in cmd_valid}
@@ -2213,7 +2213,7 @@ class TacticalPlanner:
         deployed = 0
 
         for fleet in ready_fleets:
-            valid = ctx.game_state.get_valid_deployment_hexes(
+            valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(
                 fleet, allow_territory_wide=allow_territory_wide
             ) or []
             if not valid:
@@ -2330,7 +2330,7 @@ class TacticalPlanner:
 
         deployed = 0
         for army in ready_armies:
-            valid = ctx.game_state.get_valid_deployment_hexes(army, allow_territory_wide=allow_territory_wide) or []
+            valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(army, allow_territory_wide=allow_territory_wide) or []
             if not valid:
                 continue
 
@@ -2710,7 +2710,7 @@ class TacticalPlanner:
                             continue
                         if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
                             continue
-                        if ctx.game_state.can_unboard_unit_to_hex(p, target_hex):
+                        if ctx.movement_service.can_unboard_unit_to_hex(p, target_hex):
                             legal_unload_here = True
                             break
                     if legal_unload_here:
@@ -2991,7 +2991,7 @@ class TacticalPlanner:
                 candidates.sort(key=lambda x: (x[1], x[2]))
 
                 for passenger, _, _, pair_key in candidates:
-                    if ctx.game_state.board_unit(fleet, passenger):
+                    if ctx.movement_service.board_unit(fleet, passenger):
                         if transport_actions is not None:
                             transport_actions.add(pair_key)
                         return True
@@ -3096,7 +3096,7 @@ class TacticalPlanner:
             f"on_assigned_slot={on_assigned} on_approved_slot={on_approved} existing_ground={existing_ground} passengers={p_ids}"
         )
         for p in passengers:
-            legal_now = bool(ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex))
+            legal_now = bool(ctx.movement_service.can_unboard_unit_to_hex(p, fleet_hex))
             print(f"[TRANSPORT_UNLOAD_PASSENGER] fleet={getattr(fleet, 'id', '?')} passenger={getattr(p, 'id', '?')} legal_now={legal_now}")
 
     def _execute_fleet_unload_actions(
@@ -3183,7 +3183,7 @@ class TacticalPlanner:
         legal_hexes = []
         seen_hexes = set()
         for p in candidate_armies:
-            for h in ctx.game_state.get_valid_unboard_hexes(fleet, p):
+            for h in ctx.movement_service.get_valid_unboard_hexes(fleet, p):
                 key = (h.q, h.r)
                 if key in seen_hexes:
                     continue
@@ -3196,7 +3196,7 @@ class TacticalPlanner:
 
         legal_now_armies = [
             p for p in candidate_armies
-            if ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex)
+            if ctx.movement_service.can_unboard_unit_to_hex(p, fleet_hex)
         ]
         if not legal_now_armies:
             print(f"[TRANSPORT] unload_illegal at ({col},{row})")
@@ -3231,7 +3231,7 @@ class TacticalPlanner:
             if getattr(p, "allegiance", None) == ctx.side
                and hasattr(p, "is_leader")
                and p.is_leader()
-               and ctx.game_state.can_unboard_unit_to_hex(p, fleet_hex)
+               and ctx.movement_service.can_unboard_unit_to_hex(p, fleet_hex)
         ]
 
         for leader in companion_leaders:
@@ -3273,7 +3273,7 @@ class TacticalPlanner:
             if not leaders:
                 continue
             commander = self._select_dragon_commander_for_wing(ctx, wing, leaders)
-            if commander and ctx.game_state.board_unit(wing, commander):
+            if commander and ctx.movement_service.board_unit(wing, commander):
                 return True
         return False
 
@@ -3316,11 +3316,11 @@ class TacticalPlanner:
             carrier_hex = Hex.offset_to_axial(*carrier.position)
         for p in list(passengers):
             if carrier_hex is not None and getattr(carrier, "unit_type", None) == UnitType.FLEET:
-                if not ctx.game_state.can_unboard_unit_to_hex(p, carrier_hex):
+                if not ctx.movement_service.can_unboard_unit_to_hex(p, carrier_hex):
                     col, row = carrier_hex.axial_to_offset()
                     print(f"[TRANSPORT] unload_illegal at ({col},{row})")
                     continue
-            if ctx.game_state.unboard_unit(p):
+            if ctx.movement_service.unboard_unit(p):
                 print(f"[TRANSPORT] Unboarded {getattr(p, 'id', '?')} from {getattr(carrier, 'id', '?')}")
                 moved = True
             elif carrier_hex is not None and getattr(carrier, "unit_type", None) == UnitType.FLEET:
@@ -3348,7 +3348,7 @@ class TacticalPlanner:
                 defenders = [u for u in defenders if getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False)]
                 if not defenders:
                     continue
-                if not ctx.game_state.can_units_attack_stack(group.units, defenders):
+                if not ctx.game_state.combat_service.can_units_attack_stack(group.units, defenders):
                     continue
                 target_key = (neighbor.q, neighbor.r)
                 bucket = target_to_groups.setdefault(target_key, {"hex": neighbor, "defenders": defenders, "groups": {}})
@@ -3372,7 +3372,7 @@ class TacticalPlanner:
                 ]
                 if not attackers:
                     continue
-                if not ctx.game_state.can_units_attack_stack(attackers, defenders):
+                if not ctx.game_state.combat_service.can_units_attack_stack(attackers, defenders):
                     continue
                 gate = self._evaluate_combat_package_gate(ctx, plan, target_hex, attackers, defenders)
                 if not gate["allow"]:
@@ -3412,7 +3412,7 @@ class TacticalPlanner:
         target_hex = best["target_hex"]
         attackers = [u for u in best["attackers"] if getattr(u, "is_on_map", False)]
         defenders_before = list(ctx.game_state.get_units_at(target_hex))
-        resolution = ctx.game_state.resolve_combat(attackers, target_hex)
+        resolution = ctx.game_state.combat_service.resolve_combat(attackers, target_hex)
         show_combat_result_popup(
             ctx.game_state,
             title="AI Combat",
@@ -3428,7 +3428,7 @@ class TacticalPlanner:
             target_key = (target_hex.q, target_hex.r)
             failed_targets.add(target_key)
         if resolution and resolution.get("advance_available"):
-            ctx.game_state.advance_after_combat(attackers, target_hex)
+            ctx.game_state.combat_service.advance_after_combat(attackers, target_hex)
         return True
 
     @staticmethod
@@ -4228,7 +4228,7 @@ class BaselineAIPlayer:
                 continue
             if not embarked_ground:
                 return True
-            if any(self.game_state.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+            if any(self.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                 return True
         return False
 

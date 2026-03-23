@@ -169,7 +169,7 @@ class InfluenceMap(OverlayBase):
             if unit.unit_type == UnitType.FLEET:
                 for (q, r), units in board.unit_map.items():
                     target_hex = Hex(q, r)
-                    if game_state.can_fleet_attack_hex(unit, target_hex):
+                    if game_state.combat_service.can_fleet_attack_hex(unit, target_hex):
                         col, row = target_hex.axial_to_offset()
                         values[(col, row)] = values.get((col, row), 0.0) + float(unit.combat_rating or 0)
                 continue

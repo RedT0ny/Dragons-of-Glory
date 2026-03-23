@@ -6,6 +6,7 @@ It includes pathfinding, cost calculations, and special rules for fleets, wings,
 """
 
 from dataclasses import dataclass
+from collections import defaultdict
 import heapq
 import random
 from typing import List, Tuple
@@ -14,6 +15,8 @@ from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, HexsideType, LocType, UnitRace, UnitType
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
+
+_KEEP_FIELD = object()
 
 
 def effective_movement_points(unit):
@@ -320,7 +323,348 @@ class MovementService:
         self.game_state = game_state
         self._interception_step_context = None
         self._interception_attempted_units = set()
+        self._movement_undo_stack = []
         self.invasion_handler = InvasionHandler(self)
+
+    # --- Movement Undo State ---
+    def clear_movement_undo(self):
+        self._movement_undo_stack.clear()
+
+    def can_undo_movement(self):
+        return bool(self._movement_undo_stack)
+
+    def push_movement_undo_snapshot(self):
+        unit_states = []
+        for unit in self.game_state.units:
+            unit_states.append({
+                "unit": unit,
+                "position": tuple(unit.position) if getattr(unit, "position", None) else (None, None),
+                "status": unit.status,
+                "movement_points": getattr(unit, "movement_points", None),
+                "moved_this_turn": getattr(unit, "moved_this_turn", False),
+                "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
+                "is_transported": getattr(unit, "is_transported", False),
+                "carried_by_citadel_this_turn": getattr(unit, "carried_by_citadel_this_turn", False),
+                "transport_host": getattr(unit, "transport_host", None),
+                "river_hexside": getattr(unit, "river_hexside", None),
+                "passengers": list(getattr(unit, "passengers", [])),
+                "escaped": bool(getattr(unit, "escaped", False)),
+            })
+        self._movement_undo_stack.append({
+            "turn": self.game_state.turn,
+            "active_player": self.game_state.active_player,
+            "units": unit_states,
+            "territory_overrides": dict(self.game_state.territory_overrides or {}),
+        })
+
+    def discard_last_movement_snapshot(self):
+        if self._movement_undo_stack:
+            self._movement_undo_stack.pop()
+
+    # --- Unified Mutation Path ---
+    def relocate_unit_on_board(
+        self,
+        unit,
+        target_hex,
+        *,
+        river_hexside=_KEEP_FIELD,
+        clear_escaped: bool = True,
+        mark_citadel_carried: bool = False,
+    ) -> bool:
+        """Single path for on-board relocation + spatial-map + passenger synchronization."""
+        if unit is None or target_hex is None:
+            return False
+
+        self.game_state.map.remove_unit_from_spatial_map(unit)
+        unit.position = target_hex.axial_to_offset()
+        if clear_escaped and hasattr(unit, "escaped"):
+            unit.escaped = False
+        if river_hexside is not _KEEP_FIELD and hasattr(unit, "river_hexside"):
+            unit.river_hexside = river_hexside
+        self.game_state.map.add_unit_to_spatial_map(unit)
+        self._sync_carrier_passengers(unit, mark_citadel_carried=mark_citadel_carried)
+        return True
+
+    def remove_unit_from_board(
+        self,
+        unit,
+        *,
+        escaped: bool = False,
+        clear_transport: bool = True,
+        clear_river_hexside: bool = False,
+        remove_passengers: bool = False,
+    ) -> bool:
+        """Single path for removing a unit from the board and spatial-map state."""
+        if unit is None:
+            return False
+
+        passenger_list = list(getattr(unit, "passengers", []) or []) if remove_passengers else []
+        self.game_state.map.remove_unit_from_spatial_map(unit)
+        unit.position = (None, None)
+        if hasattr(unit, "escaped"):
+            unit.escaped = bool(escaped)
+        if clear_transport:
+            self._detach_unit_from_carriers(unit)
+            unit.is_transported = False
+            unit.transport_host = None
+        if clear_river_hexside and hasattr(unit, "river_hexside"):
+            unit.river_hexside = None
+
+        if remove_passengers and hasattr(unit, "passengers"):
+            unit.passengers = []
+            for passenger in passenger_list:
+                self.remove_unit_from_board(
+                    passenger,
+                    escaped=escaped,
+                    clear_transport=True,
+                    clear_river_hexside=False,
+                    remove_passengers=False,
+                )
+        return True
+
+    def _sync_carrier_passengers(self, carrier, *, mark_citadel_carried: bool = False):
+        passengers = getattr(carrier, "passengers", None)
+        if not passengers:
+            return
+        for passenger in passengers:
+            passenger.position = carrier.position
+            passenger.is_transported = True
+            passenger.transport_host = carrier
+            if mark_citadel_carried:
+                passenger.carried_by_citadel_this_turn = True
+
+    def _detach_unit_from_carriers(self, unit):
+        host = getattr(unit, "transport_host", None)
+        if host is not None and hasattr(host, "passengers"):
+            while unit in host.passengers:
+                host.passengers.remove(unit)
+        for maybe_carrier in self.game_state.units:
+            if maybe_carrier is host:
+                continue
+            passengers = getattr(maybe_carrier, "passengers", None)
+            if not passengers or unit not in passengers:
+                continue
+            while unit in passengers:
+                passengers.remove(unit)
+
+    def undo_last_movement(self):
+        if not self._movement_undo_stack:
+            return False
+
+        snapshot = self._movement_undo_stack.pop()
+        if snapshot["turn"] != self.game_state.turn or snapshot["active_player"] != self.game_state.active_player:
+            self._movement_undo_stack.clear()
+            return False
+
+        for state in snapshot["units"]:
+            unit = state["unit"]
+            unit.position = state["position"]
+            unit.status = state["status"]
+            if state["movement_points"] is not None:
+                unit.movement_points = state["movement_points"]
+            unit.moved_this_turn = state["moved_this_turn"]
+            unit.attacked_this_turn = state["attacked_this_turn"]
+            unit.is_transported = state["is_transported"]
+            unit.carried_by_citadel_this_turn = state.get("carried_by_citadel_this_turn", False)
+            unit.transport_host = state["transport_host"]
+            if hasattr(unit, "river_hexside"):
+                unit.river_hexside = state["river_hexside"]
+            if hasattr(unit, "passengers"):
+                unit.passengers = list(state["passengers"])
+            unit.escaped = bool(state.get("escaped", False))
+
+        self.game_state.map.unit_map = defaultdict(list)
+        for unit in self.game_state.units:
+            pos = getattr(unit, "position", None)
+            if not pos or pos[0] is None or pos[1] is None:
+                continue
+            if not getattr(unit, "is_on_map", False):
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            self.game_state.map.add_unit_to_spatial_map(unit)
+
+        self.game_state.territory_overrides = dict(snapshot.get("territory_overrides", {}) or {})
+        self.game_state.invalidate_analysis({"control_facts"})
+        self.game_state.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
+        return True
+
+    # --- Transport State ---
+    def board_unit(self, carrier, unit):
+        if getattr(carrier, "moved_this_turn", False) or getattr(unit, "moved_this_turn", False):
+            return False
+
+        if not carrier.can_carry(unit):
+            return False
+
+        if not carrier.position or not unit.position or carrier.position != unit.position:
+            return False
+
+        self.game_state.map.remove_unit_from_spatial_map(unit)
+        carrier.load_unit(unit)
+        unit.position = carrier.position
+        unit.is_transported = True
+        if hasattr(unit, "movement_points"):
+            unit.movement_points = 0
+        unit.moved_this_turn = True
+        unit.transport_host = carrier
+
+        if carrier.unit_type == UnitType.FLEET:
+            in_port = False
+            if carrier.position:
+                hex_obj = Hex.offset_to_axial(*carrier.position)
+                loc = self.game_state.map.get_location(hex_obj)
+                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
+            if not in_port and hasattr(carrier, "movement_points"):
+                carrier.movement_points = min(
+                    carrier.movement_points,
+                    max(0, int(carrier.movement // 2)),
+                )
+        if hasattr(carrier, "movement_points"):
+            carrier.movement_points = min(carrier.movement_points, carrier.movement)
+
+        self.normalize_transport_state()
+        return True
+
+    def can_unboard_unit_to_hex(self, unit, dest_hex) -> bool:
+        carrier = getattr(unit, 'transport_host', None)
+        if not carrier:
+            return False
+
+        if dest_hex is None and carrier.position:
+            dest_hex = Hex.offset_to_axial(*carrier.position)
+        if dest_hex is None:
+            return False
+
+        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+            loc = self.game_state.map.get_location(dest_hex)
+            is_stateless_neutral_port = bool(
+                loc
+                and getattr(loc, "loc_type", None) == LocType.PORT.value
+                and getattr(loc, "country_id", None) is None
+                and getattr(loc, "occupier", None) == NEUTRAL
+            )
+            col, row = dest_hex.axial_to_offset()
+            country = self.game_state.get_country_by_hex(col, row)
+            if country and country.allegiance == NEUTRAL and not is_stateless_neutral_port:
+                return False
+
+        if not self.game_state.map.can_unit_land_on_hex(unit, dest_hex):
+            return False
+
+        if not self.game_state.map.can_stack_move_to([unit], dest_hex):
+            return False
+        return True
+
+    def get_valid_unboard_hexes(self, carrier, passenger=None) -> List[Hex]:
+        if not carrier or not getattr(carrier, "position", None) or carrier.position[0] is None:
+            return []
+
+        carrier_hex = Hex.offset_to_axial(*carrier.position)
+        candidates = [carrier_hex]
+        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+            candidates.extend(carrier_hex.neighbors())
+
+        passengers = [passenger] if passenger is not None else list(getattr(carrier, "passengers", []) or [])
+        if not passengers:
+            return []
+
+        valid: List[Hex] = []
+        seen = set()
+        for h in candidates:
+            if (h.q, h.r) in seen:
+                continue
+            seen.add((h.q, h.r))
+            if any(self.can_unboard_unit_to_hex(p, h) for p in passengers):
+                valid.append(h)
+        return valid
+
+    def unboard_unit(self, unit, target_hex=None):
+        carrier = getattr(unit, 'transport_host', None)
+        if not carrier:
+            return False
+
+        dest_hex = target_hex
+        if dest_hex is None and carrier.position:
+            dest_hex = Hex.offset_to_axial(*carrier.position)
+        if not self.can_unboard_unit_to_hex(unit, dest_hex):
+            return False
+
+        self._detach_unit_from_carriers(unit)
+        unit.transport_host = None
+        unit.is_transported = False
+        if hasattr(unit, "movement_points"):
+            unit.movement_points = 0
+        unit.moved_this_turn = True
+        self.relocate_unit_on_board(unit, dest_hex, clear_escaped=False)
+        self.game_state.finalize_board_state_change()
+        if carrier.is_wing():
+            if hasattr(carrier, "movement_points"):
+                carrier.movement_points = 0
+            carrier.moved_this_turn = True
+        elif carrier.unit_type == UnitType.FLEET:
+            in_port = False
+            if carrier.position:
+                loc = self.game_state.map.get_location(Hex.offset_to_axial(*carrier.position))
+                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
+            if not in_port:
+                if hasattr(carrier, "movement_points"):
+                    carrier.movement_points = 0
+                carrier.moved_this_turn = True
+        self.normalize_transport_state()
+        return True
+
+    def normalize_transport_state(self):
+        if not self.game_state.units:
+            return
+
+        carriers = [u for u in self.game_state.units if hasattr(u, "passengers")]
+        passenger_owner = {}
+
+        for carrier in carriers:
+            raw = list(getattr(carrier, "passengers", []) or [])
+            cleaned = []
+            seen = set()
+            for passenger in raw:
+                if passenger is None or passenger is carrier:
+                    continue
+                marker = id(passenger)
+                if marker in seen:
+                    continue
+                if marker in passenger_owner:
+                    continue
+                seen.add(marker)
+                passenger_owner[marker] = carrier
+                cleaned.append(passenger)
+            carrier.passengers = cleaned
+
+        for unit in self.game_state.units:
+            host = getattr(unit, "transport_host", None)
+            if host is None:
+                continue
+            if not hasattr(host, "passengers"):
+                unit.transport_host = None
+                unit.is_transported = False
+                continue
+            if unit not in host.passengers:
+                host.passengers.append(unit)
+            unit.is_transported = True
+            if host.position and host.position != (None, None):
+                unit.position = host.position
+            self.game_state.map.remove_unit_from_spatial_map(unit)
+
+        for carrier in carriers:
+            valid = []
+            seen = set()
+            for passenger in carrier.passengers:
+                if getattr(passenger, "transport_host", None) is not carrier:
+                    continue
+                marker = id(passenger)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                valid.append(passenger)
+            carrier.passengers = valid
 
     def get_reachable_hexes(self, units):
         """
@@ -651,7 +995,7 @@ class MovementService:
                     if getattr(u, "is_on_map", False)
                     and getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET)
                 ]
-                resolution = self.game_state.resolve_combat(live_interceptors, moving_hex)
+                resolution = self.game_state.combat_service.resolve_combat(live_interceptors, moving_hex)
                 defenders_after = [
                     u for u in air_defenders
                     if getattr(u, "is_on_map", False)
@@ -776,17 +1120,12 @@ class MovementService:
         self._relocate_unit_no_refresh(unit, target_hex)
 
     def _relocate_unit_no_refresh(self, unit, target_hex, set_escaped: bool = False, apply_escape: bool = False):
-        self.game_state.map.remove_unit_from_spatial_map(unit)
-        unit.position = target_hex.axial_to_offset()
-        if set_escaped:
-            unit.escaped = False
-        self.game_state.map.add_unit_to_spatial_map(unit)
-        passengers = getattr(unit, "passengers", None)
-        if passengers:
-            for p in passengers:
-                p.position = unit.position
-                p.is_transported = True
-                p.transport_host = unit
+        self.relocate_unit_on_board(
+            unit,
+            target_hex,
+            clear_escaped=set_escaped,
+            mark_citadel_carried=False,
+        )
         if apply_escape:
             apply_escape_fn = getattr(self.game_state, "_apply_escape_if_eligible", None)
             if callable(apply_escape_fn):
@@ -1074,7 +1413,7 @@ class MovementService:
                     if not (is_coastal or is_port):
                         messages.append(f"Cannot unboard {u.id}: carrier not in coastal hex or port")
                         continue
-                success = self.game_state.unboard_unit(u)
+                success = self.unboard_unit(u)
                 if not success:
                     messages.append(f"Failed to unboard {u.id} due to stacking or location.")
             return BoardActionResult(handled=True, messages=messages, force_sync=True)
@@ -1094,7 +1433,7 @@ class MovementService:
                         if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
                             messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
                             continue
-                        ok = self.game_state.unboard_unit(p)
+                        ok = self.unboard_unit(p)
                         if not ok:
                             messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
                     continue
@@ -1103,7 +1442,7 @@ class MovementService:
                         if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
                             messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
                             continue
-                        ok = self.game_state.unboard_unit(p)
+                        ok = self.unboard_unit(p)
                         if not ok:
                             messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
                     continue
@@ -1119,7 +1458,7 @@ class MovementService:
 
                 # Unboard all passengers (copy list since unboard_unit mutates passengers)
                 for p in carrier.passengers[:]:
-                    ok = self.game_state.unboard_unit(p)
+                    ok = self.unboard_unit(p)
                     if not ok:
                         messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
 
@@ -1139,7 +1478,7 @@ class MovementService:
         for army in armies:
             loaded = False
             for carrier in carriers:
-                if self.game_state.board_unit(carrier, army):
+                if self.board_unit(carrier, army):
                     messages.append(f"Boarded army {army.id} onto {carrier.id}")
                     loaded = True
                     break
@@ -1151,7 +1490,7 @@ class MovementService:
             for l in leaders:
                 loaded = False
                 for carrier in carriers:
-                    if self.game_state.board_unit(carrier, l):
+                    if self.board_unit(carrier, l):
                         messages.append(f"Boarded leader {l.id} onto {carrier.id}")
                         loaded = True
                         break

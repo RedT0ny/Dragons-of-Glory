@@ -1,3 +1,8 @@
+import random
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Callable, Optional
+
 from src.content import loader
 from src.content.config import CALENDAR_DATA
 from src.content.constants import HL, WS
@@ -52,6 +57,7 @@ class PhaseManager:
             GamePhase.STRATEGIC_EVENTS,
             GamePhase.ACTIVATION,
             GamePhase.INITIATIVE,
+            GamePhase.SUPPLY,
         }
 
     def should_auto_advance(self):
@@ -155,3 +161,141 @@ class PhaseManager:
         if getattr(self.game_state, "game_over", False):
             return
         self.game_state.begin_next_turn()
+
+
+class TurnAction(Enum):
+    NONE = "none"
+    REQUEST_HUMAN_DEPLOYMENT = "request_human_deployment"
+    REQUEST_HUMAN_REPLACEMENTS = "request_human_replacements"
+    REQUEST_HUMAN_EVENT_DIALOG = "request_human_event_dialog"
+    REQUEST_HUMAN_ACTIVATION = "request_human_activation"
+
+
+@dataclass(frozen=True)
+class TurnOutcome:
+    action: TurnAction = TurnAction.NONE
+    payload: Optional[dict] = None
+    advanced: bool = False
+
+
+class TurnEngine:
+    """
+    Pure turn/phase orchestration.
+    - Executes non-UI phase logic.
+    - Emits action requests when user interaction is required.
+    """
+
+    def __init__(self, game_state, ai_baseline, attempt_invasion: Optional[Callable[..., Any]] = None):
+        self.game_state = game_state
+        self.ai_baseline = ai_baseline
+        self.attempt_invasion = attempt_invasion
+
+    def step(self) -> TurnOutcome:
+        current_phase = self.game_state.phase
+        active_player = self.game_state.active_player
+        current_player = self.game_state.current_player
+        is_ai = bool(current_player and current_player.is_ai)
+
+        if current_phase == GamePhase.DEPLOYMENT:
+            print(f"Step 0: Deployment Phase - {active_player}")
+            if is_ai:
+                deployed = self.ai_baseline.deploy_all_ready_units(active_player)
+                print(f"AI deployment complete. Deployed: {deployed}")
+                self.game_state.advance_phase()
+                return TurnOutcome(advanced=True)
+            return TurnOutcome(
+                action=TurnAction.REQUEST_HUMAN_DEPLOYMENT,
+                payload={"active_player": active_player},
+            )
+
+        if current_phase == GamePhase.REPLACEMENTS:
+            print(f"Step 1: Replacements Phase - {active_player}")
+            if is_ai:
+                conscriptions, deployed = self.ai_baseline.process_replacements(active_player)
+                print(f"AI replacements complete. Conscriptions: {conscriptions}, deployed: {deployed}")
+                self.game_state.advance_phase()
+                return TurnOutcome(advanced=True)
+            return TurnOutcome(
+                action=TurnAction.REQUEST_HUMAN_REPLACEMENTS,
+                payload={"active_player": active_player},
+            )
+
+        if current_phase == GamePhase.STRATEGIC_EVENTS:
+            print(f"Step 2: Strategic Events - {active_player}")
+            event = self.game_state.event_system.draw_strategic_event(active_player)
+            if event:
+                event.force_activate(self.game_state)
+                if is_ai:
+                    assigned = self.ai_baseline.assign_assets(active_player)
+                    if assigned:
+                        print(f"AI asset assignment complete. Assigned: {assigned}")
+                    self.game_state.advance_phase()
+                    return TurnOutcome(advanced=True)
+                return TurnOutcome(
+                    action=TurnAction.REQUEST_HUMAN_EVENT_DIALOG,
+                    payload={"event": event, "active_player": active_player},
+                )
+            self.game_state.advance_phase()
+            return TurnOutcome(advanced=True)
+
+        if current_phase == GamePhase.ACTIVATION:
+            print(f"Step 3: Activation - {active_player}")
+            if not self.game_state.has_neutral_countries():
+                print("No neutral countries remain. Skipping Activation phase.")
+                self.game_state.advance_phase()
+                return TurnOutcome(advanced=True)
+
+            if is_ai:
+                success, country_id = self.ai_baseline.perform_activation(active_player)
+                if success:
+                    print(f"AI activated country {country_id}.")
+                else:
+                    print("AI activation failed or skipped.")
+                self.game_state.advance_phase()
+                return TurnOutcome(advanced=True)
+
+            return TurnOutcome(
+                action=TurnAction.REQUEST_HUMAN_ACTIVATION,
+                payload={"active_player": active_player},
+            )
+
+        if current_phase == GamePhase.INITIATIVE:
+            hl_roll = random.randint(1, 4)
+            ws_roll = random.randint(1, 4)
+            if hl_roll == ws_roll:
+                winner = self.game_state.initiative_winner
+            elif hl_roll > ws_roll:
+                winner = HL
+            else:
+                winner = WS
+            print(f"Step 4: Initiative. Winner: {winner}")
+            self.game_state.set_initiative(winner)
+            self.game_state.advance_phase()
+            return TurnOutcome(advanced=True)
+
+        if current_phase == GamePhase.MOVEMENT:
+            print(f"Step 5: Movement phase - {active_player}")
+            if is_ai:
+                assigned = self.ai_baseline.assign_assets(active_player)
+                if assigned:
+                    print(f"AI asset assignment complete. Assigned: {assigned}")
+            if is_ai:
+                moved = self.ai_baseline.execute_best_movement(
+                    active_player,
+                    attempt_invasion=self.attempt_invasion,
+                )
+                if not moved:
+                    self.game_state.advance_phase()
+                    return TurnOutcome(advanced=True)
+            return TurnOutcome()
+
+        if current_phase == GamePhase.COMBAT:
+            print(f"Step 6: Combat phase - {active_player}")
+            if is_ai:
+                fought = self.ai_baseline.execute_best_combat(active_player)
+                if not fought:
+                    self.game_state.advance_phase()
+                    return TurnOutcome(advanced=True)
+            return TurnOutcome()
+
+        return TurnOutcome()

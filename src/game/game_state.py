@@ -1,25 +1,18 @@
 import random
-import os
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
-from src.game.combat import (
-    CombatResolver,
-    DragonDuelResolver,
-    NavalCombatResolver,
-    apply_dragon_orb_bonus,
-    apply_gnome_tech_bonus,
-)
-from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
+from src.game.combat import CombatService
+from src.game.diplomacy import ConquestService
+from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
 from src.content import loader, factory
-from src.content.text_formatter import TextFormatter
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
-from src.game.movement import evaluate_unit_move, effective_movement_points
+from src.game.movement import MovementService, evaluate_unit_move, effective_movement_points
 from src.game.phase_manager import PhaseManager, CalendarService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
@@ -61,6 +54,9 @@ class GameState:
         self.event_system = EventSystem(self)
         self.phase_manager = PhaseManager(self)
         self.deployment_service = DeploymentService(self)
+        self.movement_service = MovementService(self)
+        self.combat_service = CombatService(self)
+        self.conquest_service = ConquestService(self)
         self.calendar = CalendarService()
 
         # Battle Turn State
@@ -86,7 +82,6 @@ class GameState:
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
         self.tower_country_id = "tower"
-        self._movement_undo_stack = []
         self.victory_evaluator = None
         self.game_over = False
         self.winner = None
@@ -169,7 +164,7 @@ class GameState:
             return False
         if unit.is_fleet():
             return True
-        return self._is_combat_stack_unit(unit)
+        return self.combat_service.is_combat_stack_unit(unit)
 
     def can_unit_project_across_hexside(self, unit, from_hex, to_hex) -> bool:
         if not self.map or unit is None:
@@ -191,7 +186,7 @@ class GameState:
         relevant = [
             u for u in (attackers or [])
             if getattr(u, "is_on_map", False)
-            and self._is_combat_stack_unit(u)
+            and self.combat_service.is_combat_stack_unit(u)
             and not u.is_fleet()
             and getattr(u, "transport_host", None) is None
         ]
@@ -338,7 +333,7 @@ class GameState:
         self._analysis_cache = {}
         self._analysis_dirty = set()
         self.invalidate_overlays({"territory"})
-        self.clear_movement_undo()
+        self.movement_service.clear_movement_undo()
 
     def load_scenario(self, scenario_spec):
         """
@@ -627,12 +622,6 @@ class GameState:
             for asset_id in spec.artifacts:
                 player.grant_asset(asset_id, self)
 
-    def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
-        return self.deployment_service.get_deployment_hexes(allegiance)
-
-    def get_valid_deployment_hexes(self, unit, allow_territory_wide=False) -> List[Tuple[int, int]]:
-        return self.deployment_service.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide)
-
     def apply_conscription(self, kept_unit, discarded_unit):
         """Apply conscription result: keep one unit, destroy the other."""
         if kept_unit.is_fleet():
@@ -643,7 +632,13 @@ class GameState:
             kept_unit.status = UnitState.READY
 
         discarded_unit.status = UnitState.DESTROYED
-        discarded_unit.position = (None, None)
+        self.movement_service.remove_unit_from_board(
+            discarded_unit,
+            escaped=False,
+            clear_transport=True,
+            clear_river_hexside=True,
+            remove_passengers=True,
+        )
 
     def process_delayed_fleet_replacements(self):
         """
@@ -897,8 +892,8 @@ class GameState:
 
     def finalize_combat_phase(self):
         # Keep end-of-combat rule ordering identical to previous PhaseManager logic.
-        self.resolve_end_of_combat_conquest()
-        self.clear_leader_tactical_overrides()
+        self.conquest_service.resolve_end_of_combat_conquest()
+        self.combat_service.clear_leader_tactical_overrides()
         self.clear_combat_bonus(self.active_player)
         for unit in self.units:
             unit.attacked_this_turn = False
@@ -1065,10 +1060,6 @@ class GameState:
                 return country
         return None
 
-    def is_country_neutral(self, country_id: str) -> bool:
-        country = self.countries.get(country_id)
-        return bool(country and country.allegiance == NEUTRAL)
-
     def has_neutral_countries(self) -> bool:
         return any(country.allegiance == NEUTRAL for country in self.countries.values())
 
@@ -1138,19 +1129,15 @@ class GameState:
 
     def _force_move_fleet_to_state(self, fleet, state):
         retreat_hex, retreat_side = state
-        self.map.remove_unit_from_spatial_map(fleet)
-        fleet.position = retreat_hex.axial_to_offset()
-        fleet.river_hexside = retreat_side
+        self.movement_service.relocate_unit_on_board(
+            fleet,
+            retreat_hex,
+            river_hexside=retreat_side,
+            clear_escaped=False,
+            mark_citadel_carried=False,
+        )
         if hasattr(fleet, "moved_this_turn"):
             fleet.moved_this_turn = True
-        self.map.add_unit_to_spatial_map(fleet)
-
-        passengers = getattr(fleet, "passengers", None)
-        if passengers:
-            for passenger in passengers:
-                passenger.position = fleet.position
-                passenger.is_transported = True
-                passenger.transport_host = fleet
 
     def _displace_enemy_fleets_in_hex(self, invading_unit, target_hex):
         """
@@ -1261,33 +1248,26 @@ class GameState:
                 return
             unit.movement_points = max(0, effective_mp - cost)
 
-        # 2. Update Position
-        # Remove from old position in spatial map
-        self.map.remove_unit_from_spatial_map(unit)
-
-        # Update Unit's internal state (store as offset col, row for persistence/view)
+        # 2. Update Position and spatial map (single movement mutation path)
         offset_coords = target_hex.axial_to_offset()
-        unit.escaped = False
-        unit.position = offset_coords
-
-        # Add to new position in spatial map
-        self.map.add_unit_to_spatial_map(unit)
+        if self.phase == GamePhase.MOVEMENT and unit.is_fleet():
+            self.movement_service.relocate_unit_on_board(
+                unit,
+                target_hex,
+                river_hexside=fleet_final_hexside,
+                clear_escaped=True,
+                mark_citadel_carried=(unit.is_citadel()),
+            )
+        else:
+            self.movement_service.relocate_unit_on_board(
+                unit,
+                target_hex,
+                clear_escaped=True,
+                mark_citadel_carried=(self.phase == GamePhase.MOVEMENT and unit.is_citadel()),
+            )
 
         if self.phase == GamePhase.MOVEMENT:
             unit.moved_this_turn = True
-            if unit.is_fleet():
-                unit.river_hexside = fleet_final_hexside
-
-        # If this unit is a carrier (Fleet/Wing/Citadel) move its passengers implicitly
-        passengers = getattr(unit, 'passengers', None)
-        if passengers:
-            for p in passengers:
-                # Update passenger state to remain transported; do NOT add them to spatial map
-                p.position = unit.position
-                p.is_transported = True
-                p.transport_host = unit
-                if self.phase == GamePhase.MOVEMENT and unit.is_citadel():
-                    p.carried_by_citadel_this_turn = True
 
         # Rule: Ground armies and wings displace enemy fleets from entered hexes.
         if self._unit_can_force_fleet_displacement(unit):
@@ -1324,110 +1304,13 @@ class GameState:
                 break
 
     def _mark_unit_escaped(self, unit):
-        self.map.remove_unit_from_spatial_map(unit)
-        unit.position = (None, None)
-        unit.escaped = True
-        unit.is_transported = False
-        unit.transport_host = None
-        if hasattr(unit, "river_hexside"):
-            unit.river_hexside = None
-
-        passengers = list(getattr(unit, "passengers", []) or [])
-        for passenger in passengers:
-            self.map.remove_unit_from_spatial_map(passenger)
-            passenger.position = (None, None)
-            passenger.escaped = True
-            passenger.is_transported = False
-            passenger.transport_host = None
-        if hasattr(unit, "passengers"):
-            unit.passengers = []
-
-    def clear_movement_undo(self):
-        self._movement_undo_stack.clear()
-
-    def can_undo_movement(self):
-        return bool(self._movement_undo_stack)
-
-    def push_movement_undo_snapshot(self):
-        """
-        Stores a full-unit snapshot before a movement action.
-        Snapshot scope is turn/player-bound so undo cannot cross turns or active player.
-        """
-        unit_states = []
-        for unit in self.units:
-            unit_states.append({
-                "unit": unit,
-                "position": tuple(unit.position) if getattr(unit, "position", None) else (None, None),
-                "status": unit.status,
-                "movement_points": getattr(unit, "movement_points", None),
-                "moved_this_turn": getattr(unit, "moved_this_turn", False),
-                "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
-                "is_transported": getattr(unit, "is_transported", False),
-                "carried_by_citadel_this_turn": getattr(unit, "carried_by_citadel_this_turn", False),
-                "transport_host": getattr(unit, "transport_host", None),
-                "river_hexside": getattr(unit, "river_hexside", None),
-                "passengers": list(getattr(unit, "passengers", [])),
-                "escaped": bool(getattr(unit, "escaped", False)),
-            })
-        self._movement_undo_stack.append({
-            "turn": self.turn,
-            "active_player": self.active_player,
-            "units": unit_states,
-            "territory_overrides": dict(self.territory_overrides or {}),
-        })
-
-    def discard_last_movement_snapshot(self):
-        if self._movement_undo_stack:
-            self._movement_undo_stack.pop()
-
-    def undo_last_movement(self):
-        if not self._movement_undo_stack:
-            return False
-
-        snapshot = self._movement_undo_stack.pop()
-        if snapshot["turn"] != self.turn or snapshot["active_player"] != self.active_player:
-            self._movement_undo_stack.clear()
-            return False
-
-        for state in snapshot["units"]:
-            unit = state["unit"]
-            unit.position = state["position"]
-            unit.status = state["status"]
-            if state["movement_points"] is not None:
-                unit.movement_points = state["movement_points"]
-            unit.moved_this_turn = state["moved_this_turn"]
-            unit.attacked_this_turn = state["attacked_this_turn"]
-            unit.is_transported = state["is_transported"]
-            unit.carried_by_citadel_this_turn = state.get("carried_by_citadel_this_turn", False)
-            unit.transport_host = state["transport_host"]
-            if hasattr(unit, "river_hexside"):
-                unit.river_hexside = state["river_hexside"]
-            if hasattr(unit, "passengers"):
-                unit.passengers = list(state["passengers"])
-            unit.escaped = bool(state.get("escaped", False))
-
-        # Rebuild spatial map after restoring all unit states.
-        self.map.unit_map = defaultdict(list)
-        for unit in self.units:
-            pos = getattr(unit, "position", None)
-            if not pos or pos[0] is None or pos[1] is None:
-                continue
-            if not getattr(unit, "is_on_map", False):
-                continue
-            if getattr(unit, "transport_host", None) is not None:
-                continue
-            self.map.add_unit_to_spatial_map(unit)
-
-        self.territory_overrides = dict(snapshot.get("territory_overrides", {}) or {})
-        self.invalidate_analysis({"control_facts"})
-        self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
-        return True
-
-    def check_event_trigger_conditions(self, conditions) -> bool:
-        return self.event_system.check_event_trigger_conditions(conditions)
-
-    def check_event_requirements_met(self, requirements) -> bool:
-        return self.event_system.check_event_requirements_met(requirements)
+        self.movement_service.remove_unit_from_board(
+            unit,
+            escaped=True,
+            clear_transport=True,
+            clear_river_hexside=True,
+            remove_passengers=True,
+        )
 
     def activate_country(self, country_id: str, allegiance: str):
         """Activates a country for the given allegiance and readies its units."""
@@ -1561,1287 +1444,12 @@ class GameState:
         return coords
 
 
-    def _update_location_occupiers(self):
-        """
-        Rule 9: end-of-combat conquest status updates for locations.
-        Simplified to compute occupier in a single pass with early-exits and clear logic.
-        """
-        from src.game.map import Hex
-
-        for map_loc in self.map.locations.values():
-            if not map_loc or not map_loc.coords:
-                continue
-
-            hex_obj = Hex.offset_to_axial(*map_loc.coords)
-
-            for unit in self.map.get_units_in_hex(hex_obj.q, hex_obj.r):
-                if (unit.is_on_map
-                        and unit.allegiance != map_loc.occupier
-                        and (unit.is_army() or (unit.is_wing() and map_loc.loc_type != LocType.UNDERCITY.value))
-                ):
-                    map_loc.occupier = unit.allegiance
-                    break
-
-    def _is_country_fully_occupied_by_enemy(self, country) -> bool:
-        enemy = self.get_enemy_allegiance(country.allegiance)
-        if not enemy:
-            return False
-        if not country.locations:
-            return False
-        return all(loc.occupier == enemy for loc in country.locations.values())
-
-    def _destroy_country_upon_conquest(self, country, conqueror: str):
-        """
-        Rule 9 effects:
-        - Armies, Wings and Leaders are permanently DESTROYED.
-        - Fleets remain only if currently on map (ACTIVE/DEPLETED).
-        """
-        destroyed_count = 0
-        for unit in self.units:
-            if unit.land != country.id:
-                continue
-
-            if unit.is_fleet():
-                if unit.status not in UnitState.on_map_states() and unit.status != UnitState.DESTROYED:
-                    unit.destroy()
-                    self.map.remove_unit_from_spatial_map(unit)
-                    destroyed_count += 1
-                continue
-
-            is_army = hasattr(unit, "is_army") and unit.is_army()
-            is_wing = hasattr(unit, "is_wing") and unit.is_wing()
-            is_leader = hasattr(unit, "is_leader") and unit.is_leader()
-            if not (is_army or is_wing or is_leader):
-                continue
-
-            if unit.status == UnitState.DESTROYED:
-                continue
-
-            unit.destroy()
-            self.map.remove_unit_from_spatial_map(unit)
-            destroyed_count += 1
-
-        country.allegiance = conqueror
-        country.conquered = True
-        print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
-
-    def _apply_country_conquest_or_liberation(self, country, conqueror: str):
-        if country.conquered:
-            country.allegiance = conqueror
-            country.conquered = False
-            print(f"Country {country.id} liberated for {conqueror}.")
-            return
-        self._destroy_country_upon_conquest(country, conqueror)
-
-    def _enforce_conquered_fleet_replacement_rule(self):
-        """
-        Fleets from conquered countries that reach RESERVE are DESTROYED,
-        except for knight-country fleets while at least one knight country is unconquered.
-        """
-        any_knight_unconquered = any(
-            (not c.conquered) for c in self._countries_with_tag(self.tag_knight_countries)
-        )
-
-        for unit in self.units:
-            if unit.unit_type != UnitType.FLEET or unit.status != UnitState.RESERVE:
-                continue
-            country = self.countries.get(unit.land)
-            if not country or not country.conquered:
-                continue
-
-            is_knight_country = self._country_has_tag(country, self.tag_knight_countries)
-            if is_knight_country and any_knight_unconquered:
-                continue
-
-            unit.destroy()
-            self.map.remove_unit_from_spatial_map(unit)
-
-    def _apply_standard_country_conquests(self):
-        for country in self.countries.values():
-            if country.allegiance not in (HL, WS):
-                continue
-            if self._country_has_tag(country, self.tag_knight_countries) and country.allegiance == WS:
-                # Solamnic conquest is resolved as a pooled rule below.
-                continue
-            if self._is_country_fully_occupied_by_enemy(country):
-                conqueror = self.get_enemy_allegiance(country.allegiance)
-                if conqueror:
-                    self._apply_country_conquest_or_liberation(country, conqueror)
-
-    def _apply_solamnic_group_conquest(self):
-        """
-        Solamnic rule:
-        WS-controlled countries in this group (including Tower) are conquered only when
-        all their locations are occupied by HL.
-        """
-        group = [c for c in self._countries_with_tag(self.tag_knight_countries) if c.allegiance == WS]
-        if not group:
-            return
-
-        fully_occupied = all(self._is_country_fully_occupied_by_enemy(c) for c in group)
-        if not fully_occupied:
-            return
-
-        for country in group:
-            conqueror = self.get_enemy_allegiance(country.allegiance)
-            if conqueror:
-                self._apply_country_conquest_or_liberation(country, conqueror)
-
-    def resolve_end_of_combat_conquest(self):
-        """
-        Full Rule 9 pass. Call exactly when leaving COMBAT phase.
-        """
-        if not self.map:
-            return
-        self._update_location_occupiers()
-        self._apply_standard_country_conquests()
-        self._apply_solamnic_group_conquest()
-        self._enforce_conquered_fleet_replacement_rule()
-        self.update_territory_overrides()
-        self.invalidate_overlays({"control", "territory", "supply"})
-
-    def _resolve_add_units(self, unit_key: str, allegiance: str):
-        self.event_system._resolve_add_units(unit_key, allegiance)
-
-    def apply_event_effect(self, event):
-        """Applies the effects of an event. Accepts Event object for occurrence tracking."""
-        return self.event_system.apply_event_effect(event)
-
-    def apply_event_effect_by_spec(self, spec):
-        """Applies the effects of an event given its spec. Looks up Event for occurrence tracking."""
-        return self.event_system.apply_event_effect_by_spec(spec)
-
-    def draw_strategic_event(self, allegiance):
-        return self.event_system.draw_strategic_event(allegiance)
-
     def resolve_event(self, event):
         pass
 
-    def resolve_combat(
-        self,
-        attackers,
-        hex_position,
-        naval_withdraw_decider=None,
-        dragon_duel_withdraw_decider=None,
-    ):
-        """
-        Initiates combat resolution for a specific hex.
-        """
-        attackers = list(attackers)
-        defenders = list(self.get_units_at(hex_position))
-        terrain = self.map.get_terrain(hex_position)
-        defender_allegiances = {
-            u.allegiance for u in defenders
-            if u.allegiance not in ("neutral", None)
-        }
 
-        # Leader-only defender stacks attacked by armies/wings do not resolve normal combat.
-        # Each defending leader performs leader-escape mechanics instead.
-        if self._is_leader_only_stack(defenders) and self._attack_triggers_leader_stack_escape(attackers):
-            leader_origins = {
-                u: Hex.offset_to_axial(*u.position)
-                for u in defenders
-                if hasattr(u, "is_leader") and u.is_leader() and u.position and u.position[0] is not None
-            }
-            # Force escape checks for each defending leader in the attacked leader-only stack.
-            leader_stack_has_army = {leader: True for leader in leader_origins.keys()}
-            leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
-            result = "-/-"
-            print(TextFormatter.format_combat_log(attackers, defenders, result))
-            return {
-                "result": result,
-                "leader_escape_requests": leader_escape_requests or [],
-                "advance_available": False,
-            }
 
-        if self._combat_blocked_by_citadel_rule(attackers, defenders):
-            result = "-/-"
-            print(TextFormatter.format_combat_log(attackers, defenders, result))
-            return {
-                "result": result,
-                "leader_escape_requests": [],
-                "advance_available": False,
-            }
-        attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
-        if not self.can_units_attack_stack(attackers, defenders, target_hex=hex_position):
-            result = "-/-"
-            print(TextFormatter.format_combat_log(attackers, defenders, result))
-            return {
-                "result": result,
-                "leader_escape_requests": [],
-                "advance_available": False,
-            }
-        if not attackers:
-            result = "-/-"
-            print(TextFormatter.format_combat_log(attackers, defenders, result))
-            return {
-                "result": result,
-                "leader_escape_requests": [],
-                "advance_available": False,
-            }
 
-        if self._is_naval_combat(attackers, defenders):
-            naval_resolver = NavalCombatResolver(self, attackers, defenders)
-            outcome = naval_resolver.resolve(withdraw_decider=naval_withdraw_decider)
-            self._cleanup_destroyed_units(attackers + defenders)
-            print(TextFormatter.format_naval_log(attackers, defenders, outcome))
-            return {
-                "result": outcome.get("result", "-/-"),
-                "leader_escape_requests": [],
-                "advance_available": False,
-                "combat_type": "naval",
-                "rounds": outcome.get("rounds", 0),
-            }
 
-        for msg in self._apply_combat_healing(attackers + defenders):
-            print(msg)
 
-        orb_events = apply_dragon_orb_bonus(
-            attackers,
-            defenders,
-            consume_asset_fn=self._consume_asset,
-        )
-        if orb_events:
-            self._cleanup_destroyed_units(attackers + defenders)
-            attackers = [u for u in attackers if u.is_on_map]
-            defenders = list(self.get_units_at(hex_position))
-            for evt in orb_events:
-                print(evt)
 
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
-                result = "-/-"
-                advance_available = self._can_advance_after_combat(
-                    attackers=attackers,
-                    target_hex=hex_position,
-                    defender_allegiances=defender_allegiances,
-                    attacker_had_to_retreat=False,
-                )
-                print(TextFormatter.format_combat_log(attackers, defenders, result))
-                return {
-                    "result": result,
-                    "leader_escape_requests": [],
-                    "advance_available": advance_available,
-                }
-            if not any(self._is_combat_stack_unit(u) for u in attackers):
-                result = "-/-"
-                print(TextFormatter.format_combat_log(attackers, defenders, result))
-                return {
-                    "result": result,
-                    "leader_escape_requests": [],
-                    "advance_available": False,
-                }
-
-        attacker_dragons = [u for u in attackers if self._is_dragon_unit(u) and u.is_on_map]
-        defender_dragons = [u for u in defenders if self._is_dragon_unit(u) and u.is_on_map]
-        if attacker_dragons and defender_dragons:
-            duel = DragonDuelResolver(self, attacker_dragons, defender_dragons)
-            duel_outcome = duel.resolve(withdraw_decider=dragon_duel_withdraw_decider)
-            print(
-                f"Dragon duel after {duel_outcome.get('rounds', 0)} rounds: "
-                f"A={duel_outcome.get('attacker_survivors', 0)} D={duel_outcome.get('defender_survivors', 0)}"
-            )
-            self._cleanup_destroyed_units(attackers + defenders)
-            attackers = [u for u in attackers if u.is_on_map]
-            defenders = list(self.get_units_at(hex_position))
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
-                result = "-/-"
-                advance_available = self._can_advance_after_combat(
-                    attackers=attackers,
-                    target_hex=hex_position,
-                    defender_allegiances=defender_allegiances,
-                    attacker_had_to_retreat=False,
-                )
-                print(TextFormatter.format_combat_log(attackers, defenders, result))
-                return {
-                    "result": result,
-                    "leader_escape_requests": [],
-                    "advance_available": advance_available,
-                }
-
-        attackers = self._filter_dragons_for_land_attack(attackers, defenders)
-        if not any(self._is_combat_stack_unit(u) for u in attackers):
-            result = "-/-"
-            print(TextFormatter.format_combat_log(attackers, defenders, result))
-            return {
-                "result": result,
-                "leader_escape_requests": [],
-                "advance_available": False,
-            }
-
-        gnome_drm = 0
-        gnome_effects, gnome_logs = apply_gnome_tech_bonus(
-            attackers,
-            defenders,
-            consume_asset_fn=self._consume_asset,
-        )
-        for msg in gnome_logs:
-            print(msg)
-        gnome_drm += int(gnome_effects.get("attacker", 0))
-        gnome_drm += int(gnome_effects.get("defender", 0))
-
-        # Cumulative pre-combat special retreats for wings/cavalry.
-        special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
-        if special_retreat["applied"]:
-            self._cleanup_destroyed_units(defenders)
-            defenders = list(self.get_units_at(hex_position))
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
-                result = special_retreat["result"]
-                leader_escape_requests = special_retreat.get("leader_escape_requests", []) or []
-                advance_available = self._can_advance_after_combat(
-                    attackers=attackers,
-                    target_hex=hex_position,
-                    defender_allegiances=defender_allegiances,
-                    attacker_had_to_retreat=False,
-                )
-                print(TextFormatter.format_combat_log(attackers, defenders, result))
-                return {
-                    "result": result,
-                    "leader_escape_requests": leader_escape_requests,
-                    "advance_available": advance_available,
-                }
-
-        leader_origins = {}
-        leader_stack_has_army = {}
-        for unit in attackers + defenders:
-            if hasattr(unit, "is_leader") and unit.is_leader() and unit.position:
-                origin_hex = Hex.offset_to_axial(*unit.position)
-                leader_origins[unit] = origin_hex
-                units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
-                leader_stack_has_army[unit] = any(
-                    u.allegiance == unit.allegiance and self._is_combat_stack_unit(u)
-                    for u in units_in_hex
-                )
-
-        resolver = CombatResolver(
-            attackers,
-            defenders,
-            terrain,
-            game_state=self,
-            precombat_drm_bonus=gnome_drm,
-            allow_consumable_other_bonus=True,
-        )
-        result = resolver.resolve()
-        print(f"Combat at Hex ({hex_position})")
-        print(TextFormatter.format_combat_log(attackers, defenders, result))
-        self._cleanup_destroyed_units(attackers + defenders)
-        revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
-        leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
-        leader_escape_requests = (revive_escape_requests or []) + (leader_escape_requests or [])
-
-        attacker_result_code = result.split('/')[0] if '/' in result else result
-        attacker_had_to_retreat = 'R' in attacker_result_code
-        advance_available = self._can_advance_after_combat(
-            attackers=attackers,
-            target_hex=hex_position,
-            defender_allegiances=defender_allegiances,
-            attacker_had_to_retreat=attacker_had_to_retreat,
-        )
-
-        return {
-            "result": result,
-            "leader_escape_requests": leader_escape_requests or [],
-            "advance_available": advance_available,
-        }
-
-    def _apply_combat_healing(self, units):
-        logs = []
-        for unit in units:
-            if getattr(unit, "status", None) != UnitState.DEPLETED:
-                continue
-            if getattr(unit, "_healed_this_combat_turn", False):
-                continue
-            healing_asset = self._get_equipped_other_bonus_asset(unit, "healing")
-            if healing_asset is None:
-                continue
-            unit.status = UnitState.ACTIVE
-            unit._healed_this_combat_turn = True
-            logs.append(f"Healing activated: {unit.id} restored to ACTIVE.")
-            if getattr(healing_asset, "is_consumable", False):
-                self._consume_asset(healing_asset, unit)
-                logs.append(f"Healing asset consumed: {healing_asset.id} on {unit.id}.")
-        return logs
-
-    def _get_equipped_other_bonus_asset(self, unit, bonus_name):
-        for asset in getattr(unit, "equipment", []) or []:
-            bonus = getattr(asset, "bonus", None)
-            if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
-                return asset
-        return None
-
-    def _resolve_leader_revives(self, units, leader_origins):
-        requests = []
-        for leader in units:
-            if not (hasattr(leader, "is_leader") and leader.is_leader()):
-                continue
-            if getattr(leader, "status", None) != UnitState.DESTROYED:
-                continue
-            revive_asset = self._get_equipped_other_bonus_asset(leader, "revive")
-            if revive_asset is None:
-                continue
-
-            origin_hex = leader_origins.get(leader)
-            if not origin_hex:
-                continue
-            options = self._get_nearest_friendly_combat_stacks(leader, origin_hex)
-            if not options:
-                continue
-
-            leader.status = UnitState.ACTIVE
-            leader.position = (None, None)
-            requests.append(LeaderEscapeRequest(leader=leader, options=options))
-            print(f"Revive activated: {leader.id} may escape to nearest friendly stack.")
-            if getattr(revive_asset, "is_consumable", False):
-                self._consume_asset(revive_asset, leader)
-        return requests
-
-    def _consume_asset(self, asset, unit):
-        if hasattr(asset, "remove_from"):
-            asset.remove_from(unit)
-        else:
-            if hasattr(unit, "equipment") and asset in unit.equipment:
-                unit.equipment.remove(asset)
-            asset.assigned_to = None
-
-        if getattr(asset, "owner", None) and hasattr(asset.owner, "assets"):
-            asset.owner.assets.pop(asset.id, None)
-            return
-
-        for player in self.players.values():
-            if not hasattr(player, "assets"):
-                continue
-            candidate = player.assets.get(getattr(asset, "id", None))
-            if candidate is asset or (candidate and getattr(candidate, "id", None) == getattr(asset, "id", None)):
-                player.assets.pop(asset.id, None)
-                return
-
-    def can_units_attack_stack(self, attackers, defenders, target_hex=None):
-        attackers = [u for u in attackers if getattr(u, "is_on_map", False)]
-        defenders = [u for u in defenders if getattr(u, "is_on_map", False)]
-        if not attackers or not defenders:
-            return False
-
-        if target_hex is None:
-            for d in defenders:
-                if getattr(d, "position", None) and d.position[0] is not None and d.position[1] is not None:
-                    target_hex = Hex.offset_to_axial(*d.position)
-                    break
-        if target_hex and not self.can_units_attack_target_hex(attackers, target_hex):
-            return False
-
-        defenders_have_dragons = any(self._is_dragon_unit(u) for u in defenders)
-        for unit in attackers:
-            if not self._is_combat_stack_unit(unit):
-                continue
-            if not self._is_dragon_unit(unit):
-                return True
-            if defenders_have_dragons:
-                return True
-            if self._dragon_can_make_ground_attack(unit, attackers):
-                return True
-        return False
-
-    def _filter_dragons_for_land_attack(self, attackers, defenders):
-        filtered = []
-        for unit in attackers:
-            if not getattr(unit, "is_on_map", False):
-                continue
-            if self._dragon_can_participate_in_land_attack(unit, attackers, defenders):
-                filtered.append(unit)
-        return filtered
-
-    def _dragon_can_participate_in_land_attack(self, unit, attackers, defenders):
-        if not self._is_dragon_unit(unit):
-            return True
-        return self._dragon_can_make_ground_attack(unit, attackers)
-
-    def _dragon_can_make_ground_attack(self, dragon, attackers):
-        if not self._is_dragon_unit(dragon):
-            return True
-
-        if dragon.allegiance == HL and self._all_highlords_destroyed():
-            return False
-        if dragon.allegiance == WS and self._all_ws_dragon_commanders_destroyed():
-            return False
-
-        return self._dragon_has_local_attack_leader(dragon, attackers)
-
-    def _dragon_has_local_attack_leader(self, dragon, attackers):
-        local_leaders = []
-        for unit in attackers:
-            if not (hasattr(unit, "is_leader") and unit.is_leader()):
-                continue
-            if getattr(unit, "allegiance", None) != dragon.allegiance:
-                continue
-            if getattr(unit, "position", None) != getattr(dragon, "position", None):
-                continue
-            local_leaders.append(unit)
-
-        for p in list(getattr(dragon, "passengers", []) or []):
-            if hasattr(p, "is_leader") and p.is_leader() and getattr(p, "allegiance", None) == dragon.allegiance:
-                local_leaders.append(p)
-
-        if dragon.allegiance == HL:
-            return any(self._is_valid_hl_dragon_commander(leader, dragon) for leader in local_leaders)
-        if dragon.allegiance == WS:
-            return any(self._is_valid_ws_dragon_commander(leader) for leader in local_leaders)
-        return False
-
-    def _is_valid_hl_dragon_commander(self, leader, dragon):
-        if getattr(leader, "unit_type", None) == UnitType.EMPEROR:
-            return True
-        if getattr(leader, "unit_type", None) != UnitType.HIGHLORD:
-            return False
-        leader_flight = getattr(getattr(leader, "spec", None), "dragonflight", None)
-        dragon_flight = getattr(getattr(dragon, "spec", None), "dragonflight", None)
-        return bool(leader_flight and dragon_flight and leader_flight == dragon_flight)
-
-    def _is_valid_ws_dragon_commander(self, leader):
-        return getattr(leader, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
-
-    def _all_highlords_destroyed(self):
-        highlords = [u for u in self.units if getattr(u, "unit_type", None) == UnitType.HIGHLORD]
-        return bool(highlords) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in highlords)
-
-    def _all_ws_dragon_commanders_destroyed(self):
-        ws_commanders = [
-            u for u in self.units
-            if getattr(u, "allegiance", None) == WS
-            and hasattr(u, "is_leader")
-            and u.is_leader()
-            and getattr(u, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
-        ]
-        return bool(ws_commanders) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in ws_commanders)
-
-    def _is_dragon_unit(self, unit):
-        return bool(getattr(unit, "is_on_map", False) and getattr(unit, "race", None) == UnitRace.DRAGON)
-
-    def _maybe_promote_highlord_to_emperor(self):
-        living_emperors = [
-            u for u in self.units
-            if getattr(u, "unit_type", None) == UnitType.EMPEROR
-            and getattr(u, "status", None) != UnitState.DESTROYED
-        ]
-        if living_emperors:
-            return None
-
-        candidates = [
-            u for u in self.units
-            if getattr(u, "unit_type", None) == UnitType.HIGHLORD
-            and hasattr(u, "is_leader")
-            and u.is_leader()
-            and getattr(u, "status", None) != UnitState.DESTROYED
-        ]
-        if not candidates:
-            return None
-
-        promoted = random.choice(candidates)
-        promoted._unit_type_override = UnitType.EMPEROR
-        self._notify_emperor_promotion(promoted)
-        return promoted
-
-    def _notify_emperor_promotion(self, promoted):
-        msg = f"{promoted.id} has been promoted to Emperor."
-        print(msg)
-        if os.environ.get("PYTEST_CURRENT_TEST"):
-            return
-        try:
-            from PySide6.QtWidgets import QApplication, QMessageBox
-            app = QApplication.instance()
-            if app is not None:
-                QMessageBox.information(None, "Highlord Command", msg)
-        except Exception:
-            pass
-
-    def _is_naval_combat(self, attackers, defenders):
-        atk_fleets = [u for u in attackers if u.is_fleet() and u.is_on_map]
-        if not atk_fleets or len(atk_fleets) != len([u for u in attackers if u.is_on_map]):
-            return False
-        def_fleets = [u for u in defenders if u.is_fleet() and u.is_on_map and u.allegiance != self.active_player]
-        return bool(def_fleets)
-
-    def _fleet_attack_nodes(self, fleet):
-        if not fleet.position or fleet.position[0] is None or fleet.position[1] is None:
-            return []
-        nodes = []
-        start_hex = Hex.offset_to_axial(*fleet.position)
-        nodes.append(start_hex)
-        river_side = getattr(fleet, "river_hexside", None)
-        if river_side:
-            endpoints = self.map._river_endpoints_local(river_side)
-            for ep in endpoints:
-                if ep not in nodes:
-                    nodes.append(ep)
-        return nodes
-
-    def _fleets_are_adjacent_for_combat(self, attacker_fleet, defender_fleet):
-        attacker_nodes = self._fleet_attack_nodes(attacker_fleet)
-        defender_nodes = self._fleet_attack_nodes(defender_fleet)
-        if not attacker_nodes or not defender_nodes:
-            return False
-        for a in attacker_nodes:
-            for d in defender_nodes:
-                if a == d:
-                    return True
-                if d in a.neighbors():
-                    return True
-        return False
-
-    def can_fleet_attack_hex(self, fleet, target_hex):
-        if fleet.unit_type != UnitType.FLEET or not fleet.is_on_map:
-            return False
-        defenders = [
-            u for u in self.get_units_at(target_hex)
-            if u.is_fleet()
-            and u.allegiance != fleet.allegiance
-            and u.allegiance != NEUTRAL
-            and u.is_on_map
-        ]
-        if not defenders:
-            return False
-        return any(self._fleets_are_adjacent_for_combat(fleet, d) for d in defenders)
-
-
-    def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
-        combat_defenders = [
-            u for u in defenders
-            if u.is_on_map
-            and u.position and u.position[0] is not None and u.position[1] is not None
-            and self._is_combat_stack_unit(u)
-        ]
-        if not combat_defenders:
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
-        # These rules do not apply while defending any location.
-        if self.map.get_location(target_hex):
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
-        combat_attackers = [
-            u for u in attackers
-            if u.is_on_map
-            and u.position and u.position[0] is not None and u.position[1] is not None
-            and self._is_combat_stack_unit(u)
-        ]
-        if not combat_attackers:
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
-        # No partial retreats: if any non-wing/cavalry combat defender exists (e.g. infantry),
-        # entire defending stack remains to fight.
-        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in combat_defenders):
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
-        attacker_has_wing = any(u.is_wing() for u in combat_attackers)
-        attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in combat_attackers)
-
-        wing_rule = not attacker_has_wing
-        cavalry_rule = not attacker_has_wing and not attacker_has_cavalry
-        if not (wing_rule or cavalry_rule):
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
-        leader_escape_requests = []
-        for unit in combat_defenders:
-            leader_escape_requests.extend(self._retreat_single_unit(unit) or [])
-
-        # If cavalry rule applies at all, use the more restrictive marker.
-        result = "-/SRC" if cavalry_rule else "-/SRW"
-        return {"applied": True, "result": result, "leader_escape_requests": leader_escape_requests}
-
-    def _retreat_single_unit(self, unit):
-        if not unit.position or unit.position[0] is None or unit.position[1] is None:
-            return []
-        status_before = unit.status
-        start_hex = Hex.offset_to_axial(*unit.position)
-        valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
-        if not valid_hexes:
-            unit.eliminate()
-            return []
-
-        leaders_here = [
-            u for u in self.get_units_at(start_hex)
-            if getattr(u, "is_on_map", False)
-            and hasattr(u, "is_leader") and u.is_leader()
-            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
-            and getattr(u, "transport_host", None) is None
-        ]
-
-        retreat_hex = random.choice(valid_hexes)
-
-        leader_escape_requests = []
-        boarded_leaders = set()
-
-        # Wing retreat special case: if a leader cannot legally occupy retreat hex,
-        # attempt to board the leader onto the wing before moving.
-        if unit.is_wing():
-            for leader in leaders_here:
-                can_land = (
-                    self.map.can_unit_land_on_hex(leader, retreat_hex)
-                    and self.map.can_stack_move_to([leader], retreat_hex)
-                    and not self.map.has_enemy_army(retreat_hex, leader.allegiance)
-                )
-                if can_land:
-                    continue
-                if self._force_board_leader_for_retreat(unit, leader):
-                    boarded_leaders.add(id(leader))
-                    continue
-                request = self._resolve_single_leader_escape_roll(leader, start_hex)
-                if request:
-                    leader_escape_requests.append(request)
-
-        self.move_unit(unit, retreat_hex)
-        # Special pre-combat retreat never applies damage/depletion.
-        if unit.is_on_map:
-            unit.status = status_before
-
-        # Move non-boarded leaders with the retreating unit when possible.
-        for leader in leaders_here:
-            if id(leader) in boarded_leaders:
-                continue
-            if getattr(leader, "status", None) == UnitState.DESTROYED:
-                continue
-            if getattr(leader, "transport_host", None) is not None:
-                continue
-
-            can_land = (
-                self.map.can_unit_land_on_hex(leader, retreat_hex)
-                and self.map.can_stack_move_to([leader], retreat_hex)
-                and not self.map.has_enemy_army(retreat_hex, leader.allegiance)
-            )
-            if can_land:
-                leader_status = leader.status
-                self.move_unit(leader, retreat_hex)
-                if leader.is_on_map:
-                    leader.status = leader_status
-                continue
-
-            request = self._resolve_single_leader_escape_roll(leader, start_hex)
-            if request:
-                leader_escape_requests.append(request)
-
-        return leader_escape_requests
-
-    def _force_board_leader_for_retreat(self, wing, leader):
-        if not wing or not leader:
-            return False
-        if not wing.is_wing() or not leader.is_leader():
-            return False
-        if not wing.position or not leader.position or wing.position != leader.position:
-            return False
-        if getattr(leader, "transport_host", None) is not None:
-            return True
-        if not hasattr(wing, "can_carry") or not wing.can_carry(leader):
-            return False
-
-        self.map.remove_unit_from_spatial_map(leader)
-        wing.load_unit(leader)
-        leader.position = wing.position
-        leader.is_transported = True
-        leader.transport_host = wing
-        self._normalize_transport_state()
-        return True
-
-    def _resolve_single_leader_escape_roll(self, leader, origin_hex):
-        requests = self._get_leader_escape_handler().handle_leader_escapes(
-            [
-                LeaderEscapeCheck(
-                    leader=leader,
-                    origin_hex=origin_hex,
-                    allow_fleet_destinations=False,
-                    roll_required=True,
-                    require_prior_combat_stack=False,
-                    skip_if_allied_combat_present=False,
-                    auto_place_on_success=False,
-                )
-            ],
-            auto_resolve_ai=True,
-        )
-        return requests[0] if requests else None
-
-    def _get_valid_retreat_hexes(self, unit, start_hex):
-        valid = []
-        for neighbor in start_hex.neighbors():
-            col, row = neighbor.axial_to_offset()
-            if not self.is_hex_in_bounds(col, row):
-                continue
-            if not self.map.can_unit_land_on_hex(unit, neighbor):
-                continue
-            if self.map.has_enemy_army(neighbor, unit.allegiance):
-                continue
-            if not self.map.can_stack_move_to([unit], neighbor):
-                continue
-
-            cost = self.map.get_movement_cost(unit, start_hex, neighbor)
-            if cost == float('inf') or cost is None:
-                continue
-
-            friendly_present = any(
-                u.allegiance == unit.allegiance and u.is_control_unit()
-                for u in self.map.get_units_in_hex(neighbor.q, neighbor.r)
-            )
-            if not friendly_present and self.map.is_adjacent_to_enemy(neighbor, unit):
-                continue
-
-            valid.append(neighbor)
-        return valid
-
-    def _can_advance_after_combat(self, attackers, target_hex, defender_allegiances, attacker_had_to_retreat) -> bool:
-        #Check if the attacker can advance after combat.
-        if attacker_had_to_retreat:
-            return False
-        if not defender_allegiances:
-            return False
-
-        target_offset = target_hex.axial_to_offset()
-        remaining_defender_combat_units = [
-            u for u in self.map.get_units_in_hex(target_hex.q, target_hex.r)
-            if u.is_on_map
-            and u.position == target_offset
-            and u.allegiance in defender_allegiances
-            and self._is_combat_stack_unit(u)
-        ]
-        if remaining_defender_combat_units:
-            return False
-
-        for unit in attackers:
-            if not unit.is_on_map or not unit.position:
-                continue
-            if unit.position[0] is None or unit.position[1] is None:
-                continue
-            if not (unit.is_army() or unit.is_wing()):
-                continue
-            if unit.allegiance != self.active_player:
-                continue
-            from_hex = Hex.offset_to_axial(*unit.position)
-            if target_hex not in from_hex.neighbors():
-                continue
-            if self.map.can_stack_move_to([unit], target_hex):
-                return True
-        return False
-
-    def advance_after_combat(self, attackers, target_hex):
-        """
-        Advances the game state after a combat round.
-        Handles movement of units after combat, ensuring they can move to the target hex.
-        """
-        candidates = []
-        for unit in attackers:
-            if not unit.is_on_map or not unit.position:
-                continue
-            if None in unit.position:
-                continue
-            if not (unit.is_army() or unit.is_wing()):
-                continue
-
-            from_hex = Hex.offset_to_axial(*unit.position)
-            if target_hex not in from_hex.neighbors():
-                continue
-            candidates.append(unit)
-
-        if not candidates:
-            return []
-
-        remaining_by_source = {}
-        no_adjacent_enemy = {}
-        for u in candidates:
-            src = tuple(u.position)
-            remaining_by_source[src] = remaining_by_source.get(src, 0) + 1
-            if src not in no_adjacent_enemy:
-                src_hex = Hex.offset_to_axial(*src)
-                no_adjacent_enemy[src] = not self.map.is_adjacent_to_enemy(src_hex, u)
-
-        moved = []
-        groups = [
-            [u for u in candidates if u.is_wing()],
-            [u for u in candidates if u.unit_type == UnitType.CAVALRY],
-            [u for u in candidates if u.is_army() and u.unit_type != UnitType.CAVALRY],
-        ]
-
-        for group in groups:
-            pool = list(group)
-            while pool:
-                legal = [
-                    u for u in pool
-                    if self.map.can_stack_move_to([u], target_hex)
-                    and not self._would_leave_leaders_alone_after_advance(u)
-                ]
-                if not legal:
-                    break
-
-                random.shuffle(legal)
-                legal.sort(key=lambda u: self._advance_priority_key(u, remaining_by_source, no_adjacent_enemy))
-                chosen = legal[0]
-                source_before_move = tuple(chosen.position)
-                self.move_unit(chosen, target_hex)
-                moved.append(chosen)
-
-                if source_before_move in remaining_by_source and remaining_by_source[source_before_move] > 0:
-                    remaining_by_source[source_before_move] -= 1
-
-                pool.remove(chosen)
-
-        return moved
-
-    def _would_leave_leaders_alone_after_advance(self, unit):
-        """Returns True when advancing `unit` would strand allied leader(s) with no allied army/wing."""
-        if not unit.position or unit.position[0] is None or unit.position[1] is None:
-            return False
-        src_hex = Hex.offset_to_axial(*unit.position)
-        src_units = [
-            u for u in self.map.get_units_in_hex(src_hex.q, src_hex.r)
-            if getattr(u, "is_on_map", False)
-            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
-            and getattr(u, "transport_host", None) is None
-        ]
-        has_leader = any(hasattr(u, "is_leader") and u.is_leader() for u in src_units)
-        if not has_leader:
-            return False
-
-        escort_count = sum(
-            1
-            for u in src_units
-            if u.is_control_unit()
-        )
-        # If exactly one escort is present and it advances, leaders would be left alone.
-        return escort_count <= 1
-
-    def _advance_priority_key(self, unit, remaining_by_source, no_adjacent_enemy):
-        src = tuple(unit.position)
-        source_has_no_adjacent_enemy = no_adjacent_enemy.get(src, False)
-        leaves_source_empty = remaining_by_source.get(src, 0) <= 1
-        return (
-            0 if source_has_no_adjacent_enemy else 1,
-            1 if leaves_source_empty else 0,
-        )
-
-    def _resolve_leader_escapes(self, leader_origins, leader_stack_has_army):
-        checks = [
-            LeaderEscapeCheck(
-                leader=leader,
-                origin_hex=origin_hex,
-                allow_fleet_destinations=False,
-                roll_required=True,
-                require_prior_combat_stack=True,
-                prior_had_combat_stack=bool(leader_stack_has_army.get(leader)),
-                skip_if_allied_combat_present=True,
-                auto_place_on_success=False,
-            )
-            for leader, origin_hex in leader_origins.items()
-        ]
-        return self._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
-
-    def _get_nearest_friendly_combat_stacks(self, leader, origin_hex):
-        candidates = []
-        for (q, r), units in self.map.unit_map.items():
-            if not units:
-                continue
-            if not any(
-                u.allegiance == leader.allegiance
-                and u.is_on_map
-                and self._is_combat_stack_unit(u)
-                for u in units
-            ):
-                continue
-            candidates.append(Hex(q, r))
-
-        if not candidates:
-            return []
-
-        min_distance = min(origin_hex.distance_to(h) for h in candidates)
-        return [h for h in candidates if origin_hex.distance_to(h) == min_distance]
-
-    def _is_combat_stack_unit(self, unit):
-        """
-        Determines if a unit is part of a combat stack.
-        """
-        return unit.is_army() or unit.is_wing() or unit.is_citadel()
-
-    @staticmethod
-    def _is_leader_only_stack(units):
-        live_units = [u for u in units if getattr(u, "is_on_map", False)]
-        if not live_units:
-            return False
-        return all(hasattr(u, "is_leader") and u.is_leader() for u in live_units)
-
-    @staticmethod
-    def _attack_triggers_leader_stack_escape(attackers):
-        return any(u.is_control_unit()
-            and getattr(u, "is_on_map", False)
-            for u in attackers
-        )
-
-    def _defenders_have_citadel(self, defenders):
-        return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in defenders)
-
-    def _is_ws_ground_combat_unit(self, unit):
-        if unit.allegiance != WS or not getattr(unit, "is_on_map", False):
-            return False
-        if not (hasattr(unit, "is_army") and unit.is_army()):
-            return False
-        return unit.unit_type not in (UnitType.WING, UnitType.FLEET)
-
-    def _is_ws_air_combat_unit(self, unit):
-        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.unit_type in (UnitType.WING, UnitType.CITADEL))
-
-    def _combat_blocked_by_citadel_rule(self, attackers, defenders):
-        if not self._defenders_have_citadel(defenders):
-            return False
-        has_ws_ground = any(self._is_ws_ground_combat_unit(u) for u in attackers)
-        has_ws_air = any(self._is_ws_air_combat_unit(u) for u in attackers)
-        return has_ws_ground and not has_ws_air
-
-    def _filter_ws_ground_attackers_vs_citadel(self, attackers, defenders):
-        if not self._defenders_have_citadel(defenders):
-            return list(attackers)
-        return [u for u in attackers if not self._is_ws_ground_combat_unit(u)]
-
-
-    def clear_leader_tactical_overrides(self):
-        for unit in self.units:
-            if hasattr(unit, "is_leader") and unit.is_leader():
-                if hasattr(unit, "_tactical_rating_override"):
-                    unit._tactical_rating_override = None
-
-    def get_map(self):
-        return self.map
-
-    def _cleanup_destroyed_units(self, units):
-        emperor_destroyed = any(
-            getattr(unit, "unit_type", None) == UnitType.EMPEROR
-            and getattr(unit, "status", None) == UnitState.DESTROYED
-            for unit in units
-        )
-        
-        # Collect pending leader escapes from destroyed carriers
-        all_leader_escapes = []
-        for unit in units:
-            pending = getattr(unit, "_pending_leader_escapes", None)
-            if pending:
-                all_leader_escapes.extend(pending)
-                unit._pending_leader_escapes = None
-        
-        # Process leader escapes
-        if all_leader_escapes:
-            from src.game.leader_escape import LeaderEscapeHandler
-            escape_handler = LeaderEscapeHandler(self, roll_d6_fn=lambda: random.randint(1, 6))
-            escape_handler.handle_leader_escapes(all_leader_escapes, auto_resolve_ai=True)
-        
-        for unit in units:
-            if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
-                self.map.remove_unit_from_spatial_map(unit)
-        if emperor_destroyed:
-            self._maybe_promote_highlord_to_emperor()
-        self.finalize_board_state_change()
-
-    def board_unit(self, carrier, unit):
-        """Boards `unit` onto `carrier` if allowed.
-        Removes the unit from the spatial map, marks it transported and records transport_host.
-        Returns True on success, False otherwise.
-        """
-        # Rule: passengers and carrier should start the movement phase in the same hex.
-        if getattr(carrier, "moved_this_turn", False) or getattr(unit, "moved_this_turn", False):
-            return False
-
-        if not carrier.can_carry(unit):
-            return False
-
-        # Must be co-located
-        if not carrier.position or not unit.position or carrier.position != unit.position:
-            return False
-
-        # Remove unit from spatial map so it is not considered on the hex while aboard
-        self.map.remove_unit_from_spatial_map(unit)
-        carrier.load_unit(unit)
-        unit.position = carrier.position
-        unit.is_transported = True
-        if hasattr(unit, "movement_points"):
-            unit.movement_points = 0
-        unit.moved_this_turn = True
-        unit.transport_host = carrier
-
-        if carrier.unit_type == UnitType.FLEET:
-            in_port = False
-            if carrier.position:
-                hex_obj = Hex.offset_to_axial(*carrier.position)
-                loc = self.map.get_location(hex_obj)
-                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
-            if not in_port and hasattr(carrier, "movement_points"):
-                carrier.movement_points = min(
-                    carrier.movement_points,
-                    max(0, int(carrier.movement // 2)),
-                )
-        if hasattr(carrier, "movement_points"):
-            carrier.movement_points = min(carrier.movement_points, carrier.movement)
-
-        self._normalize_transport_state()
-        return True
-
-    def can_unboard_unit_to_hex(self, unit, dest_hex) -> bool:
-        """Non-mutating legality check for unboarding `unit` into `dest_hex`."""
-        carrier = getattr(unit, 'transport_host', None)
-        if not carrier:
-            return False
-
-        if dest_hex is None and carrier.position:
-            dest_hex = Hex.offset_to_axial(*carrier.position)
-        if dest_hex is None:
-            return False
-
-        # Rule: fleets cannot unboard into neutral-country territory (coastal or port).
-        # Exception: stateless neutral ports (country_id is None) remain valid.
-        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
-            loc = self.map.get_location(dest_hex)
-            is_stateless_neutral_port = bool(
-                loc
-                and getattr(loc, "loc_type", None) == LocType.PORT.value
-                and getattr(loc, "country_id", None) is None
-                and getattr(loc, "occupier", None) == NEUTRAL
-            )
-            col, row = dest_hex.axial_to_offset()
-            country = self.get_country_by_hex(col, row)
-            if country and country.allegiance == NEUTRAL and not is_stateless_neutral_port:
-                return False
-
-        if not self.map.can_unit_land_on_hex(unit, dest_hex):
-            return False
-
-        # Validate stacking limits
-        moving_units = [unit]
-        if not self.map.can_stack_move_to(moving_units, dest_hex):
-            return False
-        return True
-
-    def get_valid_unboard_hexes(self, carrier, passenger=None) -> List[Hex]:
-        """Returns legal unboard destinations for a carrier/passenger using engine legality checks."""
-        if not carrier or not getattr(carrier, "position", None) or carrier.position[0] is None:
-            return []
-
-        carrier_hex = Hex.offset_to_axial(*carrier.position)
-        candidates = [carrier_hex]
-        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
-            candidates.extend(carrier_hex.neighbors())
-
-        if passenger is not None:
-            passengers = [passenger]
-        else:
-            passengers = list(getattr(carrier, "passengers", []) or [])
-        if not passengers:
-            return []
-
-        valid: List[Hex] = []
-        seen = set()
-        for h in candidates:
-            if (h.q, h.r) in seen:
-                continue
-            seen.add((h.q, h.r))
-            if any(self.can_unboard_unit_to_hex(p, h) for p in passengers):
-                valid.append(h)
-        return valid
-
-    def unboard_unit(self, unit, target_hex=None):
-        """Unboards `unit` from its transport_host into target_hex (axial Hex) or the carrier's hex if None.
-        Validates stacking limits using Board.can_stack_move_to. Returns True on success.
-        """
-        carrier = getattr(unit, 'transport_host', None)
-        if not carrier:
-            return False
-
-        dest_hex = target_hex
-        if dest_hex is None and carrier.position:
-            dest_hex = Hex.offset_to_axial(*carrier.position)
-        if not self.can_unboard_unit_to_hex(unit, dest_hex):
-            return False
-
-        # Perform unboard: remove stale passenger refs, clear transport flags, add to spatial map
-        if hasattr(carrier, "passengers"):
-            while unit in carrier.passengers:
-                carrier.passengers.remove(unit)
-        for maybe_carrier in self.units:
-            if maybe_carrier is carrier:
-                continue
-            passengers = getattr(maybe_carrier, "passengers", None)
-            if passengers and unit in passengers:
-                while unit in passengers:
-                    passengers.remove(unit)
-        unit.transport_host = None
-        unit.is_transported = False
-        if hasattr(unit, "movement_points"):
-            unit.movement_points = 0
-        unit.moved_this_turn = True
-        # Place unit into dest offset coords
-        offset_coords = dest_hex.axial_to_offset()
-        self.map.remove_unit_from_spatial_map(unit)
-        unit.position = offset_coords
-        self.map.add_unit_to_spatial_map(unit)
-        self.finalize_board_state_change()
-        if carrier.is_wing():
-            if hasattr(carrier, "movement_points"):
-                carrier.movement_points = 0
-            carrier.moved_this_turn = True
-        elif carrier.unit_type == UnitType.FLEET:
-            in_port = False
-            if carrier.position:
-                loc = self.map.get_location(Hex.offset_to_axial(*carrier.position))
-                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
-            if not in_port:
-                if hasattr(carrier, "movement_points"):
-                    carrier.movement_points = 0
-                carrier.moved_this_turn = True
-        self._normalize_transport_state()
-        return True
-
-    def _normalize_transport_state(self):
-        """
-        Repairs carrier/passenger graph invariants after board/unboard operations:
-        - No duplicate passenger entries per carrier.
-        - A passenger belongs to at most one carrier list.
-        - passenger.transport_host <-> carrier.passengers stays bidirectionally consistent.
-        - Transported units are not present in the spatial map.
-        """
-        if not self.units:
-            return
-
-        carriers = [u for u in self.units if hasattr(u, "passengers")]
-        passenger_owner = {}
-
-        for carrier in carriers:
-            raw = list(getattr(carrier, "passengers", []) or [])
-            cleaned = []
-            seen = set()
-            for passenger in raw:
-                if passenger is None or passenger is carrier:
-                    continue
-                marker = id(passenger)
-                if marker in seen:
-                    continue
-                if marker in passenger_owner:
-                    continue
-                seen.add(marker)
-                passenger_owner[marker] = carrier
-                cleaned.append(passenger)
-            carrier.passengers = cleaned
-
-        for unit in self.units:
-            host = getattr(unit, "transport_host", None)
-            if host is None:
-                continue
-            if not hasattr(host, "passengers"):
-                unit.transport_host = None
-                unit.is_transported = False
-                continue
-            if unit not in host.passengers:
-                host.passengers.append(unit)
-            unit.is_transported = True
-            if host.position and host.position != (None, None):
-                unit.position = host.position
-            self.map.remove_unit_from_spatial_map(unit)
-
-        for carrier in carriers:
-            valid = []
-            seen = set()
-            for passenger in carrier.passengers:
-                if getattr(passenger, "transport_host", None) is not carrier:
-                    continue
-                marker = id(passenger)
-                if marker in seen:
-                    continue
-                seen.add(marker)
-                valid.append(passenger)
-            carrier.passengers = valid

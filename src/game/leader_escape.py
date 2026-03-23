@@ -84,7 +84,7 @@ class LeaderEscapeHandler:
             requests.append(LeaderEscapeRequest(leader=leader, options=options))
 
         if destroyed:
-            self.game_state._cleanup_destroyed_units(destroyed)
+            self.game_state.combat_service.cleanup_destroyed_units(destroyed)
 
         return requests
 
@@ -142,8 +142,12 @@ class LeaderEscapeHandler:
     def _place_leader(self, leader, target_hex):
         if leader.status not in UnitState.on_map_states():
             leader.status = UnitState.ACTIVE
-        leader.position = target_hex.axial_to_offset()
-        self.game_state.map.add_unit_to_spatial_map(leader)
+        self.game_state.movement_service.relocate_unit_on_board(
+            leader,
+            target_hex,
+            clear_escaped=False,
+            mark_citadel_carried=False,
+        )
         return True
 
     def _has_allied_combat_stack(self, leader, origin_hex):

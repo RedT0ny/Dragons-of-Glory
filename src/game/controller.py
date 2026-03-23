@@ -6,8 +6,8 @@ import shiboken6
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyActivationService
-from src.game.movement import MovementService
 from src.game.ai_baseline import BaselineAIPlayer
+from src.game.phase_manager import TurnAction, TurnEngine
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 
 
@@ -51,12 +51,17 @@ class GameController(QObject):
         self._invasion_deployment_allegiance = None
         from src.game.combat import CombatClickHandler
         self.combat_click_handler = CombatClickHandler(self.game_state, self.view)
-        self.movement_service = MovementService(self.game_state)
+        self.movement_service = self.game_state.movement_service
         self.deployment_service = self.game_state.deployment_service
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyActivationService(self.game_state)
         self.ai_baseline = BaselineAIPlayer(self.game_state, self.movement_service, self.diplomacy_service)
+        self.turn_engine = TurnEngine(
+            self.game_state,
+            self.ai_baseline,
+            attempt_invasion=self._attempt_invasion,
+        )
         self._movement_undo_context = None
         self._deferred_epoch = 0
         self._end_phase_transition_pending = False
@@ -130,7 +135,7 @@ class GameController(QObject):
         self._last_end_phase_request_at = 0.0
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
-        self.game_state.clear_movement_undo()
+        self.movement_service.clear_movement_undo()
         if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
             self.replacements_dialog = None
@@ -184,9 +189,13 @@ class GameController(QObject):
         self._return_unit_to_ready_for_redeployment(candidate)
 
     def _return_unit_to_ready_for_redeployment(self, unit):
-        if getattr(unit, "is_on_map", False):
-            self.game_state.map.remove_unit_from_spatial_map(unit)
-        unit.position = (None, None)
+        self.game_state.movement_service.remove_unit_from_board(
+            unit,
+            escaped=False,
+            clear_transport=True,
+            clear_river_hexside=True,
+            remove_passengers=True,
+        )
         unit.status = UnitState.READY
         if hasattr(unit, "movement_points"):
             unit.movement_points = unit.movement
@@ -194,12 +203,6 @@ class GameController(QObject):
             unit.moved_this_turn = False
         if hasattr(unit, "attacked_this_turn"):
             unit.attacked_this_turn = False
-        if hasattr(unit, "is_transported"):
-            unit.is_transported = False
-        if hasattr(unit, "transport_host"):
-            unit.transport_host = None
-        if hasattr(unit, "river_hexside"):
-            unit.river_hexside = None
 
         def _deferred_redeploy_sync():
             if self._is_replacements_dialog_visible():
@@ -294,166 +297,17 @@ class GameController(QObject):
             active_player = self.game_state.active_player
             state_before = (current_phase, active_player)
 
-            is_ai = False
-            if self.game_state.current_player:
-                is_ai = self.game_state.current_player.is_ai
-
-            if current_phase == GamePhase.DEPLOYMENT:
-                if is_ai:
-                    deployed = self.ai_baseline.deploy_all_ready_units(active_player)
-                    print(f"AI deployment complete. Deployed: {deployed}")
-                    self.game_state.advance_phase()
-                else:
-                    if not self._is_replacements_dialog_visible():
-                        from src.gui.replacements_dialog import ReplacementsDialog
-                        self.replacements_dialog = ReplacementsDialog(
-                            self.game_state,
-                            self.view,
-                            parent=self.view.window(),
-                        )
-                        self._connect_replacements_dialog_signals()
-                        self.replacements_dialog.setWindowTitle(f"Deployment Phase - {active_player}")
-                        self.replacements_dialog.show()
-                        self._begin_deployment_session()
-                print(f"Step 0: Deployment Phase - {active_player}")
-
-            if current_phase == GamePhase.REPLACEMENTS:
-                if is_ai:
-                    conscriptions, deployed = self.ai_baseline.process_replacements(active_player)
-                    print(f"AI replacements complete. Conscriptions: {conscriptions}, deployed: {deployed}")
-                    self.game_state.advance_phase()
-                else:
-                    if not self._is_replacements_dialog_visible():
-                        from src.gui.replacements_dialog import ReplacementsDialog
-                        self.replacements_dialog = ReplacementsDialog(
-                            self.game_state,
-                            self.view,
-                            parent=self.view.window(),
-                        )
-                        self._connect_replacements_dialog_signals()
-                        self.replacements_dialog.show()
-                        self._begin_deployment_session()
-                print(f"Step 1: Replacements Phase - {active_player}")
-
-            elif current_phase == GamePhase.STRATEGIC_EVENTS:
-                print(f"Step 2: Strategic Events - {active_player}")
-                event = self.game_state.draw_strategic_event(active_player)
-
-                if event:
-                    event.force_activate(self.game_state)
-                    if not is_ai:
-                        from src.gui.event_dialog import EventDialog
-                        dlg = EventDialog(event)
-                        dlg.exec()
-                        effects = event.spec.effects
-                        if "alliance" in effects or "add_units" in effects:
-                            self._handle_deployment_from_event(effects, active_player)
-                            self._refresh_turn_panel()
-                            return
-                        #If it is an artifact, change to assets tab and let the human player assign it.
-                        if event.spec.event_type == "artifact":
-                            asset_id = event.spec.effects.get("grant_asset")
-                            self.open_assets_tab_for_assignment(asset_id)
-                            self._refresh_turn_panel()
-                            return
-
-                if is_ai:
-                    assigned = self.ai_baseline.assign_assets(active_player)
-                    if assigned:
-                        print(f"AI asset assignment complete. Assigned: {assigned}")
-                self.game_state.advance_phase()
-
-            elif current_phase == GamePhase.ACTIVATION:
-                print(f"Step 3: Activation - {active_player}")
-                if not self.game_state.has_neutral_countries():
-                    print("No neutral countries remain. Skipping Activation phase.")
-                    self.game_state.advance_phase()
-                    self.view.sync_with_model()
-                    self._refresh_info_panel()
-                    self._refresh_turn_panel()
-                    self.connect_map_view_signals()
-                    self.check_active_player()
-                    return
-                if is_ai:
-                    success, country_id = self.ai_baseline.perform_activation(active_player)
-                    if success:
-                        print(f"AI activated country {country_id}.")
-                    else:
-                        print("AI activation failed or skipped.")
-                    self._refresh_info_panel()
-                    self._refresh_minimap_allegiance()
-                    self.game_state.advance_phase()
-                    self.view.sync_with_model()
-                    self._refresh_info_panel()
-                    self._refresh_turn_panel()
-                    self.connect_map_view_signals()
-                    self.check_active_player()
-                    return
-                if not is_ai:
-                    from src.gui.diplomacy_dialog import DiplomacyDialog
-                    from PySide6.QtWidgets import QDialog
-                    self.ai_timer.stop()
-                    dlg = DiplomacyDialog(self.game_state, self.view.window())
-                    dlg.country_activated.connect(self.handle_country_activation)
-                    dlg_result = dlg.exec()
-                    if dlg.activated_country_id:
-                        country_id = dlg.activated_country_id
-                        self._handle_deployment_from_event({"alliance": country_id, "alliance_already_activated": True}, active_player)
-                        self._refresh_turn_panel()
-                        return
-                    if dlg_result != QDialog.Accepted:
-                        print("Activation attempt finished or skipped.")
-                        self.game_state.advance_phase()
-                        self.view.sync_with_model()
-                        self._refresh_info_panel()
-                        self._refresh_turn_panel()
-                        self.connect_map_view_signals()
-                        self.check_active_player()
-                        return
-                print("Activation attempt finished or skipped.")
-                self.game_state.advance_phase()
-
-            elif current_phase == GamePhase.INITIATIVE:
-                import random
-                hl_roll = random.randint(1, 4)
-                ws_roll = random.randint(1, 4)
-                if hl_roll == ws_roll:
-                    winner = self.game_state.initiative_winner
-                elif hl_roll > ws_roll:
-                    winner = HL
-                else:
-                    winner = WS
-                print(f"Step 4: Initiative. Winner: {winner}")
-                self.game_state.set_initiative(winner)
-                self.game_state.advance_phase()
-                self._processing_automatic_phases = True
-                try:
-                    self._schedule_deferred(self._continue_automatic_phases)
-                except Exception:
-                    self._processing_automatic_phases = False
-                    raise
-
-            elif current_phase == GamePhase.MOVEMENT:
-                print(f"Step 5: Movement phase - {active_player}")
-                if is_ai:
-                    assigned = self.ai_baseline.assign_assets(active_player)
-                    if assigned:
-                        print(f"AI asset assignment complete. Assigned: {assigned}")
+            if current_phase == GamePhase.MOVEMENT:
                 context = (self.game_state.turn, active_player, current_phase)
                 if self._movement_undo_context != context:
-                    self.game_state.clear_movement_undo()
+                    self.movement_service.clear_movement_undo()
                     self._movement_undo_context = context
-                if is_ai:
-                    moved = self.execute_simple_ai_logic(active_player)
-                    if not moved:
-                        self.game_state.advance_phase()
 
-            elif current_phase == GamePhase.COMBAT:
-                print(f"Step 6: Combat phase - {active_player}")
-                if is_ai:
-                    fought = self.ai_baseline.execute_best_combat(active_player)
-                    if not fought:
-                        self.game_state.advance_phase()
+            outcome = self.turn_engine.step()
+            if self._handle_turn_action(outcome.action, outcome.payload):
+                self.connect_map_view_signals()
+                self.check_active_player()
+                return
 
             self.view.sync_with_model()
             self._refresh_info_panel()
@@ -463,12 +317,85 @@ class GameController(QObject):
             self.check_active_player()
 
             state_after = (self.game_state.phase, self.game_state.active_player)
-            if state_before[0] == GamePhase.COMBAT and self.game_state.phase != GamePhase.COMBAT:
+            if state_before[0] in {GamePhase.ACTIVATION, GamePhase.COMBAT} and self.game_state.phase != state_before[0]:
                 self._refresh_minimap_allegiance()
             if state_after != state_before and not self.game_state.phase_manager.should_auto_advance():
                 self._schedule_deferred(self.process_game_turn)
         finally:
             self._processing_turn_tick = False
+
+    def _handle_turn_action(self, action: TurnAction, payload: dict | None) -> bool:
+        payload = payload or {}
+
+        if action == TurnAction.NONE:
+            return False
+
+        if action in {TurnAction.REQUEST_HUMAN_DEPLOYMENT, TurnAction.REQUEST_HUMAN_REPLACEMENTS}:
+            if not self._is_replacements_dialog_visible():
+                from src.gui.replacements_dialog import ReplacementsDialog
+                self.replacements_dialog = ReplacementsDialog(
+                    self.game_state,
+                    self.view,
+                    parent=self.view.window(),
+                )
+                self._connect_replacements_dialog_signals()
+                if action == TurnAction.REQUEST_HUMAN_DEPLOYMENT:
+                    self.replacements_dialog.setWindowTitle(
+                        f"Deployment Phase - {payload.get('active_player', self.game_state.active_player)}"
+                    )
+                self.replacements_dialog.show()
+                self._begin_deployment_session()
+            return True
+
+        if action == TurnAction.REQUEST_HUMAN_EVENT_DIALOG:
+            event = payload.get("event")
+            active_player = payload.get("active_player", self.game_state.active_player)
+            if event is None:
+                self.game_state.advance_phase()
+                return False
+            from src.gui.event_dialog import EventDialog
+            dlg = EventDialog(event)
+            dlg.exec()
+            effects = dict(getattr(event.spec, "effects", {}) or {})
+            if "alliance" in effects or "add_units" in effects:
+                self._handle_deployment_from_event(effects, active_player)
+                self._refresh_turn_panel()
+                return True
+            if getattr(event.spec, "event_type", None) == "artifact":
+                asset_id = effects.get("grant_asset")
+                self.open_assets_tab_for_assignment(asset_id)
+                self._refresh_turn_panel()
+                return True
+            self.game_state.advance_phase()
+            return False
+
+        if action == TurnAction.REQUEST_HUMAN_ACTIVATION:
+            from src.gui.diplomacy_dialog import DiplomacyDialog
+            from PySide6.QtWidgets import QDialog
+
+            self.ai_timer.stop()
+            active_player = payload.get("active_player", self.game_state.active_player)
+            dlg = DiplomacyDialog(self.game_state, self.view.window())
+            dlg.country_activated.connect(self.handle_country_activation)
+            dlg_result = dlg.exec()
+
+            if dlg.activated_country_id:
+                country_id = dlg.activated_country_id
+                self._handle_deployment_from_event(
+                    {"alliance": country_id, "alliance_already_activated": True},
+                    active_player,
+                )
+                self._refresh_turn_panel()
+                return True
+
+            if dlg_result != QDialog.Accepted:
+                print("Activation attempt finished or skipped.")
+            else:
+                print("Activation attempt finished or skipped.")
+            self.game_state.advance_phase()
+            return False
+
+        return False
 
     def _announce_victory_if_needed(self):
         if not self.game_state.game_over or self._victory_announced:
@@ -506,7 +433,7 @@ class GameController(QObject):
             if self.game_state.phase not in {GamePhase.MOVEMENT, GamePhase.COMBAT}:
                 main_window.info_panel.refresh()
             main_window.info_panel.set_undo_enabled(
-                self.game_state.phase == GamePhase.MOVEMENT and self.game_state.can_undo_movement()
+                self.game_state.phase == GamePhase.MOVEMENT and self.movement_service.can_undo_movement()
             )
 
     def _refresh_minimap_allegiance(self):
@@ -591,7 +518,7 @@ class GameController(QObject):
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
-            self.game_state.clear_movement_undo()
+            self.movement_service.clear_movement_undo()
             return
 
         # Drop repeated "End Phase" triggers until the queued phase transition is processed.
@@ -608,7 +535,7 @@ class GameController(QObject):
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
-        self.game_state.clear_movement_undo()
+        self.movement_service.clear_movement_undo()
         def _deferred_end_phase_view_update():
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
@@ -704,13 +631,13 @@ class GameController(QObject):
                     return
 
             # Move all selected units
-            self.game_state.push_movement_undo_snapshot()
+            self.movement_service.push_movement_undo_snapshot()
             move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
             if move_result.errors:
                 RuntimeDiagnostics.record_event(
                     f"Movement blocked: target={hex_obj.axial_to_offset()} errors={move_result.errors}"
                 )
-                self.game_state.discard_last_movement_snapshot()
+                self.movement_service.discard_last_movement_snapshot()
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.information(
                     self.view.window(),
@@ -948,10 +875,14 @@ class GameController(QObject):
             if kept_unit:
                 kept_unit.status = UnitState.ACTIVE
             if discarded_unit:
-                if getattr(discarded_unit, "is_on_map", False):
-                    self.game_state.map.remove_unit_from_spatial_map(discarded_unit)
+                self.game_state.movement_service.remove_unit_from_board(
+                    discarded_unit,
+                    escaped=False,
+                    clear_transport=True,
+                    clear_river_hexside=True,
+                    remove_passengers=True,
+                )
                 discarded_unit.status = UnitState.RESERVE
-                discarded_unit.position = (None, None)
 
             self.view.sync_with_model()
             self._refresh_info_panel()
@@ -989,7 +920,7 @@ class GameController(QObject):
         if unit.status != UnitState.READY or getattr(unit, "is_on_map", False):
             self.view.clear_highlights()
             return
-        valid_hexes = self.game_state.get_valid_deployment_hexes(
+        valid_hexes = self.deployment_service.get_valid_deployment_hexes(
             unit,
             allow_territory_wide=allow_territory_deploy
         )
@@ -1032,7 +963,7 @@ class GameController(QObject):
         QMessageBox.information(self.view.window(), outcome.title, outcome.message)
         if outcome.success and outcome.winner:
             # Invasion creates a new checkpoint: previous movement undo is no longer allowed.
-            self.game_state.clear_movement_undo()
+            self.movement_service.clear_movement_undo()
             self._start_invasion_deployment(country_id, outcome.winner)
         return outcome
 
@@ -1041,7 +972,7 @@ class GameController(QObject):
             return
         if self.game_state.phase != GamePhase.MOVEMENT:
             return
-        if not self.game_state.undo_last_movement():
+        if not self.movement_service.undo_last_movement():
             return
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
