@@ -243,7 +243,7 @@ locations:
   zhakar_city: "Zhakar"
 scenarios:
   campaign_0_war_of_the_lance: "The War of the Lance"
-  campaign_1_historical: "Dragonlance Chronicles"
+  campaign_1_dragonlance_chronicles: "Dragonlance Chronicles"
   scenario_1_fall_of_silvanesti: "Fall of Silvanesti"
   scenario_2_solamnic_plain: "The Solamnic Plain"
   scenario_3_kender_strike: "The Kender Strike Back"

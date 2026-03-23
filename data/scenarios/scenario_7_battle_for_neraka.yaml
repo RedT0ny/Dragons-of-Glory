@@ -1,9 +1,27 @@
-# Example scenario YAML
+# Scenario 7: Battle for Neraka
 scenario:
-  id: "unique_scenario_id"
+  id: "scenario_7_battle_for_neraka"
   picture: "scenario_7.jpg"
   description: >
-    Folded block scalar for historical flavor.
+    The War of the Lance surged like a bloody tide back and forth across the plains of Solamnia for two years. 
+    First came the flood of dragon armies, treading the plains under their clawed feet and destroying all life in their path. 
+    Then came the terrible sieges of Thelgaard Keep and Solanthus, as the hard-pressed Knights of Solamnia fought for 
+    what little foothold they had on their native soil. That winter was the darkest known for many years.
+    
+    With the spring came the Golden General, and the bright armies of the Knighthood rose up again as though by miracle. 
+    They seemed, to many, to have come from nowhere at all. In truth, they had been in seclusion awaiting their time again 
+    and it had come. With the tremendous aid of the dragons of good, just newly returned among men, the Whitestone forces 
+    pressed back the dragon tide and regained the plains even so far as the Estwilde and pressed the very foothills of 
+    Neraka itself. The evil had been beaten back into its lair.
+    
+    Yet the evil was far from dead. With new and terrible weapons did the Dragon Highlords strike back. 
+    Their flying citadels rained terror down from above with their combination of lightning attacks and tremendous defense. 
+    It looked as though the Dragonarmies were about to break through the Whitestone defense lines and destroy the 
+    overextended Knights.
+
+    It was now or never for the Knights. To delay would mean a prolonged campaign. If only the Knights could deal a 
+    crushing blow aimed right at the heart of the Dragon Empire. If only their strength would hold long enough to reach 
+    and conquer Neraka itself! If not... 
 
   # Map Configuration
   # If null or omitted, assume full map [0,0] to [64,52]
@@ -30,9 +48,7 @@ scenario:
       deployment_area: null
 
       countries:
-        taman:
-          # "all" is a keyword to pull every unit matching this country in units.csv
-          units: all
+        taman: all
         red:
           # Explicit partial setup
           units_by_type:
@@ -56,22 +72,14 @@ scenario:
         countries: ["estwilde"]
 
       countries:
-        qualinesti:
-          units: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
-        sancrist:
-          units: all
-        southlund:
-          units: all
-        gold:
-          units: all
-        silver:
-          units: all
-        bronze:
-          units: all
-        copper:
-          units: all
-        brass:
-          units: all
+        qualinesti: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
+        sancrist: all
+        southlund: all
+        gold: all
+        silver: all
+        bronze: all
+        copper: all
+        brass: all
 
       explicit_units: ["fizban", "laurana"]
       assets:

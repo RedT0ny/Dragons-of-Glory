@@ -1,6 +1,80 @@
 # Dragons-of-Glory
 A python implementation of Dragonlance classic "Dragons of Glory".
 
+<div style="font-family: 'Segoe UI', sans-serif; font-size: 9pt; color: #0f1115;">
+  <p>Version 1.0.0</p>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt;">
+    Dragons of Glory is a fan-made, non-profit adaptation of the classic Dragonlance module
+    DL-11 "Dragons of Glory."
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #0f1115; margin: 12px 0;">
+
+  <h3 style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 12px 0 6px;">LEGAL &amp; COPYRIGHT INFORMATION</h3>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    This game is unofficial Fan Content permitted under the Wizards of the Coast Fan Content Policy.
+    It is not approved, endorsed, or sponsored by Wizards of the Coast LLC.
+  </p>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    Portions of the materials used are property of Wizards of the Coast LLC, including references to:
+  </p>
+  <ul style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0 6px 18px; padding: 0;">
+    <li>Dragonlance®</li>
+    <li>DL-11 "Dragons of Glory"</li>
+    <li>TSR, Inc.</li>
+  </ul>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    DL-11 "Dragons of Glory" was published by TSR, Inc. in 1985 as part of the Dragonlance series of
+    adventure modules. It featured a war game simulation of the War of the Lance in the Dragonlance
+    campaign setting. It was created by:
+  </p>
+  <ul style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0 6px 18px; padding: 0;">
+    <li>Douglas Niles</li>
+    <li>Tracy Hickman</li>
+    <li>Jeff Easley (cover artist)</li>
+  </ul>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    © Wizards of the Coast LLC. All Rights Reserved.
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #0f1115; margin: 12px 0;">
+
+  <h3 style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 12px 0 6px;">Contact / Credits</h3>
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    <b>Creator</b>: <a href="mailto:redtony@gmail.com?subject=About DoG" style="color: #14427c; text-decoration: underline;">Tony J. Soler</a>
+  </p>
+
+  <hr style="border: none; border-top: 1px solid #0f1115; margin: 12px 0;">
+
+  <h3 style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 12px 0 6px;">Licensing</h3>
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    This game's original code is free software: you can redistribute it and/or modify it under the terms of the
+    <a href="https://www.gnu.org/licenses/" style="color: #14427c; text-decoration: underline;">GNU General Public License</a> as published by the Free Software Foundation,
+    either version 3 of the License, or (at your option) any later version.
+  </p>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+    warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See
+    <a href="https://www.gnu.org/licenses/gpl-3.0.en.html" style="color: #14427c; text-decoration: underline;">GNU General Public License v3.0</a> for more details.
+  </p>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0; text-align: center;">
+    --- <b>IMPORTANT NOTE</b> ---
+  </p>
+
+  <p style="font-family: 'Courier New', monospace; font-size: 10pt; margin: 6px 0;">
+    This license applies ONLY to the original code written by the game's author. The Dragonlance setting, DL-11 module
+    content, and all related Wizards of the Coast intellectual property are NOT covered by this license and remain the
+    exclusive property of Wizards of the Coast LLC.
+  </p>
+</div>
+
 Design overview:
 ![game_layout.svg](assets/img/game_layout.svg)
 
@@ -15,7 +89,7 @@ TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
 - Avoid garrisons (units that cannot move) being boarded onto ships.
-- Units cannot Retreat into neutral countries.
+- Units shall not retreat into neutral countries.
 
 Notes:
 

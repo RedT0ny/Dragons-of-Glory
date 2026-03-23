@@ -1,4 +1,3 @@
-import sys
 from collections import defaultdict
 from types import SimpleNamespace
 from time import perf_counter
@@ -11,6 +10,7 @@ from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
+from src.content.text_formatter import caption_id, TextFormatter
 from src.gui.map_items import UnitCounter
 
 class CheckBoxHeader(QHeaderView):
@@ -173,7 +173,7 @@ class UnitTable(QTableWidget):
             item.setIcon(QIcon(pixmap))
 
         elif col_type == UnitColumn.NAME:
-            item.setText(str(unit.id))
+            item.setText(TextFormatter.format_unit_log_string(unit))
 
         elif col_type == UnitColumn.STATUS:
             s_str = unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status)

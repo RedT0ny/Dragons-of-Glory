@@ -1,4 +1,4 @@
-# language: yaml
+# Campaign 1: Dragonlance Chronicles
 scenario:
   id: "campaign_1_dragonlance_chronicles"
   picture: "campaign_1.jpg"

@@ -2902,7 +2902,21 @@ class TacticalPlanner:
         
         # Stage 1: Batch fleet unloading wave.
         if plan.transport_campaign:
-            unload_actions = self._collect_fleet_unload_actions(ctx, plan)
+            # Fast guard: if nobody has embarked ground, unloading is impossible.
+            any_embarked = any(
+                getattr(u, "unit_type", None) == UnitType.FLEET
+                and getattr(u, "position", None) and u.position[0] is not None
+                and TacticalPlanner._fleet_has_embarked_ground(u)
+                for u in (ctx.friendly_units or [])
+            )
+            if any_embarked:
+                unload_actions = self._collect_fleet_unload_actions(ctx, plan)
+                if unload_actions:
+                    _tlog(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
+                    unloaded_any = self._execute_fleet_unload_actions(ctx, plan, unload_actions, max_actions=4)
+                    if unloaded_any:
+                        return True
+
             if unload_actions:
                 print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
             unloaded_any = self._execute_fleet_unload_actions(

@@ -17,7 +17,7 @@ def to_roman(n: int):
 def caption_id(unit_id: str):
     """Transform a unit ID string according to the specified rules.
 
-    Example: 'kern_ogre_inf_1' → '1 Kern'
+    Example: 'kern_ogre_inf_1' → 'I Kern'
     Example: 'solamnia' → 'Solamnia'
 
     Args:
@@ -82,11 +82,22 @@ class TextFormatter:
         ordinal = getattr(unit, "ordinal", None)
         id_text = getattr(unit, "id", "Unknown")
 
+        # id_text: For units e.g. taman_human_inf_1
         if '_' in id_text:
-            parts = id_text.split('_')
+            parts = id_text.split('_') # In the example: ["taman","human","inf",1]
 
             if ordinal:
-                # If more than 2 parts and no number at end, return first part capitalized
+                if parts[0] == 'dtemple':
+                    # If it's a Draconian
+                    return f"{to_roman(ordinal)} {parts[1].capitalize()}"
+                elif parts[0] == 'taman':
+                    parts[0] = 'Neraka'
+                elif parts[0] == 'nergoth':
+                    parts[0] = 'N.Ergoth'
+                elif parts[0] == 'sikket':
+                    parts[0] = "Sikk'et Hul"
+                elif parts[0] == 'thank':
+                    parts[0] = 'Than-Khal'
                 return f"{to_roman(ordinal)} {' '.join(p.capitalize() for p in parts[0:3])}"
             # If underscores but no ordinal, return the capitalized name
             return " ".join(p.capitalize() for p in parts[0:])
