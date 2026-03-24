@@ -225,8 +225,17 @@ class Unit:
     def is_control_unit(self) -> bool:
         return self.is_army() or self.is_wing() or self.is_citadel()
 
+    def is_flyer(self) -> bool:
+        return self.is_wing() or self.is_citadel()
+
     def is_carrier(self) -> bool:
         return self.is_fleet() or self.is_wing() or self.is_citadel()
+
+    def is_dragon(self) -> bool:
+        return self.race == UnitRace.DRAGON
+
+    def is_draconid(self) -> bool:
+        return self.race == UnitRace.DRACONIAN or self.is_dragon()
 
     # --- State Logic ---
 

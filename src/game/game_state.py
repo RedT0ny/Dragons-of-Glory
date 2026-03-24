@@ -898,9 +898,6 @@ class GameState:
         for unit in self.units:
             unit.attacked_this_turn = False
 
-    def execute_supply_phase(self):
-        return self.resolve_supply_phase()
-
     def begin_next_turn(self):
         self.turn += 1
         print(f"Battle Turn: {self.turn}")

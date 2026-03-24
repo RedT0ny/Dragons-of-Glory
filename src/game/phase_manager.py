@@ -132,14 +132,14 @@ class PhaseManager:
         elif self.game_state.phase == GamePhase.COMBAT:
             self.game_state.finalize_combat_phase()
             if not self.game_state.second_player_has_acted:
-                # End of First Player's turn (Step 6 done).
-                # Start Second Player's turn (Step 7).
+                # End of First Player's turn.
+                # Start Second Player's turn (Steps 5 & 6).
                 self.game_state.phase = GamePhase.MOVEMENT
                 self.game_state.active_player = WS if self.game_state.active_player == HL else HL
                 self.game_state.second_player_has_acted = True
                 self.game_state.prepare_for_movement_phase()
             else:
-                # End of Second Player's turn. Supply phase (Step 8).
+                # End of Second Player's turn. Supply phase (Step 7).
                 supply_mode = str(getattr(self.game_state, "supply", "standard")).strip().lower()
                 if supply_mode == "advanced":
                     self.game_state.phase = GamePhase.SUPPLY
@@ -147,7 +147,7 @@ class PhaseManager:
                     self.next_turn()
 
         elif self.game_state.phase == GamePhase.SUPPLY:
-            self.game_state.execute_supply_phase()
+            self.game_state.resolve_supply_phase()
             self.next_turn()
 
         try:
@@ -157,7 +157,7 @@ class PhaseManager:
         #self.game_state.evaluate_victory_conditions()
 
     def next_turn(self):
-        """Advances the game to the next turn (Step 9)."""
+        """Advances the game to the next turn (Step 8)."""
         if getattr(self.game_state, "game_over", False):
             return
         self.game_state.begin_next_turn()
@@ -297,5 +297,10 @@ class TurnEngine:
                     self.game_state.advance_phase()
                     return TurnOutcome(advanced=True)
             return TurnOutcome()
+
+        if current_phase == GamePhase.SUPPLY:
+            print("Step 7: Supply phase")
+            self.game_state.advance_phase()
+            return TurnOutcome(advanced=True)
 
         return TurnOutcome()

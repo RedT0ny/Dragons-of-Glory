@@ -25,7 +25,7 @@ def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=No
         ("attacker", attackers, defenders),
         ("defender", defenders, attackers),
     ):
-        if not any(_is_draconid(unit) for unit in opposing):
+        if not any(unit.is_draconid() for unit in opposing):
             continue
 
         orb_users = []
@@ -51,7 +51,7 @@ def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=No
 
             destroyed_dragons = []
             for enemy in opposing:
-                if not (enemy.is_on_map and _is_dragon(enemy)):
+                if not (enemy.is_on_map and enemy.is_dragon()):
                     continue
                 enemy.destroy()
                 destroyed_dragons.append(enemy)
@@ -141,27 +141,6 @@ def _get_equipped_asset_with_other(unit, bonus_name: str):
             return asset
     return None
 
-
-def _is_dragon(unit) -> bool:
-    race = getattr(unit, "race", None)
-    if race == UnitRace.DRAGON:
-        return True
-    if isinstance(race, str):
-        return race.lower() == UnitRace.DRAGON.value
-    return False
-
-
-def _is_draconian(unit) -> bool:
-    race = getattr(unit, "race", None)
-    if race == UnitRace.DRACONIAN:
-        return True
-    if isinstance(race, str):
-        return race.lower() == UnitRace.DRACONIAN.value
-    return False
-
-
-def _is_draconid(unit) -> bool:
-    return _is_dragon(unit) or _is_draconian(unit)
 
 class CombatResolver:
     """
@@ -319,7 +298,7 @@ class CombatResolver:
         attacker_dragon_bonus = sum(
             u.combat_rating
             for u in self.attackers
-            if u.is_wing() and self._is_dragon_race(u)
+            if u.is_wing() and u.is_dragon()
         )
         if self._defender_has_other_bonus("dragon_slayer") and attacker_dragon_bonus:
             attacker_dragon_bonus = 0
@@ -329,7 +308,7 @@ class CombatResolver:
         defender_dragon_bonus = sum(
             u.combat_rating
             for u in self.defenders
-            if u.is_wing() and self._is_dragon_race(u)
+            if u.is_wing() and u.is_dragon()
         )
         add_part("defender_dragons", -defender_dragon_bonus)
 
@@ -381,17 +360,6 @@ class CombatResolver:
         if return_breakdown:
             return drm, breakdown
         return drm
-
-    def _is_dragon_race(self, unit):
-        race = getattr(unit, "race", None)
-        if race == UnitRace.DRAGON:
-            return True
-        if isinstance(race, str) and race.lower() == UnitRace.DRAGON.value:
-            return True
-        return False
-
-    def _is_flier(self, unit):
-        return unit.unit_type in (UnitType.WING, UnitType.CITADEL)
 
     def _get_defender_hex(self):
         if not self.game_state or not self.game_state.map:
@@ -791,8 +759,8 @@ class DragonDuelResolver:
     """
     def __init__(self, game_state, attacker_dragons, defender_dragons, roll_d6_fn=None):
         self.game_state = game_state
-        self.attackers = [u for u in attacker_dragons if getattr(u, "is_on_map", False) and _is_dragon(u)]
-        self.defenders = [u for u in defender_dragons if getattr(u, "is_on_map", False) and _is_dragon(u)]
+        self.attackers = [u for u in attacker_dragons if getattr(u, "is_on_map", False) and u.is_dragon()]
+        self.defenders = [u for u in defender_dragons if getattr(u, "is_on_map", False) and u.is_dragon()]
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
 
     def resolve(self, withdraw_decider=None):
@@ -1096,8 +1064,8 @@ class CombatService:
                     "advance_available": False,
                 }
 
-        attacker_dragons = [u for u in attackers if self._is_dragon_unit(u) and u.is_on_map]
-        defender_dragons = [u for u in defenders if self._is_dragon_unit(u) and u.is_on_map]
+        attacker_dragons = [u for u in attackers if u.is_on_map and u.is_dragon()]
+        defender_dragons = [u for u in defenders if u.is_on_map and u.is_dragon()]
         if attacker_dragons and defender_dragons:
             duel = DragonDuelResolver(self, attacker_dragons, defender_dragons)
             duel_outcome = duel.resolve(withdraw_decider=dragon_duel_withdraw_decider)
@@ -1291,11 +1259,11 @@ class CombatService:
         if target_hex and not self.can_units_attack_target_hex(attackers, target_hex):
             return False
 
-        defenders_have_dragons = any(self._is_dragon_unit(u) for u in defenders)
+        defenders_have_dragons = any(u.is_on_map and u.is_dragon() for u in defenders)
         for unit in attackers:
             if not self._is_combat_stack_unit(unit):
                 continue
-            if not self._is_dragon_unit(unit):
+            if not unit.is_dragon():
                 return True
             if defenders_have_dragons:
                 return True
@@ -1308,17 +1276,12 @@ class CombatService:
         for unit in attackers:
             if not getattr(unit, "is_on_map", False):
                 continue
-            if self._dragon_can_participate_in_land_attack(unit, attackers, defenders):
+            if not unit.is_dragon() or self._dragon_can_make_ground_attack(unit, attackers):
                 filtered.append(unit)
         return filtered
 
-    def _dragon_can_participate_in_land_attack(self, unit, attackers, defenders):
-        if not self._is_dragon_unit(unit):
-            return True
-        return self._dragon_can_make_ground_attack(unit, attackers)
-
     def _dragon_can_make_ground_attack(self, dragon, attackers):
-        if not self._is_dragon_unit(dragon):
+        if not dragon.is_dragon():
             return True
 
         if dragon.allegiance == HL and self._all_highlords_destroyed():
@@ -1374,9 +1337,6 @@ class CombatService:
             and getattr(u, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
         ]
         return bool(ws_commanders) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in ws_commanders)
-
-    def _is_dragon_unit(self, unit):
-        return bool(getattr(unit, "is_on_map", False) and getattr(unit, "race", None) == UnitRace.DRAGON)
 
     def _maybe_promote_highlord_to_emperor(self):
         living_emperors = [
@@ -1822,7 +1782,7 @@ class CombatService:
         return unit.unit_type not in (UnitType.WING, UnitType.FLEET)
 
     def _is_ws_air_combat_unit(self, unit):
-        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.unit_type in (UnitType.WING, UnitType.CITADEL))
+        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.is_flyer())
 
     def _combat_blocked_by_citadel_rule(self, attackers, defenders):
         if not self._defenders_have_citadel(defenders):
