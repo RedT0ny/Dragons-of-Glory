@@ -225,7 +225,7 @@ class Unit:
     def is_control_unit(self) -> bool:
         return self.is_army() or self.is_wing() or self.is_citadel()
 
-    def is_flyer(self) -> bool:
+    def is_flier(self) -> bool:
         return self.is_wing() or self.is_citadel()
 
     def is_carrier(self) -> bool:

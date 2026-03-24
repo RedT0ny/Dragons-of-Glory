@@ -328,9 +328,9 @@ class CombatResolver:
             or defender_terrain in (TerrainType.FOREST, TerrainType.MOUNTAIN, TerrainType.JUNGLE)
         )
         if not flight_blocked:
-            if any(self._is_flier(u) for u in self.attackers):
+            if any(u.is_flier() for u in self.attackers):
                 add_part("attacker_fliers", 1)
-            if any(self._is_flier(u) for u in self.defenders):
+            if any(u.is_flier() for u in self.defenders):
                 add_part("defender_fliers", -1)
 
         # LOCATIONS (defender benefit only)
@@ -408,7 +408,7 @@ class CombatResolver:
     def _attacking_air_against_citadel(self):
         if not self._defenders_include_citadel():
             return False
-        return any(self._is_flier(u) for u in self.attackers if getattr(u, "is_on_map", False))
+        return any(u.is_flier() for u in self.attackers if getattr(u, "is_on_map", False))
 
     def _citadel_attack_strips_ws_defender_bonuses(self):
         attacker_has_citadel = any(
@@ -1782,7 +1782,7 @@ class CombatService:
         return unit.unit_type not in (UnitType.WING, UnitType.FLEET)
 
     def _is_ws_air_combat_unit(self, unit):
-        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.is_flyer())
+        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.is_flier())
 
     def _combat_blocked_by_citadel_rule(self, attackers, defenders):
         if not self._defenders_have_citadel(defenders):
