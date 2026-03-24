@@ -1,0 +1,729 @@
+metadata:
+  scenario_id: scenario_1_fall_of_silvanesti
+  turn: 4
+  phase: DEPLOYMENT
+  active_player: highlord
+  initiative_winner: highlord
+  second_player_has_acted: false
+  activation_bonuses:
+    highlord: 0
+    whitestone: 0
+  combat_bonuses:
+    highlord: 0
+    whitestone: 0
+  save_timestamp: '2026-03-07T22:09:00.280099+00:00'
+world_state:
+  countries:
+    dtemple:
+      allegiance: highlord
+      conquered: false
+      capital_id: dark_temple
+      locations:
+        dark_temple:
+          occupier: highlord
+          is_capital: true
+    taman:
+      allegiance: highlord
+      conquered: false
+      capital_id: neraka
+      locations:
+        neraka:
+          occupier: highlord
+          is_capital: true
+    khur:
+      allegiance: highlord
+      conquered: false
+      capital_id: khuri_khan
+      locations:
+        khuri_khan:
+          occupier: highlord
+          is_capital: true
+        delphon:
+          occupier: highlord
+          is_capital: false
+    silvanesti:
+      allegiance: whitestone
+      conquered: false
+      capital_id: silvanost
+      locations:
+        silvanost:
+          occupier: whitestone
+          is_capital: true
+        shalost:
+          occupier: whitestone
+          is_capital: false
+        west_eli:
+          occupier: whitestone
+          is_capital: false
+        east_eli:
+          occupier: whitestone
+          is_capital: false
+        silvamori:
+          occupier: whitestone
+          is_capital: false
+  units:
+  - unit_id: taman_human_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 41
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 42
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - 42
+    - 35
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - 43
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_cav_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 44
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: khur_human_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 41
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: khur_human_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 42
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: khur_human_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - 42
+    - 35
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: khur_human_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - 43
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: khur_human_cav
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 44
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sharuk
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 44
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: green_dragon_wing_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 43
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: green_dragon_wing_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 42
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: blue_dragon_wing_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 42
+    - 35
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: red_dragon_wing_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 41
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: ariakas
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 43
+    - 34
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: phair_caron
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 41
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: topus
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 42
+    - 35
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: salah_khan
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 42
+    - 36
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: lorac
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_fleet_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_fleet_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_fleet_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_fleet_4
+    ordinal: 4
+    allegiance: whitestone
+    position:
+    - 45
+    - 45
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_4
+    ordinal: 4
+    allegiance: whitestone
+    position:
+    - 41
+    - 40
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_5
+    ordinal: 5
+    allegiance: whitestone
+    position:
+    - 45
+    - 39
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_elf_inf_6
+    ordinal: 6
+    allegiance: whitestone
+    position:
+    - 43
+    - 40
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_pegasus_wing_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 44
+    - 41
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_pegasus_wing_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 43
+    - 40
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_pegasus_wing_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 45
+    - 39
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: silvanesti_pegasus_wing_4
+    ordinal: 4
+    allegiance: whitestone
+    position:
+    - 41
+    - 40
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  unit_runtime:
+    taman_human_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_2|2:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_3|3:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_4|4:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_cav_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    khur_human_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    khur_human_inf_2|2:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    khur_human_inf_3|3:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    khur_human_inf_4|4:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    khur_human_cav|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    sharuk|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    green_dragon_wing_1|1:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    green_dragon_wing_2|2:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    blue_dragon_wing_1|1:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    red_dragon_wing_1|1:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    ariakas|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    phair_caron|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    topus|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    salah_khan|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    lorac|1:
+      movement_points: 12
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_fleet_1|1:
+      movement_points: 50
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_fleet_2|2:
+      movement_points: 50
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_fleet_3|3:
+      movement_points: 50
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_fleet_4|4:
+      movement_points: 50
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_1|1:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_2|2:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_3|3:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_4|4:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_5|5:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_elf_inf_6|6:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_pegasus_wing_1|1:
+      movement_points: 18
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_pegasus_wing_2|2:
+      movement_points: 18
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_pegasus_wing_3|3:
+      movement_points: 18
+      river_hexside: null
+      replacement_ready_turn: null
+    silvanesti_pegasus_wing_4|4:
+      movement_points: 18
+      river_hexside: null
+      replacement_ready_turn: null
+  players:
+    highlord:
+      is_ai: false
+      assets: []
+    whitestone:
+      is_ai: false
+      assets:
+      - id: dragon_orb
+        assigned_to: null
+  completed_event_ids: []
+  strategic_events:
+    ws_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    ws_minor_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    hl_minor_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    blue_crystal_staff:
+      occurrence_count: 0
+      is_active: true
+    crown_of_power:
+      occurrence_count: 0
+      is_active: true
+    dragonarmor:
+      occurrence_count: 0
+      is_active: true
+    dragonmetal:
+      occurrence_count: 0
+      is_active: true
+    hammer_of_kharas:
+      occurrence_count: 0
+      is_active: true
+    highlord_blitzkrieg:
+      occurrence_count: 0
+      is_active: true
+    medallion_of_faith:
+      occurrence_count: 0
+      is_active: true
+    plate_of_solamnus:
+      occurrence_count: 0
+      is_active: true
+    wildrunner_tactics:
+      occurrence_count: 0
+      is_active: true
+    ws_wizard:
+      occurrence_count: 0
+      is_active: true
+    hl_wizard:
+      occurrence_count: 0
+      is_active: true
+    dragonlance_forged:
+      occurrence_count: 0
+      is_active: true
+    disks_of_mishakal:
+      occurrence_count: 0
+      is_active: true
+    hl_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    whitestone_council:
+      occurrence_count: 0
+      is_active: true
+    flying_citadel:
+      occurrence_count: 0
+      is_active: true
+    gnome_tech:
+      occurrence_count: 0
+      is_active: true
+    golden_general:
+      occurrence_count: 0
+      is_active: true
+    good_dragons:
+      occurrence_count: 0
+      is_active: true
+    silver_arm:
+      occurrence_count: 0
+      is_active: true
+    soths_legions:
+      occurrence_count: 0
+      is_active: true
+    wyrmslayer:
+      occurrence_count: 0
+      is_active: true
