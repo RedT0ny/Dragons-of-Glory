@@ -54,8 +54,6 @@ class PhaseManager:
         if phase is None:
             phase = self.game_state.phase
         return phase in {
-            GamePhase.STRATEGIC_EVENTS,
-            GamePhase.ACTIVATION,
             GamePhase.INITIATIVE,
             GamePhase.SUPPLY,
         }

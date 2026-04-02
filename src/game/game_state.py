@@ -887,7 +887,6 @@ class GameState:
         for unit in self.units:
             unit.movement_points = getattr(unit, "movement", 0)
             unit.moved_this_turn = False
-            unit.carried_by_citadel_this_turn = False
             unit._healed_this_combat_turn = False
 
     def finalize_combat_phase(self):
@@ -910,7 +909,6 @@ class GameState:
             unit.movement_points = getattr(unit, "movement", 0)
             unit.attacked_this_turn = False
             unit.moved_this_turn = False
-            unit.carried_by_citadel_this_turn = False
             unit._healed_this_combat_turn = False
 
         self.check_events()
@@ -1131,7 +1129,6 @@ class GameState:
             retreat_hex,
             river_hexside=retreat_side,
             clear_escaped=False,
-            mark_citadel_carried=False,
         )
         if hasattr(fleet, "moved_this_turn"):
             fleet.moved_this_turn = True
@@ -1253,14 +1250,12 @@ class GameState:
                 target_hex,
                 river_hexside=fleet_final_hexside,
                 clear_escaped=True,
-                mark_citadel_carried=(unit.is_citadel()),
             )
         else:
             self.movement_service.relocate_unit_on_board(
                 unit,
                 target_hex,
                 clear_escaped=True,
-                mark_citadel_carried=(self.phase == GamePhase.MOVEMENT and unit.is_citadel()),
             )
 
         if self.phase == GamePhase.MOVEMENT:

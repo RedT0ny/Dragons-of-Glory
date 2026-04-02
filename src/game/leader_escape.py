@@ -146,7 +146,6 @@ class LeaderEscapeHandler:
             leader,
             target_hex,
             clear_escaped=False,
-            mark_citadel_carried=False,
         )
         return True
 

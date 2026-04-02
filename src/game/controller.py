@@ -70,6 +70,7 @@ class GameController(QObject):
         self._victory_announced = False
         self._processing_turn_tick = False
         self._replacements_refresh_queued = False
+        self._pending_phase_advance_after_deployment = False
 
     def get_runtime_config(self):
         return {
@@ -133,6 +134,7 @@ class GameController(QObject):
         self._processing_automatic_phases = False
         self._end_phase_transition_pending = False
         self._last_end_phase_request_at = 0.0
+        self._pending_phase_advance_after_deployment = False
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
         self.movement_service.clear_movement_undo()
@@ -305,6 +307,9 @@ class GameController(QObject):
 
             outcome = self.turn_engine.step()
             if self._handle_turn_action(outcome.action, outcome.payload):
+                # Keep turn header in sync even when step() requests human interaction
+                # and returns early (e.g. Replacements/Event/Activation dialogs).
+                self._refresh_turn_panel()
                 self.connect_map_view_signals()
                 self.check_active_player()
                 return
@@ -525,6 +530,7 @@ class GameController(QObject):
         if self._end_phase_transition_pending:
             return
         self._end_phase_transition_pending = True
+        self._pending_phase_advance_after_deployment = False
 
         # Close replacement dialog if open
         if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
@@ -717,6 +723,13 @@ class GameController(QObject):
             )
             print(result.error)
             return
+        # Deployments originating from Strategic Events/Activation are reinforcement-only
+        # for this turn and should not move immediately in the following movement step.
+        if self.game_state.phase in {GamePhase.STRATEGIC_EVENTS, GamePhase.ACTIVATION}:
+            if hasattr(unit, "movement_points"):
+                unit.movement_points = 0
+            if hasattr(unit, "moved_this_turn"):
+                unit.moved_this_turn = True
         self._deployment_session_unit_ids.add(unit.id)
         RuntimeDiagnostics.record_event(
             f"Deployment applied: unit={unit.id} target={target_hex.axial_to_offset()}"
@@ -825,6 +838,7 @@ class GameController(QObject):
 
         # Stop timer so loop waits for user
         self.ai_timer.stop()
+        self._pending_phase_advance_after_deployment = True
 
         # Open Deployment Window
         self.replacements_dialog = ReplacementsDialog(self.game_state, self.view,
@@ -935,12 +949,17 @@ class GameController(QObject):
                 self.replacements_dialog.close()
                 self.replacements_dialog = None
             self._end_deployment_session()
+            if self._pending_phase_advance_after_deployment:
+                self._pending_phase_advance_after_deployment = False
+                self.game_state.advance_phase()
+                self._schedule_deferred(self.process_game_turn)
             return
 
         if self._is_replacements_dialog_visible():
             self.replacements_dialog.close()
             self.replacements_dialog = None
         self._end_deployment_session()
+        self._pending_phase_advance_after_deployment = False
         self._invasion_deployment_active = False
         self._invasion_deployment_country_id = None
         self._invasion_deployment_allegiance = None

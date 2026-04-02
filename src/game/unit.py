@@ -2,6 +2,8 @@ import re
 from typing import Optional, Tuple, List, Any
 from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
+from src.content.tools import caption_id
+
 
 class Unit:
     """
@@ -41,8 +43,6 @@ class Unit:
         self.is_transported = False
         # Reference to the carrier Unit (Fleet/Wing/Citadel) when transported
         self.transport_host: Optional[Unit] = None
-        # Set when a ground army is carried by a flying citadel this turn.
-        self.carried_by_citadel_this_turn = False
         self.attacked_this_turn = False
         self.moved_this_turn = False
 
@@ -222,6 +222,9 @@ class Unit:
     def is_citadel(self) -> bool:
         return False # Base unit is not a citadel either
 
+    def can_carry(self, unit):
+        return False # Base unit cannot carry anything
+
     def is_control_unit(self) -> bool:
         return self.is_army() or self.is_wing() or self.is_citadel()
 
@@ -239,25 +242,6 @@ class Unit:
 
     # --- State Logic ---
 
-    def apply_combat_loss(self, dmg_type: str, must_retreat: bool = False):
-        one_hit_units = {UnitType.GENERAL, UnitType.ADMIRAL, UnitType.HERO,
-                         UnitType.WING, UnitType.EMPEROR, UnitType.WIZARD, UnitType.CITADEL}
-
-        # Use property to get Enum type safely
-        u_type = self.unit_type
-
-        if u_type in one_hit_units:
-            self.destroy()
-            return
-
-        if dmg_type == 'E':
-            self.eliminate()
-        elif dmg_type == 'D':
-            self.deplete()
-
-        if self.is_on_map and must_retreat:
-            self.retreat()
-
     def activate(self):
         """Moves to Active status."""
         self.status = UnitState.ACTIVE
@@ -274,11 +258,13 @@ class Unit:
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:
             self.status = UnitState.RESERVE
             self.position = (None, None)
+            print(f"{caption_id(self.id)} eliminated.")
 
     def deplete(self):
         """Active -> Depleted -> Reserve."""
         if self.status == UnitState.ACTIVE:
             self.status = UnitState.DEPLETED
+            print(f"{caption_id(self.id)} depleted.")
         elif self.status == UnitState.DEPLETED:
             self.eliminate()
 
@@ -286,14 +272,15 @@ class Unit:
         """Permanently removed."""
         self.status = UnitState.DESTROYED
         self.position = (None, None)
+        print(f"{caption_id(self.id)} destroyed.")
 
-    def move(self, new_position: Tuple[int, int]):
-        self.position = new_position
-        self.moved_this_turn = True
-
-    def retreat(self):
-        # Placeholder for retreat logic
-        pass
+    def load_unit(self, unit):
+        if self.can_carry(unit):
+            self.passengers.append(unit)
+            unit.is_transported = True
+            unit.transport_host = self
+            # When aboard, the unit should not remain in the spatial map; GameState
+            # is responsible for removing it from the map (controller -> game_state.board_unit)
 
     def to_dict(self) -> dict:
         return {
@@ -304,7 +291,6 @@ class Unit:
             "status": self.status.name,
             "escaped": bool(getattr(self, "escaped", False)),
             "is_transported": self.is_transported,
-            "carried_by_citadel_this_turn": self.carried_by_citadel_this_turn,
             # Transport host serialized as tuple (id, ordinal) if present
             "transport_host": (self.transport_host.id, self.transport_host.ordinal) if getattr(self, 'transport_host', None) else None,
             "attacked_this_turn": self.attacked_this_turn,
@@ -324,7 +310,6 @@ class Unit:
 
         self.escaped = bool(state_data.get("escaped", False))
         self.is_transported = state_data.get("is_transported", False)
-        self.carried_by_citadel_this_turn = state_data.get("carried_by_citadel_this_turn", False)
         # transport_host will be resolved post-load by GameState if needed
         self.transport_host = None
         self.attacked_this_turn = state_data.get("attacked_this_turn", False)
@@ -375,7 +360,6 @@ class Unit:
         from src.game.map import Hex
         return Hex.offset_to_axial(*self.position)
 
-
 class Leader(Unit):
     """
     Leader unit class.
@@ -411,14 +395,6 @@ class Fleet(Unit):
         # Check if an army is already aboard
         has_army = any(not p.is_leader() for p in self.passengers)
         return not unit.is_leader() and not has_army
-
-    def load_unit(self, unit):
-        if self.can_carry(unit):
-            self.passengers.append(unit)
-            unit.is_transported = True
-            unit.transport_host = self
-            # When aboard, the unit should not remain in the spatial map; GameState
-            # is responsible for removing it from the map (controller -> game_state.board_unit)
 
     def set_river_hexside(self, hexside):
         self.river_hexside = hexside
@@ -472,11 +448,6 @@ class Wing(Unit):
                 return unit.race in (UnitRace.ELF, UnitRace.SOLAMNIC)
         return False
 
-    def load_unit(self, unit):
-        if self.can_carry(unit):
-            self.passengers.append(unit)
-            unit.is_transported = True
-
 class FlyingCitadel(Unit):
     """
     A specific unit type that acts as a mobile fortress.
@@ -497,12 +468,6 @@ class FlyingCitadel(Unit):
         # Rule says "Up to three HL armies of any types"
         army_count = sum(1 for p in self.passengers if hasattr(p, "is_army") and p.is_army())
         return army_count < 3
-
-    def load_unit(self, unit: Unit):
-        if self.can_carry(unit):
-            self.passengers.append(unit)
-            unit.is_transported = True
-            unit.transport_host = self
 
     def get_defense_modifier(self):
         """

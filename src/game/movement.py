@@ -32,9 +32,6 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if getattr(unit, "transport_host", None) is not None:
         return False, f"{unit.id} is transported and cannot move independently.", 0, None, []
 
-    if getattr(unit, "carried_by_citadel_this_turn", False):
-        return False, f"{unit.id} was carried by a citadel and cannot move independently this turn.", 0, None, []
-
     if unit.unit_type != UnitType.FLEET and not game_state.map.can_unit_land_on_hex(unit, target_hex):
         return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
 
@@ -343,7 +340,6 @@ class MovementService:
                 "moved_this_turn": getattr(unit, "moved_this_turn", False),
                 "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
                 "is_transported": getattr(unit, "is_transported", False),
-                "carried_by_citadel_this_turn": getattr(unit, "carried_by_citadel_this_turn", False),
                 "transport_host": getattr(unit, "transport_host", None),
                 "river_hexside": getattr(unit, "river_hexside", None),
                 "passengers": list(getattr(unit, "passengers", [])),
@@ -368,7 +364,6 @@ class MovementService:
         *,
         river_hexside=_KEEP_FIELD,
         clear_escaped: bool = True,
-        mark_citadel_carried: bool = False,
     ) -> bool:
         """Single path for on-board relocation + spatial-map + passenger synchronization."""
         if unit is None or target_hex is None:
@@ -381,7 +376,7 @@ class MovementService:
         if river_hexside is not _KEEP_FIELD and hasattr(unit, "river_hexside"):
             unit.river_hexside = river_hexside
         self.game_state.map.add_unit_to_spatial_map(unit)
-        self._sync_carrier_passengers(unit, mark_citadel_carried=mark_citadel_carried)
+        self._sync_carrier_passengers(unit)
         return True
 
     def remove_unit_from_board(
@@ -421,7 +416,7 @@ class MovementService:
                 )
         return True
 
-    def _sync_carrier_passengers(self, carrier, *, mark_citadel_carried: bool = False):
+    def _sync_carrier_passengers(self, carrier):
         passengers = getattr(carrier, "passengers", None)
         if not passengers:
             return
@@ -429,8 +424,6 @@ class MovementService:
             passenger.position = carrier.position
             passenger.is_transported = True
             passenger.transport_host = carrier
-            if mark_citadel_carried:
-                passenger.carried_by_citadel_this_turn = True
 
     def _detach_unit_from_carriers(self, unit):
         host = getattr(unit, "transport_host", None)
@@ -464,7 +457,6 @@ class MovementService:
             unit.moved_this_turn = state["moved_this_turn"]
             unit.attacked_this_turn = state["attacked_this_turn"]
             unit.is_transported = state["is_transported"]
-            unit.carried_by_citadel_this_turn = state.get("carried_by_citadel_this_turn", False)
             unit.transport_host = state["transport_host"]
             if hasattr(unit, "river_hexside"):
                 unit.river_hexside = state["river_hexside"]
@@ -1131,7 +1123,6 @@ class MovementService:
             unit,
             target_hex,
             clear_escaped=set_escaped,
-            mark_citadel_carried=False,
         )
         if apply_escape:
             apply_escape_fn = getattr(self.game_state, "_apply_escape_if_eligible", None)
