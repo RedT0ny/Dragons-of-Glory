@@ -9,6 +9,7 @@ from src.content import loader
 from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import UnitType, UnitState, LocType, UnitRace, HexsideType
+from src.content.tools import debug_print
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
@@ -458,7 +459,7 @@ class StrategicPlanner:
             beachhead_slots = []
 
         if beachhead_slots:
-            print(f"[TRANSPORT] beachhead_slots={[h.axial_to_offset() for h in beachhead_slots]}")
+            debug_print(f"[TRANSPORT] beachhead_slots={[h.axial_to_offset() for h in beachhead_slots]}")
 
         return StrategicPlan(
             posture=posture,
@@ -606,9 +607,9 @@ class StrategicPlanner:
         needs_recompute, valid_slots, recompute_reason = self._evaluate_existing_landing_plan(ctx, main_objective, state)
         if not needs_recompute and valid_slots:
             anchor = valid_slots[0]
-            print(f"[TRANSPORT] reusing_landing_plan anchor={anchor.axial_to_offset()} slots={[h.axial_to_offset() for h in valid_slots]}")
+            debug_print(f"[TRANSPORT] reusing_landing_plan anchor={anchor.axial_to_offset()} slots={[h.axial_to_offset() for h in valid_slots]}")
             return anchor, valid_slots
-        print(f"[TRANSPORT] recompute_landing_plan reason={recompute_reason}")
+        debug_print(f"[TRANSPORT] recompute_landing_plan reason={recompute_reason}")
 
         anchor = fallback_anchor if fallback_anchor is not None else self._simple_beachhead_choice(ctx, main_objective)
         target_countries = list(objective_graph.get("offensive_target_countries", set()) or set())
@@ -792,7 +793,7 @@ class StrategicPlanner:
                     score += inland_exit_count * 6.0
                 if h == beachhead_hex:
                     score += 6.0
-                print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
+                debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
                 if inland_exit_count >= 3:
                     primary_scored.append((score, h))
                 elif inland_exit_count == 2:
@@ -1371,7 +1372,7 @@ class OperationalPlanner:
                     loaded_fleet_group_keys.add(_task_group_key(g))
                 else:
                     empty_fleet_group_keys.add(_task_group_key(g))
-                    print(f"[TRANSPORT] skip_slot_assignment empty_fleet={getattr(fleet_unit, 'id', '?')}")
+                    debug_print(f"[TRANSPORT] skip_slot_assignment empty_fleet={getattr(fleet_unit, 'id', '?')}")
             needed_loaded_keys = {
                 _unit_key(next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None))
                 for g in loaded_fleet_groups
@@ -1502,7 +1503,7 @@ class OperationalPlanner:
                         priority=95 + plan.urgency_score * 20 + group.power * 0.5,
                     ))
                     assigned_dbg = assigned_slot.axial_to_offset() if assigned_slot is not None else None
-                    print(f"[TRANSPORT] fleet_target={target.axial_to_offset()} assigned_slot={assigned_dbg}")
+                    debug_print(f"[TRANSPORT] fleet_target={target.axial_to_offset()} assigned_slot={assigned_dbg}")
                     continue
                 if group.has_army and (not group_has_ashore_committed) and self._group_needs_embarkation(ctx, group, main_hex):
                     embark_hex = self._best_embark_hex(ctx, group, main_hex)
@@ -1548,7 +1549,7 @@ class OperationalPlanner:
                             objective=push_objective,
                             priority=priority,
                         ))
-                        print(f"[TRANSPORT] {mission_type} group={group_key} target={push_hex.axial_to_offset()}")
+                        debug_print(f"[TRANSPORT] {mission_type} group={group_key} target={push_hex.axial_to_offset()}")
                         continue
             if (not offensive) and loc and getattr(loc, "loc_type", None) == LocType.PORT.value and loc.occupier == ctx.side:
                 og = ctx.objective_graph or {}
@@ -1723,7 +1724,7 @@ class OperationalPlanner:
             )
             cap = max(0, 2 - existing_ground)
             slot_capacity[(col, row)] = cap
-            print(f"[TRANSPORT_SLOT_ASSIGN] slot=({col},{row}) current_ground={existing_ground} capacity={cap} projected_load={projected_load[(col,row)]}")
+            debug_print(f"[TRANSPORT_SLOT_ASSIGN] slot=({col},{row}) current_ground={existing_ground} capacity={cap} projected_load={projected_load[(col,row)]}")
         for group in sorted(fleet_groups, key=lambda g: (_task_group_key(g), -g.power)):
             fleet = next((u for u in group.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
             if fleet is None:
@@ -1736,15 +1737,15 @@ class OperationalPlanner:
                     assignments[fleet_key] = prev_key
                     usage[prev_key] += 1
                     projected_load[prev_key] += 1
-                    print(f"[TRANSPORT] keep_slot fleet={fleet_key} slot={prev_key}")
-                    print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={prev_key} overflow=False")
+                    debug_print(f"[TRANSPORT] keep_slot fleet={fleet_key} slot={prev_key}")
+                    debug_print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={prev_key} overflow=False")
                     continue
                 if slot_capacity.get(prev_key, 0) <= 0 and all(projected_load[k] >= slot_capacity.get(k, 0) for k in slot_capacity):
                     assignments[fleet_key] = prev_key
                     usage[prev_key] += 1
                     projected_load[prev_key] += 1
-                    print(f"[TRANSPORT] keep_slot fleet={fleet_key} slot={prev_key}")
-                    print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={prev_key} overflow=True")
+                    debug_print(f"[TRANSPORT] keep_slot fleet={fleet_key} slot={prev_key}")
+                    debug_print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={prev_key} overflow=True")
                     continue
             best_slot = None
             best_score = None
@@ -1765,11 +1766,11 @@ class OperationalPlanner:
             assignments[fleet_key] = slot_off
             usage[slot_off] = usage.get(slot_off, 0) + 1
             projected_load[slot_off] = projected_load.get(slot_off, 0) + 1
-            print(f"[TRANSPORT] assigned_slot for fleet_group={_task_group_key(group)} slot={slot_off}")
-            print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={slot_off} overflow={overflow_mode}")
+            debug_print(f"[TRANSPORT] assigned_slot for fleet_group={_task_group_key(group)} slot={slot_off}")
+            debug_print(f"[TRANSPORT_SLOT_PICK] fleet={getattr(fleet, 'id', '?')} slot={slot_off} overflow={overflow_mode}")
             for s in slots:
                 scol, srow = s.axial_to_offset()
-                print(f"[TRANSPORT_SLOT_ASSIGN] slot=({scol},{srow}) current_ground={max(0,2-slot_capacity[(scol,srow)])} capacity={slot_capacity[(scol,srow)]} projected_load={projected_load[(scol,srow)]}")
+                debug_print(f"[TRANSPORT_SLOT_ASSIGN] slot=({scol},{srow}) current_ground={max(0,2-slot_capacity[(scol,srow)])} capacity={slot_capacity[(scol,srow)]} projected_load={projected_load[(scol,srow)]}")
         return assignments
 
     @staticmethod
@@ -2280,7 +2281,7 @@ class TacticalPlanner:
                 used_fleet_hexes.add(chosen)
                 ready_units.remove(fleet)
                 deployed += 1
-                print(f"[TRANSPORT] Deployed fleet {getattr(fleet, 'id', '?')} to {chosen_hex.axial_to_offset()}")
+                debug_print(f"[TRANSPORT] Deployed fleet {getattr(fleet, 'id', '?')} to {chosen_hex.axial_to_offset()}")
 
         return deployed
 
@@ -2378,7 +2379,7 @@ class TacticalPlanner:
                     fleet_army_count[chosen_hex] += 1
                 ready_units.remove(army)
                 deployed += 1
-                print(f"[TRANSPORT] Deployed army {getattr(army, 'id', '?')} to {chosen_hex.axial_to_offset()}")
+                debug_print(f"[TRANSPORT] Deployed army {getattr(army, 'id', '?')} to {chosen_hex.axial_to_offset()}")
 
         return deployed
 
@@ -2595,7 +2596,7 @@ class TacticalPlanner:
             fleet_id = getattr(fleet, "id", "?")
             pos = current
             assigned_dbg = target_offset if target_offset is not None else None
-            print(
+            debug_print(
                 f"[TRANSPORT_MOVE] fleet={fleet_id} pos={pos} assigned={assigned_dbg} "
                 f"reachable_count={len(move_range.reachable_coords)} assigned_reachable={assigned_reachable} "
                 f"assigned_preserved={assigned_preserved}"
@@ -2621,7 +2622,7 @@ class TacticalPlanner:
             dist_before = group.hex.distance_to(mission.target_hex)
             dist_after = best_action.target_hex.distance_to(mission.target_hex)
             on_slot = bool(best_action.target_hex == mission.target_hex)
-            print(
+            debug_print(
                 f"[TRANSPORT_MOVE_RESULT] fleet={fleet_id} chosen={chosen} assigned={assigned} "
                 f"dist_before={dist_before} dist_after={dist_after} on_slot={on_slot}"
             )
@@ -2912,7 +2913,7 @@ class TacticalPlanner:
             if any_embarked:
                 unload_actions = self._collect_fleet_unload_actions(ctx, plan)
                 if unload_actions:
-                    print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
+                    debug_print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
                     unloaded_any = self._execute_fleet_unload_actions(ctx, plan, unload_actions, max_actions=4)
                     if unloaded_any:
                         return True
@@ -2957,27 +2958,27 @@ class TacticalPlanner:
                             UnitType.WING, UnitType.FLEET):
                         ukey = _unit_key(unit)
                         if ukey in ashore_state:
-                            print(f"[TRANSPORT] skip_reboard ashore_committed={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard ashore_committed={getattr(unit, 'id', '?')}")
                             continue
                         if transport_actions and ("landed_army", ukey) in transport_actions:
-                            print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
                             continue
                         if ukey in landed_state:
-                            print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
                             continue
                         if getattr(unit, "position", None) and tuple(unit.position) in beachhead_slot_offsets:
-                            print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
                             continue
                         if ukey in landed_state and getattr(unit, "position", None):
                             uhex = Hex.offset_to_axial(*unit.position)
                             if any(uhex.distance_to(slot) <= 1 for slot in beachhead_slots):
-                                print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
+                                debug_print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
                             continue
                         if getattr(unit, "moved_this_turn", False):
-                            print(f"[TRANSPORT] skip_reboard exhausted={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard exhausted={getattr(unit, 'id', '?')}")
                             continue
                         if float(getattr(unit, "movement_points", 0) or 0) <= 0:
-                            print(f"[TRANSPORT] skip_reboard exhausted={getattr(unit, 'id', '?')}")
+                            debug_print(f"[TRANSPORT] skip_reboard exhausted={getattr(unit, 'id', '?')}")
                             continue
                         if getattr(fleet, "can_carry", lambda x: True)(unit):
                             candidates.append((unit, 0, -float(getattr(unit, "combat_rating", 0) or 0), pair_key))
@@ -3012,10 +3013,10 @@ class TacticalPlanner:
             TacticalPlanner._debug_fleet_unload_state(ctx, plan, unit)
             passengers = list(getattr(unit, "passengers", []) or [])
             if not passengers:
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_embarked_ground")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_embarked_ground")
                 continue
             if not TacticalPlanner._fleet_has_embarked_ground(unit):
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_embarked_ground")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_embarked_ground")
                 continue
             fleet_hex = Hex.offset_to_axial(*unit.position)
             col, row = fleet_hex.axial_to_offset()
@@ -3025,7 +3026,7 @@ class TacticalPlanner:
             if assigned_offset:
                 approved_slots = [Hex.offset_to_axial(assigned_offset[0], assigned_offset[1])]
             if approved_slots and not any(fleet_hex == h for h in approved_slots):
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_not_on_slot")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_not_on_slot")
                 continue
             if key not in projected_ground:
                 existing_ground = sum(
@@ -3038,15 +3039,15 @@ class TacticalPlanner:
                 projected_ground[key] = existing_ground
             selected = TacticalPlanner._select_fleet_unboard_passengers(ctx, plan, unit, passengers)
             if not selected:
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_legal_passengers")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_no_legal_passengers")
                 continue
             cap = max(0, 2 - projected_ground[key])
             if cap <= 0:
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_slot_full")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_slot_full")
                 continue
             selected = selected[:cap]
             if not selected:
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_slot_full")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_slot_full")
                 continue
             projected_ground[key] += len(selected)
             assigned = False
@@ -3063,7 +3064,7 @@ class TacticalPlanner:
             if getattr(unit, "unit_type", None) != UnitType.FLEET:
                 continue
             if _unit_key(unit) not in selected_fleets and getattr(unit, "position", None) and unit.position[0] is not None:
-                print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_not_selected_in_batch")
+                debug_print(f"[TRANSPORT_UNLOAD_SKIP] fleet={getattr(unit, 'id', '?')} reason=skip_not_selected_in_batch")
         actions.sort(key=lambda item: item[2], reverse=True)
         return actions
 
@@ -3090,14 +3091,14 @@ class TacticalPlanner:
         )
         passengers = list(getattr(fleet, "passengers", []) or [])
         p_ids = [str(getattr(p, "id", "?")) for p in passengers]
-        print(
+        debug_print(
             f"[TRANSPORT_UNLOAD_CHECK] fleet={getattr(fleet, 'id', '?')} pos=({col},{row}) "
             f"assigned={(assigned_hex.axial_to_offset() if assigned_hex else None)} "
             f"on_assigned_slot={on_assigned} on_approved_slot={on_approved} existing_ground={existing_ground} passengers={p_ids}"
         )
         for p in passengers:
             legal_now = bool(ctx.movement_service.can_unboard_unit_to_hex(p, fleet_hex))
-            print(f"[TRANSPORT_UNLOAD_PASSENGER] fleet={getattr(fleet, 'id', '?')} passenger={getattr(p, 'id', '?')} legal_now={legal_now}")
+            debug_print(f"[TRANSPORT_UNLOAD_PASSENGER] fleet={getattr(fleet, 'id', '?')} passenger={getattr(p, 'id', '?')} legal_now={legal_now}")
 
     def _execute_fleet_unload_actions(
         self,
@@ -3123,7 +3124,7 @@ class TacticalPlanner:
                 continue
             unloaded += 1
             unit_ids = [str(getattr(p, "id", "?")) for p in selected]
-            print(f"[TRANSPORT] unload_exec fleet={getattr(fleet, 'id', '?')} slot=({col},{row}) units={unit_ids}")
+            debug_print(f"[TRANSPORT] unload_exec fleet={getattr(fleet, 'id', '?')} slot=({col},{row}) units={unit_ids}")
             if transport_actions is not None:
                 transport_actions.add(("landing_reserve", (col, row)))
                 for p in selected:
@@ -3131,7 +3132,7 @@ class TacticalPlanner:
                     transport_actions.add(("landed_army", _unit_key(p)))
                     landed_state.add(_unit_key(p))
                     ashore_state.add(_unit_key(p))
-                    print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
+                    debug_print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
             if ctx.invasion_state is not None:
                 ctx.invasion_state["landed_armies"] = set(landed_state)
                 ctx.invasion_state["ashore_committed_armies"] = set(ashore_state)
@@ -3191,7 +3192,7 @@ class TacticalPlanner:
                 legal_hexes.append(h)
 
         if not any(h == fleet_hex for h in legal_hexes):
-            print(f"[TRANSPORT] no_legal_unload_hex at ({col},{row})")
+            debug_print(f"[TRANSPORT] no_legal_unload_hex at ({col},{row})")
             return []
 
         legal_now_armies = [
@@ -3199,7 +3200,7 @@ class TacticalPlanner:
             if ctx.movement_service.can_unboard_unit_to_hex(p, fleet_hex)
         ]
         if not legal_now_armies:
-            print(f"[TRANSPORT] unload_illegal at ({col},{row})")
+            debug_print(f"[TRANSPORT] unload_illegal at ({col},{row})")
             return []
 
         # 2) Landing density cap applies to GROUND ARMIES only.
@@ -3235,7 +3236,7 @@ class TacticalPlanner:
         ]
 
         for leader in companion_leaders:
-            print(f"[TRANSPORT] companion_leader_unload={getattr(leader, 'id', '?')} fleet={getattr(fleet, 'id', '?')}")
+            debug_print(f"[TRANSPORT] companion_leader_unload={getattr(leader, 'id', '?')} fleet={getattr(fleet, 'id', '?')}")
 
         return selected_armies + companion_leaders
 
@@ -3318,14 +3319,14 @@ class TacticalPlanner:
             if carrier_hex is not None and getattr(carrier, "unit_type", None) == UnitType.FLEET:
                 if not ctx.movement_service.can_unboard_unit_to_hex(p, carrier_hex):
                     col, row = carrier_hex.axial_to_offset()
-                    print(f"[TRANSPORT] unload_illegal at ({col},{row})")
+                    debug_print(f"[TRANSPORT] unload_illegal at ({col},{row})")
                     continue
             if ctx.movement_service.unboard_unit(p):
-                print(f"[TRANSPORT] Unboarded {getattr(p, 'id', '?')} from {getattr(carrier, 'id', '?')}")
+                debug_print(f"[TRANSPORT] Unboarded {getattr(p, 'id', '?')} from {getattr(carrier, 'id', '?')}")
                 moved = True
             elif carrier_hex is not None and getattr(carrier, "unit_type", None) == UnitType.FLEET:
                 col, row = carrier_hex.axial_to_offset()
-                print(f"[TRANSPORT] unload_illegal at ({col},{row})")
+                debug_print(f"[TRANSPORT] unload_illegal at ({col},{row})")
         return moved
 
     def execute_best_combat(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission]) -> bool:
@@ -3470,6 +3471,17 @@ class TacticalPlanner:
         if att_power <= 0 or def_power <= 0:
             return {"allow": False, "note": "no_combat_power"}
 
+        projected_odds_str = None
+        projected_ratio = None
+        combat_service = getattr(ctx.game_state, "combat_service", None)
+        if combat_service and hasattr(combat_service, "calculate_odds_preview"):
+            try:
+                projected_odds_str = combat_service.calculate_odds_preview(attackers, defenders, target_hex)
+                projected_ratio = self._odds_str_to_ratio(projected_odds_str)
+            except Exception:
+                projected_odds_str = None
+                projected_ratio = None
+
         loc = ctx.game_state.map.get_location(target_hex)
         loc_bonus = 0.0
         if loc:
@@ -3506,6 +3518,18 @@ class TacticalPlanner:
         main_obj_hex = Hex.offset_to_axial(*plan.main_objective.coords) if plan.main_objective else None
         is_main_objective_hex = bool(main_obj_hex and target_hex.q == main_obj_hex.q and target_hex.r == main_obj_hex.r)
 
+        defensive_desperate_recovery = False
+        if not offensive:
+            defensive_desperate_recovery = self._is_desperate_defensive_recovery_attack(ctx, target_hex)
+            if projected_ratio is not None and projected_ratio < 2.0 and not defensive_desperate_recovery:
+                return {
+                    "allow": False,
+                    "note": "defensive_crt_2to1_gate",
+                    "odds": odds,
+                    "projected_odds": projected_odds_str,
+                    "projected_ratio": projected_ratio,
+                }
+
         air_combat = [u for u in attackers if ctx.game_state.is_combat_unit(u)]
         ground_present = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in air_combat)
         air_only = bool(air_combat) and not ground_present and any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in air_combat)
@@ -3525,7 +3549,79 @@ class TacticalPlanner:
             "odds": odds,
             "effective_att": effective_att,
             "effective_def": effective_def,
+            "projected_odds": projected_odds_str,
+            "projected_ratio": projected_ratio,
+            "defensive_desperate_recovery": defensive_desperate_recovery,
         }
+
+    @staticmethod
+    def _odds_str_to_ratio(odds_str: Optional[str]) -> Optional[float]:
+        if not odds_str or ":" not in str(odds_str):
+            return None
+        try:
+            left, right = str(odds_str).split(":", 1)
+            a = float(left)
+            d = float(right)
+            if d <= 0:
+                return None
+            return a / d
+        except Exception:
+            return None
+
+    @staticmethod
+    def _collect_capture_locations_with_deadline(raw: Any, current_turn: int, default_deadline: int, out: Set[str]):
+        if isinstance(raw, dict):
+            if "all" in raw:
+                for child in raw.get("all", []) or []:
+                    TacticalPlanner._collect_capture_locations_with_deadline(child, current_turn, default_deadline, out)
+            if "any" in raw:
+                for child in raw.get("any", []) or []:
+                    TacticalPlanner._collect_capture_locations_with_deadline(child, current_turn, default_deadline, out)
+            node_type = str(raw.get("type", "") or "")
+            if node_type == "capture_location":
+                try:
+                    by_turn = int(raw.get("by_turn")) if raw.get("by_turn") is not None else None
+                except Exception:
+                    by_turn = None
+                if by_turn is None:
+                    by_turn = int(default_deadline or 0) if default_deadline else None
+                if by_turn is not None and by_turn <= current_turn:
+                    loc_id = _slugify(raw.get("location", ""))
+                    if loc_id:
+                        out.add(loc_id)
+            return
+        if isinstance(raw, list):
+            for child in raw:
+                TacticalPlanner._collect_capture_locations_with_deadline(child, current_turn, default_deadline, out)
+
+    def _is_desperate_defensive_recovery_attack(self, ctx: AIContext, target_hex: Hex) -> bool:
+        end_turn = int(getattr(ctx.game_state.scenario_spec, "end_turn", 0) or 0)
+        if end_turn <= 0 or ctx.turn != end_turn:
+            return False
+
+        victory_eval = getattr(ctx.game_state, "victory_evaluator", None)
+        if victory_eval is None:
+            return False
+        status = victory_eval.evaluate()
+        if getattr(status, "major_winner", None) != ctx.enemy:
+            return False
+
+        target_loc = ctx.game_state.map.get_location(target_hex)
+        target_loc_id = _slugify(getattr(target_loc, "id", "") or "")
+        if not target_loc_id:
+            return False
+
+        vc = getattr(ctx.game_state.scenario_spec, "victory_conditions", {}) or {}
+        enemy_major = (vc.get(ctx.enemy, {}) or {}).get("major")
+        if not enemy_major:
+            return False
+
+        urgent_capture_locations: Set[str] = set()
+        self._collect_capture_locations_with_deadline(enemy_major, ctx.turn, end_turn, urgent_capture_locations)
+        if target_loc_id not in urgent_capture_locations:
+            return False
+
+        return bool(getattr(target_loc, "occupier", None) == ctx.enemy)
 
     @staticmethod
     def _is_air_special_opportunity(ctx: AIContext, target_hex: Hex, defenders: List[object], is_main_objective_hex: bool) -> bool:
@@ -3909,7 +4005,7 @@ class BaselineAIPlayer:
         min_adjacent_power = max(8.0, float(getattr(target_country, "strength", 0) or 0))
 
         if adjacent_unit_count < min_adjacent_units or adjacent_power < min_adjacent_power:
-            print(
+            debug_print(
                 f"[INVASION] Delaying invasion of {target_country_id}: "
                 f"adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f} "
                 f"required_units>={min_adjacent_units} required_power>={min_adjacent_power:.1f}"
@@ -3921,11 +4017,11 @@ class BaselineAIPlayer:
         if not probe or not getattr(probe, "is_neutral_entry", False):
             return False
         if getattr(probe, "blocked_message", None):
-            print(f"[INVASION] Delaying invasion of {target_country_id}: {probe.blocked_message}")
+            debug_print(f"[INVASION] Delaying invasion of {target_country_id}: {probe.blocked_message}")
             return False
 
         best_group_power, best_hex, _ = max(border_groups, key=lambda item: item[0])
-        print(
+        debug_print(
             f"[INVASION] Triggering invasion of {target_country_id} from {best_hex.axial_to_offset()} "
             f"with adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f}"
         )
@@ -3933,7 +4029,7 @@ class BaselineAIPlayer:
         post_country = ctx.game_state.countries.get(target_country_id)
         if post_country and getattr(post_country, "allegiance", None) != NEUTRAL:
             return True
-        print(f"[INVASION] Invasion of {target_country_id} did not change allegiance; falling through to movement.")
+        debug_print(f"[INVASION] Invasion of {target_country_id} did not change allegiance; falling through to movement.")
         return False
 
     # ---------- Movement ----------
@@ -3973,7 +4069,7 @@ class BaselineAIPlayer:
 
         if reuse_cached:
             plan = cache.get("plan")
-            print(f"[TRANSPORT] phase_plan_reused side={side} objective={cache.get('objective_id')}")
+            debug_print(f"[TRANSPORT] phase_plan_reused side={side} objective={cache.get('objective_id')}")
         else:
             beachhead_memory = self._ensure_beachhead_phase_memory()
             plan = self._strategic.build_plan(ctx, beachhead_memory=beachhead_memory)
@@ -3990,7 +4086,7 @@ class BaselineAIPlayer:
                 "transport_signature": transport_signature,
                 "transport_actions_count": transport_actions_count,
             }
-            print(f"[TRANSPORT] phase_plan_recomputed reason={recompute_reason}")
+            debug_print(f"[TRANSPORT] phase_plan_recomputed reason={recompute_reason}")
         groups = self._operational.build_task_groups(ctx)
         missions = self._operational.build_missions(ctx, plan, groups)
         
@@ -3998,10 +4094,10 @@ class BaselineAIPlayer:
         if plan.transport_campaign:
             if plan.main_objective:
                 obj_col, obj_row = plan.main_objective.coords
-                print(f"[TRANSPORT] objective=({obj_col},{obj_row})")
+                debug_print(f"[TRANSPORT] objective=({obj_col},{obj_row})")
             if plan.beachhead_hex:
                 col, row = plan.beachhead_hex.axial_to_offset()
-                print(f"[TRANSPORT] beachhead=({col},{row})")
+                debug_print(f"[TRANSPORT] beachhead=({col},{row})")
         
         # Neutral invasion override
         if self._try_neutral_invasion(ctx, plan, attempt_invasion):

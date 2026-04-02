@@ -1,0 +1,1492 @@
+metadata:
+  scenario_id: scenario_4_siege_of_kalaman
+  turn: 20
+  phase: DEPLOYMENT
+  active_player: highlord
+  initiative_winner: highlord
+  second_player_has_acted: false
+  activation_bonuses:
+    highlord: 0
+    whitestone: 0
+  combat_bonuses:
+    highlord: 0
+    whitestone: 0
+  save_timestamp: '2026-04-02T11:34:00.177412+00:00'
+world_state:
+  countries:
+    dtemple:
+      allegiance: highlord
+      conquered: false
+      capital_id: dark_temple
+      locations:
+        dark_temple:
+          occupier: highlord
+          is_capital: true
+    estwilde:
+      allegiance: highlord
+      conquered: false
+      capital_id: null
+      locations: {}
+    kern:
+      allegiance: highlord
+      conquered: false
+      capital_id: kernen
+      locations:
+        kernen:
+          occupier: highlord
+          is_capital: true
+        ogrebond:
+          occupier: highlord
+          is_capital: false
+    taman:
+      allegiance: highlord
+      conquered: false
+      capital_id: neraka
+      locations:
+        neraka:
+          occupier: highlord
+          is_capital: true
+    southlund:
+      allegiance: whitestone
+      conquered: false
+      capital_id: caergoth
+      locations:
+        caergoth:
+          occupier: whitestone
+          is_capital: true
+        starport:
+          occupier: whitestone
+          is_capital: false
+    nightlund:
+      allegiance: whitestone
+      conquered: false
+      capital_id: kalaman
+      locations:
+        kalaman:
+          occupier: whitestone
+          is_capital: true
+    palanthas:
+      allegiance: whitestone
+      conquered: false
+      capital_id: palanthas_city
+      locations:
+        palanthas_city:
+          occupier: whitestone
+          is_capital: true
+    sancrist:
+      allegiance: whitestone
+      conquered: false
+      capital_id: castle_wistan
+      locations:
+        castle_wistan:
+          occupier: whitestone
+          is_capital: true
+    solanthus:
+      allegiance: whitestone
+      conquered: false
+      capital_id: solanthus_city
+      locations:
+        solanthus_city:
+          occupier: whitestone
+          is_capital: true
+        thelgaard:
+          occupier: whitestone
+          is_capital: false
+    dargaard:
+      allegiance: neutral
+      conquered: false
+      capital_id: dargaard_keep
+      locations:
+        dargaard_keep:
+          occupier: neutral
+          is_capital: true
+  units:
+  - unit_id: dargaard_undead_inf_1
+    ordinal: 1
+    allegiance: neutral
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dargaard_undead_inf_2
+    ordinal: 2
+    allegiance: neutral
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: soth
+    ordinal: 1
+    allegiance: neutral
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 36
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_10
+    ordinal: 10
+    allegiance: highlord
+    position:
+    - 36
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_11
+    ordinal: 11
+    allegiance: highlord
+    position:
+    - 34
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_12
+    ordinal: 12
+    allegiance: highlord
+    position:
+    - 34
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_13
+    ordinal: 13
+    allegiance: highlord
+    position:
+    - 35
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_14
+    ordinal: 14
+    allegiance: highlord
+    position:
+    - 33
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_15
+    ordinal: 15
+    allegiance: highlord
+    position:
+    - 33
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_16
+    ordinal: 16
+    allegiance: highlord
+    position:
+    - 34
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_17
+    ordinal: 17
+    allegiance: highlord
+    position:
+    - 35
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_18
+    ordinal: 18
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_19
+    ordinal: 19
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_20
+    ordinal: 20
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_5
+    ordinal: 5
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_6
+    ordinal: 6
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_7
+    ordinal: 7
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_8
+    ordinal: 8
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_9
+    ordinal: 9
+    allegiance: highlord
+    position:
+    - null
+    - null
+    status: INACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: guugar
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 32
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kern_ogre_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 35
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kern_ogre_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 32
+    - 16
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kern_ogre_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - 32
+    - 16
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kern_ogre_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - 32
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kern_ogre_inf_5
+    ordinal: 5
+    allegiance: highlord
+    position:
+    - 32
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - 35
+    - 11
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - 35
+    - 11
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: taman_human_cav_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 35
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: red_dragon_wing_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 34
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: red_dragon_wing_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 32
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: phair_caron
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 32
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: blue_dragon_wing_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 36
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: blue_dragon_wing_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kitiara
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 36
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: topus
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: ariakas
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 34
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dracart
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 31
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: eleszar
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: southlund_solamnic_cav_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 31
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: southlund_solamnic_cav_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 31
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: southlund_solamnic_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 32
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: southlund_solamnic_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 34
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: southlund_solamnic_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 34
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: calof
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_fleet_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_fleet_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 32
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 33
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 33
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: nightlund_human_inf_4
+    ordinal: 4
+    allegiance: whitestone
+    position:
+    - 32
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: palanthas_human_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 33
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: palanthas_human_fleet_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: gunthar
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 32
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_human_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 32
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_human_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 33
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_human_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 32
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_cav_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 31
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_cav_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 31
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_fleet_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 35
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_fleet_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 35
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: sancrist_solamnic_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: aurik
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 35
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: solanthus_solamnic_cav_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 30
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: solanthus_solamnic_cav_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 30
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: solanthus_solamnic_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 35
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: solanthus_solamnic_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 35
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: solanthus_solamnic_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: fizban
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: laurana
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 34
+    - 12
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    carried_by_citadel_this_turn: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  unit_runtime:
+    dargaard_undead_inf_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    dargaard_undead_inf_2|2:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    soth|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_1|1:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_10|10:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_11|11:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_12|12:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_13|13:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_14|14:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_15|15:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_16|16:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_17|17:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_18|18:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_19|19:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_2|2:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_20|20:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_3|3:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_4|4:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_5|5:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_6|6:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_7|7:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_8|8:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_9|9:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    guugar|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    kern_ogre_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    kern_ogre_inf_2|2:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    kern_ogre_inf_3|3:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    kern_ogre_inf_4|4:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    kern_ogre_inf_5|5:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_2|2:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_3|3:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_inf_4|4:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    taman_human_cav_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    red_dragon_wing_1|1:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    red_dragon_wing_2|2:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    phair_caron|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    blue_dragon_wing_1|1:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    blue_dragon_wing_2|2:
+      movement_points: 16
+      river_hexside: null
+      replacement_ready_turn: null
+    kitiara|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    topus|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    ariakas|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    dracart|1:
+      movement_points: 99
+      river_hexside: null
+      replacement_ready_turn: null
+    eleszar|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    southlund_solamnic_cav_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    southlund_solamnic_cav_2|2:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    southlund_solamnic_inf_1|1:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    southlund_solamnic_inf_2|2:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    southlund_solamnic_inf_3|3:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    calof|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_fleet_1|1:
+      movement_points: 40
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_fleet_2|2:
+      movement_points: 40
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_inf_2|2:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_inf_3|3:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    nightlund_human_inf_4|4:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    palanthas_human_inf_1|1:
+      movement_points: 4
+      river_hexside: null
+      replacement_ready_turn: null
+    palanthas_human_fleet_1|1:
+      movement_points: 40
+      river_hexside: null
+      replacement_ready_turn: null
+    gunthar|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_human_inf_1|1:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_human_inf_2|2:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_human_inf_3|3:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_cav_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_cav_2|2:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_fleet_1|1:
+      movement_points: 40
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_fleet_2|2:
+      movement_points: 40
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_inf_1|1:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    sancrist_solamnic_inf_2|2:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    aurik|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    solanthus_solamnic_cav_1|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    solanthus_solamnic_cav_2|2:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+    solanthus_solamnic_inf_1|1:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    solanthus_solamnic_inf_2|2:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    solanthus_solamnic_inf_3|3:
+      movement_points: 5
+      river_hexside: null
+      replacement_ready_turn: null
+    fizban|1:
+      movement_points: 99
+      river_hexside: null
+      replacement_ready_turn: null
+    laurana|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+  players:
+    highlord:
+      is_ai: false
+      assets: []
+    whitestone:
+      is_ai: false
+      assets:
+      - id: dragonlance_1
+        assigned_to: null
+  completed_event_ids: []
+  strategic_events:
+    ws_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    ws_minor_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    hl_minor_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    blue_crystal_staff:
+      occurrence_count: 0
+      is_active: true
+    crown_of_power:
+      occurrence_count: 0
+      is_active: true
+    dragonarmor:
+      occurrence_count: 0
+      is_active: true
+    hammer_of_kharas:
+      occurrence_count: 0
+      is_active: true
+    highlord_blitzkrieg:
+      occurrence_count: 0
+      is_active: true
+    medallion_of_faith:
+      occurrence_count: 0
+      is_active: true
+    plate_of_solamnus:
+      occurrence_count: 0
+      is_active: true
+    wildrunner_tactics:
+      occurrence_count: 0
+      is_active: true
+    ws_wizard:
+      occurrence_count: 0
+      is_active: true
+    hl_wizard:
+      occurrence_count: 0
+      is_active: true
+    disks_of_mishakal:
+      occurrence_count: 0
+      is_active: true
+    hl_diplomacy:
+      occurrence_count: 0
+      is_active: true
+    whitestone_council:
+      occurrence_count: 0
+      is_active: true
+    gnome_tech:
+      occurrence_count: 0
+      is_active: true
+    silver_arm:
+      occurrence_count: 0
+      is_active: true
+    soths_legions:
+      occurrence_count: 0
+      is_active: true
+    wyrmslayer:
+      occurrence_count: 0
+      is_active: true
+  territory_overrides:
+  - col: 30
+    row: 19
+    value: highlord
+  - col: 31
+    row: 16
+    value: highlord
+  - col: 30
+    row: 17
+    value: highlord
+  - col: 31
+    row: 20
+    value: highlord
+  - col: 30
+    row: 18
+    value: highlord
+  - col: 31
+    row: 13
+    value: highlord
+  - col: 31
+    row: 15
+    value: contested
+  - col: 31
+    row: 17
+    value: highlord

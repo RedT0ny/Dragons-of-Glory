@@ -1,5 +1,6 @@
 import sys
 import os
+import webbrowser
 from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -8,7 +9,9 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
-from src.content.config import APP_NAME, DEBUG, SAVEGAME_DIR
+from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR
+from src.content.tools import debug_print
+from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
 from src.gui.new_game_dialog import NewGameDialog
 from src.gui.status_tab import StatusTab
@@ -21,10 +24,6 @@ from src.gui.config_dialog import ConfigDialog
 from src.gui.volume_dialog import Ui_volumeDialog
 from src.content.audio_manager import AudioManager
 
-
-def _perf_print(message):
-    if DEBUG:
-        print(message)
 
 class ConsoleRedirector(QObject):
     """Custom stream object to redirect stdout/stderr to a Qt Signal while keeping original output."""
@@ -221,7 +220,7 @@ class MainWindow(QMainWindow):
             self.assets_tab.refresh()
         dt_ms = (perf_counter() - t0) * 1000.0
         hits_after, misses_after = UnitTable.get_icon_cache_stats()
-        _perf_print(
+        debug_print(
             f"[perf] MainWindow.on_tab_changed tab={tab_name} time_ms={dt_ms:.1f} "
             f"icon_hits={hits_after - hits_before} icon_misses={misses_after - misses_before}"
         )
@@ -246,7 +245,7 @@ class MainWindow(QMainWindow):
         if t0 is None:
             return
         total_ms = (perf_counter() - t0) * 1000.0
-        _perf_print(f"[perf] MainWindow.tab_settled tab={tab_name} total_ms={total_ms:.1f}")
+        debug_print(f"[perf] MainWindow.tab_settled tab={tab_name} total_ms={total_ms:.1f}")
 
     def setup_menu_bar(self):
         """Initializes the top menu bar."""
@@ -338,6 +337,12 @@ class MainWindow(QMainWindow):
 
         # --- Help Menu ---
         help_menu = menubar.addMenu("&Help")
+        manual_action = QAction("&Manual", self)
+        manual_action.triggered.connect(self.on_manual_clicked)
+        help_menu.addAction(manual_action)
+
+        view_menu.addSeparator()
+
         about_action = QAction("&About", self)
         about_action.triggered.connect(self.on_about_clicked)
         help_menu.addAction(about_action)
@@ -354,6 +359,19 @@ class MainWindow(QMainWindow):
         ui = Ui_aboutDialog()
         ui.setupUi(dialog)
         dialog.exec()
+
+    def on_manual_clicked(self):
+        """Opens the game manual using the system's default PDF viewer."""
+        viewer = QMainWindow(self)
+        ui = Ui_ManualViewer()
+        ui.setupUi(viewer)
+
+        # try:
+        #     # webbrowser.open() works on Windows, macOS, Linux, and many mobile platforms
+        #     # It uses the default application for PDF files
+        #     webbrowser.open(MANUAL)
+        # except Exception as e:
+        #     print(f"Error opening manual: {e}")
 
     def on_config_clicked(self):
         if not self.controller:

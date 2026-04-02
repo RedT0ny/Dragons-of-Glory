@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
 
 from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, NEUTRAL
 from src.content.specs import UnitType, UnitRace, UnitState
-from src.content.text_formatter import caption_id
+from src.content.tools import caption_id
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 

@@ -101,12 +101,6 @@ Every country has a color for their units. The country can be neutral, aligned w
 How to show the unit allegiance without changing the original color?
 DECISION: Use a different icon, border and font/text color. White for Whitestone, Black for Highlord, Grey for Neutral.
 
-Moving units QoL improvements needed:
-
-(UNSURE) Once the unit or stack is selected, it can be dragged to a new Hex. How to distinguish between dragging and clicking? Maybe a long click (click and hold for 0.5s) could trigger the drag mode?
-
-Events and artifacts:
-
 events in the scenario yaml:
 
 if active_events [{ event_id : int(times) }] remove them from the game_state list of active events or reduce the number of possible occurrences by times.

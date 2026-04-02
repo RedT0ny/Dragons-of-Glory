@@ -1,4 +1,6 @@
 from typing import Any, Iterable
+
+from src.content.config import DEBUG
 from src.content.specs import UnitType
 
 
@@ -340,3 +342,8 @@ class TextFormatter:
                 return default
             cursor = cursor.get(part)
         return cursor if isinstance(cursor, str) else default
+
+
+def debug_print(message):
+    if DEBUG:
+        print(message)

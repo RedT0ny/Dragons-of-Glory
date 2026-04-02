@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
                                QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
 from src.content.config import SCENARIOS_DIR, IMAGES_DIR
 from src.content.loader import load_scenario_yaml
-from src.content.text_formatter import TextFormatter
+from src.content.tools import TextFormatter
 from src.gui.notes_dialog import NotesDialog
 import os
 

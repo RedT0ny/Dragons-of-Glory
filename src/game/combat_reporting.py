@@ -4,7 +4,7 @@ from typing import Optional, Tuple
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from src.content.text_formatter import TextFormatter
+from src.content.tools import TextFormatter
 
 _PENDING_COMBAT_DIALOGS = deque()
 _COMBAT_DIALOG_ACTIVE = False

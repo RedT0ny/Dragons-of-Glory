@@ -10,7 +10,7 @@ from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
-from src.content.text_formatter import caption_id, TextFormatter
+from src.content.tools import caption_id, TextFormatter
 from src.gui.map_items import UnitCounter
 
 class CheckBoxHeader(QHeaderView):

@@ -1,11 +1,12 @@
 # config.py - Constants moved to constants.py
+import math
 import os
 
 # --- DEBUG & RUNTIME ---
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "Beta 0.34.3"
+APP_VERSION = "Beta 0.35.0"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,6 +15,7 @@ LOGS_DIR = os.path.join(BASE_DIR, "logs")
 LOCALE_DIR = os.path.join(DATA_DIR, "locale")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 AUDIO_DIR = os.path.join(ASSETS_DIR, "audio")
+DOC_DIR = os.path.join(ASSETS_DIR, "doc")
 FONTS_DIR = os.path.join(ASSETS_DIR, "font")
 ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
@@ -35,6 +37,7 @@ LIBRA_FONT = os.path.join(FONTS_DIR, "Libra Regular.otf")
 LOGO_HL = os.path.join(ICONS_DIR, "logo_hl.png")
 LOGO_WS = os.path.join(ICONS_DIR, "logo_ws.png")
 LOG_FILE = os.path.join(LOGS_DIR, "qt_last20.log")
+MANUAL = os.path.join(DOC_DIR, "manual.pdf")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77
@@ -52,3 +55,4 @@ MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "map.jpg")
 LOCATION_SIZE = 60
 MAX_TICKS = 12
 OVERLAY_ALPHA = 100
+ZOOM_MULTIPLIER = math.sqrt(2.0)

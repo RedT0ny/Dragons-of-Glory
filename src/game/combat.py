@@ -4,7 +4,7 @@ from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS
 from src.content.loader import load_data
-from src.content.text_formatter import TextFormatter
+from src.content.tools import TextFormatter
 from src.game.combat_reporting import show_combat_result_popup
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.game.map import Hex
