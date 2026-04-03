@@ -1,5 +1,4 @@
 -r requirements.txt
-pyside6-android-deploy
 jinja2
 pkginfo
 tqdm
