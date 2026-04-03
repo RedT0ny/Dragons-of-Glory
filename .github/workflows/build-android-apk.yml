@@ -185,9 +185,37 @@ jobs:
 
       - name: Build APK
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           source "$VENV_PATH/bin/activate"
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          dump_config_logs() {
+            echo
+            echo "===== Searching for libffi config.log ====="
+            find .buildozer -type f -path "*/libffi/*/config.log" -print || true
+
+            echo
+            echo "===== Printing tail of any libffi config.log files ====="
+            while IFS= read -r f; do
+              echo
+              echo "===== $f ====="
+              tail -n 200 "$f" || true
+            done < <(find .buildozer -type f -path "*/libffi/*/config.log" 2>/dev/null || true)
+
+            echo
+            echo "===== Searching for any config.log under .buildozer ====="
+            find .buildozer -type f -name "config.log" -print || true
+          }
+
+          on_error() {
+            status=$?
+            echo
+            echo "Build failed with exit code: $status"
+            dump_config_logs
+            exit "$status"
+          }
+
+          trap on_error ERR
 
           pyside6-android-deploy \
             --verbose \
@@ -196,10 +224,14 @@ jobs:
             --ndk-path "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels
 
-      - name: Dump libffi config.log on failure
-        if: failure()
-        run: |
-          find .buildozer -path "*/libffi/config.log" -print -exec sh -c 'echo "===== {} ====="; tail -n 200 "{}"' \;
+      - name: Upload build logs on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-logs
+          path: |
+            .buildozer/**
+          if-no-files-found: ignore
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

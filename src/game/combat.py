@@ -9,6 +9,9 @@ from src.game.combat_reporting import show_combat_result_popup
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.game.map import Hex
 
+# This module is intentionally rule-dense: it centralizes combat math, special-case
+# rule handling, and click-driven combat UX orchestration in one place.
+
 
 def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
     """
@@ -189,6 +192,8 @@ class CombatResolver:
         return "1:3"
 
     def resolve(self):
+        # Core land/air resolution pipeline:
+        # odds -> DRM -> die roll (+DRM clamp) -> CRT lookup -> apply both sides.
         # 1. Calculate Odds
         attacker_cs = sum(u.combat_rating for u in self.attackers)
         defender_cs = sum(u.combat_rating for u in self.defenders)
@@ -269,6 +274,12 @@ class CombatResolver:
             raise ValueError(error_msg)
 
     def calculate_total_drm(self, return_breakdown=False):
+        """
+        Calculate the total DRM for the combat, including leader tactical ratings, terrain effects, crossing penalties,
+        and other bonuses.
+        DRMs are accumulated as signed parts so callers can show a transparent breakdown in logs/UI while still using
+        a single integer total.
+        """
         drm = 0
         breakdown = []
         def add_part(label, value):
@@ -284,11 +295,11 @@ class CombatResolver:
 
         # LEADERS
         atk_leader = max(
-            [u.tactical_rating for u in self.attackers if hasattr(u, "is_leader") and u.is_leader()],
+            [u.tactical_rating for u in self.attackers if u.is_leader()],
             default=0,
         )
         def_leader = max(
-            [u.tactical_rating for u in self.defenders if hasattr(u, "is_leader") and u.is_leader()],
+            [u.tactical_rating for u in self.defenders if u.is_leader()],
             default=0,
         )
         add_part("attacker_leader", atk_leader)
@@ -375,9 +386,11 @@ class CombatResolver:
         return None
 
     def _get_defender_location(self):
+        # Citadel-vs-WS special case can suppress defender location benefits.
         if self._citadel_attack_strips_ws_defender_bonuses():
             return None
         if self._attacking_air_against_citadel():
+            # Air attacking a citadel is treated like city defense for modifiers.
             return {"type": LocType.CITY.value}
 
         defender_hex = self._get_defender_hex()
@@ -476,6 +489,7 @@ class CombatResolver:
                 continue
 
             if self.game_state.map.is_ship_bridge(attacker_hex, defender_hex, unit.allegiance):
+                # Ship bridge is treated as bridge crossing DRM.
                 candidates.append(("crossing_bridge", -4))
                 continue
 
@@ -499,7 +513,8 @@ class CombatResolver:
         candidates = self._collect_attacker_crossing_candidates(defender_hex)
         if not candidates:
             return None, 0
-        # Worst means most negative DRM; tie-break keeps a stable severity order.
+        # Apply only one crossing DRM: the harshest applicable among attackers.
+        # Tie-break keeps deterministic behavior when penalties are equal.
         tie_priority = {
             "crossing_river": 4,
             "crossing_bridge": 3,
@@ -1839,6 +1854,11 @@ class CombatClickHandler:
         self.pending_advance = None
 
     def handle_click(self, target_hex):
+        # UI click state machine:
+        # 1) building attacker selection
+        # 2) validating common targets
+        # 3) confirming and executing combat
+        # 4) post-combat leader escape / advance prompts
         if self.active_leader_escape:
             self._handle_leader_escape_click(target_hex)
             return
@@ -2003,6 +2023,7 @@ class CombatClickHandler:
         if not stack_targets:
             return []
 
+        # Combined attacks require geometric intersection of each stack's legal targets.
         common_set = set.intersection(*stack_targets)
         return list(common_set)
 
@@ -2142,6 +2163,7 @@ class CombatClickHandler:
         options = list(getattr(self.active_leader_escape, "options", []) or [])
         player = self.game_state.get_player(getattr(leader, "allegiance", None)) if leader else None
         if leader and options and player and player.is_ai:
+            # AI escapes resolve immediately; humans get a highlighted choice set.
             destination = self.game_state._get_leader_escape_handler().choose_escape_destination(leader, options)
             if destination:
                 self.game_state.move_unit(leader, destination)

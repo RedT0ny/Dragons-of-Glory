@@ -83,6 +83,7 @@ TODO:
 - Review country colors and unit icons to make them more distinguishable (Partially done).
 - I18n (Partially)
 - Simplify GameState.resolve_combat()
+- Rethink Leader drm bonus. Now it's the max, but maybe it should be the sum of all leaders in the combat?
 
 TODO BUGFIX:
 
