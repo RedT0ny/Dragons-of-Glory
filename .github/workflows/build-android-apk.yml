@@ -20,7 +20,6 @@ jobs:
       ANDROID_NDK_VERSION: "26.1.10909125"
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
-      VENV_PATH: ${{ runner.temp }}/android-venv
 
     steps:
       - name: Checkout
@@ -40,6 +39,11 @@ jobs:
       - name: Verify deploy spec exists
         run: |
           test -f pysidedeploy.spec || { echo "Missing pysidedeploy.spec at repository root"; exit 1; }
+
+      - name: Define dynamic paths
+        run: |
+          echo "VENV_PATH=$RUNNER_TEMP/android-venv" >> "$GITHUB_ENV"
+          echo "WHEEL_DIR=${GITHUB_WORKSPACE}/android-wheels" >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         run: |
@@ -82,18 +86,18 @@ jobs:
       - name: Download Android wheels
         run: |
           set -euo pipefail
-          mkdir -p android-wheels
+          mkdir -p "$WHEEL_DIR"
 
           PYSIDE_WHEEL="PySide6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
           SHIBOKEN_WHEEL="shiboken6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
 
-          wget -q -O "android-wheels/${PYSIDE_WHEEL}" \
+          wget -q -O "$WHEEL_DIR/$PYSIDE_WHEEL" \
             "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${PYSIDE_WHEEL}"
 
-          wget -q -O "android-wheels/${SHIBOKEN_WHEEL}" \
+          wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" \
             "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
 
-          ls -lh android-wheels/
+          ls -lh "$WHEEL_DIR"
 
       - name: Patch pysidedeploy.spec for CI
         run: |
@@ -112,7 +116,7 @@ jobs:
 
           qt_ver = os.environ["QT_PYSIDE_VERSION"]
           arch = os.environ["TARGET_ARCH"]
-          workspace = os.environ["GITHUB_WORKSPACE"]
+          wheel_dir = os.environ["WHEEL_DIR"]
           venv_path = os.environ["VENV_PATH"]
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
@@ -120,12 +124,10 @@ jobs:
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
 
           cfg["android"]["wheel_pyside"] = (
-              f"{workspace}/android-wheels/"
-              f"PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+              f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           )
           cfg["android"]["wheel_shiboken"] = (
-              f"{workspace}/android-wheels/"
-              f"shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+              f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           )
           cfg["android"]["sdk_path"] = sdk_root
           cfg["android"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
