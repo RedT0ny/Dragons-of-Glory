@@ -496,16 +496,14 @@ class CombatResolver:
             hexside = self.game_state.map.get_effective_hexside(attacker_hex, defender_hex)
             if hexside in (
                 HexsideType.RIVER,
-                HexsideType.RIVER.value,
                 HexsideType.DEEP_RIVER,
-                HexsideType.DEEP_RIVER.value,
             ):
                 candidates.append(("crossing_river", -4))
-            elif hexside in (HexsideType.BRIDGE, HexsideType.BRIDGE.value):
+            elif hexside == HexsideType.BRIDGE:
                 candidates.append(("crossing_bridge", -4))
-            elif hexside in (HexsideType.FORD, HexsideType.FORD.value):
+            elif hexside == HexsideType.FORD:
                 candidates.append(("crossing_ford", -3))
-            elif hexside in (HexsideType.PASS, HexsideType.PASS.value):
+            elif hexside == HexsideType.PASS:
                 candidates.append(("crossing_pass", -2))
         return candidates
 

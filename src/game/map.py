@@ -162,18 +162,23 @@ class Board:
     def add_hexside(self, q1, r1, q2, r2, side_type):
         """Registers a special border between two hexes (River/Mountain)."""
         key = tuple(sorted([(q1, r1), (q2, r2)]))
-        self.hexside_data[key] = side_type
+        self.hexside_data[key] = self._to_hexside_type(side_type)
 
         # Rule 4: Ships can only move along Deep Rivers.
         # Fords and Bridges are for ground units and usually block large ships.
-        if self._hexside_is(side_type, HexsideType.DEEP_RIVER):
+        if self._to_hexside_type(side_type) == HexsideType.DEEP_RIVER:
             self.navigable_edges.add(key)
 
     @staticmethod
-    def _hexside_is(value, hexside_type: HexsideType) -> bool:
+    def _to_hexside_type(value):
+        if value is None:
+            return None
         if isinstance(value, HexsideType):
-            return value == hexside_type
-        return value == hexside_type.value
+            return value
+        try:
+            return HexsideType(value)
+        except ValueError:
+            return None
 
     def add_unit_to_spatial_map(self, unit):
         """Registers a unit at its current position in the spatial lookup."""
@@ -292,7 +297,7 @@ class Board:
         m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
         m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
         key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
-        return self.hexside_data.get(key)
+        return self._to_hexside_type(self.hexside_data.get(key))
 
     def get_hexside_key(self, from_hex, to_hex):
         m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
@@ -305,15 +310,15 @@ class Board:
         Rule: all six hexsides adjacent to a mountain hex are treated as mountain,
         except when explicitly defined as a pass.
         """
-        raw = self.get_hexside(from_hex, to_hex)
-        if self._hexside_is(raw, HexsideType.PASS):
+        raw = self._to_hexside_type(self.get_hexside(from_hex, to_hex))
+        if raw == HexsideType.PASS:
             return raw
 
         if (
             self.get_terrain(from_hex) == TerrainType.MOUNTAIN
             or self.get_terrain(to_hex) == TerrainType.MOUNTAIN
         ):
-            return HexsideType.MOUNTAIN.value
+            return HexsideType.MOUNTAIN
 
         return raw
 
@@ -420,7 +425,7 @@ class Board:
                 if not self._is_valid_local_hex(next_hex):
                     continue
                 edge = self.get_effective_hexside(current_hex, next_hex)
-                if self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                if edge == HexsideType.DEEP_RIVER:
                     next_side = self.get_hexside_key(current_hex, next_hex)
                     if not self._fleet_can_enter_river_hexside(unit, next_side):
                         continue
@@ -441,7 +446,7 @@ class Board:
                         a = adjacent[i]
                         b = adjacent[j]
                         edge = self.get_effective_hexside(a, b)
-                        if not self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                        if edge != HexsideType.DEEP_RIVER:
                             continue
                         side = self.get_hexside_key(a, b)
                         if not self._fleet_can_enter_river_hexside(unit, side):
@@ -467,7 +472,7 @@ class Board:
                 if not self._is_valid_local_hex(next_hex):
                     continue
                 edge = self.get_effective_hexside(endpoint, next_hex)
-                if self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                if edge == HexsideType.DEEP_RIVER:
                     continue
                 if self._fleet_can_enter_hex(unit, next_hex):
                     neighbors.append(((next_hex, None), 1))
@@ -476,7 +481,7 @@ class Board:
                 if not self._is_valid_local_hex(next_hex):
                     continue
                 edge = self.get_effective_hexside(endpoint, next_hex)
-                if not self._hexside_is(edge, HexsideType.DEEP_RIVER):
+                if edge != HexsideType.DEEP_RIVER:
                     continue
                 next_side = self.get_hexside_key(endpoint, next_hex)
                 if next_side == river_hexside:
@@ -817,10 +822,7 @@ class Board:
             if self.has_enemy_army(neighbor, unit.allegiance):
                 hexside = self.get_effective_hexside(hex_coord, neighbor)
                 # "Armies are never considered adjacent if separated by mountain or deep river"
-                blocked = (
-                    self._hexside_is(hexside, HexsideType.MOUNTAIN)
-                    or self._hexside_is(hexside, HexsideType.DEEP_RIVER)
-                )
+                blocked = hexside in (HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER)
                 if not blocked:
                     return True
         return False
@@ -852,9 +854,9 @@ class Board:
             return False
 
         hexside_type = self.get_effective_hexside(from_hex, to_hex)
-        if self._hexside_is(hexside_type, HexsideType.SEA):
+        if hexside_type == HexsideType.SEA:
             return False
-        if self._hexside_is(hexside_type, HexsideType.MOUNTAIN) and not self._hexside_is(hexside_type, HexsideType.PASS):
+        if hexside_type == HexsideType.MOUNTAIN:
             return False
         return True
 
@@ -866,7 +868,7 @@ class Board:
 
         cost = 1
         # It costs one extra Movement Point for an air army to fly over a mountain hexside.
-        if self._hexside_is(self.get_effective_hexside(from_hex, to_hex), HexsideType.MOUNTAIN):
+        if self.get_effective_hexside(from_hex, to_hex) == HexsideType.MOUNTAIN:
             cost += 1
         return cost
 
@@ -881,7 +883,7 @@ class Board:
 
         # 2. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
-        if self._hexside_is(self.get_effective_hexside(from_hex, to_hex), HexsideType.DEEP_RIVER):
+        if self.get_effective_hexside(from_hex, to_hex) == HexsideType.DEEP_RIVER:
             river_side = self.get_hexside_key(from_hex, to_hex)
             if self._hexside_has_enemy_ship(river_side, unit):
                 return float('inf')
@@ -965,7 +967,7 @@ class Board:
         cost = 1
 
         # Mountains are impassable, unless there is a pass
-        if terrain == TerrainType.MOUNTAIN and not self._hexside_is(hexside_type, HexsideType.PASS):
+        if terrain == TerrainType.MOUNTAIN and hexside_type != HexsideType.PASS:
                 return float('inf')
 
         # Jungle costs 2
@@ -978,13 +980,13 @@ class Board:
                 cost += 1
 
         # Rule 5: Hexside Barriers
-        if self._hexside_is(hexside_type, HexsideType.SEA) or self._hexside_is(hexside_type, HexsideType.DEEP_RIVER):
+        if hexside_type in (HexsideType.SEA, HexsideType.DEEP_RIVER):
             return float('inf')
 
-        if self._hexside_is(hexside_type, HexsideType.RIVER):
+        if hexside_type == HexsideType.RIVER:
             cost += 1
 
-        if self._hexside_is(hexside_type, HexsideType.MOUNTAIN):
+        if hexside_type == HexsideType.MOUNTAIN:
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV
             if unit.terrain_affinity == TerrainType.MOUNTAIN:
                 cost += 1
@@ -1011,7 +1013,7 @@ class Board:
             # If ground unit, check if the hexside between current and neighbor is 'sea'
             if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
                 hexside = self.get_effective_hexside(hex_coord, neighbor)
-                if self._hexside_is(hexside, HexsideType.SEA):  # Explicitly mark water-only boundaries in config
+                if hexside == HexsideType.SEA:  # Explicitly mark water-only boundaries in config
                     continue
 
             # 3. Cannot occupy enemy hex, except ground-army displacement rule.
@@ -1102,7 +1104,7 @@ class Board:
             # Check 2: Sea Barrier
             if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
                 hexside = self.get_effective_hexside(current_hex, next_hex)
-                if self._hexside_is(hexside, HexsideType.SEA):
+                if hexside == HexsideType.SEA:
                     return None
 
             # Check 3: ZOC (Rule 5) applies only to non-cavalry Army units.

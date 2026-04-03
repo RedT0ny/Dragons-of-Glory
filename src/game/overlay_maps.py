@@ -308,11 +308,11 @@ class ThreatMap(OverlayBase):
         defensive_sides = 0
         for neighbor in hex_obj.neighbors():
             hexside = board.get_effective_hexside(hex_obj, neighbor)
-            if board._hexside_is(hexside, HexsideType.RIVER):
+            if hexside == HexsideType.RIVER:
                 defensive_sides += 1
-            elif board._hexside_is(hexside, HexsideType.DEEP_RIVER):
+            elif hexside == HexsideType.DEEP_RIVER:
                 defensive_sides += 1
-            elif board._hexside_is(hexside, HexsideType.MOUNTAIN):
+            elif hexside == HexsideType.MOUNTAIN:
                 defensive_sides += 1
         strength += min(1.5, defensive_sides * 0.2)
         return max(1.0, strength)

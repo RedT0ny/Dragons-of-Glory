@@ -170,7 +170,7 @@ jobs:
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
           cfg["python"]["android_packages"] = "buildozer==1.5.0,Cython==0.29.33"
-          
+
           cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
 
@@ -181,6 +181,32 @@ jobs:
 
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
+          PY
+
+      - name: Force python-for-android to master
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          spec = Path("buildozer.spec")
+          if not spec.exists():
+              raise SystemExit("buildozer.spec not found")
+
+          text = spec.read_text(encoding="utf-8")
+
+          if "p4a.branch" not in text:
+              text += "\np4a.branch = master\n"
+          else:
+              lines = []
+              for line in text.splitlines():
+                  if line.strip().startswith("p4a.branch"):
+                      lines.append("p4a.branch = master")
+                  else:
+                      lines.append(line)
+              text = "\n".join(lines) + "\n"
+
+          spec.write_text(text, encoding="utf-8")
+          print("Patched buildozer.spec with p4a.branch = master")
           PY
 
       - name: Build APK
@@ -194,7 +220,7 @@ jobs:
             {
               echo
               echo "===== Searching for libffi config.log ====="
-              find .buildozer -type f -path "*/libffi/*/config.log" -print || true
+              find .buildozer -type f -path "*/other_builds/libffi/*/libffi/config.log" -print || true
 
               echo
               echo "===== Printing tail of any libffi config.log files ====="
@@ -202,7 +228,7 @@ jobs:
                 echo
                 echo "===== $f ====="
                 tail -n 200 "$f" || true
-              done < <(find .buildozer -type f -path "*/libffi/*/config.log" 2>/dev/null || true)
+              done < <(find .buildozer -type f -path "*/other_builds/libffi/*/libffi/config.log" 2>/dev/null || true)
 
               echo
               echo "===== Searching for any config.log under .buildozer ====="

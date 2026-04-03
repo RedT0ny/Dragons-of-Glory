@@ -3650,11 +3650,11 @@ class TacticalPlanner:
             if target_hex not in src.neighbors():
                 continue
             edge = ctx.game_state.map.get_effective_hexside(src, target_hex)
-            if edge in (HexsideType.RIVER, HexsideType.RIVER.value, HexsideType.BRIDGE, HexsideType.BRIDGE.value):
+            if edge in (HexsideType.RIVER, HexsideType.BRIDGE):
                 penalty += 1.0
-            elif edge in (HexsideType.FORD, HexsideType.FORD.value):
+            elif edge == HexsideType.FORD:
                 penalty += 0.7
-            elif edge in (HexsideType.PASS, HexsideType.PASS.value):
+            elif edge == HexsideType.PASS:
                 penalty += 0.5
         return penalty
 

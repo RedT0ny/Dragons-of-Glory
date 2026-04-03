@@ -999,7 +999,7 @@ class GameState:
             return False
 
         hexside = self.map.get_effective_hexside(from_hex, to_hex)
-        if hexside in ([HexsideType.MOUNTAIN.value, HexsideType.DEEP_RIVER.value, HexsideType.SEA.value] or set()):
+        if hexside in {HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER, HexsideType.SEA}:
             return False
 
         if self.map.has_enemy_army(to_hex, allegiance):

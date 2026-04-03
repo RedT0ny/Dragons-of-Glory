@@ -7,7 +7,7 @@ import shiboken6
 
 from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
-from src.content.specs import UnitState, GamePhase, UnitType
+from src.content.specs import UnitState, GamePhase, UnitType, HexsideType
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
@@ -396,19 +396,19 @@ class AnsalonMapView(QGraphicsView):
                 for idx, neighbor in enumerate(neighbors):
                     hexside = board.get_hexside(hex_obj, neighbor)
 
-                    if hexside == "sea":
+                    if hexside == HexsideType.SEA:
                         coastal_dirs.append(idx)
-                    elif hexside == "pass":
+                    elif hexside == HexsideType.PASS:
                         pass_directions.append(idx)
 
                     # 4. Draw Hexside Items (Rivers, etc)
                     # To avoid duplicates, we only draw for specific directions (e.g. E, SE, SW)
-                    if idx in [0, 1, 2] and hexside and hexside in ["river", "deep_river", "mountain"]:
+                    if idx in [0, 1, 2] and hexside in {HexsideType.RIVER, HexsideType.DEEP_RIVER, HexsideType.MOUNTAIN}:
                         # Calculate vertices for this edge
                         # Edge i connects vertex i and (i+1)%6
                         p1 = self.get_vertex(center, idx)
                         p2 = self.get_vertex(center, (idx + 1) % 6)
-                        self.scene.addItem(HexsideItem(p1, p2, hexside))
+                        self.scene.addItem(HexsideItem(p1, p2, hexside.value))
 
                 # Draw Base Hex
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),
