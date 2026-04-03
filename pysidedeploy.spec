@@ -2,6 +2,7 @@
 title = Dragons of Glory
 input_file = main.py
 project_dir = .
+project_file = pyproject.toml
 exec_directory = .
 icon = assets/icon/DOG_icon.ico
 
