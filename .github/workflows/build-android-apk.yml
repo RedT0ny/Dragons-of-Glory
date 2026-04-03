@@ -83,9 +83,9 @@ jobs:
           ln -sf src/main.py main.py
           
           pyside6-android-deploy \
-            --verbose \
-            --wheel-pyside $(python -c "import site; print(site.getsitepackages()[0])")/PySide6 \
-            --wheel-shiboken $(python -c "import site; print(site.getsitepackages()[0])")/shiboken6
+            --verbose
+#            --wheel-pyside $(python -c "import site; print(site.getsitepackages()[0])")/PySide6 \
+#            --wheel-shiboken $(python -c "import site; print(site.getsitepackages()[0])")/shiboken6
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
