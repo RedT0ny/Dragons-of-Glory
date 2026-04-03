@@ -170,11 +170,21 @@ jobs:
             --ndk-path "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels
 
+      - name: Locate generated Android package
+        run: |
+          echo "Searching for APK/AAB files..."
+          find . -type f \( -name "*.apk" -o -name "*.aab" \) -print
+          echo
+          echo "Listing bin directory if present..."
+          ls -R bin || true
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dog-android-apk
+          name: dog-android-package
           path: |
+            bin/*.apk
+            bin/*.aab
             ./**/*.apk
             ./**/*.aab
           if-no-files-found: error
