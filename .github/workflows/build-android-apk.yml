@@ -10,9 +10,17 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-22.04
+
     env:
+      PYTHON_VERSION: "3.11"
+      QT_PYSIDE_VERSION: "6.10.2"
+      TARGET_ARCH: "aarch64"
+      ANDROID_API_LEVEL: "34"
+      ANDROID_BUILD_TOOLS: "35.0.0"
+      ANDROID_NDK_VERSION: "26.1.10909125"
       ANDROID_SDK_ROOT: ${{ github.workspace }}/android-sdk
       ANDROID_HOME: ${{ github.workspace }}/android-sdk
+      VENV_PATH: ${{ runner.temp }}/android-venv
 
     steps:
       - name: Checkout
@@ -21,15 +29,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Verify PySide deploy spec exists
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Verify deploy spec exists
         run: |
-          if [ ! -f pysidedeploy.spec ]; then
-            echo "Missing pysidedeploy.spec at repository root."
-            echo "Create it locally with: pyside6-android-deploy --init"
-            exit 1
-          fi
+          test -f pysidedeploy.spec || { echo "Missing pysidedeploy.spec at repository root"; exit 1; }
 
       - name: Install system dependencies
         run: |
@@ -38,21 +48,17 @@ jobs:
             git \
             zip \
             unzip \
-            openjdk-17-jdk \
             wget \
+            curl \
             patchelf \
             libffi-dev \
             libssl-dev
 
-      - name: Install Python tooling
+      - name: Create virtual environment outside project
         run: |
+          python -m venv "$VENV_PATH"
+          source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
-          pip install -r requirements-android.txt
-
-      - name: Create virtual environment
-        run: |
-          python -m venv venv
-          source venv/bin/activate
           pip install -r requirements-android.txt
 
       - name: Install Android SDK command-line tools
@@ -64,38 +70,90 @@ jobs:
 
       - name: Install Android SDK/NDK packages
         run: |
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
           yes | sdkmanager --licenses
           sdkmanager \
             "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0" \
-            "ndk;27.2.12479018" \
+            "platforms;android-${ANDROID_API_LEVEL}" \
+            "build-tools;${ANDROID_BUILD_TOOLS}" \
+            "ndk;${ANDROID_NDK_VERSION}" \
             "cmake;3.22.1"
 
-       - name: Build APK (PySide6 Android Deploy)
-         run: |
-           source venv/bin/activate
-           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-           
-           ln -sf src/main.py main.py
-           
-           # Find wheels in pip cache or use package discovery
-           PYSIDE_WHEEL=$(pip show pyside6 | grep Location | cut -d' ' -f2)/PySide6
-           SHIBOKEN_WHEEL=$(pip show shiboken6 | grep Location | cut -d' ' -f2)/shiboken6
-           
-           pyside6-android-deploy \
-             --verbose \
-             --wheel-pyside "$PYSIDE_WHEEL" \
-             --wheel-shiboken "$SHIBOKEN_WHEEL"
+      - name: Download Android wheels
+        run: |
+          set -euo pipefail
+          mkdir -p android-wheels
+
+          PYSIDE_WHEEL="PySide6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
+          SHIBOKEN_WHEEL="shiboken6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
+
+          wget -q -O "android-wheels/${PYSIDE_WHEEL}" \
+            "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${PYSIDE_WHEEL}"
+
+          wget -q -O "android-wheels/${SHIBOKEN_WHEEL}" \
+            "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
+
+          ls -lh android-wheels/
+
+      - name: Patch pysidedeploy.spec for CI
+        run: |
+          python - <<'PY'
+          import configparser
+          from pathlib import Path
+          import os
+
+          spec_path = Path("pysidedeploy.spec")
+          cfg = configparser.ConfigParser()
+          cfg.optionxform = str
+          cfg.read(spec_path, encoding="utf-8")
+
+          if "buildozer" not in cfg:
+              cfg["buildozer"] = {}
+
+          qt_ver = os.environ["QT_PYSIDE_VERSION"]
+          arch = os.environ["TARGET_ARCH"]
+          workspace = os.environ["GITHUB_WORKSPACE"]
+          venv_path = os.environ["VENV_PATH"]
+          sdk_root = os.environ["ANDROID_SDK_ROOT"]
+          ndk_ver = os.environ["ANDROID_NDK_VERSION"]
+
+          cfg["python"]["python_path"] = f"{venv_path}/bin/python"
+
+          cfg["android"]["wheel_pyside"] = (
+              f"{workspace}/android-wheels/"
+              f"PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          )
+          cfg["android"]["wheel_shiboken"] = (
+              f"{workspace}/android-wheels/"
+              f"shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          )
+          cfg["android"]["sdk_path"] = sdk_root
+          cfg["android"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
+
+          cfg["buildozer"]["mode"] = "debug"
+
+          with spec_path.open("w", encoding="utf-8") as f:
+              cfg.write(f)
+          PY
+
+          echo "Patched pysidedeploy.spec:"
+          cat pysidedeploy.spec
+
+      - name: Build APK
+        run: |
+          set -euo pipefail
+          source "$VENV_PATH/bin/activate"
+          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          pyside6-android-deploy \
+            --verbose \
+            --config-file pysidedeploy.spec
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: dog-android-apk
           path: |
-            build/**/*.apk
-            dist/**/*.apk
-            **/*.apk
+            ./**/*.apk
+            ./**/*.aab
+          if-no-files-found: error

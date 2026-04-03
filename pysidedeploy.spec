@@ -6,7 +6,7 @@ exec_directory = .
 icon = assets/icon/DOG_icon.ico
 
 [python]
-python_path = .
+python_path =
 packages = src
 extra_args =
 
@@ -26,3 +26,6 @@ permissions =
 features =
 local_libs =
 extra_files = assets,data
+
+[buildozer]
+mode = debug
