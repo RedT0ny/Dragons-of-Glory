@@ -24,7 +24,7 @@ class Ui_configDialog(object):
     def setupUi(self, configDialog):
         if not configDialog.objectName():
             configDialog.setObjectName(u"configDialog")
-        configDialog.resize(330, 330)
+        configDialog.resize(330, 361)
         self.gridLayout = QGridLayout(configDialog)
         self.gridLayout.setObjectName(u"gridLayout")
         self.buttonBox = QDialogButtonBox(configDialog)
@@ -120,6 +120,19 @@ class Ui_configDialog(object):
 
         self.gridLayout_4.addWidget(self.supComboBox, 0, 1, 1, 1)
 
+        self.depLabel = QLabel(self.rulesConfig)
+        self.depLabel.setObjectName(u"depLabel")
+        self.depLabel.setFont(font)
+
+        self.gridLayout_4.addWidget(self.depLabel, 1, 0, 1, 1)
+
+        self.depComboBox = QComboBox(self.rulesConfig)
+        self.depComboBox.addItem("")
+        self.depComboBox.addItem("")
+        self.depComboBox.setObjectName(u"depComboBox")
+
+        self.gridLayout_4.addWidget(self.depComboBox, 1, 1, 1, 1)
+
 
         self.gridLayout.addWidget(self.rulesConfig, 1, 0, 1, 1)
 
@@ -156,6 +169,10 @@ class Ui_configDialog(object):
         self.supLabel.setText(QCoreApplication.translate("configDialog", u"Supply", None))
         self.supComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Standard", None))
         self.supComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Advanced", None))
+
+        self.depLabel.setText(QCoreApplication.translate("configDialog", u"Deployment", None))
+        self.depComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Canonical", None))
+        self.depComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Manual", None))
 
     # retranslateUi
 
