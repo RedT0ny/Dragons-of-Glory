@@ -99,6 +99,12 @@ jobs:
 
           ls -lh "$WHEEL_DIR"
 
+      - name: Prepare main.py for Android deploy
+        run: |
+          test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
+          ln -sf src/main.py main.py
+          ls -l main.py
+
       - name: Patch pysidedeploy.spec for CI
         run: |
           python - <<'PY'
@@ -120,6 +126,9 @@ jobs:
           venv_path = os.environ["VENV_PATH"]
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
+
+          cfg["app"]["input_file"] = "main.py"
+          cfg["app"]["project_dir"] = "."
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
 
