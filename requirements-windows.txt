@@ -1,0 +1,3 @@
+-r requirements.txt
+# Add any Windows-specific dependencies here
+# (e.g., pyinstaller, windows-specific libraries)

@@ -1,0 +1,3 @@
+-r requirements.txt
+tqdm
+packaging==24.1
