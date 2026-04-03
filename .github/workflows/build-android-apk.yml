@@ -143,7 +143,7 @@ jobs:
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
-          cfg["python"]["android_packages"] = "buildozer,cpython"
+          cfg["python"]["android_packages"] = "buildozer==1.5.0,Cython==0.29.33"
           
           cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
