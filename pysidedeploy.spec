@@ -10,6 +10,7 @@ icon = assets/icon/DOG_icon.ico
 python_path =
 packages = src
 extra_args =
+android_packages = buildozer,cpython
 
 [qt]
 qml_files =
