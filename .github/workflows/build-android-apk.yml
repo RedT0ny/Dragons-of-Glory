@@ -72,7 +72,10 @@ jobs:
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-          pyside6-android-deploy --verbose
+          pyside6-android-deploy \
+            --verbose \
+            --wheel-pyside $(python -c "import site; print(site.getsitepackages()[0])")/PySide6 \
+            --wheel-shiboken $(python -c "import site; print(site.getsitepackages()[0])")/shiboken6
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
