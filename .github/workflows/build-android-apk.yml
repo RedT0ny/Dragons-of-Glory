@@ -132,6 +132,9 @@ jobs:
           cfg.optionxform = str
           cfg.read(spec_path, encoding="utf-8")
 
+          if "buildozer" not in cfg:
+              cfg["buildozer"] = {}
+
           qt_ver = os.environ["QT_PYSIDE_VERSION"]
           arch = os.environ["TARGET_ARCH"]
           wheel_dir = os.environ["WHEEL_DIR"]
@@ -140,10 +143,14 @@ jobs:
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
+
           cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
-          cfg["android"]["sdk_path"] = sdk_root
-          cfg["android"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
+
+          cfg["buildozer"]["mode"] = "debug"
+          cfg["buildozer"]["sdk_path"] = sdk_root
+          cfg["buildozer"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
+          cfg["buildozer"]["arch"] = arch
 
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
@@ -158,6 +165,8 @@ jobs:
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
+            --sdk-path "$ANDROID_SDK_ROOT" \
+            --ndk-path "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels
 
       - name: Upload artifact
