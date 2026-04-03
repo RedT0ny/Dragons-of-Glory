@@ -150,6 +150,29 @@ jobs:
           echo "Patched pysidedeploy.spec:"
           cat pysidedeploy.spec
 
+      - name: Validate Python syntax with CI interpreter
+        run: |
+          set -euo pipefail
+          source "$VENV_PATH/bin/activate"
+          python - <<'PY'
+          from pathlib import Path
+          import py_compile
+          import sys
+
+          failed = False
+          for py_file in Path("src").rglob("*.py"):
+              try:
+                  py_compile.compile(str(py_file), doraise=True)
+              except py_compile.PyCompileError as e:
+                  print(f"\n[SYNTAX ERROR] {py_file}\n{e.msg}\n")
+                  failed = True
+
+          if failed:
+              sys.exit(1)
+
+          print("All Python files under src compile successfully with this interpreter.")
+          PY
+
       - name: Build APK
         run: |
           set -euo pipefail
