@@ -48,7 +48,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install shiboken6 pyside6-android-deploy
+          pip install pyside6
 
       - name: Install Android SDK command-line tools
         run: |

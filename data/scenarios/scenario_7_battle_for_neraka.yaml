@@ -35,7 +35,14 @@ scenario:
   #initiative_start: "highlord"  # highlord | whitestone | neutral
 
   # Global Events
-  possible_events: all
+  possible_events:
+    dragonarmor: 2
+    dragonlance: 2
+    highlord_blitzkrieg: 2
+    medallion:_of_faith: 1
+    dragon_orb: 1
+    wildrunner_tactics: 2
+    flying_citadel: 1
 
   # Allegiance-based Setup
   initial_setup:
@@ -45,21 +52,37 @@ scenario:
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
-      deployment_area: null
+      deployment_area:
+        countries: ["dtemple", "taman_busuk"]
 
       countries:
-        taman: all
-        red:
-          # Explicit partial setup
+        dtemple:
           units_by_type:
-            dragon: 1
+            inf: 10
+          ready: 10
+        kern: all
+        khur:
+          units_by_type:
+            inf: 2
+            cav: 1
+        taman:
+          units_by_type:
+            inf: 4
+            cav: 1
+        blue: all
+        black: all
+        red:
+          units_by_type:
+             dragon: 2
+        green: all
 
       # Specific units (Leaders/Wizards) not tied to a country's regular army
-      explicit_units: ["verminaard", "kitiara", "iolanthe"]
+      explicit_units: ["ariakas", "verminaard", "iolanthe"]
       units_by_type:
         citadel: 2
       assets:
         dragon_orb: 1
+        dragonarmor: 3
 
       victory_conditions:
         major:
@@ -72,9 +95,18 @@ scenario:
         countries: ["estwilde"]
 
       countries:
-        qualinesti: all # Automatically pulls 4 inf, 4 wing (griffon), etc.
+        qualinesti:
+          units_by_type:
+            inf: 2
+            wing: 2
+            general: 1
         sancrist: all
         southlund: all
+        solanthus:
+          units_by_type:
+            inf: 2
+            cav: 1
+            general: 1
         gold: all
         silver: all
         bronze: all
@@ -83,6 +115,8 @@ scenario:
 
       explicit_units: ["fizban", "laurana"]
       assets:
+        dragonmetal: all
+        plate_of_solamnus: 3
         dragonlance: 2
 
       victory_conditions:
@@ -92,4 +126,4 @@ scenario:
           by_turn: 30
 
   notes: >
-    Any additional special rules or setup instructions.
+    Using Solanthus troops instead of Northern Ergoth (Dragon #107).
