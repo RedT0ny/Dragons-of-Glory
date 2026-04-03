@@ -38,7 +38,7 @@ jobs:
             --add-data "assets/font;assets/font" `
             --add-data "assets/icon;assets/icon" `
             --add-data "assets/img;assets/img" `
-            --add-data "assets/video;assets/video" `
+            --add-data "assets/video;assets/video/intro.gif" `
             --add-data "data;data" `
             src/main.py
 
