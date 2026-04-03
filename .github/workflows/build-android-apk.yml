@@ -82,10 +82,13 @@ jobs:
           
           ln -sf src/main.py main.py
           
+          PYSIDE_WHEEL=$(python -c "import site; import glob; wheels=glob.glob(site.getsitepackages()[0] + '/PySide6*.whl'); print(wheels[0] if wheels else '')")
+          SHIBOKEN_WHEEL=$(python -c "import site; import glob; wheels=glob.glob(site.getsitepackages()[0] + '/shiboken6*.whl'); print(wheels[0] if wheels else '')")
+          
           pyside6-android-deploy \
-            --verbose
-#            --wheel-pyside $(python -c "import site; print(site.getsitepackages()[0])")/PySide6 \
-#            --wheel-shiboken $(python -c "import site; print(site.getsitepackages()[0])")/shiboken6
+            --verbose \
+            --wheel-pyside "$PYSIDE_WHEEL" \
+            --wheel-shiboken "$SHIBOKEN_WHEEL"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
