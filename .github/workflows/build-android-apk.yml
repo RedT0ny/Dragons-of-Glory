@@ -72,6 +72,10 @@ jobs:
         run: |
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+          
+          # Create symlink for Android deployment
+          ln -sf src/main.py main.py
+          
           pyside6-android-deploy \
             --verbose \
             --wheel-pyside $(python -c "import site; print(site.getsitepackages()[0])")/PySide6 \

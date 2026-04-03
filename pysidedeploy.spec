@@ -1,9 +1,8 @@
 [app]
 title = Dragons of Glory
-input_file = src/main.py
+input_file = main.py
 project_dir = .
-exec_directory = src
-project_file =
+exec_directory = .
 icon = assets/icon/DOG_icon.ico
 
 [python]
