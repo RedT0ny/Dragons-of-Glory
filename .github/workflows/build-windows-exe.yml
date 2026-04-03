@@ -35,7 +35,7 @@ jobs:
             --name dog `
             --icon assets/icon/DOG_icon.ico `
             --add-data "assets/audio;assets/audio" `
-            --add-data "assets/doc;assets/doc" `          
+            --add-data "assets/doc;assets/doc" `
             --add-data "assets/font;assets/font" `
             --add-data "assets/icon;assets/icon" `
             --add-data "assets/img;assets/img" `
