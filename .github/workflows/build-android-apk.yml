@@ -183,31 +183,16 @@ jobs:
               cfg.write(f)
           PY
 
-      - name: Force python-for-android to master
+      - name: Seed buildozer.spec with stable p4a branch
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          cat > buildozer.spec <<'EOF'
+          [app]
+          p4a.branch = master
 
-          spec = Path("buildozer.spec")
-          if not spec.exists():
-              raise SystemExit("buildozer.spec not found")
-
-          text = spec.read_text(encoding="utf-8")
-
-          if "p4a.branch" not in text:
-              text += "\np4a.branch = master\n"
-          else:
-              lines = []
-              for line in text.splitlines():
-                  if line.strip().startswith("p4a.branch"):
-                      lines.append("p4a.branch = master")
-                  else:
-                      lines.append(line)
-              text = "\n".join(lines) + "\n"
-
-          spec.write_text(text, encoding="utf-8")
-          print("Patched buildozer.spec with p4a.branch = master")
-          PY
+          [buildozer]
+          log_level = 2
+          warn_on_root = 1
+          EOF
 
       - name: Build APK
         run: |

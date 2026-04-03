@@ -2111,8 +2111,9 @@ class TacticalPlanner:
             valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(unit, allow_territory_wide=allow_territory_wide) or []
             if not valid:
                 continue
+            preferred_valid = TacticalPlanner._preferred_deployment_hexes(ctx, unit, valid)
             best_hex = max(
-                valid,
+                preferred_valid,
                 key=lambda coords: self._score_deployment_hex(ctx, plan, unit, coords),
             )
             result = ctx.game_state.deployment_service.deploy_unit(
@@ -2334,6 +2335,7 @@ class TacticalPlanner:
             valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(army, allow_territory_wide=allow_territory_wide) or []
             if not valid:
                 continue
+            valid = TacticalPlanner._preferred_deployment_hexes(ctx, army, valid)
 
             # Score candidates - SAME-HEX first, adjacent only as fallback
             same_hex_candidates = []
@@ -2516,8 +2518,46 @@ class TacticalPlanner:
                                   or getattr(unit, "is_army", lambda: False)())
             if is_ground_infantry and threat < 0.5:
                 score -= 15.0
+
+        # Avoid deploying ground armies into terrain/hexside pockets with no legal exits.
+        if TacticalPlanner._is_locked_ground_deployment_hex(ctx, unit, deploy_hex):
+            score -= 1000.0
         
         return score
+
+    @staticmethod
+    def _is_locked_ground_deployment_hex(ctx: AIContext, unit, deploy_hex: Hex) -> bool:
+        if not (
+            getattr(unit, "is_army", lambda: False)()
+            and getattr(unit, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        ):
+            return False
+
+        board = ctx.game_state.map
+        for neighbor in deploy_hex.neighbors():
+            if not board._is_valid_local_hex(neighbor):
+                continue
+            if board.get_movement_cost(unit, deploy_hex, neighbor) != float("inf"):
+                return False
+        return True
+
+    @staticmethod
+    def _preferred_deployment_hexes(ctx: AIContext, unit, valid: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        if not valid:
+            return valid
+        if not (
+            getattr(unit, "is_army", lambda: False)()
+            and getattr(unit, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+        ):
+            return valid
+
+        movable = []
+        for coords in valid:
+            col, row = int(coords[0]), int(coords[1])
+            deploy_hex = Hex.offset_to_axial(col, row)
+            if not TacticalPlanner._is_locked_ground_deployment_hex(ctx, unit, deploy_hex):
+                movable.append(coords)
+        return movable if movable else valid
 
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
         if self._maybe_execute_transport_action(ctx, plan):
