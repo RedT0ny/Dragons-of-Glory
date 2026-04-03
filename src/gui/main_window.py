@@ -377,13 +377,13 @@ class MainWindow(QMainWindow):
         if not self.controller:
             return
         current_player = getattr(self.game_state, "current_player", None)
-        if current_player and getattr(current_player, "is_ai", False):
-            QMessageBox.information(
-                self,
-                "Configuration",
-                "Player configuration can be changed only during a human player's turn.",
-            )
-            return
+        # if current_player and getattr(current_player, "is_ai", False):
+        #     QMessageBox.information(
+        #         self,
+        #         "Configuration",
+        #         "Player configuration can be changed only during a human player's turn.",
+        #     )
+        #     return
 
         dialog = ConfigDialog(self)
         dialog.set_from_config(self.controller.get_runtime_config())

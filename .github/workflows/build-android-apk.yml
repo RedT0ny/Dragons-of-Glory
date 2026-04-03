@@ -197,27 +197,47 @@ jobs:
       - name: Build APK
         run: |
           set -Eeuo pipefail
-          mkdir -p ci-debug
+          mkdir -p ci-debug/configlogs
           source "$VENV_PATH/bin/activate"
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 
-          dump_config_logs() {
+          start_configlog_watcher() {
+            (
+              while true; do
+                if [ -d ".buildozer" ]; then
+                  find .buildozer -type f -name "config.log" -print0 2>/dev/null | \
+                  while IFS= read -r -d '' f; do
+                    mkdir -p "ci-debug/configlogs/$(dirname "$f")"
+                    cp -f "$f" "ci-debug/configlogs/$f" 2>/dev/null || true
+                  done
+                fi
+                sleep 2
+              done
+            ) &
+            echo $!
+          }
+
+          dump_saved_config_logs() {
             {
               echo
-              echo "===== Searching for libffi config.log ====="
-              find .buildozer -type f -path "*/other_builds/libffi/*/libffi/config.log" -print || true
+              echo "===== Saved config.log files copied during build ====="
+              find ci-debug/configlogs -type f -name "config.log" -print || true
 
               echo
-              echo "===== Printing tail of any libffi config.log files ====="
+              echo "===== Tail of saved libffi config.log files ====="
               while IFS= read -r f; do
                 echo
                 echo "===== $f ====="
                 tail -n 200 "$f" || true
-              done < <(find .buildozer -type f -path "*/other_builds/libffi/*/libffi/config.log" 2>/dev/null || true)
+              done < <(find ci-debug/configlogs -type f -path "*/other_builds/libffi/*/libffi/config.log" 2>/dev/null || true)
 
               echo
-              echo "===== Searching for any config.log under .buildozer ====="
-              find .buildozer -type f -name "config.log" -print || true
+              echo "===== Tail of all saved config.log files ====="
+              while IFS= read -r f; do
+                echo
+                echo "===== $f ====="
+                tail -n 80 "$f" || true
+              done < <(find ci-debug/configlogs -type f -name "config.log" 2>/dev/null || true)
             } | tee -a ci-debug/build-apk.log
           }
 
@@ -227,10 +247,12 @@ jobs:
               echo
               echo "Build failed with exit code: $status"
             } | tee -a ci-debug/build-apk.log
-            dump_config_logs
+            dump_saved_config_logs
             exit "$status"
           }
 
+          WATCHER_PID="$(start_configlog_watcher)"
+          trap 'kill "$WATCHER_PID" 2>/dev/null || true' EXIT
           trap on_error ERR
 
           pyside6-android-deploy \
@@ -240,6 +262,8 @@ jobs:
             --ndk-path "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee ci-debug/build-apk.log
+
+          kill "$WATCHER_PID" 2>/dev/null || true
 
       - name: Upload build logs
         if: always()
