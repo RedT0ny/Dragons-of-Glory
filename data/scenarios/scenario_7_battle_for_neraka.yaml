@@ -52,8 +52,7 @@ scenario:
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
-      deployment_area:
-        countries: ["dtemple", "taman_busuk"]
+      deployment_area: ["dtemple", "taman"]
 
       countries:
         dtemple:
@@ -91,10 +90,10 @@ scenario:
 
     whitestone:
       # Example of specific deployment region (subset of countries)
-      deployment_area:
-        countries: ["estwilde"]
+      deployment_area: ["estwilde"]
 
       countries:
+        estwilde: null
         qualinesti:
           units_by_type:
             inf: 2

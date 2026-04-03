@@ -49,12 +49,31 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            git \
             zip \
             unzip \
-            wget \
-            patchelf \
+            openjdk-17-jdk \
+            python3-pip \
+            python3-setuptools \
+            python3-dev \
+            build-essential \
+            patch \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
             libffi-dev \
-            libssl-dev
+            libssl-dev \
+            libltdl-dev \
+            autopoint \
+            gettext \
+            gawk \
+            patchelf
 
       - name: Create virtual environment
         run: |
@@ -177,13 +196,10 @@ jobs:
             --ndk-path "$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels
 
-      - name: Locate generated Android package
+      - name: Dump libffi config.log on failure
+        if: failure()
         run: |
-          echo "Searching for APK/AAB files..."
-          find . -type f \( -name "*.apk" -o -name "*.aab" \) -print
-          echo
-          echo "Listing bin directory if present..."
-          ls -R bin || true
+          find .buildozer -path "*/libffi/config.log" -print -exec sh -c 'echo "===== {} ====="; tail -n 200 "{}"' \;
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
