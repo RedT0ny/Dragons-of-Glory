@@ -70,6 +70,13 @@ jobs:
           unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
           mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
 
+      - name: Create legacy sdkmanager path for Buildozer compatibility
+        run: |
+          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
+          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+                 "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+          test -x "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+
       - name: Install Android SDK/NDK packages
         run: |
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
