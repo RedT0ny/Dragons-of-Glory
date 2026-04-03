@@ -74,21 +74,22 @@ jobs:
             "ndk;27.2.12479018" \
             "cmake;3.22.1"
 
-      - name: Build APK (PySide6 Android Deploy)
-        run: |
-          source venv/bin/activate
-          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
-          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-          
-          ln -sf src/main.py main.py
-          
-          PYSIDE_WHEEL=$(python -c "import site; import glob; wheels=glob.glob(site.getsitepackages()[0] + '/PySide6*.whl'); print(wheels[0] if wheels else '')")
-          SHIBOKEN_WHEEL=$(python -c "import site; import glob; wheels=glob.glob(site.getsitepackages()[0] + '/shiboken6*.whl'); print(wheels[0] if wheels else '')")
-          
-          pyside6-android-deploy \
-            --verbose \
-            --wheel-pyside "$PYSIDE_WHEEL" \
-            --wheel-shiboken "$SHIBOKEN_WHEEL"
+       - name: Build APK (PySide6 Android Deploy)
+         run: |
+           source venv/bin/activate
+           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+           
+           ln -sf src/main.py main.py
+           
+           # Find wheels in pip cache or use package discovery
+           PYSIDE_WHEEL=$(pip show pyside6 | grep Location | cut -d' ' -f2)/PySide6
+           SHIBOKEN_WHEEL=$(pip show shiboken6 | grep Location | cut -d' ' -f2)/shiboken6
+           
+           pyside6-android-deploy \
+             --verbose \
+             --wheel-pyside "$PYSIDE_WHEEL" \
+             --wheel-shiboken "$SHIBOKEN_WHEEL"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
