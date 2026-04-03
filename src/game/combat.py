@@ -258,10 +258,7 @@ class CombatResolver:
                 unit.eliminate()
         elif apply_deplete_all:
             for unit in affected:
-                if unit.status.name == "DEPLETED":
-                    unit.eliminate()
-                elif unit.status.name == "ACTIVE":
-                    unit.deplete()
+                unit.deplete()
 
         if depletion_steps:
             self._apply_depletion_steps(affected, depletion_steps)
@@ -294,14 +291,8 @@ class CombatResolver:
         defender_loc_type = self._normalize_loc_type(defender_location)
 
         # LEADERS
-        atk_leader = max(
-            [u.tactical_rating for u in self.attackers if u.is_leader()],
-            default=0,
-        )
-        def_leader = max(
-            [u.tactical_rating for u in self.defenders if u.is_leader()],
-            default=0,
-        )
+        atk_leader = sum( u.tactical_rating for u in self.attackers if u.is_leader() )
+        def_leader = sum( u.tactical_rating for u in self.defenders if u.is_leader() )
         add_part("attacker_leader", atk_leader)
         add_part("defender_leader", -def_leader)
 
@@ -432,7 +423,6 @@ class CombatResolver:
             return False
         return any(
             getattr(u, "allegiance", None) == WS
-            and hasattr(u, "is_army")
             and u.is_army()
             and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
             and getattr(u, "is_on_map", False)
