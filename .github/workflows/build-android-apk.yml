@@ -49,6 +49,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-android.txt
 
+      - name: Create virtual environment
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install -r requirements-android.txt
+
       - name: Install Android SDK command-line tools
         run: |
           mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
@@ -70,10 +76,10 @@ jobs:
 
       - name: Build APK (PySide6 Android Deploy)
         run: |
+          source venv/bin/activate
           export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
           
-          # Create symlink for Android deployment
           ln -sf src/main.py main.py
           
           pyside6-android-deploy \
