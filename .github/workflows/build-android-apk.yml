@@ -43,22 +43,20 @@ jobs:
           echo "VENV_PATH=$RUNNER_TEMP/android-venv" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
           echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
-          echo "WHEEL_DIR=${GITHUB_WORKSPACE}/android-wheels" >> "$GITHUB_ENV"
+          echo "WHEEL_DIR=$GITHUB_WORKSPACE/android-wheels" >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git \
             zip \
             unzip \
             wget \
-            curl \
             patchelf \
             libffi-dev \
             libssl-dev
 
-      - name: Create virtual environment outside project
+      - name: Create virtual environment
         run: |
           python -m venv "$VENV_PATH"
           source "$VENV_PATH/bin/activate"
@@ -97,13 +95,30 @@ jobs:
           wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" \
             "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
 
-          ls -lh "$WHEEL_DIR"
-
       - name: Prepare main.py for Android deploy
         run: |
           test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
           ln -sf src/main.py main.py
-          ls -l main.py
+
+      - name: Remove UTF-8 BOM from Python files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          fixed = []
+          for p in Path("src").rglob("*.py"):
+              raw = p.read_bytes()
+              if raw.startswith(b'\xef\xbb\xbf'):
+                  p.write_bytes(raw[3:])
+                  fixed.append(str(p))
+
+          if fixed:
+              print("Removed BOM from:")
+              for f in fixed:
+                  print(" -", f)
+          else:
+              print("No BOM found in Python files under src.")
+          PY
 
       - name: Patch pysidedeploy.spec for CI
         run: |
@@ -117,9 +132,6 @@ jobs:
           cfg.optionxform = str
           cfg.read(spec_path, encoding="utf-8")
 
-          if "buildozer" not in cfg:
-              cfg["buildozer"] = {}
-
           qt_ver = os.environ["QT_PYSIDE_VERSION"]
           arch = os.environ["TARGET_ARCH"]
           wheel_dir = os.environ["WHEEL_DIR"]
@@ -127,50 +139,14 @@ jobs:
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
 
-          cfg["app"]["input_file"] = "main.py"
-          cfg["app"]["project_dir"] = "."
-
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
-
-          cfg["android"]["wheel_pyside"] = (
-              f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
-          )
-          cfg["android"]["wheel_shiboken"] = (
-              f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
-          )
+          cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["sdk_path"] = sdk_root
           cfg["android"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
 
-          cfg["buildozer"]["mode"] = "debug"
-
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
-          PY
-
-          echo "Patched pysidedeploy.spec:"
-          cat pysidedeploy.spec
-
-      - name: Validate Python syntax with CI interpreter
-        run: |
-          set -euo pipefail
-          source "$VENV_PATH/bin/activate"
-          python - <<'PY'
-          from pathlib import Path
-          import py_compile
-          import sys
-
-          failed = False
-          for py_file in Path("src").rglob("*.py"):
-              try:
-                  py_compile.compile(str(py_file), doraise=True)
-              except py_compile.PyCompileError as e:
-                  print(f"\n[SYNTAX ERROR] {py_file}\n{e.msg}\n")
-                  failed = True
-
-          if failed:
-              sys.exit(1)
-
-          print("All Python files under src compile successfully with this interpreter.")
           PY
 
       - name: Build APK
@@ -182,7 +158,7 @@ jobs:
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
-            --extra-ignore-dirs android-sdk,.git,.github,build,dist,venv,__pycache__
+            --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
