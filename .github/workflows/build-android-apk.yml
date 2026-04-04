@@ -81,6 +81,8 @@ jobs:
           source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
           pip install -r requirements-android.txt
+          pip install "https://github.com/kivy/buildozer/archive/master.zip"
+          pip install Cython==0.29.34 setuptools legacy-cgi
 
       - name: Install Android SDK command-line tools
         run: |
@@ -169,7 +171,7 @@ jobs:
           ndk_ver = os.environ["ANDROID_NDK_VERSION"]
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
-          cfg["python"]["android_packages"] = "https://github.com/kivy/buildozer/archive/master.zip,legacy-cgi,setuptools,Cython==0.29.34"
+          cfg["python"]["android_packages"] = "buildozer,Cython,legacy_cgi,setuptools"
 
           cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
@@ -182,17 +184,6 @@ jobs:
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
           PY
-
-      - name: Seed buildozer.spec with stable p4a branch
-        run: |
-          cat > buildozer.spec <<'EOF'
-          [app]
-          p4a.branch = master
-
-          [buildozer]
-          log_level = 2
-          warn_on_root = 1
-          EOF
 
       - name: Build APK
         run: |
