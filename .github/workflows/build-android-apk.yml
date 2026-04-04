@@ -17,7 +17,7 @@ jobs:
       TARGET_ARCH: "aarch64"
       ANDROID_API_LEVEL: "34"
       ANDROID_BUILD_TOOLS: "35.0.0"
-      ANDROID_NDK_VERSION: "26.1.10909125"
+      ANDROID_NDK_VERSION: "25.2.9519653"
 
     steps:
       - name: Checkout
