@@ -23,6 +23,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Remove any stale root buildozer.spec
+        run: |
+          rm -f buildozer.spec
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -33,6 +37,10 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+
+      - name: Verify deploy spec exists
+        run: |
+          test -f pysidedeploy.spec || { echo "Missing pysidedeploy.spec at repository root"; exit 1; }
 
       - name: Define dynamic paths
         run: |
@@ -76,6 +84,7 @@ jobs:
           python -m venv "$VENV_PATH"
           source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
+          pip install -r requirements-android.txt
           pip install buildozer==1.5.0 Cython==0.29.34 setuptools
 
       - name: Install Android SDK command-line tools
@@ -117,17 +126,9 @@ jobs:
           wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" \
             "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
 
-      - name: Verify required deployment assets exist
+      - name: Prepare main.py for Android deploy
         run: |
-          test -f buildozer.spec || { echo "Missing buildozer.spec at repo root"; exit 1; }
-          test -d src/deployment/recipes/PySide6 || { echo "Missing src/deployment/recipes/PySide6"; exit 1; }
-          test -d src/deployment/recipes/shiboken6 || { echo "Missing src/deployment/recipes/shiboken6"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing Qt6Android.jar"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing Qt6AndroidBindings.jar"; exit 1; }
           test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
-
-      - name: Prepare main.py for Buildozer
-        run: |
           ln -sf src/main.py main.py
 
       - name: Remove UTF-8 BOM from Python files
@@ -150,13 +151,96 @@ jobs:
               print("No BOM found in Python files under src.")
           PY
 
-      - name: Build APK with Buildozer directly
+      - name: Patch pysidedeploy.spec for CI
+        run: |
+          python - <<'PY'
+          import configparser
+          from pathlib import Path
+          import os
+
+          spec_path = Path("pysidedeploy.spec")
+          cfg = configparser.ConfigParser()
+          cfg.optionxform = str
+          cfg.read(spec_path, encoding="utf-8")
+
+          for section in ("app", "python", "android", "buildozer"):
+              if section not in cfg:
+                  cfg[section] = {}
+
+          qt_ver = os.environ["QT_PYSIDE_VERSION"]
+          arch = os.environ["TARGET_ARCH"]
+          wheel_dir = os.environ["WHEEL_DIR"]
+          venv_path = os.environ["VENV_PATH"]
+          sdk_root = os.environ["ANDROID_SDK_ROOT"]
+          ndk_ver = os.environ["ANDROID_NDK_VERSION"]
+
+          cfg["app"]["project_file"] = "pyproject.toml"
+
+          cfg["python"]["python_path"] = f"{venv_path}/bin/python"
+          cfg["python"]["android_packages"] = "buildozer==1.5.0,Cython==0.29.34,setuptools"
+
+          cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+
+          cfg["buildozer"]["mode"] = "debug"
+          cfg["buildozer"]["sdk_path"] = sdk_root
+          cfg["buildozer"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
+          cfg["buildozer"]["arch"] = arch
+
+          with spec_path.open("w", encoding="utf-8") as f:
+              cfg.write(f)
+
+          print("Patched pysidedeploy.spec")
+          PY
+
+      - name: Create buildozer patch script for generated spec
+        run: |
+          cat > patch_buildozer.py <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("buildozer.spec")
+          text = p.read_text(encoding="utf-8")
+
+          def upsert(text, key, value):
+              pattern = rf"(?m)^\s*{re.escape(key)}\s*=.*$"
+              replacement = f"{key} = {value}"
+              if re.search(pattern, text):
+                  return re.sub(pattern, replacement, text)
+              return text.rstrip() + "\n" + replacement + "\n"
+
+          # Force Android-safe identifiers
+          text = upsert(text, "package.name", "dragonsofglory")
+          text = upsert(text, "package.domain", "org.redtony")
+
+          # Force stable p4a path for Python <= 3.12
+          text = upsert(text, "p4a.branch", "master")
+
+          # Force Python 3.11 to match cp311 Android wheels
+          text = upsert(
+              text,
+              "requirements",
+              "python3==3.11.11,hostpython3==3.11.11,shiboken6,PySide6"
+          )
+
+          # Keep Android API/minapi aligned
+          text = upsert(text, "android.api", "34")
+          text = upsert(text, "android.minapi", "24")
+
+          p.write_text(text, encoding="utf-8")
+
+          print("Patched generated buildozer.spec")
+          print("----- buildozer.spec -----")
+          print(p.read_text(encoding="utf-8"))
+          PY
+
+      - name: Generate PySide deployment assets only
         run: |
           set -Eeuo pipefail
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Normalize Android environment for Buildozer / p4a
+          # Normalize Android environment
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
 
@@ -165,40 +249,3 @@ jobs:
 
           export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
           export ANDROIDSDK="$ANDROID_SDK_ROOT"
-
-          export ANDROID_NDK="$ANDROIDNDK"
-          export ANDROID_NDK_HOME="$ANDROIDNDK"
-          export ANDROID_NDK_ROOT="$ANDROIDNDK"
-
-          export ANDROIDAPI=34
-          export ANDROIDMINAPI=24
-
-          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee ci-debug/build-apk.log
-          echo "ANDROID_NDK=$ANDROIDNDK" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
-
-          python -m buildozer -v android debug 2>&1 | tee -a ci-debug/build-apk.log
-
-      - name: Upload build logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-build-logs
-          path: |
-            ci-debug/**
-          if-no-files-found: ignore
-
-      - name: Upload Android package
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dog-android-package
-          path: |
-            bin/*.apk
-            bin/*.aab
-            ./**/*.apk
-            ./**/*.aab
-          if-no-files-found: error

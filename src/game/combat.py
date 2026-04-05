@@ -954,12 +954,6 @@ class CombatService:
     def movement_service(self):
         return self.game_state.movement_service
 
-    def get_units_at(self, hex_coord):
-        return self.game_state.get_units_at(hex_coord)
-
-    def move_unit(self, unit, target_hex):
-        return self.game_state.move_unit(unit, target_hex)
-
     def is_hex_in_bounds(self, q: int, r: int) -> bool:
         return self.game_state.is_hex_in_bounds(q, r)
 
@@ -987,12 +981,6 @@ class CombatService:
         """Returns effective attacker/defender combat ratio for the given combat context."""
         return self._project_combat_odds(attackers, defenders, hex_position)["ratio"]
 
-    def _get_leader_escape_handler(self):
-        return self.game_state._get_leader_escape_handler()
-
-    def finalize_board_state_change(self):
-        return self.game_state.finalize_board_state_change()
-
     def is_combat_stack_unit(self, unit):
         return self._is_combat_stack_unit(unit)
 
@@ -1008,7 +996,7 @@ class CombatService:
         defender_pool = set(defenders_override) if defenders_override is not None else None
 
         def current_defenders():
-            defenders_now = list(self.get_units_at(hex_position))
+            defenders_now = list(self.game_state.get_units_at(hex_position))
             if defender_pool is None:
                 return defenders_now
             return [u for u in defenders_now if u in defender_pool]
@@ -1461,7 +1449,7 @@ class CombatService:
         if fleet.unit_type != UnitType.FLEET or not fleet.is_on_map:
             return False
         defenders = [
-            u for u in self.get_units_at(target_hex)
+            u for u in self.game_state.get_units_at(target_hex)
             if u.is_fleet()
             and u.allegiance != fleet.allegiance
             and u.allegiance != NEUTRAL
@@ -1522,7 +1510,7 @@ class CombatService:
             return []
 
         leaders_here = [
-            u for u in self.get_units_at(start_hex)
+            u for u in self.game_state.get_units_at(start_hex)
             if getattr(u, "is_on_map", False)
             and hasattr(u, "is_leader") and u.is_leader()
             and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
@@ -1550,7 +1538,7 @@ class CombatService:
                 if request:
                     leader_escape_requests.append(request)
 
-        self.move_unit(unit, retreat_hex)
+        self.game_state.move_unit(unit, retreat_hex)
         if unit.is_on_map:
             unit.status = status_before
 
@@ -1569,7 +1557,7 @@ class CombatService:
             )
             if can_land:
                 leader_status = leader.status
-                self.move_unit(leader, retreat_hex)
+                self.game_state.move_unit(leader, retreat_hex)
                 if leader.is_on_map:
                     leader.status = leader_status
                 continue
@@ -1601,7 +1589,7 @@ class CombatService:
         return True
 
     def _resolve_single_leader_escape_roll(self, leader, origin_hex):
-        requests = self._get_leader_escape_handler().handle_leader_escapes(
+        requests = self.game_state._get_leader_escape_handler().handle_leader_escapes(
             [
                 LeaderEscapeCheck(
                     leader=leader,
@@ -1726,7 +1714,7 @@ class CombatService:
                 legal.sort(key=lambda u: self._advance_priority_key(u, remaining_by_source, no_adjacent_enemy))
                 chosen = legal[0]
                 source_before_move = tuple(chosen.position)
-                self.move_unit(chosen, target_hex)
+                self.game_state.move_unit(chosen, target_hex)
                 moved.append(chosen)
 
                 if source_before_move in remaining_by_source and remaining_by_source[source_before_move] > 0:
@@ -1780,7 +1768,7 @@ class CombatService:
             )
             for leader, origin_hex in leader_origins.items()
         ]
-        return self._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
+        return self.game_state._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
 
     def _get_nearest_friendly_combat_stacks(self, leader, origin_hex):
         candidates = []
@@ -1873,7 +1861,7 @@ class CombatService:
                 self.map.remove_unit_from_spatial_map(unit)
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
-        self.finalize_board_state_change()
+        self.game_state.finalize_board_state_change()
 
 
 class CombatClickHandler:
