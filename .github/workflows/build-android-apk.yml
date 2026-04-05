@@ -252,43 +252,36 @@ jobs:
               print(f"Hook already present in {target}")
               sys.exit(0)
 
-          lines = text.splitlines()
-          out = []
-          inserted = False
+          marker = 'logging.info("[DEPLOY] Running buildozer deployment")'
+          if marker not in text:
+              raise SystemExit(f"Could not find insertion marker in {target}")
 
-          for line in lines:
-              out.append(line)
-              if "Running buildozer deployment" in line and not inserted:
-                  indent = line[:len(line) - len(line.lstrip())]
-                  out.extend([
-                      f"{indent}{sentinel}",
-                      f"{indent}try:",
-                      f"{indent}    import subprocess as _subprocess",
-                      f"{indent}    import sys as _sys",
-                      f"{indent}    from pathlib import Path as _Path",
-                      f"{indent}    _patch_script = _Path.cwd() / 'patch_buildozer.py'",
-                      f"{indent}    if _patch_script.exists():",
-                      f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
-                      f"{indent}except Exception as _e:",
-                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
-                  ])
-                  inserted = True
+          hook = '''
+          # AUTOPATCH_BUILD_SPEC_HOOK
+          try:
+              import subprocess as _subprocess
+              import sys as _sys
+              from pathlib import Path as _Path
+              _patch_script = _Path.cwd() / "patch_buildozer.py"
+              if _patch_script.exists():
+                  _subprocess.check_call([_sys.executable, str(_patch_script)])
+          except Exception as _e:
+              logging.warning(f"[DEPLOY] buildozer.spec autopatch failed: {_e}")
+          '''
 
-          if not inserted:
-              raise SystemExit(f"Could not find insertion point in {target}")
+          # Insert hook BEFORE the log line, not after
+          text = text.replace(marker, hook + "\n" + marker, 1)
 
-          target.write_text("\n".join(out) + "\n", encoding="utf-8")
+          target.write_text(text, encoding="utf-8")
 
           print(f"Patched {target}")
           print("----- inserted hook preview -----")
-          for i, line in enumerate(out):
-              if sentinel in line:
-                  start = max(0, i - 2)
-                  end = min(len(out), i + 12)
-                  print("\n".join(out[start:end]))
-                  break
+          idx = text.find(sentinel)
+          start = max(0, idx - 200)
+          end = min(len(text), idx + 700)
+          print(text[start:end])
           PY
-
+          
       - name: Build APK
         run: |
           set -Eeuo pipefail
