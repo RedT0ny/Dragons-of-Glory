@@ -249,3 +249,110 @@ jobs:
 
           export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
           export ANDROIDSDK="$ANDROID_SDK_ROOT"
+          export ANDROID_NDK="$ANDROIDNDK"
+          export ANDROID_NDK_HOME="$ANDROIDNDK"
+          export ANDROID_NDK_ROOT="$ANDROIDNDK"
+
+          export ANDROIDAPI=34
+          export ANDROIDMINAPI=24
+
+          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          rm -f buildozer.spec
+          rm -rf src/deployment
+
+          pyside6-android-deploy \
+            --verbose \
+            --config-file pysidedeploy.spec \
+            --sdk-path "$ANDROID_SDK_ROOT" \
+            --ndk-path "$ANDROIDNDK" \
+            --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
+            > ci-debug/generate-assets.log 2>&1 &
+          DEPLOY_PID=$!
+
+          found=0
+          for i in $(seq 1 240); do
+            if [ -f buildozer.spec ] \
+               && [ -d src/deployment/recipes/PySide6 ] \
+               && [ -d src/deployment/recipes/shiboken6 ] \
+               && [ -f src/deployment/jar/PySide6/jar/Qt6Android.jar ] \
+               && [ -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar ]; then
+              found=1
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "Timed out waiting for generated deployment assets" | tee -a ci-debug/generate-assets.log
+            kill -9 "$DEPLOY_PID" 2>/dev/null || true
+            wait "$DEPLOY_PID" 2>/dev/null || true
+            exit 1
+          fi
+
+          python patch_buildozer.py | tee -a ci-debug/generate-assets.log
+
+          # Stop the wrapper before it goes deep into Buildozer packaging
+          kill -9 "$DEPLOY_PID" 2>/dev/null || true
+          wait "$DEPLOY_PID" 2>/dev/null || true
+
+          test -f buildozer.spec
+          test -d src/deployment/recipes/PySide6
+          test -d src/deployment/recipes/shiboken6
+          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar
+          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar
+
+      - name: Build APK with Buildozer directly
+        run: |
+          set -Eeuo pipefail
+          source "$VENV_PATH/bin/activate"
+
+          # Normalize Android environment again for direct Buildozer
+          unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
+          unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
+
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+
+          export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
+          export ANDROIDSDK="$ANDROID_SDK_ROOT"
+
+          export ANDROID_NDK="$ANDROIDNDK"
+          export ANDROID_NDK_HOME="$ANDROIDNDK"
+          export ANDROID_NDK_ROOT="$ANDROIDNDK"
+
+          export ANDROIDAPI=34
+          export ANDROIDMINAPI=24
+
+          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee ci-debug/build-apk.log
+          echo "ANDROID_NDK=$ANDROIDNDK" | tee -a ci-debug/build-apk.log
+          echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
+          echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
+
+          python -m buildozer -v android debug 2>&1 | tee -a ci-debug/build-apk.log
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build-logs
+          path: |
+            ci-debug/**
+            patch_buildozer.py
+            buildozer.spec
+            src/deployment/**
+          if-no-files-found: ignore
+
+      - name: Upload Android package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dog-android-package
+          path: |
+            bin/*.apk
+            bin/*.aab
+            ./**/*.apk
+            ./**/*.aab
+          if-no-files-found: error

@@ -187,6 +187,18 @@ class TurnEngine:
         self.game_state = game_state
         self.ai_baseline = ai_baseline
         self.attempt_invasion = attempt_invasion
+        self._last_phase_header_key = None
+
+    def _log_phase_header_once(self, message: str):
+        key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+        )
+        if self._last_phase_header_key == key:
+            return
+        self._last_phase_header_key = key
+        print(message)
 
     def step(self) -> TurnOutcome:
         current_phase = self.game_state.phase
@@ -195,7 +207,7 @@ class TurnEngine:
         is_ai = bool(current_player and current_player.is_ai)
 
         if current_phase == GamePhase.DEPLOYMENT:
-            print(f"Step 0: Deployment Phase - {active_player}")
+            self._log_phase_header_once(f"Step 0: Deployment Phase - {active_player}")
             if is_ai:
                 deployed = self.ai_baseline.deploy_all_ready_units(active_player)
                 print(f"AI deployment complete. Deployed: {deployed}")
@@ -207,7 +219,7 @@ class TurnEngine:
             )
 
         if current_phase == GamePhase.REPLACEMENTS:
-            print(f"Step 1: Replacements Phase - {active_player}")
+            self._log_phase_header_once(f"Step 1: Replacements Phase - {active_player}")
             if is_ai:
                 conscriptions, deployed = self.ai_baseline.process_replacements(active_player)
                 print(f"AI replacements complete. Conscriptions: {conscriptions}, deployed: {deployed}")
@@ -219,7 +231,7 @@ class TurnEngine:
             )
 
         if current_phase == GamePhase.STRATEGIC_EVENTS:
-            print(f"Step 2: Strategic Events - {active_player}")
+            self._log_phase_header_once(f"Step 2: Strategic Events - {active_player}")
             event = self.game_state.event_system.draw_strategic_event(active_player)
             if event:
                 event.force_activate(self.game_state)
@@ -237,7 +249,7 @@ class TurnEngine:
             return TurnOutcome(advanced=True)
 
         if current_phase == GamePhase.ACTIVATION:
-            print(f"Step 3: Activation - {active_player}")
+            self._log_phase_header_once(f"Step 3: Activation - {active_player}")
             if not self.game_state.has_neutral_countries():
                 print("No neutral countries remain. Skipping Activation phase.")
                 self.game_state.advance_phase()
@@ -266,13 +278,13 @@ class TurnEngine:
                 winner = HL
             else:
                 winner = WS
-            print(f"Step 4: Initiative. Winner: {winner}")
+            self._log_phase_header_once(f"Step 4: Initiative. Winner: {winner}")
             self.game_state.set_initiative(winner)
             self.game_state.advance_phase()
             return TurnOutcome(advanced=True)
 
         if current_phase == GamePhase.MOVEMENT:
-            print(f"Step 5: Movement phase - {active_player}")
+            self._log_phase_header_once(f"Step 5: Movement phase - {active_player}")
             if is_ai:
                 assigned = self.ai_baseline.assign_assets(active_player)
                 if assigned:
@@ -288,7 +300,7 @@ class TurnEngine:
             return TurnOutcome()
 
         if current_phase == GamePhase.COMBAT:
-            print(f"Step 6: Combat phase - {active_player}")
+            self._log_phase_header_once(f"Step 6: Combat phase - {active_player}")
             if is_ai:
                 fought = self.ai_baseline.execute_best_combat(active_player)
                 if not fought:
@@ -297,7 +309,7 @@ class TurnEngine:
             return TurnOutcome()
 
         if current_phase == GamePhase.SUPPLY:
-            print("Step 7: Supply phase")
+            self._log_phase_header_once("Step 7: Supply phase")
             self.game_state.advance_phase()
             return TurnOutcome(advanced=True)
 

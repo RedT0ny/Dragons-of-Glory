@@ -159,6 +159,9 @@ class CombatResolver:
         defenders,
         terrain_type,
         game_state=None,
+        consume_asset_fn=None,
+        get_valid_retreat_hexes_fn=None,
+        move_unit_fn=None,
         precombat_drm_bonus=0,
         allow_consumable_other_bonus=False,
     ):
@@ -166,6 +169,9 @@ class CombatResolver:
         self.defenders = defenders
         self.terrain_type = terrain_type
         self.game_state = game_state
+        self._consume_asset_fn = consume_asset_fn
+        self._get_valid_retreat_hexes_fn = get_valid_retreat_hexes_fn
+        self._move_unit_fn = move_unit_fn
         self.precombat_drm_bonus = int(precombat_drm_bonus or 0)
         self.allow_consumable_other_bonus = bool(allow_consumable_other_bonus)
         # Use the centralized loader
@@ -457,7 +463,7 @@ class CombatResolver:
     def _consume_other_bonus_if_needed(self, units, bonus_name):
         if not self.allow_consumable_other_bonus:
             return
-        if not self.game_state or not hasattr(self.game_state, "_consume_asset"):
+        if not callable(self._consume_asset_fn):
             return
         for unit in units:
             asset = _get_equipped_asset_with_other(unit, bonus_name)
@@ -465,7 +471,7 @@ class CombatResolver:
                 continue
             if not getattr(asset, "is_consumable", False):
                 continue
-            self.game_state._consume_asset(asset, unit)
+            self._consume_asset_fn(asset, unit)
             return
 
     def _collect_attacker_crossing_candidates(self, defender_hex):
@@ -605,6 +611,8 @@ class CombatResolver:
     def _apply_retreats(self, units):
         if not self.game_state or not self.game_state.map:
             return
+        if not callable(self._get_valid_retreat_hexes_fn) or not callable(self._move_unit_fn):
+            return
 
         from src.game.map import Hex
 
@@ -612,12 +620,12 @@ class CombatResolver:
             if not unit.position or unit.position[0] is None or unit.position[1] is None:
                 continue
             start_hex = Hex.offset_to_axial(*unit.position)
-            valid_hexes = self.game_state._get_valid_retreat_hexes(unit, start_hex)
+            valid_hexes = self._get_valid_retreat_hexes_fn(unit, start_hex)
             if not valid_hexes:
                 unit.eliminate()
                 continue
             retreat_hex = random.choice(valid_hexes)
-            self.game_state.move_unit(unit, retreat_hex)
+            self._move_unit_fn(unit, retreat_hex)
 
 
 class NavalCombatResolver:
@@ -1051,7 +1059,7 @@ class CombatService:
             }
 
         if self._is_naval_combat(attackers, defenders):
-            naval_resolver = NavalCombatResolver(self, attackers, defenders)
+            naval_resolver = NavalCombatResolver(self.game_state, attackers, defenders)
             outcome = naval_resolver.resolve(withdraw_decider=naval_withdraw_decider)
             self.cleanup_destroyed_units(attackers + defenders)
             print(TextFormatter.format_naval_log(attackers, defenders, outcome))
@@ -1103,7 +1111,7 @@ class CombatService:
         attacker_dragons = [u for u in attackers if u.is_on_map and u.is_dragon()]
         defender_dragons = [u for u in defenders if u.is_on_map and u.is_dragon()]
         if attacker_dragons and defender_dragons:
-            duel = DragonDuelResolver(self, attacker_dragons, defender_dragons)
+            duel = DragonDuelResolver(self.game_state, attacker_dragons, defender_dragons)
             duel_outcome = duel.resolve(withdraw_decider=dragon_duel_withdraw_decider)
             print(
                 f"Dragon duel after {duel_outcome.get('rounds', 0)} rounds: "
@@ -1184,7 +1192,10 @@ class CombatService:
             attackers,
             defenders,
             terrain,
-            game_state=self,
+            game_state=self.game_state,
+            consume_asset_fn=self._consume_asset,
+            get_valid_retreat_hexes_fn=self._get_valid_retreat_hexes,
+            move_unit_fn=self.game_state.move_unit,
             precombat_drm_bonus=gnome_drm,
             allow_consumable_other_bonus=True,
         )
