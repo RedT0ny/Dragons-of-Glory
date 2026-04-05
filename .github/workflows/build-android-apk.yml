@@ -185,19 +185,19 @@ jobs:
               cfg.write(f)
           PY
 
+
       - name: Build APK
         run: |
           set -Eeuo pipefail
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Remove conflicting Android variables inherited from the runner or previous tools
+          # Normalize Android env first
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
 
-          # Recreate one single, consistent Android toolchain context
-          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
 
           export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
           export ANDROIDSDK="$ANDROID_SDK_ROOT"
@@ -211,10 +211,59 @@ jobs:
 
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee ci-debug/build-apk.log
-          echo "ANDROID_NDK=$ANDROIDNDK" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
+          # One-shot patcher: wait for PySide to create buildozer.spec, patch it once, then exit
+          (
+            for i in $(seq 1 180); do
+              if [ -f buildozer.spec ]; then
+                python - <<'PY'
+                from pathlib import Path
+                import re
+                
+                p = Path("buildozer.spec")
+                text = p.read_text(encoding="utf-8")
+                
+                def replace_or_append(pattern, replacement, text):
+                    if re.search(pattern, text, flags=re.MULTILINE):
+                        return re.sub(pattern, replacement, text, flags=re.MULTILINE)
+                    return text.rstrip() + "\n" + replacement + "\n"
+                
+                # Force stable p4a path (Buildozer docs: master is the stable <=3.12 route)
+                text = replace_or_append(r'^\s*p4a\.branch\s*=.*$', 'p4a.branch = master', text)
+                
+                # Force Python 3.11 to match the cp311 Android wheels
+                text = replace_or_append(
+                    r'^\s*requirements\s*=.*$',
+                    'requirements = python3==3.11.11,hostpython3==3.11.11,shiboken6,PySide6',
+                    text
+                )
+                
+                # Keep Android API/minapi aligned
+                text = replace_or_append(r'^\s*android\.api\s*=.*$', 'android.api = 34', text)
+                text = replace_or_append(r'^\s*android\.minapi\s*=.*$', 'android.minapi = 24', text)
+                
+                p.write_text(text, encoding="utf-8")
+                print("Patched generated buildozer.spec")
+                print("----- buildozer.spec -----")
+                print(p.read_text(encoding="utf-8"))
+                PY
+                exit 0
+              fi
+              sleep 1
+            done
+            echo "Timed out waiting for buildozer.spec; continuing anyway"
+            exit 0
+          ) &
+          SPEC_PATCH_PID=$!
+
+          pyside6-android-deploy \
+            --verbose \
+            --config-file pysidedeploy.spec \
+            --sdk-path "$ANDROID_SDK_ROOT" \
+            --ndk-path "$ANDROIDNDK" \
+            --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
+            2>&1 | tee ci-debug/build-apk.log
+
+          wait "$SPEC_PATCH_PID" || true
 
           pyside6-android-deploy \
             --verbose \
