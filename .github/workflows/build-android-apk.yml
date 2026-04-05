@@ -302,6 +302,15 @@ jobs:
           test -f src/deployment/jar/PySide6/jar/Qt6Android.jar
           test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar
 
+      - name: Clean interrupted Buildozer platform cache
+        run: |
+          # Keep generated buildozer.spec and src/deployment assets,
+          # but remove the partially-created Buildozer platform state
+          rm -rf .buildozer
+
+          # Recreate the top-level folder only if you want predictable structure
+          mkdir -p .buildozer
+
       - name: Build APK with Buildozer directly
         run: |
           set -Eeuo pipefail

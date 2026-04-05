@@ -1414,6 +1414,8 @@ class CombatService:
         print(msg)
         if os.environ.get("PYTEST_CURRENT_TEST"):
             return
+        if bool(getattr(self.game_state, "are_all_players_ai", lambda: False)()):
+            return
         try:
             from PySide6.QtWidgets import QApplication, QMessageBox
             app = QApplication.instance()

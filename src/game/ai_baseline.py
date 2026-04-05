@@ -2509,7 +2509,11 @@ class TacticalPlanner:
                 # Already sufficiently garrisoned and offensive posture - anti-overstack penalty
                 excess = max(0, garrison_count - min_garrison_units)
                 score -= 80.0 + excess * 15.0
-        
+
+        # Defensive posture: shape deployment around the defended objective and enemy approach lanes.
+        if is_defensive:
+            score += TacticalPlanner._defensive_objective_corridor_bonus(ctx, plan, deploy_hex)
+
         # Defensive: reward threatened friendly objectives, penalize low-threat rear hexes
         if is_defensive:
             # Penalize very low-threat rear hexes for ground infantry
@@ -2524,6 +2528,53 @@ class TacticalPlanner:
             score -= 1000.0
         
         return score
+
+    @staticmethod
+    def _defensive_objective_corridor_bonus(ctx: AIContext, plan: StrategicPlan, deploy_hex: Hex) -> float:
+        """
+        Rewards deployment on/near likely enemy approach lanes to the side's defended main objective.
+        This helps avoid overfitting to local threat pockets while leaving direct objective corridors open.
+        """
+        main_obj = getattr(plan, "main_objective", None)
+        if not main_obj or not getattr(main_obj, "coords", None):
+            return 0.0
+        if getattr(main_obj, "owner", None) != ctx.side:
+            return 0.0
+
+        main_hex = Hex.offset_to_axial(main_obj.coords[0], main_obj.coords[1])
+        dist_to_obj = deploy_hex.distance_to(main_hex)
+
+        # Ring bonus keeps defenders centered on objective depth, but not only in the capital hex.
+        bonus = max(0.0, (14.0 - dist_to_obj) * 1.8)
+
+        best_axis_score = 0.0
+        for enemy in (ctx.enemy_units or []):
+            if not getattr(enemy, "is_on_map", False):
+                continue
+            if not getattr(enemy, "position", None) or enemy.position[0] is None or enemy.position[1] is None:
+                continue
+            if not ctx.game_state.is_combat_unit(enemy):
+                continue
+            if getattr(enemy, "unit_type", None) == UnitType.FLEET:
+                continue
+
+            enemy_hex = Hex.offset_to_axial(enemy.position[0], enemy.position[1])
+            enemy_to_obj = enemy_hex.distance_to(main_hex)
+            if enemy_to_obj > 16:
+                continue
+
+            # Corridor slack: 0 means exactly on a shortest path from enemy to objective.
+            slack = (enemy_hex.distance_to(deploy_hex) + dist_to_obj) - enemy_to_obj
+            if slack > 2:
+                continue
+
+            pressure = max(1.0, (16.0 - enemy_to_obj) / 4.0)
+            axis_score = (3.0 - float(slack)) * pressure
+            if axis_score > best_axis_score:
+                best_axis_score = axis_score
+
+        bonus += best_axis_score * 3.0
+        return bonus
 
     @staticmethod
     def _is_locked_ground_deployment_hex(ctx: AIContext, unit, deploy_hex: Hex) -> bool:

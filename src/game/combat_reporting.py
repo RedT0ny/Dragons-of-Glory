@@ -12,10 +12,6 @@ _COMBAT_DIALOG_ACTIVE = False
 def _is_verbose(game_state) -> bool:
     return str(getattr(game_state, "combat_details", "brief")).strip().lower() == "verbose"
 
-def _has_human_player(game_state) -> bool:
-    players = getattr(game_state, "players", {}) or {}
-    return any(not getattr(player, "is_ai", False) for player in players.values())
-
 def _to_offset_coords(target_hex) -> Optional[Tuple[int, int]]:
     """
     Normalize target_hex into (col, row) offset coords if possible.
@@ -55,7 +51,7 @@ def show_combat_result_popup(
     is highlighted in red using the "warning" highlight channel, and the map
     view is centered on that hex.
     """
-    if not _is_verbose(game_state) or not _has_human_player(game_state):
+    if not game_state.has_human_player():
         return
 
     result = (resolution or {}).get("result", "-/-")

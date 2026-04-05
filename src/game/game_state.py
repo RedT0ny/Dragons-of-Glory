@@ -100,6 +100,14 @@ class GameState:
         """Returns the Player object for the active_player allegiance."""
         return self.players.get(self.active_player)
 
+    def has_human_player(self) -> bool:
+        players = getattr(self, "players", {}) or {}
+        return any(not getattr(player, "is_ai", False) for player in players.values())
+
+    def are_all_players_ai(self) -> bool:
+        players = getattr(self, "players", {}) or {}
+        return bool(players) and all(bool(getattr(player, "is_ai", False)) for player in players.values())
+
     def get_player(self, allegiance: str):
         return self.players.get(allegiance)
 
