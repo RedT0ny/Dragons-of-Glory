@@ -131,6 +131,7 @@ def apply_gnome_tech_bonus(
 
 
 def _get_equipped_asset(unit, asset_id: str):
+    """Returns the asset with the given ID equipped by the unit, or None if not found."""
     for asset in getattr(unit, "equipment", []) or []:
         if getattr(asset, "id", None) == asset_id:
             return asset
@@ -138,6 +139,9 @@ def _get_equipped_asset(unit, asset_id: str):
 
 
 def _get_equipped_asset_with_other(unit, bonus_name: str):
+    """
+    Returns the first asset equipped by the unit that has a bonus.other matching the given name, or None if not found.
+    """
     for asset in getattr(unit, "equipment", []) or []:
         bonus = getattr(asset, "bonus", None)
         if isinstance(bonus, dict) and bonus.get("other") == bonus_name:

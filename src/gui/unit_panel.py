@@ -176,15 +176,11 @@ class UnitTable(QTableWidget):
             item.setText(TextFormatter.format_unit_log_string(unit))
 
         elif col_type == UnitColumn.STATUS:
-            s_str = unit.status.name.title() if hasattr(unit.status, 'name') else str(unit.status)
+            s_str = unit.status.name.title()
             item.setText(s_str)
 
         elif col_type == UnitColumn.RATING:
-            rating_str = f"{unit.combat_rating}"
-            if unit.tactical_rating and unit.combat_rating != 0:
-                rating_str = f"{unit.combat_rating}/{unit.tactical_rating}"
-            elif unit.combat_rating == 0 and unit.tactical_rating:
-                rating_str = f"{unit.tactical_rating}"
+            rating_str = f"{unit.combat_rating}" if unit.combat_rating != 0 else str(unit.tactical_rating)
             item.setText(rating_str)
 
         elif col_type == UnitColumn.MOVE:

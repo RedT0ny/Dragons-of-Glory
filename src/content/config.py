@@ -6,7 +6,7 @@ import os
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "Beta 0.35.1"
+APP_VERSION = "Beta 0.36.2"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,6 +38,7 @@ LOGO_HL = os.path.join(ICONS_DIR, "logo_hl.png")
 LOGO_WS = os.path.join(ICONS_DIR, "logo_ws.png")
 LOG_FILE = os.path.join(LOGS_DIR, "qt_last20.log")
 MANUAL = os.path.join(DOC_DIR, "manual.pdf")
+ADVANCED_RULES = os.path.join(DOC_DIR, "advanced_rules.pdf")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77

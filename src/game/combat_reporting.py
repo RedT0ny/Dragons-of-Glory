@@ -9,15 +9,12 @@ from src.content.tools import TextFormatter
 _PENDING_COMBAT_DIALOGS = deque()
 _COMBAT_DIALOG_ACTIVE = False
 
-
 def _is_verbose(game_state) -> bool:
     return str(getattr(game_state, "combat_details", "brief")).strip().lower() == "verbose"
-
 
 def _has_human_player(game_state) -> bool:
     players = getattr(game_state, "players", {}) or {}
     return any(not getattr(player, "is_ai", False) for player in players.values())
-
 
 def _to_offset_coords(target_hex) -> Optional[Tuple[int, int]]:
     """
@@ -39,7 +36,6 @@ def _to_offset_coords(target_hex) -> Optional[Tuple[int, int]]:
         except Exception:
             return None
     return None
-
 
 def show_combat_result_popup(
     game_state,
@@ -86,12 +82,10 @@ def show_combat_result_popup(
     highlight_coords = _to_offset_coords(target_hex)
     _enqueue_combat_popup(title, message, highlight_coords)
 
-
 def _enqueue_combat_popup(title: str, message: str, highlight_coords: Optional[Tuple[int, int]] = None):
     # Store coords in the queue so highlight + centering can be applied at display time.
     _PENDING_COMBAT_DIALOGS.append((title, message, highlight_coords))
     QTimer.singleShot(0, _drain_combat_popup_queue)
-
 
 def _drain_combat_popup_queue():
     global _COMBAT_DIALOG_ACTIVE

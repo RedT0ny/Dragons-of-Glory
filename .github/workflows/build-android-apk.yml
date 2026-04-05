@@ -205,7 +205,7 @@ jobs:
                   return re.sub(pattern, replacement, text)
               return text.rstrip() + "\n" + replacement + "\n"
 
-          # Force stable p4a path
+          # Force stable p4a path (Buildozer docs: master is stable <= 3.12)
           text = upsert(text, "p4a.branch", "master")
 
           # Force Python 3.11 to match cp311 Android wheels
@@ -215,7 +215,7 @@ jobs:
               "python3==3.11.11,hostpython3==3.11.11,shiboken6,PySide6"
           )
 
-          # Keep API/minapi aligned
+          # Keep Android API/minapi aligned
           text = upsert(text, "android.api", "34")
           text = upsert(text, "android.minapi", "24")
 
@@ -252,36 +252,43 @@ jobs:
               print(f"Hook already present in {target}")
               sys.exit(0)
 
-          marker = 'logging.info("[DEPLOY] Running buildozer deployment")'
-          if marker not in text:
+          lines = text.splitlines()
+          out = []
+          inserted = False
+
+          for line in lines:
+              if ("Running buildozer deployment" in line) and not inserted:
+                  indent = line[:len(line) - len(line.lstrip())]
+                  out.extend([
+                      f"{indent}{sentinel}",
+                      f"{indent}try:",
+                      f"{indent}    import subprocess as _subprocess",
+                      f"{indent}    import sys as _sys",
+                      f"{indent}    from pathlib import Path as _Path",
+                      f"{indent}    _patch_script = _Path.cwd() / 'patch_buildozer.py'",
+                      f"{indent}    if _patch_script.exists():",
+                      f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
+                      f"{indent}except Exception as _e:",
+                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
+                  ])
+                  inserted = True
+              out.append(line)
+
+          if not inserted:
               raise SystemExit(f"Could not find insertion marker in {target}")
 
-          hook = '''
-          # AUTOPATCH_BUILD_SPEC_HOOK
-          try:
-              import subprocess as _subprocess
-              import sys as _sys
-              from pathlib import Path as _Path
-              _patch_script = _Path.cwd() / "patch_buildozer.py"
-              if _patch_script.exists():
-                  _subprocess.check_call([_sys.executable, str(_patch_script)])
-          except Exception as _e:
-              logging.warning(f"[DEPLOY] buildozer.spec autopatch failed: {_e}")
-          '''
-
-          # Insert hook BEFORE the log line, not after
-          text = text.replace(marker, hook + "\n" + marker, 1)
-
-          target.write_text(text, encoding="utf-8")
+          target.write_text("\n".join(out) + "\n", encoding="utf-8")
 
           print(f"Patched {target}")
           print("----- inserted hook preview -----")
-          idx = text.find(sentinel)
-          start = max(0, idx - 200)
-          end = min(len(text), idx + 700)
-          print(text[start:end])
+          for i, line in enumerate(out):
+              if sentinel in line:
+                  start = max(0, i - 2)
+                  end = min(len(out), i + 12)
+                  print("\n".join(out[start:end]))
+                  break
           PY
-          
+
       - name: Build APK
         run: |
           set -Eeuo pipefail

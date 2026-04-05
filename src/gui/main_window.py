@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
-from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR
+from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES
 from src.content.tools import debug_print
 from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
@@ -45,7 +45,9 @@ class ConsoleRedirector(QObject):
 
 
 class MainWindow(QMainWindow):
+    """Main application window containing the map view, tabs, info panel, and log area."""
     def __init__(self, game_state):
+        """Initializes the main window and its components."""
         super().__init__()
         self.game_state = game_state
         self.controller = None
@@ -227,6 +229,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda s=seq, n=tab_name: self._log_tab_switch_settled(s, n))
 
     def focus_unit_on_map(self, unit):
+        """Centers the map view on the given unit's position and switches to the Map tab."""
         if not unit:
             return
         if not getattr(unit, "is_on_map", False):
@@ -340,8 +343,11 @@ class MainWindow(QMainWindow):
         manual_action = QAction("&Manual", self)
         manual_action.triggered.connect(self.on_manual_clicked)
         help_menu.addAction(manual_action)
+        advrules_action = QAction("Advanced &Rules", self)
+        advrules_action.triggered.connect(self.on_advrules_clicked)
+        help_menu.addAction(advrules_action)
 
-        view_menu.addSeparator()
+        help_menu.addSeparator()
 
         about_action = QAction("&About", self)
         about_action.triggered.connect(self.on_about_clicked)
@@ -362,16 +368,20 @@ class MainWindow(QMainWindow):
 
     def on_manual_clicked(self):
         """Opens the game manual using the system's default PDF viewer."""
-        viewer = QMainWindow(self)
-        ui = Ui_ManualViewer()
-        ui.setupUi(viewer)
+        try:
+            # webbrowser.open() works on Windows, macOS, Linux, and many mobile platforms
+            # It uses the default application for PDF files
+            webbrowser.open(MANUAL)
+        except Exception as e:
+            print(f"Error opening manual: {e}")
 
-        # try:
-        #     # webbrowser.open() works on Windows, macOS, Linux, and many mobile platforms
-        #     # It uses the default application for PDF files
-        #     webbrowser.open(MANUAL)
-        # except Exception as e:
-        #     print(f"Error opening manual: {e}")
+    def on_advrules_clicked(self):
+        """Opens the advanced rules using the system's default PDF viewer."""
+        try:
+            webbrowser.open(ADVANCED_RULES)
+        except Exception as e:
+            print(f"Error opening manual: {e}")
+
 
     def on_config_clicked(self):
         if not self.controller:

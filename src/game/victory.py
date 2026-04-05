@@ -13,6 +13,8 @@ def _slugify(s: str) -> str:
 
 @dataclass
 class VictoryStatus:
+    """Holds the outcome of a victory evaluation run."""
+
     game_over: bool = False
     winner: str | None = None
     reason: str = ""
@@ -22,9 +24,15 @@ class VictoryStatus:
 
 
 class VictoryConditionEvaluator:
-    """Structured victory evaluator."""
+    """Evaluates victory conditions for the current game state.
+
+    This class normalizes victory specifications from the scenario,
+    then computes major and minor victory outcomes for the two sides.
+    The evaluate() method returns a VictoryStatus describing the result.
+    """
 
     def __init__(self, game_state):
+        # Original game state reference used for victory calculation
         self.game_state = game_state
         self._normalized = {
             HL: self._normalize_side_victory(self._side_victory_raw(HL)),
@@ -32,6 +40,13 @@ class VictoryConditionEvaluator:
         }
 
     def evaluate(self) -> VictoryStatus:
+        """Evaluate the current game state's victory conditions.
+
+        Returns a VictoryStatus describing whether the game is over, who
+        won (if any), and the reason for the outcome. This aggregates both
+        major victory conditions and minor point-based conclusions at the
+        end of the turn when appropriate.
+        """
         turn = int(getattr(self.game_state, "turn", 0) or 0)
         end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 0) or 0)
         status = VictoryStatus()
@@ -48,6 +63,7 @@ class VictoryConditionEvaluator:
                 return status
 
         for side in (HL, WS):
+            # Compute minor points for this side at current turn
             status.minor_points[side] = self._compute_minor_points(side, turn)
 
         if turn >= end_turn > 0:
@@ -69,10 +85,20 @@ class VictoryConditionEvaluator:
         return status
 
     def _side_victory_raw(self, side: str) -> Any:
+        """Return the raw victory definition for a given side from the scenario.
+
+        The raw data is later normalized into a structured form for evaluation.
+        """
         vc = getattr(self.game_state.scenario_spec, "victory_conditions", {}) or {}
         return vc.get(side, {})
 
     def _normalize_side_victory(self, raw_side: Any) -> Dict[str, Any]:
+        """Normalize a side's victory block into a consistent structure.
+
+        Produces a dict with optional keys 'major' and 'minor' where values are
+        normalized node trees prepared for evaluation.
+        """
+        # Normalize the raw structure for a side's victory conditions
         if not isinstance(raw_side, dict):
             return {}
 
@@ -88,6 +114,12 @@ class VictoryConditionEvaluator:
         return normalized
 
     def _normalize_minor(self, minor_raw: Any) -> Dict[str, Any]:
+        """Normalize the minor victory specification.
+
+        Minor victory points can be described as a simple number of points with
+        conditions, or as a list of condition nodes. This method converts those
+        inputs into a uniform dict with 'points_to_win' and 'conditions'.
+        """
         if minor_raw is None:
             return {"points_to_win": 1, "conditions": []}
 
@@ -112,6 +144,12 @@ class VictoryConditionEvaluator:
         return {"points_to_win": 1, "conditions": [{"points": 1, "node": node}]}
 
     def _normalize_node(self, node: Any) -> Dict[str, Any]:
+        """Normalize a single victory condition node into a pluggable dict.
+
+        Supports composite nodes with 'all' or 'any' and assigns a default
+        'by_turn' deadline if not provided. Returns a dict suitable for
+        evaluation by _is_node_satisfied.
+        """
         end_turn = int(getattr(self.game_state.scenario_spec, "end_turn", 30) or 30)
 
         if isinstance(node, dict):
@@ -149,6 +187,7 @@ class VictoryConditionEvaluator:
         return total
 
     def _is_node_satisfied(self, node: Dict[str, Any], side: str, turn: int) -> bool:
+        """Determine if a given victory condition node is satisfied for a side at a turn."""
         deadline = int(node.get("by_turn", getattr(self.game_state.scenario_spec, "end_turn", 30)))
 
         # Generic cutoff: after deadline it cannot be newly satisfied.
@@ -180,6 +219,7 @@ class VictoryConditionEvaluator:
         }
 
     def _evaluate_leaf(self, node: Dict[str, Any], side: str) -> bool:
+        """Evaluate the leaf node against the current side and game state."""
         node_type = str(node.get("type", "unknown"))
 
         if node_type == "conquer_country":
@@ -327,9 +367,10 @@ class VictoryConditionEvaluator:
         return country_filter in {unit_country, unit_df}
 
     def get_escape_rules_for_side(self, side: str, turn: int | None = None) -> List[Dict[str, Any]]:
-        """
-        Returns normalized escape rules from major/minor trees for a side.
-        Used by movement flow to mark eligible units as escaped immediately.
+        """Return normalized escape rules for a given side.
+
+        Escape rules are extracted from major/minor trees and describe when a unit
+        can be considered escaped given the current or provided turn.
         """
         current_turn = int(getattr(self.game_state, "turn", 0) if turn is None else turn)
         collected: List[Dict[str, Any]] = []
