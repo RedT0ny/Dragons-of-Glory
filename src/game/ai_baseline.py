@@ -3514,10 +3514,12 @@ class TacticalPlanner:
         projected_odds_str = None
         projected_ratio = None
         combat_service = getattr(ctx.game_state, "combat_service", None)
-        if combat_service and hasattr(combat_service, "calculate_odds_preview"):
+        if combat_service:
             try:
-                projected_odds_str = combat_service.calculate_odds_preview(attackers, defenders, target_hex)
-                projected_ratio = self._odds_str_to_ratio(projected_odds_str)
+                if hasattr(combat_service, "calculate_odds_ratio"):
+                    projected_ratio = combat_service.calculate_odds_ratio(attackers, defenders, target_hex)
+                if hasattr(combat_service, "calculate_odds_preview"):
+                    projected_odds_str = combat_service.calculate_odds_preview(attackers, defenders, target_hex)
             except Exception:
                 projected_odds_str = None
                 projected_ratio = None
@@ -3593,20 +3595,6 @@ class TacticalPlanner:
             "projected_ratio": projected_ratio,
             "defensive_desperate_recovery": defensive_desperate_recovery,
         }
-
-    @staticmethod
-    def _odds_str_to_ratio(odds_str: Optional[str]) -> Optional[float]:
-        if not odds_str or ":" not in str(odds_str):
-            return None
-        try:
-            left, right = str(odds_str).split(":", 1)
-            a = float(left)
-            d = float(right)
-            if d <= 0:
-                return None
-            return a / d
-        except Exception:
-            return None
 
     @staticmethod
     def _collect_capture_locations_with_deadline(raw: Any, current_turn: int, default_deadline: int, out: Set[str]):

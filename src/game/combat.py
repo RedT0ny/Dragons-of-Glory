@@ -195,13 +195,18 @@ class CombatResolver:
 
         return "1:3"
 
+    def calculate_effective_combat_strengths(self):
+        """Returns effective attacker and defender combat strengths for this combat context."""
+        attacker_cs = sum(u.combat_rating for u in self.attackers)
+        defender_cs = sum(u.combat_rating for u in self.defenders)
+        defender_cs *= self._get_defender_combat_multiplier()
+        return attacker_cs, defender_cs
+
     def resolve(self):
         # Core land/air resolution pipeline:
         # odds -> DRM -> die roll (+DRM clamp) -> CRT lookup -> apply both sides.
         # 1. Calculate Odds
-        attacker_cs = sum(u.combat_rating for u in self.attackers)
-        defender_cs = sum(u.combat_rating for u in self.defenders)
-        defender_cs *= self._get_defender_combat_multiplier()
+        attacker_cs, defender_cs = self.calculate_effective_combat_strengths()
         
         odds_str = self.calculate_odds(attacker_cs, defender_cs)
         
@@ -961,6 +966,27 @@ class CombatService:
     def can_units_attack_target_hex(self, attackers, target_hex) -> bool:
         return self.game_state.can_units_attack_target_hex(attackers, target_hex)
 
+    def _project_combat_odds(self, attackers, defenders, hex_position):
+        terrain = self.game_state.map.get_terrain(hex_position)
+        resolver = CombatResolver(attackers, defenders, terrain, game_state=self.game_state)
+        attacker_cs, defender_cs = resolver.calculate_effective_combat_strengths()
+        odds_str = resolver.calculate_odds(attacker_cs, defender_cs)
+        ratio = float("inf") if defender_cs <= 0 else (attacker_cs / defender_cs)
+        return {
+            "attacker_cs": attacker_cs,
+            "defender_cs": defender_cs,
+            "odds_str": odds_str,
+            "ratio": ratio,
+        }
+
+    def calculate_odds_preview(self, attackers, defenders, hex_position):
+        """Helper to get odds column string (for example, '3:1') without rolling."""
+        return self._project_combat_odds(attackers, defenders, hex_position)["odds_str"]
+
+    def calculate_odds_ratio(self, attackers, defenders, hex_position):
+        """Returns effective attacker/defender combat ratio for the given combat context."""
+        return self._project_combat_odds(attackers, defenders, hex_position)["ratio"]
+
     def _get_leader_escape_handler(self):
         return self.game_state._get_leader_escape_handler()
 
@@ -970,9 +996,24 @@ class CombatService:
     def is_combat_stack_unit(self, unit):
         return self._is_combat_stack_unit(unit)
 
-    def resolve_combat(self, attackers, hex_position, naval_withdraw_decider=None, dragon_duel_withdraw_decider=None):
+    def resolve_combat(
+        self,
+        attackers,
+        hex_position,
+        naval_withdraw_decider=None,
+        dragon_duel_withdraw_decider=None,
+        defenders_override=None,
+    ):
         attackers = list(attackers)
-        defenders = list(self.get_units_at(hex_position))
+        defender_pool = set(defenders_override) if defenders_override is not None else None
+
+        def current_defenders():
+            defenders_now = list(self.get_units_at(hex_position))
+            if defender_pool is None:
+                return defenders_now
+            return [u for u in defenders_now if u in defender_pool]
+
+        defenders = current_defenders()
         terrain = self.map.get_terrain(hex_position)
         defender_allegiances = {
             u.allegiance for u in defenders
@@ -1044,7 +1085,7 @@ class CombatService:
         if orb_events:
             self.cleanup_destroyed_units(attackers + defenders)
             attackers = [u for u in attackers if u.is_on_map]
-            defenders = list(self.get_units_at(hex_position))
+            defenders = current_defenders()
             for evt in orb_events:
                 print(evt)
 
@@ -1082,7 +1123,7 @@ class CombatService:
             )
             self.cleanup_destroyed_units(attackers + defenders)
             attackers = [u for u in attackers if u.is_on_map]
-            defenders = list(self.get_units_at(hex_position))
+            defenders = current_defenders()
             if not any(self._is_combat_stack_unit(u) for u in defenders):
                 result = "-/-"
                 advance_available = self._can_advance_after_combat(
@@ -1122,7 +1163,7 @@ class CombatService:
         special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
         if special_retreat["applied"]:
             self.cleanup_destroyed_units(defenders)
-            defenders = list(self.get_units_at(hex_position))
+            defenders = current_defenders()
             if not any(self._is_combat_stack_unit(u) for u in defenders):
                 result = special_retreat["result"]
                 leader_escape_requests = special_retreat.get("leader_escape_requests", []) or []
@@ -1918,7 +1959,11 @@ class CombatClickHandler:
             if is_naval:
                 prompt_text = f"Start naval combat with {len(self.attackers)} fleet(s)?"
             else:
-                odds_str = self.calculate_odds_preview(self.attackers, enemy_units, target_hex)
+                odds_str = self.game_state.combat_service.calculate_odds_preview(
+                    self.attackers,
+                    enemy_units,
+                    target_hex,
+                )
                 prompt_text = f"Attack with {len(self.attackers)} units?\nOdds: {odds_str}"
 
             reply = QMessageBox.question(
@@ -2078,17 +2123,6 @@ class CombatClickHandler:
                 valid_target_offsets.add(target_hex.axial_to_offset())
 
         return list(valid_target_offsets)
-
-    def calculate_odds_preview(self, attackers, defenders, hex_position):
-        """Helper to just get the string "3:1" etc without rolling."""
-        # We create a dummy resolver just to calc odds
-        terrain = self.game_state.map.get_terrain(hex_position)
-        resolver = CombatResolver(attackers, defenders, terrain, game_state=self.game_state)
-
-        attacker_cs = sum(u.combat_rating for u in attackers)
-        defender_cs = sum(u.combat_rating for u in defenders)
-        defender_cs *= resolver._get_defender_combat_multiplier()
-        return resolver.calculate_odds(attacker_cs, defender_cs)
 
     def _is_unit_on_map(self, unit):
         return bool(getattr(unit, "is_on_map", False) and unit.position and unit.position[0] is not None and unit.position[1] is not None)

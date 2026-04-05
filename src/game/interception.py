@@ -118,7 +118,26 @@ class InterceptionService:
                     if getattr(u, "is_on_map", False)
                     and getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET)
                 ]
-                resolution = self.game_state.combat_service.resolve_combat(live_interceptors, moving_hex)
+                if not air_defenders:
+                    print("Interception cancelled: no air defenders at target hex.")
+                    return
+
+                odds_ratio = self.game_state.combat_service.calculate_odds_ratio(
+                    live_interceptors,
+                    air_defenders,
+                    moving_hex,
+                )
+                if odds_ratio < 1:
+                    print(
+                        f"Interception cancelled: projected ratio {odds_ratio:.2f} below 1:1."
+                    )
+                    return
+
+                resolution = self.game_state.combat_service.resolve_combat(
+                    live_interceptors,
+                    moving_hex,
+                    defenders_override=air_defenders,
+                )
                 defenders_after = [
                     u for u in air_defenders
                     if getattr(u, "is_on_map", False)

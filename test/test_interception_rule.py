@@ -43,6 +43,24 @@ class DummyUnit:
     def is_army(self):
         return self.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
 
+    def is_wing(self):
+        return self.unit_type == UnitType.WING
+
+    def is_fleet(self):
+        return self.unit_type == UnitType.FLEET
+
+    def is_flier(self):
+        return self.unit_type in (UnitType.WING, UnitType.FLEET)
+
+    def is_dragon(self):
+        return self.race == UnitRace.DRAGON and self.unit_type == UnitType.WING
+
+    def is_draconid(self):
+        return self.race == UnitRace.DRACONIAN
+
+    def is_citadel(self):
+        return self.unit_type == UnitType.CITADEL
+
     def is_leader(self):
         return self.unit_type in {
             UnitType.GENERAL,
@@ -373,3 +391,105 @@ def test_ws_dragon_interceptor_requires_elf_or_solamnic_commander():
     )
     dragon.passengers = [leader]
     assert service.interception_service.dragon_interceptor_has_required_commander(dragon) is True
+
+
+def test_interception_uses_only_air_defenders(monkeypatch):
+    gs = _setup_state()
+    mover_air = DummyUnit(
+        unit_id="ws_wing",
+        allegiance=WS,
+        unit_type=UnitType.WING,
+        race=UnitRace.PEGASUS,
+        position=(4, 4),
+    )
+    mover_ground = DummyUnit(
+        unit_id="ws_inf",
+        allegiance=WS,
+        unit_type=UnitType.INFANTRY,
+        race=UnitRace.ELF,
+        position=(4, 4),
+    )
+    interceptor = DummyUnit(
+        unit_id="hl_wing",
+        allegiance=HL,
+        unit_type=UnitType.WING,
+        race=UnitRace.DRAGON,
+        position=(6, 4),
+    )
+    gs.units = [mover_air, mover_ground, interceptor]
+    gs.map.add_unit_to_spatial_map(mover_air)
+    gs.map.add_unit_to_spatial_map(mover_ground)
+    gs.map.add_unit_to_spatial_map(interceptor)
+    service = MovementService(gs)
+
+    calls = {"count": 0, "defenders_override": None}
+
+    def fake_resolve(attackers, hex_position, **kwargs):
+        calls["count"] += 1
+        calls["defenders_override"] = list(kwargs.get("defenders_override") or [])
+        return {"result": "-/-", "leader_escape_requests": [], "advance_available": False}
+
+    gs.combat_service.calculate_odds_ratio = lambda attackers, defenders, hex_position: 1.0
+    gs.combat_service.resolve_combat = fake_resolve
+    monkeypatch.setattr("src.game.interception.show_combat_result_popup", lambda *args, **kwargs: None)
+    monkeypatch.setattr(service, "_teleport_unit_no_cost", lambda unit, target_hex: None)
+    monkeypatch.setattr(
+        service.interception_service,
+        "find_interceptor_attack_hex_for_stack",
+        lambda interceptors, moving_hex, origin_hex: moving_hex,
+    )
+
+    moving_hex = Hex.offset_to_axial(4, 4)
+    service.interception_service.resolve_interception_attack(
+        [interceptor],
+        [mover_air, mover_ground],
+        moving_hex,
+        origin_offset=(6, 4),
+    )
+
+    assert calls["count"] == 1
+    assert calls["defenders_override"] == [mover_air]
+
+
+def test_interception_skips_attack_when_odds_below_one_to_one(monkeypatch):
+    gs = _setup_state()
+    mover_air = DummyUnit(
+        unit_id="ws_wing",
+        allegiance=WS,
+        unit_type=UnitType.WING,
+        race=UnitRace.PEGASUS,
+        position=(4, 4),
+    )
+    interceptor = DummyUnit(
+        unit_id="hl_wing",
+        allegiance=HL,
+        unit_type=UnitType.WING,
+        race=UnitRace.DRAGON,
+        position=(6, 4),
+    )
+    gs.units = [mover_air, interceptor]
+    gs.map.add_unit_to_spatial_map(mover_air)
+    gs.map.add_unit_to_spatial_map(interceptor)
+    service = MovementService(gs)
+
+    calls = {"count": 0}
+
+    gs.combat_service.calculate_odds_ratio = lambda attackers, defenders, hex_position: 0.5
+    gs.combat_service.resolve_combat = lambda *args, **kwargs: calls.__setitem__("count", calls["count"] + 1)
+    monkeypatch.setattr("src.game.interception.show_combat_result_popup", lambda *args, **kwargs: None)
+    monkeypatch.setattr(service, "_teleport_unit_no_cost", lambda unit, target_hex: None)
+    monkeypatch.setattr(
+        service.interception_service,
+        "find_interceptor_attack_hex_for_stack",
+        lambda interceptors, moving_hex, origin_hex: moving_hex,
+    )
+
+    moving_hex = Hex.offset_to_axial(4, 4)
+    service.interception_service.resolve_interception_attack(
+        [interceptor],
+        [mover_air],
+        moving_hex,
+        origin_offset=(6, 4),
+    )
+
+    assert calls["count"] == 0
