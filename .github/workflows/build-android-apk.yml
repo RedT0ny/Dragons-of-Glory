@@ -17,7 +17,7 @@ jobs:
       TARGET_ARCH: "aarch64"
       ANDROID_API_LEVEL: "34"
       ANDROID_BUILD_TOOLS: "35.0.0"
-      ANDROID_NDK_VERSION: "25.2.9519653"
+      ANDROID_NDK_VERSION: "26.1.10909125"
 
     steps:
       - name: Checkout
@@ -189,13 +189,113 @@ jobs:
           print("Patched pysidedeploy.spec")
           PY
 
+      - name: Create buildozer patch script
+        run: |
+          cat > patch_buildozer.py <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path("buildozer.spec")
+          text = p.read_text(encoding="utf-8")
+
+          def upsert(text, key, value):
+              pattern = rf"(?m)^\s*{re.escape(key)}\s*=.*$"
+              replacement = f"{key} = {value}"
+              if re.search(pattern, text):
+                  return re.sub(pattern, replacement, text)
+              return text.rstrip() + "\n" + replacement + "\n"
+
+          # Force stable p4a path
+          text = upsert(text, "p4a.branch", "master")
+
+          # Force Python 3.11 to match cp311 Android wheels
+          text = upsert(
+              text,
+              "requirements",
+              "python3==3.11.11,hostpython3==3.11.11,shiboken6,PySide6"
+          )
+
+          # Keep API/minapi aligned
+          text = upsert(text, "android.api", "34")
+          text = upsert(text, "android.minapi", "24")
+
+          p.write_text(text, encoding="utf-8")
+
+          print("Patched generated buildozer.spec")
+          print("----- buildozer.spec -----")
+          print(p.read_text(encoding="utf-8"))
+          PY
+
+      - name: Patch PySide android_deploy.py to patch buildozer.spec before build
+        run: |
+          source "$VENV_PATH/bin/activate"
+          python - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+          target = (
+              Path(os.environ["VENV_PATH"])
+              / "lib"
+              / py_ver
+              / "site-packages"
+              / "PySide6"
+              / "scripts"
+              / "android_deploy.py"
+          )
+
+          text = target.read_text(encoding="utf-8")
+
+          sentinel = "# AUTOPATCH_BUILD_SPEC_HOOK"
+          if sentinel in text:
+              print(f"Hook already present in {target}")
+              sys.exit(0)
+
+          lines = text.splitlines()
+          out = []
+          inserted = False
+
+          for line in lines:
+              out.append(line)
+              if "Running buildozer deployment" in line and not inserted:
+                  indent = line[:len(line) - len(line.lstrip())]
+                  out.extend([
+                      f"{indent}{sentinel}",
+                      f"{indent}try:",
+                      f"{indent}    import subprocess as _subprocess",
+                      f"{indent}    import sys as _sys",
+                      f"{indent}    from pathlib import Path as _Path",
+                      f"{indent}    _patch_script = _Path.cwd() / 'patch_buildozer.py'",
+                      f"{indent}    if _patch_script.exists():",
+                      f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
+                      f"{indent}except Exception as _e:",
+                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
+                  ])
+                  inserted = True
+
+          if not inserted:
+              raise SystemExit(f"Could not find insertion point in {target}")
+
+          target.write_text("\n".join(out) + "\n", encoding="utf-8")
+
+          print(f"Patched {target}")
+          print("----- inserted hook preview -----")
+          for i, line in enumerate(out):
+              if sentinel in line:
+                  start = max(0, i - 2)
+                  end = min(len(out), i + 12)
+                  print("\n".join(out[start:end]))
+                  break
+          PY
+
       - name: Build APK
         run: |
           set -Eeuo pipefail
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Normalize Android env so Buildozer/p4a see one consistent toolchain
+          # Normalize Android env
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
 
@@ -219,56 +319,6 @@ jobs:
           echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
           echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
 
-          # Create a small patcher script once (no nested heredoc in subshells)
-          cat > ci-debug/patch_buildozer.py <<'PY'
-          from pathlib import Path
-          import re
-
-          p = Path("buildozer.spec")
-          text = p.read_text(encoding="utf-8")
-
-          def upsert(text, key, value):
-              pattern = rf"(?m)^\s*{re.escape(key)}\s*=.*$"
-              replacement = f"{key} = {value}"
-              if re.search(pattern, text):
-                  return re.sub(pattern, replacement, text)
-              return text.rstrip() + "\n" + replacement + "\n"
-
-          # Force stable p4a path (Buildozer docs: master is stable <=3.12)
-          text = upsert(text, "p4a.branch", "master")
-
-          # Force Python 3.11 to match cp311 Android wheels (p4a supports explicit pinning)
-          text = upsert(
-              text,
-              "requirements",
-              "python3==3.11.11,hostpython3==3.11.11,shiboken6,PySide6"
-          )
-
-          # Keep API/minapi aligned
-          text = upsert(text, "android.api", "34")
-          text = upsert(text, "android.minapi", "24")
-
-          p.write_text(text, encoding="utf-8")
-
-          print("Patched generated buildozer.spec")
-          print("----- buildozer.spec -----")
-          print(p.read_text(encoding="utf-8"))
-          PY
-
-          # Wait for PySide to create buildozer.spec, patch it once, then exit
-          (
-            for i in $(seq 1 180); do
-              if [ -f buildozer.spec ]; then
-                python ci-debug/patch_buildozer.py | tee -a ci-debug/build-apk.log
-                exit 0
-              fi
-              sleep 1
-            done
-            echo "Timed out waiting for buildozer.spec; continuing anyway" | tee -a ci-debug/build-apk.log
-            exit 0
-          ) &
-          SPEC_PATCH_PID=$!
-
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
@@ -277,8 +327,6 @@ jobs:
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee -a ci-debug/build-apk.log
 
-          wait "$SPEC_PATCH_PID" || true
-
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -286,6 +334,7 @@ jobs:
           name: android-build-logs
           path: |
             ci-debug/**
+            patch_buildozer.py
           if-no-files-found: ignore
 
       - name: Upload Android package
