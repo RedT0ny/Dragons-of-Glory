@@ -224,7 +224,7 @@ def test_fleet_cannot_intercept_enemy_wing():
         race=UnitRace.PEGASUS,
         position=(2, 2),
     )
-    assert service._can_unit_intercept_target(fleet, [mover_wing]) is False
+    assert service.interception_service.can_unit_intercept_target(fleet, [mover_wing]) is False
 
 
 def test_same_interceptor_attempts_only_once_per_opponent_movement_step(monkeypatch):
@@ -338,7 +338,7 @@ def test_hl_dragon_interceptor_requires_valid_commander():
         position=(5, 2),
         dragonflight="red",
     )
-    assert service._dragon_interceptor_has_required_commander(dragon) is False
+    assert service.interception_service.dragon_interceptor_has_required_commander(dragon) is False
 
     leader = DummyUnit(
         unit_id="hl_red_lord",
@@ -349,8 +349,8 @@ def test_hl_dragon_interceptor_requires_valid_commander():
         dragonflight="red",
     )
     dragon.passengers = [leader]
-    assert service._dragon_interceptor_has_required_commander(dragon) is True
-    assert service._can_unit_intercept_target(dragon, [mover]) is True
+    assert service.interception_service.dragon_interceptor_has_required_commander(dragon) is True
+    assert service.interception_service.can_unit_intercept_target(dragon, [mover]) is True
 
 
 def test_ws_dragon_interceptor_requires_elf_or_solamnic_commander():
@@ -362,7 +362,7 @@ def test_ws_dragon_interceptor_requires_elf_or_solamnic_commander():
         race=UnitRace.DRAGON,
         position=(5, 2),
     )
-    assert service._dragon_interceptor_has_required_commander(dragon) is False
+    assert service.interception_service.dragon_interceptor_has_required_commander(dragon) is False
 
     leader = DummyUnit(
         unit_id="ws_elf_leader",
@@ -372,4 +372,4 @@ def test_ws_dragon_interceptor_requires_elf_or_solamnic_commander():
         position=(5, 2),
     )
     dragon.passengers = [leader]
-    assert service._dragon_interceptor_has_required_commander(dragon) is True
+    assert service.interception_service.dragon_interceptor_has_required_commander(dragon) is True

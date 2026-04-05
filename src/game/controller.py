@@ -5,7 +5,7 @@ import shiboken6
 
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 from src.game.ai_baseline import BaselineAIPlayer
 from src.game.phase_manager import TurnAction, TurnEngine
 from src.content.runtime_diagnostics import RuntimeDiagnostics
@@ -55,7 +55,7 @@ class GameController(QObject):
         self.deployment_service = self.game_state.deployment_service
         self._processing_automatic_phases = False  # Flag to prevent reentry
         self._map_view_signals_connected = False  # Track if map view signals are connected
-        self.diplomacy_service = DiplomacyActivationService(self.game_state)
+        self.diplomacy_service = DiplomacyService(self.game_state)
         self.ai_baseline = BaselineAIPlayer(self.game_state, self.movement_service, self.diplomacy_service)
         self.turn_engine = TurnEngine(
             self.game_state,

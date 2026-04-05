@@ -5,7 +5,7 @@ import shiboken6
 from src.content.audio_manager import AudioManager
 from src.content.config import MAX_TICKS
 from src.content.translator import Translator
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 from src.gui.map_view import AnsalonMapView
 
 
@@ -43,7 +43,7 @@ class DiplomacyDialog(QDialog):
         """Sets up diplomacy dialog with map and buttons"""
         super().__init__(parent)
         self.game_state = game_state
-        self.diplomacy_service = DiplomacyActivationService(game_state)
+        self.diplomacy_service = DiplomacyService(game_state)
         self.translator = Translator()
         self.setWindowTitle(self.translator.tr("dialogs.diplomacy.title", "Diplomacy Phase"))
         self.resize(1200, 960)

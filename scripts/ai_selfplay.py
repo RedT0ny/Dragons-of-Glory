@@ -19,7 +19,7 @@ from src.content.constants import HL, WS
 from src.content.loader import load_scenario_yaml
 from src.content.specs import GamePhase
 from src.game.ai_baseline import BaselineAIPlayer
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 from src.game.game_state import GameState
 from src.game.movement import MovementService
 
@@ -91,7 +91,7 @@ def _run_one_game(
         game_state.players[WS].set_ai(True)
 
     movement_service = MovementService(game_state)
-    diplomacy_service = DiplomacyActivationService(game_state)
+    diplomacy_service = DiplomacyService(game_state)
     ai = BaselineAIPlayer(game_state, movement_service, diplomacy_service)
 
     movement_actions = 0

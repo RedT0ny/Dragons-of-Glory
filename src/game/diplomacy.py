@@ -42,7 +42,7 @@ class InvasionOutcome:
     winner: Optional[str] = None
 
 
-class DiplomacyActivationService:
+class DiplomacyService:
     """Domain logic for diplomacy activation checks and roll resolution."""
 
     def __init__(self, game_state):

@@ -4,7 +4,7 @@ from unittest.mock import patch
 from src.content.constants import HL, WS
 from src.content.specs import CountrySpec, GamePhase, LocationSpec
 from src.game.country import Country
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 from src.game.game_state import GameState
 
 
@@ -32,7 +32,7 @@ def test_activation_bonus_event_subtracts_from_roll_for_current_turn():
     gs.countries = {"palanthas": _country("palanthas", alignment=(5, -1))}
 
     gs.apply_event_effect(SimpleNamespace(effects={"activation_bonus": 2}, occurrence_count=1))
-    svc = DiplomacyActivationService(gs)
+    svc = DiplomacyService(gs)
     attempt = svc.build_activation_attempt("palanthas")
 
     assert attempt is not None

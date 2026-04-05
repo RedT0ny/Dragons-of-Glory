@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.content.constants import HL, NEUTRAL, WS
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 
 
 def _country(country_id: str, allegiance: str, alignment: tuple[int, int], tags=None):
@@ -38,7 +38,7 @@ def test_build_activation_attempt_uses_ws_rating_and_solamnic_bonus_for_ws():
         solamnic_bonus=2,
         solamnic_enabled=True,
     )
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     attempt = service.build_activation_attempt("coastlund")
 
@@ -57,7 +57,7 @@ def test_build_activation_attempt_uses_hl_rating_for_highlord_player():
         solamnic_bonus=9,
         solamnic_enabled=True,
     )
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     attempt = service.build_activation_attempt("icewall")
 
@@ -69,7 +69,7 @@ def test_build_activation_attempt_uses_hl_rating_for_highlord_player():
 
 def test_roll_activation_returns_success_when_roll_is_at_or_below_target():
     gs = _game_state(active_player=WS, countries={})
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     with patch("src.game.diplomacy.random.randint", return_value=4):
         result = service.roll_activation(4)
@@ -80,7 +80,7 @@ def test_roll_activation_returns_success_when_roll_is_at_or_below_target():
 
 def test_roll_activation_returns_failure_when_roll_exceeds_target():
     gs = _game_state(active_player=WS, countries={})
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     with patch("src.game.diplomacy.random.randint", return_value=8):
         result = service.roll_activation(7)
@@ -94,7 +94,7 @@ def test_build_deployment_plan_activates_country_for_alliance_effect():
         active_player=HL,
         countries={"icewall": _country("icewall", NEUTRAL, (2, 6))},
     )
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     plan = service.build_deployment_plan({"alliance": "icewall"}, HL)
 
@@ -105,7 +105,7 @@ def test_build_deployment_plan_activates_country_for_alliance_effect():
 
 def test_build_deployment_plan_clears_filter_for_add_units():
     gs = _game_state(active_player=HL, countries={})
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     plan = service.build_deployment_plan({"alliance": "icewall", "add_units": True}, HL)
 
@@ -117,7 +117,7 @@ def test_build_deployment_plan_skips_activation_when_already_activated():
         active_player=HL,
         countries={"icewall": _country("icewall", NEUTRAL, (2, 6))},
     )
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     plan = service.build_deployment_plan(
         {"alliance": "icewall", "alliance_already_activated": True},
@@ -132,7 +132,7 @@ def test_resolve_invasion_success_activates_country_and_returns_outcome():
     country = _country("coastlund", NEUTRAL, (5, 3))
     country.strength = 4
     gs = _game_state(active_player=HL, countries={"coastlund": country})
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     with patch("src.game.diplomacy.random.randint", return_value=3):
         outcome = service.resolve_invasion("coastlund", {"strength": 6})
@@ -147,7 +147,7 @@ def test_resolve_invasion_failure_when_no_force():
     country = _country("coastlund", NEUTRAL, (5, 3))
     country.strength = 4
     gs = _game_state(active_player=HL, countries={"coastlund": country})
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
 
     outcome = service.resolve_invasion("coastlund", {"strength": 0, "reason": "No force."})
 

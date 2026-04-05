@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import AssetSpec, TerrainType, UnitSpec, UnitState, UnitType
 from src.game.combat import CombatResolver, apply_gnome_tech_bonus
-from src.game.diplomacy import DiplomacyActivationService
+from src.game.diplomacy import DiplomacyService
 from src.game.event import Asset
 from src.game.game_state import GameState
 from src.game.map import Board, Hex
@@ -112,7 +112,7 @@ def test_country_diplomacy_bonus_affects_activation_target_rating():
 
     assert gs.get_country_activation_bonus(HL, "thorbardin") == 1
 
-    service = DiplomacyActivationService(gs)
+    service = DiplomacyService(gs)
     attempt = service.build_activation_attempt("thorbardin")
     assert attempt is not None
     assert attempt.target_rating == 5
