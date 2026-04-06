@@ -234,13 +234,77 @@ jobs:
           print(p.read_text(encoding="utf-8"))
           PY
 
+      - name: Patch PySide android_deploy.py to exit after asset generation
+        run: |
+          source "$VENV_PATH/bin/activate"
+          python - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+
+          py_ver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+          target = (
+              Path(os.environ["VENV_PATH"])
+              / "lib"
+              / py_ver
+              / "site-packages"
+              / "PySide6"
+              / "scripts"
+              / "android_deploy.py"
+          )
+
+          text = target.read_text(encoding="utf-8")
+          sentinel = "# AUTOGEN_ONLY_EXIT_HOOK"
+
+          if sentinel in text:
+              print(f"Hook already present in {target}")
+              sys.exit(0)
+
+          lines = text.splitlines()
+          out = []
+          inserted = False
+
+          for line in lines:
+              if ("Running buildozer deployment" in line) and not inserted:
+                  indent = line[:len(line) - len(line.lstrip())]
+                  out.extend([
+                      f"{indent}{sentinel}",
+                      f"{indent}try:",
+                      f"{indent}    import subprocess as _subprocess",
+                      f"{indent}    import sys as _sys",
+                      f"{indent}    from pathlib import Path as _Path",
+                      f"{indent}    _patch_script = _Path.cwd() / 'patch_buildozer.py'",
+                      f"{indent}    if _patch_script.exists():",
+                      f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
+                      f"{indent}except Exception as _e:",
+                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
+                      f"{indent}logging.info('[DEPLOY] Asset generation complete - exiting before Buildozer packaging')",
+                      f"{indent}return",
+                  ])
+                  inserted = True
+              out.append(line)
+
+          if not inserted:
+              raise SystemExit(f"Could not find insertion marker in {target}")
+
+          target.write_text(\"\\n\".join(out) + \"\\n\", encoding=\"utf-8\")
+
+          print(f\"Patched {target}\")
+          print(\"----- inserted hook preview -----\")
+          for i, line in enumerate(out):
+              if sentinel in line:
+                  start = max(0, i - 2)
+                  end = min(len(out), i + 14)
+                  print(\"\\n\".join(out[start:end]))
+                  break
+          PY
+
       - name: Generate PySide deployment assets only
         run: |
           set -Eeuo pipefail
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Normalize Android environment
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
 
@@ -249,6 +313,7 @@ jobs:
 
           export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
           export ANDROIDSDK="$ANDROID_SDK_ROOT"
+
           export ANDROID_NDK="$ANDROIDNDK"
           export ANDROID_NDK_HOME="$ANDROIDNDK"
           export ANDROID_NDK_ROOT="$ANDROIDNDK"
@@ -260,6 +325,7 @@ jobs:
 
           rm -f buildozer.spec
           rm -rf src/deployment
+          rm -rf .buildozer bin build
 
           pyside6-android-deploy \
             --verbose \
@@ -267,40 +333,13 @@ jobs:
             --sdk-path "$ANDROID_SDK_ROOT" \
             --ndk-path "$ANDROIDNDK" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
-            > ci-debug/generate-assets.log 2>&1 &
-          DEPLOY_PID=$!
+            2>&1 | tee ci-debug/generate-assets.log
 
-          found=0
-          for i in $(seq 1 300); do
-            if [ -f buildozer.spec ] \
-               && [ -d src/deployment/recipes/PySide6 ] \
-               && [ -d src/deployment/recipes/shiboken6 ] \
-               && [ -f src/deployment/jar/PySide6/jar/Qt6Android.jar ] \
-               && [ -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar ]; then
-              found=1
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$found" -ne 1 ]; then
-            echo "Timed out waiting for generated deployment assets" | tee -a ci-debug/generate-assets.log
-            kill -9 "$DEPLOY_PID" 2>/dev/null || true
-            wait "$DEPLOY_PID" 2>/dev/null || true
-            exit 1
-          fi
-
-          python patch_buildozer.py | tee -a ci-debug/generate-assets.log
-
-          # Stop the wrapper before it continues into deep Buildozer packaging
-          kill -9 "$DEPLOY_PID" 2>/dev/null || true
-          wait "$DEPLOY_PID" 2>/dev/null || true
-
-          test -f buildozer.spec
-          test -d src/deployment/recipes/PySide6
-          test -d src/deployment/recipes/shiboken6
-          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar
-          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar
+          test -f buildozer.spec || { echo "Missing generated buildozer.spec"; exit 1; }
+          test -d src/deployment/recipes/PySide6 || { echo "Missing generated PySide6 recipe"; exit 1; }
+          test -d src/deployment/recipes/shiboken6 || { echo "Missing generated shiboken6 recipe"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing generated Qt6Android.jar"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing generated Qt6AndroidBindings.jar"; exit 1; }
 
       - name: Build APK with Buildozer directly
         run: |
@@ -308,10 +347,9 @@ jobs:
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Hard reset Buildozer state from the interrupted asset-generation phase
+          # Hard reset Buildozer state from the generation phase
           rm -rf .buildozer bin build
 
-          # Normalize Android environment again for direct Buildozer
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
           unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
 
@@ -335,7 +373,6 @@ jobs:
           echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
           echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
 
-          # Sanity check: the generated assets/spec must still exist
           test -f buildozer.spec || { echo "Missing generated buildozer.spec"; exit 1; }
           test -d src/deployment/recipes/PySide6 || { echo "Missing generated PySide6 recipe"; exit 1; }
           test -d src/deployment/recipes/shiboken6 || { echo "Missing generated shiboken6 recipe"; exit 1; }

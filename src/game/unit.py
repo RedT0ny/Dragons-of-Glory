@@ -260,13 +260,13 @@ class Unit:
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:
             self.status = UnitState.RESERVE
             self.position = (None, None)
-            print(f"{TextFormatter.format_unit_log_string(self.id)} eliminated.")
+            print(f"{TextFormatter.format_unit_log_string(self)} eliminated.")
 
     def deplete(self):
         """Active -> Depleted -> Reserve."""
         if self.status == UnitState.ACTIVE:
             self.status = UnitState.DEPLETED
-            print(f"{TextFormatter.format_unit_log_string(self.id)} depleted.")
+            print(f"{TextFormatter.format_unit_log_string(self)} depleted.")
         elif self.status == UnitState.DEPLETED:
             self.eliminate()
 
@@ -274,7 +274,7 @@ class Unit:
         """Permanently removed."""
         self.status = UnitState.DESTROYED
         self.position = (None, None)
-        print(f"{TextFormatter.format_unit_log_string(self.id)} destroyed.")
+        print(f"{TextFormatter.format_unit_log_string(self)} destroyed.")
 
     def load_unit(self, unit):
         if self.can_carry(unit):
