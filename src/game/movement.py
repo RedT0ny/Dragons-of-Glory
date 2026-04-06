@@ -760,25 +760,19 @@ class MovementService:
         return MoveUnitsResult(moved=moved, errors=[])
 
     def _move_units_with_interception(self, units, target_hex):
-        plans = {}
+        lead = units[0]
+        lead_state_path = None
         for unit in units:
-            ok, reason, cost, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
+            ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or f"{unit.id} cannot move."])
-            final_hexside = getattr(unit, "river_hexside", None)
-            if unit.unit_type == UnitType.FLEET and state_path:
-                final_hexside = state_path[-1][1]
-            plans[unit] = {
-                "cost": cost,
-                "final_hexside": final_hexside,
-                "state_path": state_path,
-            }
+            if unit is lead and unit.unit_type == UnitType.FLEET:
+                lead_state_path = state_path
 
-        lead = units[0]
         path = self._build_movement_hex_path(
             units,
             target_hex,
-            precomputed_state_path=plans.get(lead, {}).get("state_path"),
+            precomputed_state_path=lead_state_path if lead.unit_type == UnitType.FLEET else None,
         )
         if path is None:
             return MoveUnitsResult(moved=[], errors=["Selected stack has no valid path."])
@@ -789,7 +783,15 @@ class MovementService:
             for unit in list(units):
                 if not getattr(unit, "is_on_map", False):
                     continue
-                self._relocate_unit_for_interception_step(unit, step_hex)
+                self.game_state.move_unit(
+                    unit,
+                    step_hex,
+                    invalidate_analysis=False,
+                    update_territory=False,
+                    invalidate_overlays=False,
+                )
+                if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
+                    return MoveUnitsResult(moved=[], errors=[f"{unit.id} cannot move."])
 
             movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
             if not movers_alive:
@@ -802,14 +804,6 @@ class MovementService:
 
             if intercepted:
                 print(f"Interception resolved at {step_hex.axial_to_offset()}.")
-
-        for unit in units:
-            if not getattr(unit, "is_on_map", False):
-                continue
-            plan = plans.get(unit)
-            if not plan:
-                continue
-            self._finalize_interception_move(unit, plan)
 
         self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
@@ -846,23 +840,6 @@ class MovementService:
         if not path and start_hex != target_hex:
             return None
         return path
-
-    def _relocate_unit_for_interception_step(self, unit, target_hex):
-        """Temporarily moves a unit to a new hex for interception resolution, without applying movement costs or rules."""
-        self._relocate_unit_no_refresh(unit, target_hex, set_escaped=True, apply_escape=True)
-
-    def _finalize_interception_move(self, unit, plan):
-        """After interception steps are resolved, applies the final movement costs and state changes to the unit."""
-        if not hasattr(unit, "movement_points"):
-            unit.movement_points = unit.movement
-        cost = int(plan.get("cost", 0) or 0)
-        effective_mp = effective_movement_points(unit)
-        if cost > 0:
-            unit.movement_points = max(0, effective_mp - cost)
-        if getattr(self.game_state, "phase", None) == GamePhase.MOVEMENT:
-            unit.moved_this_turn = True
-            if unit.unit_type == UnitType.FLEET:
-                unit.river_hexside = plan.get("final_hexside", getattr(unit, "river_hexside", None))
 
     def _teleport_unit_no_cost(self, unit, target_hex):
         """Temporarily moves a unit to a new hex without applying movement costs or rules, used for interception resolution."""

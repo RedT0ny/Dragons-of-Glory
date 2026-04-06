@@ -138,16 +138,11 @@ class InterceptionService:
                     moving_hex,
                     defenders_override=air_defenders,
                 )
-                defenders_after = [
-                    u for u in air_defenders
-                    if getattr(u, "is_on_map", False)
-                    and getattr(u, "allegiance", None) != getattr(live_interceptors[0], "allegiance", None)
-                ]
                 show_combat_result_popup(
                     self.game_state,
                     title="Interception Details",
                     attackers=live_interceptors,
-                    defenders=defenders_after,
+                    defenders=air_defenders,
                     resolution=resolution,
                     context="interception",
                     target_hex=moving_hex,

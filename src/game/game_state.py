@@ -1176,8 +1176,7 @@ class GameState:
             if (
                 u is not invading_unit
                 and getattr(u, "allegiance", None) not in (getattr(invading_unit, "allegiance", None), NEUTRAL, None)
-                and getattr(u, "is_on_map", False)
-                and hasattr(u, "is_leader")
+                and u.is_on_map
                 and u.is_leader()
             )
         ]
@@ -1197,11 +1196,12 @@ class GameState:
         ]
         self._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
 
-    @staticmethod
-    def _unit_can_force_fleet_displacement(unit):
-        if unit and unit.is_control_unit():
-            return True
-        return False
+    def apply_forced_entry_displacement(self, invading_unit, target_hex):
+        """Apply forced fleet displacement and leader escapes when a control unit enters a hex."""
+        if not invading_unit or not invading_unit.is_control_unit():
+            return
+        self._displace_enemy_fleets_in_hex(invading_unit, target_hex)
+        self._force_enemy_leader_escapes_in_hex(invading_unit, target_hex)
 
     def move_unit(
         self,
@@ -1269,10 +1269,8 @@ class GameState:
         if self.phase == GamePhase.MOVEMENT:
             unit.moved_this_turn = True
 
-        # Rule: Ground armies and wings displace enemy fleets from entered hexes.
-        if self._unit_can_force_fleet_displacement(unit):
-            self._displace_enemy_fleets_in_hex(unit, target_hex)
-            self._force_enemy_leader_escapes_in_hex(unit, target_hex)
+        # Rule: control units displace enemy fleets and force enemy leader escapes.
+        self.apply_forced_entry_displacement(unit, target_hex)
 
         if invalidate_analysis and update_territory and invalidate_overlays:
             self.finalize_board_state_change()

@@ -213,7 +213,7 @@ jobs:
           text = upsert(text, "package.name", "dragonsofglory")
           text = upsert(text, "package.domain", "org.redtony")
 
-          # Force stable p4a path for Python <= 3.12
+          # Force stable p4a path
           text = upsert(text, "p4a.branch", "master")
 
           # Force Python 3.11 to match cp311 Android wheels
@@ -271,7 +271,7 @@ jobs:
           DEPLOY_PID=$!
 
           found=0
-          for i in $(seq 1 240); do
+          for i in $(seq 1 300); do
             if [ -f buildozer.spec ] \
                && [ -d src/deployment/recipes/PySide6 ] \
                && [ -d src/deployment/recipes/shiboken6 ] \
@@ -292,7 +292,7 @@ jobs:
 
           python patch_buildozer.py | tee -a ci-debug/generate-assets.log
 
-          # Stop the wrapper before it goes deep into Buildozer packaging
+          # Stop the wrapper before it continues into deep Buildozer packaging
           kill -9 "$DEPLOY_PID" 2>/dev/null || true
           wait "$DEPLOY_PID" 2>/dev/null || true
 
@@ -302,19 +302,14 @@ jobs:
           test -f src/deployment/jar/PySide6/jar/Qt6Android.jar
           test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar
 
-      - name: Clean interrupted Buildozer platform cache
-        run: |
-          # Keep generated buildozer.spec and src/deployment assets,
-          # but remove the partially-created Buildozer platform state
-          rm -rf .buildozer
-
-          # Recreate the top-level folder only if you want predictable structure
-          mkdir -p .buildozer
-
       - name: Build APK with Buildozer directly
         run: |
           set -Eeuo pipefail
+          mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
+
+          # Hard reset Buildozer state from the interrupted asset-generation phase
+          rm -rf .buildozer bin build
 
           # Normalize Android environment again for direct Buildozer
           unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
@@ -339,6 +334,13 @@ jobs:
           echo "ANDROID_NDK=$ANDROIDNDK" | tee -a ci-debug/build-apk.log
           echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
           echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
+
+          # Sanity check: the generated assets/spec must still exist
+          test -f buildozer.spec || { echo "Missing generated buildozer.spec"; exit 1; }
+          test -d src/deployment/recipes/PySide6 || { echo "Missing generated PySide6 recipe"; exit 1; }
+          test -d src/deployment/recipes/shiboken6 || { echo "Missing generated shiboken6 recipe"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing generated Qt6Android.jar"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing generated Qt6AndroidBindings.jar"; exit 1; }
 
           python -m buildozer -v android debug 2>&1 | tee -a ci-debug/build-apk.log
 

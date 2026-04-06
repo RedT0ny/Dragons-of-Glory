@@ -1,5 +1,7 @@
 import re
 from typing import Optional, Tuple, List, Any
+
+from content.tools import TextFormatter
 from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
 from src.content.tools import caption_id
@@ -258,13 +260,13 @@ class Unit:
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:
             self.status = UnitState.RESERVE
             self.position = (None, None)
-            print(f"{caption_id(self.id)} eliminated.")
+            print(f"{TextFormatter.format_unit_log_string(self.id)} eliminated.")
 
     def deplete(self):
         """Active -> Depleted -> Reserve."""
         if self.status == UnitState.ACTIVE:
             self.status = UnitState.DEPLETED
-            print(f"{caption_id(self.id)} depleted.")
+            print(f"{TextFormatter.format_unit_log_string(self.id)} depleted.")
         elif self.status == UnitState.DEPLETED:
             self.eliminate()
 
@@ -272,7 +274,7 @@ class Unit:
         """Permanently removed."""
         self.status = UnitState.DESTROYED
         self.position = (None, None)
-        print(f"{caption_id(self.id)} destroyed.")
+        print(f"{TextFormatter.format_unit_log_string(self.id)} destroyed.")
 
     def load_unit(self, unit):
         if self.can_carry(unit):

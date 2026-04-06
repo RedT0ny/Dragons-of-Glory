@@ -379,19 +379,21 @@ class GeographyAnalyzer:
 
     @staticmethod
     def get_country_landing_candidates(ctx: AIContext, country_id: str, main_objective: Objective) -> List[Hex]:
+        """
+        Return coastal hexes in the target country that are within distance 6 of the main objective and can be reached
+        by at least one currently embarked ground unit, and where the disembarking army can move inland on the next turn.
+        """
         board = ctx.game_state.map
         objective_hex = Hex.offset_to_axial(*main_objective.coords)
         candidates: List[Hex] = []
         embarked_ground = []
         for u in ctx.friendly_units:
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if u.unit_type != UnitType.FLEET:
                 continue
-            for p in list(getattr(u, "passengers", []) or []):
-                if getattr(p, "allegiance", None) != ctx.side:
+            for p in u.passengers or []:  # Cycle through passengers
+                if p.allegiance != ctx.side:
                     continue
-                if not getattr(p, "is_army", lambda: False)():
-                    continue
-                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                if not p.is_army():
                     continue
                 embarked_ground.append(p)
         if not embarked_ground:
@@ -518,13 +520,11 @@ class StrategicPlanner:
 
         friendly_ground_hexes: List[Hex] = []
         for u in ctx.friendly_units:
-            if not getattr(u, "is_on_map", False):
+            if not u.is_on_map:
                 continue
-            if getattr(u, "transport_host", None) is not None:
+            if u.transport_host is not None:
                 continue
-            if not getattr(u, "is_army", lambda: False)():
-                continue
-            if getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+            if not u.is_army():
                 continue
             if not getattr(u, "position", None) or u.position[0] is None:
                 continue
