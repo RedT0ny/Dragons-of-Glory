@@ -277,7 +277,7 @@ jobs:
                       f"{indent}    if _patch_script.exists():",
                       f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
                       f"{indent}except Exception as _e:",
-                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
+                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {_e}')",
                       f"{indent}logging.info('[DEPLOY] Asset generation complete - exiting before Buildozer packaging')",
                       f"{indent}return",
                   ])
@@ -287,15 +287,15 @@ jobs:
           if not inserted:
               raise SystemExit(f"Could not find insertion marker in {target}")
 
-          target.write_text(\"\\n\".join(out) + \"\\n\", encoding=\"utf-8\")
+          target.write_text("\n".join(out) + "\n", encoding="utf-8")
 
-          print(f\"Patched {target}\")
-          print(\"----- inserted hook preview -----\")
+          print(f"Patched {target}")
+          print("----- inserted hook preview -----")
           for i, line in enumerate(out):
               if sentinel in line:
                   start = max(0, i - 2)
                   end = min(len(out), i + 14)
-                  print(\"\\n\".join(out[start:end]))
+                  print("\n".join(out[start:end]))
                   break
           PY
 
