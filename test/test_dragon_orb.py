@@ -127,6 +127,7 @@ def test_dragon_orb_success_destroys_only_dragons_and_consumes_orb():
         [leader],
         [dragon, draconian],
         consume_asset_fn=gs._consume_asset,
+        damage_unit_fn=gs.damage_unit,
         roll_d6_fn=lambda: 3,
     )
 
@@ -167,6 +168,7 @@ def test_dragon_orb_failure_destroys_leader_and_consumes_orb():
         [leader],
         [enemy_dragon],
         consume_asset_fn=gs._consume_asset,
+        damage_unit_fn=gs.damage_unit,
         roll_d6_fn=lambda: 6,
     )
 

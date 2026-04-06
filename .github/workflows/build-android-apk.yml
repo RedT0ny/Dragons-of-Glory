@@ -277,7 +277,7 @@ jobs:
                       f"{indent}    if _patch_script.exists():",
                       f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
                       f"{indent}except Exception as _e:",
-                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {_e}')",
+                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
                       f"{indent}logging.info('[DEPLOY] Asset generation complete - exiting before Buildozer packaging')",
                       f"{indent}return",
                   ])

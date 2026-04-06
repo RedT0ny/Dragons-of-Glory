@@ -252,9 +252,15 @@ class Unit:
         self.status = UnitState.READY
 
     def eliminate(self):
-        """Moves to Reserve (can be rebuilt)."""
+        """Apply elimination rules by unit type."""
         if self.is_carrier():
             self.eliminate_carrier()
+
+        # Wings and Flying Citadels are destroyed when eliminated.
+        if self.is_flier():
+            if self.status != UnitState.DESTROYED:
+                self.destroy()
+            return
 
         if self.status not in [UnitState.RESERVE, UnitState.DESTROYED]:
             self.status = UnitState.RESERVE

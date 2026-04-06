@@ -364,7 +364,7 @@ class Board:
             for other in units:
                 if (
                     other is not unit
-                    and getattr(other, "unit_type", None) == UnitType.FLEET
+                    and other.is_fleet()
                     and getattr(other, "river_hexside", None) == river_hexside
                     and self._is_enemy_for_fleet(unit, other)
                 ):
@@ -378,9 +378,9 @@ class Board:
                 if other is exclude_unit:
                     continue
                 if (
-                    getattr(other, "unit_type", None) == UnitType.FLEET
+                    other.is_fleet()
                     and getattr(other, "river_hexside", None) == river_hexside
-                    and getattr(other, "is_on_map", True)
+                    and other.is_on_map
                 ):
                     count += 1
         return count

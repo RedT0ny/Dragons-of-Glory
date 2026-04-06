@@ -15,7 +15,7 @@ from src.game.map import Hex
 # rule handling, and click-driven combat UX orchestration in one place.
 
 
-def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=None):
+def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, damage_unit_fn, roll_d6_fn=None):
     """
     Resolves Dragon Orb usage before normal land combat.
 
@@ -47,7 +47,7 @@ def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=No
             roll = roll_d6()
             tactical_rating = int(getattr(leader, "tactical_rating", 0) or 0)
             if roll > tactical_rating:
-                leader.destroy()
+                damage_unit_fn(leader, mode="destroy")
                 consume_asset_fn(orb, leader)
                 logs.append(
                     f"Dragon Orb ({side_name}) failed: {leader.id} rolled {roll} > TR {tactical_rating}; leader and orb destroyed."
@@ -58,7 +58,7 @@ def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, roll_d6_fn=No
             for enemy in opposing:
                 if not (enemy.is_on_map and enemy.is_dragon()):
                     continue
-                enemy.destroy()
+                damage_unit_fn(enemy, mode="destroy")
                 destroyed_dragons.append(enemy)
             consume_asset_fn(orb, leader)
             logs.append(
@@ -210,6 +210,9 @@ class CombatResolver:
         defender_cs *= self._get_defender_combat_multiplier()
         return attacker_cs, defender_cs
 
+    def _damage_unit(self, unit, mode: str = "deplete"):
+        self.game_state.damage_unit(unit, mode=mode)
+
     def resolve(self):
         # Core land/air resolution pipeline:
         # odds -> DRM -> die roll (+DRM clamp) -> CRT lookup -> apply both sides.
@@ -272,10 +275,10 @@ class CombatResolver:
 
         if apply_eliminate_all:
             for unit in affected:
-                unit.eliminate()
+                self._damage_unit(unit, mode="eliminate")
         elif apply_deplete_all:
             for unit in affected:
-                unit.deplete()
+                self._damage_unit(unit, mode="deplete")
 
         if depletion_steps:
             self._apply_depletion_steps(affected, depletion_steps)
@@ -586,25 +589,25 @@ class CombatResolver:
             ground_active = [u for u in units if u.status.name == "ACTIVE" and not u.is_wing()]
             if ground_active:
                 target = min(ground_active, key=lambda u: u.combat_rating)
-                target.deplete()
+                self._damage_unit(target, mode="deplete")
                 continue
 
             ground_depleted = [u for u in units if u.status.name == "DEPLETED" and not u.is_wing()]
             if ground_depleted:
                 target = min(ground_depleted, key=lambda u: u.combat_rating)
-                target.eliminate()
+                self._damage_unit(target, mode="eliminate")
                 continue
 
             wing_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
             if wing_active:
                 target = min(wing_active, key=lambda u: u.combat_rating)
-                target.deplete()
+                self._damage_unit(target, mode="deplete")
                 continue
 
             wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
             if wing_depleted:
                 target = min(wing_depleted, key=lambda u: u.combat_rating)
-                target.eliminate()
+                self._damage_unit(target, mode="eliminate")
                 continue
 
             break
@@ -623,7 +626,7 @@ class CombatResolver:
             start_hex = Hex.offset_to_axial(*unit.position)
             valid_hexes = self._get_valid_retreat_hexes_fn(unit, start_hex)
             if not valid_hexes:
-                unit.eliminate()
+                self._damage_unit(unit, mode="eliminate")
                 continue
             retreat_hex = random.choice(valid_hexes)
             self._move_unit_fn(unit, retreat_hex)
@@ -669,7 +672,11 @@ class NavalCombatResolver:
                 for _ in range(amount):
                     if not getattr(target, "is_on_map", False):
                         break
-                    self._apply_hit_to_fleet(target)
+                    if target.status == UnitState.ACTIVE:
+                        self.game_state.damage_unit(target, mode="deplete")
+                        continue
+                    if target.status == UnitState.DEPLETED:
+                        self.game_state.damage_unit(target, mode="eliminate")
 
             self._sync_combat_lists()
             if not self.attackers or not self.defenders:
@@ -713,22 +720,6 @@ class NavalCombatResolver:
             return None
         live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
         return live[0]
-
-    def _apply_hit_to_fleet(self, fleet):
-        if fleet.status == UnitState.ACTIVE:
-            fleet.deplete()
-            return
-        if fleet.status == UnitState.DEPLETED:
-            self._sink_fleet(fleet)
-
-    def _sink_fleet(self, fleet):
-        """Sink a fleet unit. Passenger handling is done by Fleet.eliminate()."""
-        if not fleet.position or None in fleet.position:
-            fleet.eliminate()
-            return
-
-        fleet.eliminate()
-        self.game_state.map.remove_unit_from_spatial_map(fleet)
 
     def _withdraw_all(self, side_fleets):
         for fleet in list(side_fleets):
@@ -815,7 +806,11 @@ class DragonDuelResolver:
                 for _ in range(amount):
                     if not getattr(target, "is_on_map", False):
                         break
-                    self._apply_hit_to_dragon(target)
+                    if target.status.name == "ACTIVE":
+                        self.game_state.damage_unit(target, mode="deplete")
+                        continue
+                    if target.status.name == "DEPLETED":
+                        self.game_state.damage_unit(target, mode="destroy")
 
             self._sync_combat_lists()
             if not self.attackers or not self.defenders:
@@ -855,15 +850,6 @@ class DragonDuelResolver:
             return None
         live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
         return live[0]
-
-    def _apply_hit_to_dragon(self, dragon):
-        if dragon.status.name == "ACTIVE":
-            dragon.deplete()
-            return
-        if dragon.status.name == "DEPLETED":
-            dragon.destroy()
-            if self.game_state and getattr(self.game_state, "map", None):
-                self.game_state.map.remove_unit_from_spatial_map(dragon)
 
     def _withdraw_all(self, side_dragons):
         for dragon in list(side_dragons):
@@ -1073,6 +1059,7 @@ class CombatService:
             attackers,
             defenders,
             consume_asset_fn=self._consume_asset,
+            damage_unit_fn=self.game_state.damage_unit,
         )
         if orb_events:
             self.cleanup_destroyed_units(attackers + defenders)
@@ -1527,7 +1514,7 @@ class CombatService:
         start_hex = Hex.offset_to_axial(*unit.position)
         valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
         if not valid_hexes:
-            unit.eliminate()
+            self.game_state.damage_unit(unit, mode="eliminate")
             return []
 
         leaders_here = [

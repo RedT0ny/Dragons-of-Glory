@@ -813,7 +813,7 @@ class GameState:
         # 1. Sink
         if roll == 1:
             result["effect"] = "sink"
-            unit.destroy()
+            self.damage_unit(unit, mode="destroy")
             print(f"Maelstrom Effect (Roll {roll}): Ship {unit.id} destroyed!")
 
         # 2-5. Stay
@@ -1158,7 +1158,7 @@ class GameState:
             retreat_state = self.map.find_nearest_safe_fleet_state(fleet, start_hex)
             if retreat_state is None:
                 print(f"No legal displacement hex found for fleet {fleet.id}. Fleet eliminated")
-                fleet.eliminate()
+                self.damage_unit(fleet, mode="eliminate")
                 continue
             self._force_move_fleet_to_state(fleet, retreat_state)
 
@@ -1194,6 +1194,41 @@ class GameState:
             return
         self._displace_enemy_fleets_in_hex(invading_unit, target_hex)
         self._force_enemy_leader_escapes_in_hex(invading_unit, target_hex)
+
+    def damage_unit(self, unit, mode: str = "deplete"):
+        """
+        Apply unit damage through a single model entry point.
+
+        mode:
+        - "deplete": ACTIVE -> DEPLETED, DEPLETED -> RESERVE
+        - "eliminate": force RESERVE
+        - "destroy": force DESTROYED
+        """
+        if unit is None:
+            return
+
+        was_on_map = bool(
+            getattr(unit, "is_on_map", False)
+            and getattr(unit, "position", None)
+            and None not in unit.position
+        )
+
+        if mode == "deplete":
+            unit.deplete()
+        elif mode == "eliminate":
+            unit.eliminate()
+        elif mode == "destroy":
+            unit.destroy()
+        else:
+            raise ValueError(f"Unsupported damage mode: {mode}")
+
+        if was_on_map and (
+            not getattr(unit, "is_on_map", False)
+            or not getattr(unit, "position", None)
+            or None in unit.position
+        ):
+            if getattr(self, "map", None):
+                self.map.remove_unit_from_spatial_map(unit)
 
     def move_unit(
         self,

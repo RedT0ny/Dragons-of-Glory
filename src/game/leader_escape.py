@@ -52,7 +52,7 @@ class LeaderEscapeHandler:
             if getattr(check, "roll_required", True):
                 roll = self._roll_d6()
                 if roll <= 3:
-                    leader.destroy()
+                    self.game_state.damage_unit(leader, mode="destroy")
                     destroyed.append(leader)
                     continue
 
@@ -62,7 +62,7 @@ class LeaderEscapeHandler:
                 allow_fleet=getattr(check, "allow_fleet_destinations", False),
             )
             if not options:
-                leader.destroy()
+                self.game_state.damage_unit(leader, mode="destroy")
                 destroyed.append(leader)
                 continue
 
@@ -70,7 +70,7 @@ class LeaderEscapeHandler:
                 destination = self.choose_escape_destination(leader, options)
                 if destination and self._place_leader(leader, destination):
                     continue
-                leader.destroy()
+                self.game_state.damage_unit(leader, mode="destroy")
                 destroyed.append(leader)
                 continue
 
@@ -78,7 +78,7 @@ class LeaderEscapeHandler:
                 destination = self.choose_escape_destination(leader, options)
                 if destination and self._place_leader(leader, destination):
                     continue
-                leader.destroy()
+                self.game_state.damage_unit(leader, mode="destroy")
                 destroyed.append(leader)
                 continue
 
