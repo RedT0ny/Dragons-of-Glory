@@ -167,13 +167,6 @@ class GameState:
             self._analysis_dirty.discard(key)
         return self._analysis_cache.get(key)
 
-    def is_combat_unit(self, unit) -> bool:
-        if unit is None:
-            return False
-        if unit.is_fleet():
-            return True
-        return self.combat_service.is_combat_stack_unit(unit)
-
     def can_unit_project_across_hexside(self, unit, from_hex, to_hex) -> bool:
         if not self.map or unit is None:
             return False
@@ -193,9 +186,8 @@ class GameState:
 
         relevant = [
             u for u in (attackers or [])
-            if getattr(u, "is_on_map", False)
-            and self.combat_service.is_combat_stack_unit(u)
-            and not u.is_fleet()
+            if u.is_on_map
+            and u.is_control_unit()
             and getattr(u, "transport_host", None) is None
         ]
         if not relevant:

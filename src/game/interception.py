@@ -1,3 +1,4 @@
+from game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, UnitRace, UnitType
 from src.game.combat_reporting import show_combat_result_popup
@@ -20,7 +21,7 @@ class InterceptionService:
         if getattr(self.game_state, "phase", None) != GamePhase.MOVEMENT:
             return False
         self.ensure_step_context()
-        return all(getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET) for u in units)
+        return all(u.is_wing() or u.is_fleet() for u in units)
 
     def ensure_step_context(self):
         context = (
@@ -64,13 +65,13 @@ class InterceptionService:
         for unit in self.game_state.units:
             if unit.allegiance in (mover_side, NEUTRAL, None):
                 continue
-            if not getattr(unit, "is_on_map", False):
+            if not unit.is_on_map:
                 continue
-            if getattr(unit, "transport_host", None) is not None:
+            if unit.transport_host is not None:
                 continue
-            if unit.unit_type not in (UnitType.WING, UnitType.FLEET):
+            if not unit.is_wing() and not unit.is_fleet():
                 continue
-            if not unit.position or unit.position[0] is None or unit.position[1] is None:
+            if not unit.position or None in unit.position:
                 continue
             if (unit.id, getattr(unit, "ordinal", 1)) in self._interception_attempted_units:
                 continue

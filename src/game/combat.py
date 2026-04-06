@@ -1,10 +1,12 @@
 import os
 import random
+
+from game.unit import Unit
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS
 from src.content.loader import load_data
-from src.content.tools import TextFormatter
+from src.content.tools import TextFormatter, caption_id
 from src.game.combat_reporting import show_combat_result_popup
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.game.map import Hex
@@ -422,25 +424,24 @@ class CombatResolver:
         return bool(self._get_defender_location())
 
     def _defenders_include_citadel(self):
-        return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in self.defenders)
+        return any(u.is_citadel() and u.is_on_map for u in self.defenders)
 
     def _attacking_air_against_citadel(self):
         if not self._defenders_include_citadel():
             return False
-        return any(u.is_flier() for u in self.attackers if getattr(u, "is_on_map", False))
+        return any(u.is_flier() for u in self.attackers if u.is_on_map)
 
     def _citadel_attack_strips_ws_defender_bonuses(self):
         attacker_has_citadel = any(
-            u.is_citadel() and getattr(u, "is_on_map", False)
+            u.is_citadel() and u.is_on_map
             for u in self.attackers
         )
         if not attacker_has_citadel:
             return False
         return any(
-            getattr(u, "allegiance", None) == WS
+            u.allegiance == WS
             and u.is_army()
-            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-            and getattr(u, "is_on_map", False)
+            and u.is_on_map
             for u in self.defenders
         )
 
@@ -454,7 +455,7 @@ class CombatResolver:
 
     def _defender_has_other_bonus(self, bonus_name):
         for unit in self.defenders:
-            if not getattr(unit, "is_on_map", False):
+            if not unit.is_on_map:
                 continue
             if self._unit_has_other_bonus(unit, bonus_name):
                 return True
@@ -479,9 +480,9 @@ class CombatResolver:
         if not defender_hex or not self.game_state or not self.game_state.map:
             return candidates
         for unit in self.attackers:
-            if not (hasattr(unit, "is_army") and unit.is_army()):
+            if not unit.is_army():
                 continue
-            if not getattr(unit, "position", None):
+            if not unit.position:
                 continue
             col, row = unit.position
             if col is None or row is None:
@@ -714,15 +715,15 @@ class NavalCombatResolver:
         return live[0]
 
     def _apply_hit_to_fleet(self, fleet):
-        if fleet.status.name == "ACTIVE":
+        if fleet.status == UnitState.ACTIVE:
             fleet.deplete()
             return
-        if fleet.status.name == "DEPLETED":
+        if fleet.status == UnitState.DEPLETED:
             self._sink_fleet(fleet)
 
     def _sink_fleet(self, fleet):
         """Sink a fleet unit. Passenger handling is done by Fleet.eliminate()."""
-        if not getattr(fleet, "position", None) or fleet.position[0] is None or fleet.position[1] is None:
+        if not fleet.position or None in fleet.position:
             fleet.eliminate()
             return
 
@@ -731,9 +732,7 @@ class NavalCombatResolver:
 
     def _withdraw_all(self, side_fleets):
         for fleet in list(side_fleets):
-            if not getattr(fleet, "is_on_map", False) or not getattr(fleet, "position", None):
-                continue
-            if fleet.position[0] is None or fleet.position[1] is None:
+            if not fleet.is_on_map or not fleet.position or None in fleet.position:
                 continue
             from src.game.map import Hex
             start_hex = Hex.offset_to_axial(*fleet.position)
@@ -746,8 +745,8 @@ class NavalCombatResolver:
             fleet.river_hexside = next_side
 
     def _sync_combat_lists(self):
-        self.attackers = [u for u in self.attackers if getattr(u, "is_on_map", False)]
-        self.defenders = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+        self.attackers = [u for u in self.attackers if u.is_on_map]
+        self.defenders = [u for u in self.defenders if u.is_on_map]
 
     def _result_code(self):
         if self.attackers and not self.defenders:
@@ -989,9 +988,6 @@ class CombatService:
         """Returns effective attacker/defender combat ratio for the given combat context."""
         return self._project_combat_odds(attackers, defenders, hex_position)["ratio"]
 
-    def is_combat_stack_unit(self, unit):
-        return self._is_combat_stack_unit(unit)
-
     def resolve_combat(
         self,
         attackers,
@@ -1085,7 +1081,7 @@ class CombatService:
             for evt in orb_events:
                 print(evt)
 
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
+            if not any(u.is_combat_unit() for u in defenders):
                 result = "-/-"
                 advance_available = self._can_advance_after_combat(
                     attackers=attackers,
@@ -1099,7 +1095,7 @@ class CombatService:
                     "leader_escape_requests": [],
                     "advance_available": advance_available,
                 }
-            if not any(self._is_combat_stack_unit(u) for u in attackers):
+            if not any(u.is_combat_unit() for u in attackers):
                 result = "-/-"
                 print(TextFormatter.format_combat_log(attackers, defenders, result))
                 return {
@@ -1120,7 +1116,7 @@ class CombatService:
             self.cleanup_destroyed_units(attackers + defenders)
             attackers = [u for u in attackers if u.is_on_map]
             defenders = current_defenders()
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
+            if not any(u.is_combat_unit() for u in defenders):
                 result = "-/-"
                 advance_available = self._can_advance_after_combat(
                     attackers=attackers,
@@ -1136,7 +1132,7 @@ class CombatService:
                 }
 
         attackers = self._filter_dragons_for_land_attack(attackers, defenders)
-        if not any(self._is_combat_stack_unit(u) for u in attackers):
+        if not any(u.is_combat_unit() for u in attackers):
             result = "-/-"
             print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
@@ -1160,7 +1156,7 @@ class CombatService:
         if special_retreat["applied"]:
             self.cleanup_destroyed_units(defenders)
             defenders = current_defenders()
-            if not any(self._is_combat_stack_unit(u) for u in defenders):
+            if not any(u.is_combat_unit() for u in defenders):
                 result = special_retreat["result"]
                 leader_escape_requests = special_retreat.get("leader_escape_requests", []) or []
                 advance_available = self._can_advance_after_combat(
@@ -1184,7 +1180,7 @@ class CombatService:
                 leader_origins[unit] = origin_hex
                 units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
                 leader_stack_has_army[unit] = any(
-                    u.allegiance == unit.allegiance and self._is_combat_stack_unit(u)
+                    u.allegiance == unit.allegiance and u.is_combat_unit()
                     for u in units_in_hex
                 )
 
@@ -1225,7 +1221,7 @@ class CombatService:
     def _apply_combat_healing(self, units):
         logs = []
         for unit in units:
-            if getattr(unit, "status", None) != UnitState.DEPLETED:
+            if unit.status != UnitState.DEPLETED:
                 continue
             if getattr(unit, "_healed_this_combat_turn", False):
                 continue
@@ -1308,7 +1304,7 @@ class CombatService:
 
         defenders_have_dragons = any(u.is_on_map and u.is_dragon() for u in defenders)
         for unit in attackers:
-            if not self._is_combat_stack_unit(unit):
+            if not unit.is_combat_unit():
                 continue
             if not unit.is_dragon():
                 return True
@@ -1321,7 +1317,7 @@ class CombatService:
     def _filter_dragons_for_land_attack(self, attackers, defenders):
         filtered = []
         for unit in attackers:
-            if not getattr(unit, "is_on_map", False):
+            if not unit.is_on_map:
                 continue
             if not unit.is_dragon() or self._dragon_can_make_ground_attack(unit, attackers):
                 filtered.append(unit)
@@ -1341,16 +1337,16 @@ class CombatService:
     def _dragon_has_local_attack_leader(self, dragon, attackers):
         local_leaders = []
         for unit in attackers:
-            if not (hasattr(unit, "is_leader") and unit.is_leader()):
+            if not unit.is_leader():
                 continue
-            if getattr(unit, "allegiance", None) != dragon.allegiance:
+            if unit.allegiance != dragon.allegiance:
                 continue
             if getattr(unit, "position", None) != getattr(dragon, "position", None):
                 continue
             local_leaders.append(unit)
 
         for p in list(getattr(dragon, "passengers", []) or []):
-            if hasattr(p, "is_leader") and p.is_leader() and getattr(p, "allegiance", None) == dragon.allegiance:
+            if p.is_leader() and p.allegiance == dragon.allegiance:
                 local_leaders.append(p)
 
         if dragon.allegiance == HL:
@@ -1360,16 +1356,16 @@ class CombatService:
         return False
 
     def _is_valid_hl_dragon_commander(self, leader, dragon):
-        if getattr(leader, "unit_type", None) == UnitType.EMPEROR:
+        if leader.unit_type == UnitType.EMPEROR:
             return True
-        if getattr(leader, "unit_type", None) != UnitType.HIGHLORD:
+        if leader.unit_type != UnitType.HIGHLORD:
             return False
         leader_flight = getattr(getattr(leader, "spec", None), "dragonflight", None)
         dragon_flight = getattr(getattr(dragon, "spec", None), "dragonflight", None)
         return bool(leader_flight and dragon_flight and leader_flight == dragon_flight)
 
     def _is_valid_ws_dragon_commander(self, leader):
-        return getattr(leader, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
+        return leader.race in (UnitRace.SOLAMNIC, UnitRace.ELF)
 
     def _all_highlords_destroyed(self):
         highlords = [u for u in self.units if getattr(u, "unit_type", None) == UnitType.HIGHLORD]
@@ -1378,28 +1374,25 @@ class CombatService:
     def _all_ws_dragon_commanders_destroyed(self):
         ws_commanders = [
             u for u in self.units
-            if getattr(u, "allegiance", None) == WS
-            and hasattr(u, "is_leader")
+            if u.allegiance == WS
             and u.is_leader()
-            and getattr(u, "race", None) in (UnitRace.SOLAMNIC, UnitRace.ELF)
+            and u.race in (UnitRace.SOLAMNIC, UnitRace.ELF)
         ]
-        return bool(ws_commanders) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in ws_commanders)
+        return bool(ws_commanders) and all(u.status == UnitState.DESTROYED for u in ws_commanders)
 
     def _maybe_promote_highlord_to_emperor(self):
         living_emperors = [
             u for u in self.units
-            if getattr(u, "unit_type", None) == UnitType.EMPEROR
-            and getattr(u, "status", None) != UnitState.DESTROYED
+            if u.unit_type == UnitType.EMPEROR
+            and u.status != UnitState.DESTROYED
         ]
         if living_emperors:
             return None
 
         candidates = [
             u for u in self.units
-            if getattr(u, "unit_type", None) == UnitType.HIGHLORD
-            and hasattr(u, "is_leader")
-            and u.is_leader()
-            and getattr(u, "status", None) != UnitState.DESTROYED
+            if u.unit_type == UnitType.HIGHLORD
+            and u.status != UnitState.DESTROYED
         ]
         if not candidates:
             return None
@@ -1410,7 +1403,7 @@ class CombatService:
         return promoted
 
     def _notify_emperor_promotion(self, promoted):
-        msg = f"{promoted.id} has been promoted to Emperor."
+        msg = f"{caption_id(promoted.id)} has been promoted to Emperor."
         print(msg)
         if os.environ.get("PYTEST_CURRENT_TEST"):
             return
@@ -1446,6 +1439,10 @@ class CombatService:
         return nodes
 
     def _fleets_are_adjacent_for_combat(self, attacker_fleet, defender_fleet):
+        """
+        Determines if two fleets are adjacent for combat purposes, which includes being in the same hex
+        or in neighboring hexes.
+        """
         attacker_nodes = self._fleet_attack_nodes(attacker_fleet)
         defender_nodes = self._fleet_attack_nodes(defender_fleet)
         if not attacker_nodes or not defender_nodes:
@@ -1459,7 +1456,11 @@ class CombatService:
         return False
 
     def can_fleet_attack_hex(self, fleet, target_hex):
-        if fleet.unit_type != UnitType.FLEET or not fleet.is_on_map:
+        """
+        Determines if a fleet can attack a given hex, which requires at least one enemy fleet in the target hex that
+        is adjacent for combat.
+        """
+        if not fleet.is_fleet() or not fleet.is_on_map:
             return False
         defenders = [
             u for u in self.game_state.get_units_at(target_hex)
@@ -1473,11 +1474,14 @@ class CombatService:
         return any(self._fleets_are_adjacent_for_combat(fleet, d) for d in defenders)
 
     def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
+        """
+        Applies special retreat rules that can trigger before combat rolls, such as Wing/Cavalry escaping slower units.
+        """
         combat_defenders = [
             u for u in defenders
             if u.is_on_map
-            and u.position and u.position[0] is not None and u.position[1] is not None
-            and self._is_combat_stack_unit(u)
+            and u.position and None not in u.position
+            and u.is_combat_unit()
         ]
         if not combat_defenders:
             return {"applied": False, "result": None, "leader_escape_requests": []}
@@ -1489,7 +1493,7 @@ class CombatService:
             u for u in attackers
             if u.is_on_map
             and u.position and u.position[0] is not None and u.position[1] is not None
-            and self._is_combat_stack_unit(u)
+            and u.is_combat_unit()
         ]
         if not combat_attackers:
             return {"applied": False, "result": None, "leader_escape_requests": []}
@@ -1513,6 +1517,10 @@ class CombatService:
         return {"applied": True, "result": result, "leader_escape_requests": leader_escape_requests}
 
     def _retreat_single_unit(self, unit):
+        """
+        Handles retreat logic for a single unit, including forced boarding of leaders onto Wings and escape rolls
+        for leaders who can't board.
+        """
         if not unit.position or unit.position[0] is None or unit.position[1] is None:
             return []
         status_before = unit.status
@@ -1524,10 +1532,10 @@ class CombatService:
 
         leaders_here = [
             u for u in self.game_state.get_units_at(start_hex)
-            if getattr(u, "is_on_map", False)
-            and hasattr(u, "is_leader") and u.is_leader()
-            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
-            and getattr(u, "transport_host", None) is None
+            if u.is_on_map
+            and u.is_leader()
+            and u.allegiance == unit.allegiance
+            and u.transport_host is None
         ]
 
         retreat_hex = random.choice(valid_hexes)
@@ -1558,9 +1566,9 @@ class CombatService:
         for leader in leaders_here:
             if id(leader) in boarded_leaders:
                 continue
-            if getattr(leader, "status", None) == UnitState.DESTROYED:
+            if leader.status == UnitState.DESTROYED:
                 continue
-            if getattr(leader, "transport_host", None) is not None:
+            if leader.transport_host is not None:
                 continue
 
             can_land = (
@@ -1588,9 +1596,9 @@ class CombatService:
             return False
         if not wing.position or not leader.position or wing.position != leader.position:
             return False
-        if getattr(leader, "transport_host", None) is not None:
+        if leader.transport_host is not None:
             return True
-        if not hasattr(wing, "can_carry") or not wing.can_carry(leader):
+        if not wing.can_carry(leader):
             return False
 
         self.map.remove_unit_from_spatial_map(leader)
@@ -1657,7 +1665,7 @@ class CombatService:
             if u.is_on_map
             and u.position == target_offset
             and u.allegiance in defender_allegiances
-            and self._is_combat_stack_unit(u)
+            and u.is_combat_unit()
         ]
         if remaining_defender_combat_units:
             return False
@@ -1743,11 +1751,11 @@ class CombatService:
         src_hex = Hex.offset_to_axial(*unit.position)
         src_units = [
             u for u in self.map.get_units_in_hex(src_hex.q, src_hex.r)
-            if getattr(u, "is_on_map", False)
-            and getattr(u, "allegiance", None) == getattr(unit, "allegiance", None)
-            and getattr(u, "transport_host", None) is None
+            if u.is_on_map
+            and u.allegiance == unit.allegiance
+            and u.transport_host is None
         ]
-        has_leader = any(hasattr(u, "is_leader") and u.is_leader() for u in src_units)
+        has_leader = any(u.is_leader() for u in src_units)
         if not has_leader:
             return False
 
@@ -1791,7 +1799,7 @@ class CombatService:
             if not any(
                 u.allegiance == leader.allegiance
                 and u.is_on_map
-                and self._is_combat_stack_unit(u)
+                and u.is_combat_unit()
                 for u in units
             ):
                 continue
@@ -1803,20 +1811,17 @@ class CombatService:
         min_distance = min(origin_hex.distance_to(h) for h in candidates)
         return [h for h in candidates if origin_hex.distance_to(h) == min_distance]
 
-    def _is_combat_stack_unit(self, unit):
-        return unit.is_army() or unit.is_wing() or unit.is_citadel()
-
     @staticmethod
     def _is_leader_only_stack(units):
         live_units = [u for u in units if getattr(u, "is_on_map", False)]
         if not live_units:
             return False
-        return all(hasattr(u, "is_leader") and u.is_leader() for u in live_units)
+        return all(u.is_leader() for u in live_units)
 
     @staticmethod
     def _attack_triggers_leader_stack_escape(attackers):
         return any(u.is_control_unit()
-            and getattr(u, "is_on_map", False)
+            and u.is_on_map
             for u in attackers
         )
 
@@ -1824,14 +1829,10 @@ class CombatService:
         return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in defenders)
 
     def _is_ws_ground_combat_unit(self, unit):
-        if unit.allegiance != WS or not getattr(unit, "is_on_map", False):
-            return False
-        if not (hasattr(unit, "is_army") and unit.is_army()):
-            return False
-        return unit.unit_type not in (UnitType.WING, UnitType.FLEET)
+        return bool(unit.allegiance == WS and unit.is_on_map and unit.is_army())
 
     def _is_ws_air_combat_unit(self, unit):
-        return bool(unit.allegiance == WS and getattr(unit, "is_on_map", False) and unit.is_flier())
+        return bool(unit.allegiance == WS and unit.is_on_map and unit.is_flier())
 
     def _combat_blocked_by_citadel_rule(self, attackers, defenders):
         if not self._defenders_have_citadel(defenders):
@@ -2126,7 +2127,7 @@ class CombatClickHandler:
         return list(valid_target_offsets)
 
     def _is_unit_on_map(self, unit):
-        return bool(getattr(unit, "is_on_map", False) and unit.position and unit.position[0] is not None and unit.position[1] is not None)
+        return bool(unit.is_on_map and unit.position and None not in unit.position)
 
     def _selection_mode(self, attackers):
         if not attackers:

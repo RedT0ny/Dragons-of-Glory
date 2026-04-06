@@ -10,6 +10,7 @@ from collections import defaultdict
 import random
 from typing import List, Tuple
 
+from game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
 from src.game.interception import InterceptionService
@@ -35,7 +36,7 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if unit.unit_type != UnitType.FLEET and not game_state.map.can_unit_land_on_hex(unit, target_hex):
         return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
 
-    if not unit.position or unit.position[0] is None or unit.position[1] is None:
+    if not unit.position or None in unit.position:
         return True, None, 0, None, []
 
     max_mp = effective_movement_points(unit)
@@ -245,9 +246,9 @@ class InvasionHandler:
         for unit in list(extra_units or []):
             if unit is None or id(unit) in seen:
                 continue
-            if getattr(unit, "allegiance", None) != HL:
+            if unit.allegiance != HL:
                 continue
-            if getattr(unit, "unit_type", None) == UnitType.FLEET:
+            if unit.is_fleet():
                 continue
             if not self._can_extra_unit_invade_target(unit, target_hexes):
                 continue
@@ -288,7 +289,7 @@ class InvasionHandler:
     def _collect_unboard_landing_units(self, selected_units):
         landing = {}
         for unit in selected_units or []:
-            carrier = getattr(unit, "transport_host", None)
+            carrier = unit.transport_host
             if carrier is None:
                 passengers = list(getattr(unit, "passengers", []) or [])
                 if not passengers:
@@ -303,8 +304,6 @@ class InvasionHandler:
         if not carrier or not getattr(carrier, "position", None):
             return
         if getattr(passenger, "allegiance", None) != self.game_state.active_player:
-            return
-        if getattr(passenger, "unit_type", None) == UnitType.FLEET:
             return
         carrier_hex = Hex.offset_to_axial(*carrier.position)
         col, row = carrier_hex.axial_to_offset()

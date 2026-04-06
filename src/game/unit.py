@@ -80,10 +80,6 @@ class Unit:
         # Ideally, we should shadow the spec value if it changes.
         self._allegiance_override = value
 
-    # We need a getter that checks the override first
-    def get_allegiance(self):
-        return getattr(self, '_allegiance_override', self.spec.allegiance or NEUTRAL)
-
     @property
     def land(self) -> Optional[str]:
         return self.spec.country
@@ -229,6 +225,9 @@ class Unit:
 
     def is_control_unit(self) -> bool:
         return self.is_army() or self.is_wing() or self.is_citadel()
+
+    def is_combat_unit(self) -> bool:
+        return self.is_army() or self.is_fleet() or self.is_wing() or self.is_citadel()
 
     def is_flier(self) -> bool:
         return self.is_wing() or self.is_citadel()

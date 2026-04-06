@@ -158,7 +158,7 @@ class InfluenceMap(OverlayBase):
                 continue
             if getattr(unit, "allegiance", None) != self.side:
                 continue
-            if not game_state.is_combat_unit(unit):
+            if not unit.is_combat_unit():
                 continue
 
             if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:

@@ -526,7 +526,7 @@ class StrategicPlanner:
                 continue
             if not u.is_army():
                 continue
-            if not getattr(u, "position", None) or u.position[0] is None:
+            if not u.position or None in u.position:
                 continue
             friendly_ground_hexes.append(Hex.offset_to_axial(*u.position))
 
@@ -894,12 +894,12 @@ class StrategicPlanner:
         friendly_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in ctx.friendly_units
-            if ctx.game_state.is_combat_unit(u)
+            if u.is_combat_unit()
         )
         enemy_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in ctx.enemy_units
-            if ctx.game_state.is_combat_unit(u)
+            if u.is_combat_unit()
         )
         territory = ctx.overlays.get("territory")
         friendly_hexes = sum(1 for v in territory.values.values() if v == ctx.side) if territory else 0
@@ -1238,11 +1238,10 @@ class OperationalPlanner:
 
             ground_units = [
                 u for u in group.mobile_units
-                if getattr(u, "is_on_map", False)
-                   and getattr(u, "is_army", lambda: False)()
-                   and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-                   and getattr(u, "position", None)
-                   and u.position[0] is not None
+                if u.is_on_map
+                   and u.is_army()
+                   and not u.is_carrier()
+                   and u.position and None not in u.position
             ]
             if not ground_units:
                 continue
@@ -1267,10 +1266,9 @@ class OperationalPlanner:
 
             adjacent_group_keys.add(_task_group_key(group))
             adjacent_unit_count += len(ground_units)
-            adjacent_power += sum(
-                float(getattr(u, "combat_rating", 0) or 0)
+            adjacent_power += sum(u.combat_rating
                 for u in ground_units
-                if ctx.game_state.is_combat_unit(u)
+                if u.is_combat_unit()
             )
 
         return adjacent_group_keys, adjacent_unit_count, adjacent_power
@@ -1290,12 +1288,11 @@ class OperationalPlanner:
             armies = [u for u in stack if getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET]
             leaders = [
                 u for u in stack
-                if hasattr(u, "is_leader")
-                and u.is_leader()
-                and getattr(u, "transport_host", None) is None
+                if u.is_leader()
+                and u.transport_host is None
             ]
-            air_units = [u for u in stack if getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)()]
-            fleets = [u for u in stack if getattr(u, "unit_type", None) == UnitType.FLEET]
+            air_units = [u for u in stack if u.is_flier()]
+            fleets = [u for u in stack if u.is_fleet()]
 
             role_groups: List[List[object]] = []
             if armies:
@@ -1307,13 +1304,13 @@ class OperationalPlanner:
                     role_groups.append([fleet])
 
             for role_units in role_groups:
-                combat_units = [u for u in role_units if ctx.game_state.is_combat_unit(u)]
+                combat_units = [u for u in role_units if u.is_combat_unit()]
                 if not combat_units:
                     continue
-                power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in combat_units)
-                has_fleet = any(getattr(u, "unit_type", None) == UnitType.FLEET for u in role_units)
-                has_air = any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in role_units)
-                has_army = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in role_units)
+                power = sum(float(u.combat_rating) for u in combat_units)
+                has_fleet = any(u.is_fleet() for u in role_units)
+                has_air = any(u.is_flier() for u in role_units)
+                has_army = any(u.is_army() for u in role_units)
                 mobile_units = [
                     u for u in role_units
                     if getattr(u, "transport_host", None) is None
@@ -1523,7 +1520,7 @@ class OperationalPlanner:
                     nearby_enemy = 0
                     for neighbor in group.hex.neighbors():
                         nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                        if any(getattr(u, "allegiance", None) == ctx.enemy and ctx.game_state.is_combat_unit(u) for u in nstack):
+                        if any(u.allegiance == ctx.enemy and u.is_combat_unit() for u in nstack):
                             nearby_enemy += 1
                     push_objective = None
                     if main_objective and getattr(main_objective, "owner", None) == ctx.enemy:
@@ -1613,7 +1610,7 @@ class OperationalPlanner:
                         u for u in stack
                         if getattr(u, "allegiance", None) == ctx.side
                            and getattr(u, "is_on_map", False)
-                           and ctx.game_state.is_combat_unit(u)
+                           and u.is_combat_unit()
                     ]
                     garrison_count = len(defenders)
                     min_garrison_units = 2 if local_threat < 2.0 else 3
@@ -1913,7 +1910,7 @@ class OperationalPlanner:
         defender_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in defenders
-            if ctx.game_state.is_combat_unit(u)
+            if u.is_combat_unit()
         )
         if defender_power <= 0:
             return False
@@ -2460,7 +2457,7 @@ class TacticalPlanner:
                     1 for u in stack
                     if getattr(u, "allegiance", None) == ctx.side
                     and getattr(u, "is_on_map", False)
-                    and ctx.game_state.is_combat_unit(u)
+                    and u.is_combat_unit()
                 )
                 if friendly_combat_here > 4:
                     score -= (friendly_combat_here - 4) * 8.0
@@ -2497,7 +2494,7 @@ class TacticalPlanner:
                 u for u in stack
                 if getattr(u, "allegiance", None) == ctx.side
                    and getattr(u, "is_on_map", False)
-                   and ctx.game_state.is_combat_unit(u)
+                   and u.is_combat_unit()
             ]
             garrison_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders)
             garrison_count = len(defenders)
@@ -2553,7 +2550,7 @@ class TacticalPlanner:
                 continue
             if not getattr(enemy, "position", None) or enemy.position[0] is None or enemy.position[1] is None:
                 continue
-            if not ctx.game_state.is_combat_unit(enemy):
+            if not enemy.is_combat_unit():
                 continue
             if getattr(enemy, "unit_type", None) == UnitType.FLEET:
                 continue
@@ -2871,7 +2868,7 @@ class TacticalPlanner:
                 score += 8
             for neighbor in target_hex.neighbors():
                 nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                if any(getattr(u, "allegiance", None) == ctx.enemy and ctx.game_state.is_combat_unit(u) for u in nstack):
+                if any(getattr(u, "allegiance", None) == ctx.enemy and u.is_combat_unit() for u in nstack):
                     score += 6
 
         if mission.mission_type == "prepare_assault" and mission.target_hex is not None:
@@ -2888,9 +2885,9 @@ class TacticalPlanner:
             adj_enemy = 0
             for neighbor in target_hex.neighbors():
                 nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                if any(getattr(u, "allegiance", None) == ctx.side and ctx.game_state.is_combat_unit(u) for u in nstack):
+                if any(u.allegiance == ctx.side and u.is_combat_unit() for u in nstack):
                     adj_friendly += 1
-                if any(getattr(u, "allegiance", None) == ctx.enemy and ctx.game_state.is_combat_unit(u) for u in nstack):
+                if any(u.allegiance == ctx.enemy and u.is_combat_unit() for u in nstack):
                     adj_enemy += 1
             if front_dist <= 1 and adj_friendly < adj_enemy:
                 score -= 18
@@ -2967,9 +2964,9 @@ class TacticalPlanner:
         target_stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
         enemy_combat = [
             u for u in target_stack
-            if getattr(u, "allegiance", None) == ctx.enemy
-            and getattr(u, "is_on_map", False)
-            and ctx.game_state.is_combat_unit(u)
+            if u.allegiance == ctx.enemy
+            and u.is_on_map
+            and u.is_combat_unit()
         ]
         enemy_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in enemy_combat)
         loc = ctx.game_state.map.get_location(target_hex)
@@ -3541,7 +3538,7 @@ class TacticalPlanner:
         combat_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in group.units
-            if ctx.game_state.is_combat_unit(u)
+            if u.is_combat_unit()
         )
         if group.has_army:
             combat_power += 2.0
@@ -3557,8 +3554,8 @@ class TacticalPlanner:
         attackers: List[object],
         defenders: List[object],
     ) -> Dict[str, Any]:
-        att_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in attackers if ctx.game_state.is_combat_unit(u))
-        def_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders if ctx.game_state.is_combat_unit(u))
+        att_power = sum(float(u.combat_rating) for u in attackers if u.is_combat_unit())
+        def_power = sum(float(u.combat_rating) for u in defenders if u.is_combat_unit())
         if att_power <= 0 or def_power <= 0:
             return {"allow": False, "note": "no_combat_power"}
 
@@ -3623,7 +3620,7 @@ class TacticalPlanner:
                     "projected_ratio": projected_ratio,
                 }
 
-        air_combat = [u for u in attackers if ctx.game_state.is_combat_unit(u)]
+        air_combat = [u for u in attackers if u.is_combat_unit()]
         ground_present = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in air_combat)
         air_only = bool(air_combat) and not ground_present and any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in air_combat)
         if air_only and not self._is_air_special_opportunity(ctx, target_hex, defenders, is_main_objective_hex):
@@ -3707,7 +3704,7 @@ class TacticalPlanner:
         def_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
             for u in defenders
-            if ctx.game_state.is_combat_unit(u)
+            if u.is_combat_unit()
         )
         loc = ctx.game_state.map.get_location(target_hex)
         weak_enemy_location = bool(loc and getattr(loc, "occupier", None) == ctx.enemy and def_power <= 3.0)
@@ -3748,7 +3745,7 @@ class TacticalPlanner:
         gate: Dict[str, Any],
     ) -> float:
         total_power = sum(g.power for g in groups)
-        defenders_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders if ctx.game_state.is_combat_unit(u))
+        defenders_power = sum(float(u.combat_rating) for u in defenders if u.is_combat_unit())
         odds = float(gate.get("odds", 1.0))
         score = odds * 45.0 + total_power - defenders_power * 0.4
 
@@ -3766,8 +3763,8 @@ class TacticalPlanner:
         return score
 
     def _score_combat(self, ctx: AIContext, plan: StrategicPlan, mission: Mission, group: TaskGroup, defenders: List[object], target_hex: Hex) -> float:
-        att_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in group.units if ctx.game_state.is_combat_unit(u))
-        def_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders if ctx.game_state.is_combat_unit(u))
+        att_power = sum(float(u.combat_rating) for u in group.units if u.is_combat_unit())
+        def_power = sum(float(u.combat_rating) for u in defenders if u.is_combat_unit())
         ratio = att_power / max(def_power, 1.0)
         score = ratio * 40
 
@@ -4068,7 +4065,7 @@ class BaselineAIPlayer:
             group_power = sum(
                 float(getattr(u, "combat_rating", 0) or 0)
                 for u in ground_units
-                if self.game_state.is_combat_unit(u)
+                if u.is_combat_unit()
             )
 
             adjacent_unit_count += len(ground_units)

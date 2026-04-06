@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import Iterable, List
 
+from game.unit import Unit
 from src.content.specs import LocType, UnitState, UnitType
 
 
@@ -38,10 +39,10 @@ class LeaderEscapeHandler:
             origin_hex = getattr(check, "origin_hex", None)
             if not leader or not origin_hex:
                 continue
-            if getattr(leader, "status", None) == UnitState.DESTROYED:
+            if leader.status == UnitState.DESTROYED:
                 continue
             if getattr(check, "require_leader_on_map", True):
-                if not getattr(leader, "is_on_map", False) or not getattr(leader, "position", None):
+                if not leader.is_on_map or not getattr(leader, "position", None):
                     continue
             if getattr(check, "require_prior_combat_stack", False) and not getattr(check, "prior_had_combat_stack", False):
                 continue
@@ -104,14 +105,11 @@ class LeaderEscapeHandler:
         def stack_score(hex_obj):
             units = self.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r)
             return sum(
-                int(getattr(unit, "combat_rating", 0) or 0)
+                int(unit.combat_rating)
                 for unit in units
-                if getattr(unit, "is_on_map", False)
-                and getattr(unit, "allegiance", None) == getattr(leader, "allegiance", None)
-                and (
-                    self._is_combat_stack_unit(unit)
-                    or getattr(unit, "unit_type", None) == UnitType.FLEET
-                )
+                if unit.is_on_map
+                and unit.allegiance == leader.allegiance
+                and unit.is_combat_unit()
             )
 
         def is_location(hex_obj):
@@ -152,8 +150,8 @@ class LeaderEscapeHandler:
     def _has_allied_combat_stack(self, leader, origin_hex):
         units_in_hex = self.game_state.map.get_units_in_hex(origin_hex.q, origin_hex.r)
         return any(
-            getattr(unit, "allegiance", None) == getattr(leader, "allegiance", None)
-            and self._is_combat_stack_unit(unit)
+            unit.allegiance == leader.allegiance
+            and unit.is_control_unit()
             for unit in units_in_hex
         )
 
@@ -175,21 +173,15 @@ class LeaderEscapeHandler:
 
     def _hex_has_friendly_escape_stack(self, units, leader, allow_fleet):
         for unit in units:
-            if getattr(unit, "allegiance", None) != getattr(leader, "allegiance", None):
+            if unit.allegiance != leader.allegiance:
                 continue
-            if not getattr(unit, "is_on_map", False):
+            if not unit.is_on_map:
                 continue
-            if allow_fleet and getattr(unit, "unit_type", None) == UnitType.FLEET:
+            if allow_fleet and unit.is_fleet():
                 return True
-            if self._is_combat_stack_unit(unit):
+            if unit.is_control_unit():
                 return True
         return False
-
-    def _is_combat_stack_unit(self, unit):
-        return bool(
-            (hasattr(unit, "is_army") and unit.is_army())
-            or getattr(unit, "unit_type", None) in (UnitType.INFANTRY, UnitType.CAVALRY, UnitType.WING, UnitType.CITADEL)
-        )
 
     def _is_ai_allegiance(self, allegiance):
         if not allegiance:
