@@ -362,7 +362,7 @@ class Unit:
 
     def _get_origin_hex(self):
         """Get hex for leader escape calculations."""
-        if not self.position or self.position[0] is None or self.position[1] is None:
+        if not self.position or None in self.position:
             return None
         from src.game.map import Hex
         return Hex.offset_to_axial(*self.position)

@@ -234,7 +234,7 @@ jobs:
           print(p.read_text(encoding="utf-8"))
           PY
 
-      - name: Patch PySide android_deploy.py to exit after asset generation
+      - name: Patch PySide android_deploy.py to preserve assets and exit before Buildozer
         run: |
           source "$VENV_PATH/bin/activate"
           python - <<'PY'
@@ -272,13 +272,27 @@ jobs:
                       f"{indent}try:",
                       f"{indent}    import subprocess as _subprocess",
                       f"{indent}    import sys as _sys",
+                      f"{indent}    import shutil as _shutil",
                       f"{indent}    from pathlib import Path as _Path",
-                      f"{indent}    _patch_script = _Path.cwd() / 'patch_buildozer.py'",
+                      f"{indent}    _cwd = _Path.cwd()",
+                      f"{indent}    _patch_script = _cwd / 'patch_buildozer.py'",
+                      f"{indent}    _preserve_dir = _cwd / 'ci-preserve'",
+                      f"{indent}    _preserve_dir.mkdir(parents=True, exist_ok=True)",
                       f"{indent}    if _patch_script.exists():",
                       f"{indent}        _subprocess.check_call([_sys.executable, str(_patch_script)])",
+                      f"{indent}    _spec = _cwd / 'buildozer.spec'",
+                      f"{indent}    if _spec.exists():",
+                      f"{indent}        _shutil.copy2(_spec, _preserve_dir / 'buildozer.spec')",
+                      f"{indent}    _deployment = _cwd / 'src' / 'deployment'",
+                      f"{indent}    if _deployment.exists():",
+                      f"{indent}        _dst = _preserve_dir / 'src' / 'deployment'",
+                      f"{indent}        if _dst.exists():",
+                      f"{indent}            _shutil.rmtree(_dst)",
+                      f"{indent}        _dst.parent.mkdir(parents=True, exist_ok=True)",
+                      f"{indent}        _shutil.copytree(_deployment, _dst)",
                       f"{indent}except Exception as _e:",
-                      f"{indent}    logging.warning(f'[DEPLOY] buildozer.spec autopatch failed: {{_e}}')",
-                      f"{indent}logging.info('[DEPLOY] Asset generation complete - exiting before Buildozer packaging')",
+                      f"{indent}    logging.warning(f'[DEPLOY] asset preservation/autopatch failed: {{_e}}')",
+                      f"{indent}logging.info('[DEPLOY] Asset generation complete - preserved files and exiting before Buildozer packaging')",
                       f"{indent}return",
                   ])
                   inserted = True
@@ -294,7 +308,7 @@ jobs:
           for i, line in enumerate(out):
               if sentinel in line:
                   start = max(0, i - 2)
-                  end = min(len(out), i + 14)
+                  end = min(len(out), i + 24)
                   print("\n".join(out[start:end]))
                   break
           PY
@@ -324,8 +338,8 @@ jobs:
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 
           rm -f buildozer.spec
-          rm -rf src/deployment
-          rm -rf .buildozer bin build
+          rm -rf src/deployment .buildozer bin build ci-preserve
+          mkdir -p ci-preserve
 
           pyside6-android-deploy \
             --verbose \
@@ -335,17 +349,23 @@ jobs:
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee ci-debug/generate-assets.log
 
-          test -f buildozer.spec || { echo "Missing generated buildozer.spec"; exit 1; }
-          test -d src/deployment/recipes/PySide6 || { echo "Missing generated PySide6 recipe"; exit 1; }
-          test -d src/deployment/recipes/shiboken6 || { echo "Missing generated shiboken6 recipe"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing generated Qt6Android.jar"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing generated Qt6AndroidBindings.jar"; exit 1; }
+          test -f ci-preserve/buildozer.spec || { echo "Missing preserved buildozer.spec"; exit 1; }
+          test -d ci-preserve/src/deployment/recipes/PySide6 || { echo "Missing preserved PySide6 recipe"; exit 1; }
+          test -d ci-preserve/src/deployment/recipes/shiboken6 || { echo "Missing preserved shiboken6 recipe"; exit 1; }
+          test -f ci-preserve/src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing preserved Qt6Android.jar"; exit 1; }
+          test -f ci-preserve/src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing preserved Qt6AndroidBindings.jar"; exit 1; }
 
       - name: Build APK with Buildozer directly
         run: |
           set -Eeuo pipefail
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
+
+          # Restore preserved files after wrapper cleanup
+          rm -rf src/deployment
+          cp ci-preserve/buildozer.spec buildozer.spec
+          mkdir -p src
+          cp -R ci-preserve/src/deployment src/deployment
 
           # Hard reset Buildozer state from the generation phase
           rm -rf .buildozer bin build
@@ -373,11 +393,11 @@ jobs:
           echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
           echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
 
-          test -f buildozer.spec || { echo "Missing generated buildozer.spec"; exit 1; }
-          test -d src/deployment/recipes/PySide6 || { echo "Missing generated PySide6 recipe"; exit 1; }
-          test -d src/deployment/recipes/shiboken6 || { echo "Missing generated shiboken6 recipe"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing generated Qt6Android.jar"; exit 1; }
-          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing generated Qt6AndroidBindings.jar"; exit 1; }
+          test -f buildozer.spec || { echo "Missing restored buildozer.spec"; exit 1; }
+          test -d src/deployment/recipes/PySide6 || { echo "Missing restored PySide6 recipe"; exit 1; }
+          test -d src/deployment/recipes/shiboken6 || { echo "Missing restored shiboken6 recipe"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6Android.jar || { echo "Missing restored Qt6Android.jar"; exit 1; }
+          test -f src/deployment/jar/PySide6/jar/Qt6AndroidBindings.jar || { echo "Missing restored Qt6AndroidBindings.jar"; exit 1; }
 
           python -m buildozer -v android debug 2>&1 | tee -a ci-debug/build-apk.log
 
@@ -388,6 +408,7 @@ jobs:
           name: android-build-logs
           path: |
             ci-debug/**
+            ci-preserve/**
             patch_buildozer.py
             buildozer.spec
             src/deployment/**

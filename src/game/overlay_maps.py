@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, Optional
 
+from game.unit import Unit
 from src.content.config import CRT_DATA
 from src.content.constants import HL, WS
 from src.content.loader import load_data
@@ -154,14 +155,14 @@ class InfluenceMap(OverlayBase):
 
         values = {}
         for unit in game_state.units:
-            if not getattr(unit, "is_on_map", False):
+            if not unit.is_on_map:
                 continue
-            if getattr(unit, "allegiance", None) != self.side:
+            if unit.allegiance != self.side:
                 continue
             if not unit.is_combat_unit():
                 continue
 
-            if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:
+            if not unit.position or None in unit.position:
                 continue
 
             start_hex = Hex.offset_to_axial(*unit.position)

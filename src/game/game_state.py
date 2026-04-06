@@ -194,7 +194,7 @@ class GameState:
             return False
 
         for unit in relevant:
-            if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:
+            if not unit.position or None in unit.position:
                 return False
             from_hex = Hex.offset_to_axial(*unit.position)
             if target_hex not in from_hex.neighbors():
