@@ -349,7 +349,7 @@ class Board:
     def _is_enemy_for_fleet(self, unit, other):
         return (
             other.allegiance != unit.allegiance
-            and other.allegiance != "neutral"
+            and other.allegiance != NEUTRAL
             and getattr(other, "is_on_map", True)
         )
 
@@ -626,12 +626,7 @@ class Board:
         return self.unit_map.get((q, r), [])
 
     def _stack_has_ground_army(self, moving_units):
-        return any(
-            hasattr(u, "is_army")
-            and u.is_army()
-            and u.unit_type not in (UnitType.FLEET, UnitType.WING)
-            for u in moving_units
-        )
+        return any( u.is_army() for u in moving_units )
 
     def _stack_has_ground_or_wing(self, moving_units):
         return any( u.is_army() or u.is_wing() for u in moving_units )
@@ -639,29 +634,18 @@ class Board:
     def has_enemy_unit(self, hex_coord, alliance):
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
         for u in units:
-            if (
-                u.allegiance != alliance
-                and u.allegiance != "neutral"
-                and getattr(u, "is_on_map", True)
-            ):
+            if u.allegiance not in (alliance, NEUTRAL) and u.is_on_map:
                 return True
         return False
 
     def has_enemy_ground_wing_or_citadel(self, hex_coord, alliance):
         units = self.get_units_in_hex(hex_coord.q, hex_coord.r)
         for u in units:
-            if u.allegiance in (alliance, "neutral"):
+            if u.allegiance in (alliance, NEUTRAL):
                 continue
-            if not getattr(u, "is_on_map", True):
+            if not u.is_on_map:
                 continue
-            if (
-                (
-                    hasattr(u, "is_army")
-                    and u.is_army()
-                    and getattr(u, "unit_type", None) != UnitType.FLEET
-                )
-                or getattr(u, "unit_type", None) in (UnitType.WING, UnitType.CITADEL)
-            ):
+            if u.is_control_unit():
                 return True
         return False
 
@@ -765,7 +749,7 @@ class Board:
             return terrain not in forbidden_terrain
 
         # Fleets can only be in water, ports or coastal hexes
-        if unit.unit_type == UnitType.FLEET:
+        if unit.is_fleet():
             is_coastal = self.is_coastal(target_hex)
             loc = self.get_location(target_hex)
             is_port = False
@@ -809,7 +793,7 @@ class Board:
         for u in units:
             if (
                 u.allegiance != alliance
-                and u.allegiance != 'neutral'
+                and u.allegiance != NEUTRAL
                 and hasattr(u, "is_army")
                 and u.is_army()
             ):
@@ -1011,7 +995,7 @@ class Board:
 
             # 2. Check for Sea Barriers (Rule 5)
             # If ground unit, check if the hexside between current and neighbor is 'sea'
-            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
+            if not unit.is_flier():
                 hexside = self.get_effective_hexside(hex_coord, neighbor)
                 if hexside == HexsideType.SEA:  # Explicitly mark water-only boundaries in config
                     continue
@@ -1075,9 +1059,9 @@ class Board:
         min_mp = 999
 
         for unit in units:
-            if not getattr(unit, 'is_on_map', True):
+            if not unit.is_on_map:
                 continue
-            if hasattr(unit, 'position') and unit.position:
+            if unit.position:
                 col, row = unit.position
                 h = Hex.offset_to_axial(col, row)
                 if start_hex is None:
@@ -1085,8 +1069,7 @@ class Board:
                 elif start_hex != h:
                     return None, 0
 
-            m = getattr(unit, "movement_points", unit.movement)
-            min_mp = min(min_mp, m)
+            min_mp = min(min_mp, unit.movement_points)
 
         return start_hex, min_mp
 
@@ -1102,7 +1085,7 @@ class Board:
         stack_cost = 0
         for unit in units:
             # Check 2: Sea Barrier
-            if unit.unit_type not in (UnitType.WING, UnitType.CITADEL):
+            if not unit.is_flier():
                 hexside = self.get_effective_hexside(current_hex, next_hex)
                 if hexside == HexsideType.SEA:
                     return None
@@ -1135,7 +1118,7 @@ class Board:
         """
         if not units:
             return ([], []) if split_neutral else []
-        if len(units) == 1 and units[0].unit_type == UnitType.FLEET:
+        if len(units) == 1 and units[0].is_fleet():
             fleet_reachable = self.get_reachable_hexes_for_fleet(units[0])
             return (fleet_reachable, []) if split_neutral else fleet_reachable
 

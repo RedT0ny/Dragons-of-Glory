@@ -287,7 +287,7 @@ class ConquestService:
         )
 
         for unit in gs.units:
-            if unit.unit_type != UnitType.FLEET or unit.status != UnitState.RESERVE:
+            if not unit.is_fleet() or unit.status != UnitState.RESERVE:
                 continue
             country = gs.countries.get(unit.land)
             if not country or not country.conquered:

@@ -93,7 +93,7 @@ def apply_gnome_tech_bonus(
         carrier = None
         tech = None
         for unit in friendly:
-            if not (hasattr(unit, "is_army") and unit.is_army() and getattr(unit, "is_on_map", False)):
+            if not unit.is_army() and unit.is_on_map:
                 continue
             found = _get_equipped_asset_with_other(unit, "gnome_tech")
             if found is None:
@@ -387,7 +387,7 @@ class CombatResolver:
         if not self.game_state or not self.game_state.map:
             return None
         for unit in self.defenders:
-            if not getattr(unit, "position", None):
+            if not unit.position:
                 continue
             col, row = unit.position
             if col is None or row is None:
@@ -567,7 +567,7 @@ class CombatResolver:
         terrain = self.game_state.map.get_terrain(defender_hex)
         bonus = 0
         for unit in self.defenders:
-            if not (hasattr(unit, "is_army") and unit.is_army()):
+            if not unit.is_army():
                 continue
             if getattr(unit, "terrain_affinity", None) == terrain:
                 bonus += 1
@@ -576,11 +576,9 @@ class CombatResolver:
     def _get_affected_armies(self, units):
         affected = []
         for unit in units:
-            if hasattr(unit, "is_leader") and unit.is_leader():
+            if not unit.is_on_map:
                 continue
-            if not getattr(unit, "is_on_map", False):
-                continue
-            if unit.is_wing() or unit.is_citadel() or unit.is_army():
+            if unit.is_control_unit():
                 affected.append(unit)
         return affected
 
@@ -598,13 +596,13 @@ class CombatResolver:
                 self._damage_unit(target, mode="eliminate")
                 continue
 
-            wing_active = [u for u in units if u.status.name == "ACTIVE" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
+            wing_active = [u for u in units if u.status.name == "ACTIVE" and u.is_flier()]
             if wing_active:
                 target = min(wing_active, key=lambda u: u.combat_rating)
                 self._damage_unit(target, mode="deplete")
                 continue
 
-            wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.unit_type in (UnitType.WING, UnitType.CITADEL)]
+            wing_depleted = [u for u in units if u.status.name == "DEPLETED" and u.is_flier()]
             if wing_depleted:
                 target = min(wing_depleted, key=lambda u: u.combat_rating)
                 self._damage_unit(target, mode="eliminate")
@@ -638,8 +636,8 @@ class NavalCombatResolver:
     """
     def __init__(self, game_state, attackers, defenders, roll_d10_fn=None, roll_d6_fn=None):
         self.game_state = game_state
-        self.attackers = [u for u in attackers if u.is_fleet() and getattr(u, "is_on_map", False)]
-        self.defenders = [u for u in defenders if u.is_fleet() and getattr(u, "is_on_map", False)]
+        self.attackers = [u for u in attackers if u.is_fleet() and u.is_on_map]
+        self.defenders = [u for u in defenders if u.is_fleet() and u.is_on_map]
         self._roll_d10 = roll_d10_fn or (lambda: random.randint(1, 10))
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
@@ -648,8 +646,8 @@ class NavalCombatResolver:
         rounds = 0
         while self.attackers and self.defenders:
             rounds += 1
-            atk_round = [u for u in self.attackers if getattr(u, "is_on_map", False)]
-            def_round = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+            atk_round = [u for u in self.attackers if u.is_on_map]
+            def_round = [u for u in self.defenders if u.is_on_map]
             if not atk_round or not def_round:
                 break
 
@@ -670,7 +668,7 @@ class NavalCombatResolver:
 
             for target, amount in hits.items():
                 for _ in range(amount):
-                    if not getattr(target, "is_on_map", False):
+                    if not target.is_on_map:
                         break
                     if target.status == UnitState.ACTIVE:
                         self.game_state.damage_unit(target, mode="deplete")
@@ -693,8 +691,8 @@ class NavalCombatResolver:
         return {
             "result": result,
             "rounds": rounds,
-            "attacker_survivors": len([u for u in self.attackers if getattr(u, "is_on_map", False)]),
-            "defender_survivors": len([u for u in self.defenders if getattr(u, "is_on_map", False)]),
+            "attacker_survivors": len([u for u in self.attackers if u.is_on_map]),
+            "defender_survivors": len([u for u in self.defenders if u.is_on_map]),
         }
 
     def _roll_hits(self, fleet):
@@ -703,19 +701,17 @@ class NavalCombatResolver:
         return roll <= threshold
 
     def _fleet_attack_rating(self, fleet):
-        base = getattr(fleet, "combat_rating", 0)
+        base = fleet.combat_rating
         passengers = list(getattr(fleet, "passengers", []) or [])
         leader_bonus = 0
         for p in passengers:
-            if not (hasattr(p, "is_leader") and p.is_leader()):
-                continue
-            if p.unit_type not in (UnitType.WIZARD, UnitType.ADMIRAL):
+            if not p.is_leader():
                 continue
             leader_bonus = max(leader_bonus, getattr(p, "tactical_rating", 0))
         return base + leader_bonus
 
     def _select_target(self, attacker, candidates):
-        live = [u for u in candidates if getattr(u, "is_on_map", False)]
+        live = [u for u in candidates if u.is_on_map]
         if not live:
             return None
         live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
@@ -769,8 +765,8 @@ class DragonDuelResolver:
     """
     def __init__(self, game_state, attacker_dragons, defender_dragons, roll_d6_fn=None):
         self.game_state = game_state
-        self.attackers = [u for u in attacker_dragons if getattr(u, "is_on_map", False) and u.is_dragon()]
-        self.defenders = [u for u in defender_dragons if getattr(u, "is_on_map", False) and u.is_dragon()]
+        self.attackers = list(attacker_dragons)
+        self.defenders = list(defender_dragons)
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
 
     def resolve(self, withdraw_decider=None):
@@ -782,8 +778,8 @@ class DragonDuelResolver:
             rounds += 1
             if rounds > 20:
                 break
-            atk_round = [u for u in self.attackers if getattr(u, "is_on_map", False)]
-            def_round = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+            atk_round = [u for u in self.attackers if u.is_on_map]
+            def_round = [u for u in self.defenders if u.is_on_map]
             if not atk_round or not def_round:
                 break
 
@@ -804,7 +800,7 @@ class DragonDuelResolver:
 
             for target, amount in hits.items():
                 for _ in range(amount):
-                    if not getattr(target, "is_on_map", False):
+                    if not target.is_on_map:
                         break
                     if target.status.name == "ACTIVE":
                         self.game_state.damage_unit(target, mode="deplete")
@@ -845,7 +841,7 @@ class DragonDuelResolver:
         return False
 
     def _select_target(self, candidates):
-        live = [u for u in candidates if getattr(u, "is_on_map", False)]
+        live = [u for u in candidates if u.is_on_map]
         if not live:
             return None
         live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
@@ -853,14 +849,14 @@ class DragonDuelResolver:
 
     def _withdraw_all(self, side_dragons):
         for dragon in list(side_dragons):
-            if not getattr(dragon, "is_on_map", False):
+            if not dragon.is_on_map:
                 continue
             self._withdraw_dragon_random_distance(dragon)
 
     def _withdraw_dragon_random_distance(self, dragon):
         if not self.game_state or not getattr(self.game_state, "map", None):
             return
-        if not getattr(dragon, "position", None) or dragon.position[0] is None or dragon.position[1] is None:
+        if not dragon.position or None in dragon.position:
             return
         from src.game.map import Hex
         start_hex = Hex.offset_to_axial(*dragon.position)
@@ -905,8 +901,8 @@ class DragonDuelResolver:
         self.game_state.move_unit(dragon, retreat_hex)
 
     def _sync_combat_lists(self):
-        self.attackers = [u for u in self.attackers if getattr(u, "is_on_map", False)]
-        self.defenders = [u for u in self.defenders if getattr(u, "is_on_map", False)]
+        self.attackers = [u for u in self.attackers if u.is_on_map]
+        self.defenders = [u for u in self.defenders if u.is_on_map]
 
     def _attacker_side(self):
         if self.attackers:
@@ -995,14 +991,14 @@ class CombatService:
         terrain = self.map.get_terrain(hex_position)
         defender_allegiances = {
             u.allegiance for u in defenders
-            if u.allegiance not in ("neutral", None)
+            if u.allegiance not in (NEUTRAL, None)
         }
 
         if self._is_leader_only_stack(defenders) and self._attack_triggers_leader_stack_escape(attackers):
             leader_origins = {
                 u: Hex.offset_to_axial(*u.position)
                 for u in defenders
-                if hasattr(u, "is_leader") and u.is_leader() and u.position and u.position[0] is not None
+                if u.is_leader() and u.position and None not in u.position
             }
             leader_stack_has_army = {leader: True for leader in leader_origins.keys()}
             leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
@@ -1162,7 +1158,7 @@ class CombatService:
         leader_origins = {}
         leader_stack_has_army = {}
         for unit in attackers + defenders:
-            if hasattr(unit, "is_leader") and unit.is_leader() and unit.position:
+            if unit.is_leader() and unit.position:
                 origin_hex = Hex.offset_to_axial(*unit.position)
                 leader_origins[unit] = origin_hex
                 units_in_hex = self.map.get_units_in_hex(origin_hex.q, origin_hex.r)
@@ -1233,9 +1229,9 @@ class CombatService:
     def _resolve_leader_revives(self, units, leader_origins):
         requests = []
         for leader in units:
-            if not (hasattr(leader, "is_leader") and leader.is_leader()):
+            if not leader.is_leader():
                 continue
-            if getattr(leader, "status", None) != UnitState.DESTROYED:
+            if leader.status != UnitState.DESTROYED:
                 continue
             revive_asset = self._get_equipped_other_bonus_asset(leader, "revive")
             if revive_asset is None:
@@ -1412,7 +1408,7 @@ class CombatService:
         return bool(def_fleets)
 
     def _fleet_attack_nodes(self, fleet):
-        if not fleet.position or fleet.position[0] is None or fleet.position[1] is None:
+        if not fleet.position or None in fleet.position:
             return []
         nodes = []
         start_hex = Hex.offset_to_axial(*fleet.position)
@@ -1479,7 +1475,7 @@ class CombatService:
         combat_attackers = [
             u for u in attackers
             if u.is_on_map
-            and u.position and u.position[0] is not None and u.position[1] is not None
+            and u.position and None not in u.position
             and u.is_combat_unit()
         ]
         if not combat_attackers:
@@ -1800,7 +1796,7 @@ class CombatService:
 
     @staticmethod
     def _is_leader_only_stack(units):
-        live_units = [u for u in units if getattr(u, "is_on_map", False)]
+        live_units = [u for u in units if u.is_on_map]
         if not live_units:
             return False
         return all(u.is_leader() for u in live_units)
@@ -1835,7 +1831,7 @@ class CombatService:
 
     def clear_leader_tactical_overrides(self):
         for unit in self.units:
-            if hasattr(unit, "is_leader") and unit.is_leader():
+            if unit.is_leader():
                 if hasattr(unit, "_tactical_rating_override"):
                     unit._tactical_rating_override = None
 
@@ -2137,7 +2133,7 @@ class CombatClickHandler:
             return False
 
         if active_player == WS:
-            has_air = any(u.unit_type in (UnitType.WING, UnitType.CITADEL) for u in attackers)
+            has_air = any(u.is_flier() for u in attackers)
             return has_air
         return True
 
@@ -2182,7 +2178,7 @@ class CombatClickHandler:
             destination = self.game_state._get_leader_escape_handler().choose_escape_destination(leader, options)
             if destination:
                 self.game_state.move_unit(leader, destination)
-                print(f"Leader {leader.id} escaped to {destination.axial_to_offset()} (AI).")
+                print(f"Leader {caption_id(leader.id)} escaped to {destination.axial_to_offset()} (AI).")
             self.active_leader_escape = None
             self.escape_hexes = set()
             self.view.sync_with_model()
@@ -2206,7 +2202,7 @@ class CombatClickHandler:
         leader = self.active_leader_escape.leader
         self.game_state.move_unit(leader, target_hex)
         leader._tactical_rating_override = 0
-        print(f"Leader {leader.id} escaped to {clicked_offset}.")
+        print(f"Leader {caption_id(leader.id)} escaped to {clicked_offset}.")
 
         self.active_leader_escape = None
         self.escape_hexes = set()

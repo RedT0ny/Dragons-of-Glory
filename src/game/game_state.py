@@ -645,7 +645,7 @@ class GameState:
         Promotes fleets recovered by conscription to READY at the start of a later replacement turn.
         """
         for unit in self.units:
-            if unit.unit_type != UnitType.FLEET:
+            if not unit.is_fleet():
                 continue
             ready_turn = getattr(unit, "replacement_ready_turn", None)
             if ready_turn is None:
@@ -936,11 +936,9 @@ class GameState:
         for (q, r), units in list(self.map.unit_map.items()):
             stack_armies = [
                 u for u in units
-                if getattr(u, "is_on_map", False)
-                and getattr(u, "allegiance", None) == active
-                and hasattr(u, "is_army")
+                if u.is_on_map
+                and u.allegiance == active
                 and u.is_army()
-                and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
             ]
             if len(stack_armies) <= 1:
                 continue

@@ -94,9 +94,9 @@ class InterceptionService:
         original_states = {}
         for interceptor in interceptors:
             original_states[interceptor] = {
-                "movement_points": getattr(interceptor, "movement_points", None),
-                "moved_this_turn": getattr(interceptor, "moved_this_turn", False),
-                "attacked_this_turn": getattr(interceptor, "attacked_this_turn", False),
+                "movement_points": interceptor.movement_points,
+                "moved_this_turn": interceptor.moved_this_turn,
+                "attacked_this_turn": interceptor.attacked_this_turn,
                 "river_hexside": getattr(interceptor, "river_hexside", None),
             }
 
@@ -114,11 +114,7 @@ class InterceptionService:
         try:
             live_interceptors = [u for u in interceptors if getattr(u, "is_on_map", False)]
             if live_interceptors:
-                air_defenders = [
-                    u for u in moving_units
-                    if getattr(u, "is_on_map", False)
-                    and getattr(u, "unit_type", None) in (UnitType.WING, UnitType.FLEET)
-                ]
+                air_defenders = [u for u in moving_units if u.is_on_map and (u.is_wing() or u.is_fleet())]
                 if not air_defenders:
                     print("Interception cancelled: no air defenders at target hex.")
                     return
@@ -180,7 +176,7 @@ class InterceptionService:
                 if not self.game_state.map.can_unit_land_on_hex(interceptor, neighbor):
                     feasible = False
                     break
-                if interceptor.unit_type == UnitType.FLEET:
+                if interceptor.is_fleet():
                     state_path, cost = self.game_state.map.find_fleet_route(interceptor, origin_hex, neighbor)
                     if cost == float("inf") or (not state_path and origin_hex != neighbor):
                         feasible = False
@@ -212,7 +208,7 @@ class InterceptionService:
             - Interceptors must meet special commander requirements (e.g. Dragon Wings).
         """
         moving_types = {getattr(u, "unit_type", None) for u in moving_units if getattr(u, "is_on_map", False)}
-        if interceptor.unit_type == UnitType.FLEET:
+        if interceptor.is_fleet():
             return UnitType.FLEET in moving_types
         if interceptor.is_wing():
             return bool(moving_types & {UnitType.WING, UnitType.FLEET})
@@ -227,28 +223,27 @@ class InterceptionService:
         """
         if not interceptor.is_wing():
             return True
-        if getattr(interceptor, "race", None) != UnitRace.DRAGON:
+        if not interceptor.is_dragon():
             return True
 
         passengers = list(getattr(interceptor, "passengers", []) or [])
         if interceptor.allegiance == HL:
             dragonflight = getattr(getattr(interceptor, "spec", None), "dragonflight", None)
             for p in passengers:
-                if not (hasattr(p, "is_leader") and p.is_leader()):
+                if not p.is_leader():
                     continue
-                if getattr(p, "unit_type", None) == UnitType.EMPEROR:
+                if p.unit_type == UnitType.EMPEROR:
                     return True
-                if getattr(p, "unit_type", None) == UnitType.HIGHLORD:
+                if p.unit_type == UnitType.HIGHLORD:
                     p_flight = getattr(getattr(p, "spec", None), "dragonflight", None)
                     if dragonflight and p_flight == dragonflight:
                         return True
             return False
         if interceptor.allegiance == WS:
             for p in passengers:
-                if not (hasattr(p, "is_leader") and p.is_leader()):
+                if not p.is_leader():
                     continue
-                p_race = getattr(p, "race", None)
-                if p_race in (UnitRace.ELF, UnitRace.SOLAMNIC):
+                if p.race in (UnitRace.ELF, UnitRace.SOLAMNIC):
                     return True
             return False
         return True

@@ -388,7 +388,7 @@ class GeographyAnalyzer:
         candidates: List[Hex] = []
         embarked_ground = []
         for u in ctx.friendly_units:
-            if u.unit_type != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
             for p in u.passengers or []:  # Cycle through passengers
                 if p.allegiance != ctx.side:
@@ -677,14 +677,12 @@ class StrategicPlanner:
             return []
         embarked_ground = []
         for u in ctx.friendly_units:
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
             for p in list(getattr(u, "passengers", []) or []):
-                if getattr(p, "allegiance", None) != ctx.side:
+                if p.allegiance != ctx.side:
                     continue
-                if not getattr(p, "is_army", lambda: False)():
-                    continue
-                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                if not p.is_army():
                     continue
                 embarked_ground.append(p)
         if not embarked_ground:
@@ -725,14 +723,12 @@ class StrategicPlanner:
             target_countries.add(str(main_objective.country_id))
         embarked_ground = []
         for u in ctx.friendly_units:
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
             for p in list(getattr(u, "passengers", []) or []):
-                if getattr(p, "allegiance", None) != ctx.side:
+                if p.allegiance != ctx.side:
                     continue
-                if not getattr(p, "is_army", lambda: False)():
-                    continue
-                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                if not p.is_army():
                     continue
                 embarked_ground.append(p)
         if not embarked_ground:
@@ -773,10 +769,9 @@ class StrategicPlanner:
                 loc = board.get_location(h)
                 existing_ground = sum(
                     1 for u in board.get_units_in_hex(col, row)
-                    if getattr(u, "allegiance", None) == ctx.side
-                    and getattr(u, "is_on_map", False)
-                    and getattr(u, "is_army", lambda: False)()
-                    and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
+                    and u.is_army()
                 )
                 score = 0.0
                 score += (12.0 - h.distance_to(objective_hex)) * 3.0
@@ -822,14 +817,12 @@ class StrategicPlanner:
         main_hex = Hex.offset_to_axial(*main_objective.coords)
         embarked_ground = []
         for u in ctx.friendly_units:
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
             for p in list(getattr(u, "passengers", []) or []):
-                if getattr(p, "allegiance", None) != ctx.side:
+                if p.allegiance != ctx.side:
                     continue
-                if not getattr(p, "is_army", lambda: False)():
-                    continue
-                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                if not p.is_army():
                     continue
                 embarked_ground.append(p)
         if not embarked_ground:
@@ -1174,11 +1167,7 @@ class OperationalPlanner:
         if fleet is None:
             return False
         passengers = list(getattr(fleet, "passengers", []) or [])
-        return any(
-            getattr(p, "is_army", lambda: False)()
-            and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-            for p in passengers
-        )
+        return any(p.is_army() for p in passengers)
 
     @staticmethod
     def _neutral_border_staging_hexes(ctx: AIContext, country_id: str) -> List[Hex]:
@@ -1239,7 +1228,6 @@ class OperationalPlanner:
                 u for u in group.mobile_units
                 if u.is_on_map
                    and u.is_army()
-                   and not u.is_carrier()
                    and u.position and None not in u.position
             ]
             if not ground_units:
@@ -1265,10 +1253,7 @@ class OperationalPlanner:
 
             adjacent_group_keys.add(_task_group_key(group))
             adjacent_unit_count += len(ground_units)
-            adjacent_power += sum(u.combat_rating
-                for u in ground_units
-                if u.is_combat_unit()
-            )
+            adjacent_power += sum(u.combat_rating for u in ground_units if u.is_combat_unit())
 
         return adjacent_group_keys, adjacent_unit_count, adjacent_power
 
@@ -1276,7 +1261,7 @@ class OperationalPlanner:
         board = ctx.game_state.map
         groups = []
         for (q, r), units in sorted(board.unit_map.items(), key=lambda item: (item[0][1], item[0][0])):
-            stack = [u for u in units if getattr(u, "allegiance", None) == ctx.side and getattr(u, "is_on_map", False)]
+            stack = [u for u in units if u.allegiance == ctx.side and u.is_on_map]
             if not stack:
                 continue
             hex_obj = Hex(q, r)
@@ -1284,7 +1269,7 @@ class OperationalPlanner:
             # - Ground: armies + leaders (leaders are never isolated as standalone groups)
             # - Air: wings + citadels
             # - Fleet: fleets only
-            armies = [u for u in stack if getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET]
+            armies = [u for u in stack if u.is_army()]
             leaders = [
                 u for u in stack
                 if u.is_leader()
@@ -1293,27 +1278,23 @@ class OperationalPlanner:
             air_units = [u for u in stack if u.is_flier()]
             fleets = [u for u in stack if u.is_fleet()]
 
-            role_groups: List[List[object]] = []
+            role_groups: List[Tuple[List[object], bool, bool, bool]] = []
             if armies:
-                role_groups.append(armies + leaders)
+                role_groups.append((armies + leaders, True, False, False))
             if air_units:
-                role_groups.append(air_units)
-            if fleets:
-                for fleet in fleets:
-                    role_groups.append([fleet])
+                role_groups.append((air_units, False, True, False))
+            for fleet in fleets:
+                role_groups.append(([fleet], False, False, True))
 
-            for role_units in role_groups:
+            for role_units, has_army, has_air, has_fleet in role_groups:
                 combat_units = [u for u in role_units if u.is_combat_unit()]
                 if not combat_units:
                     continue
                 power = sum(float(u.combat_rating) for u in combat_units)
-                has_fleet = any(u.is_fleet() for u in role_units)
-                has_air = any(u.is_flier() for u in role_units)
-                has_army = any(u.is_army() for u in role_units)
                 mobile_units = [
                     u for u in role_units
-                    if getattr(u, "transport_host", None) is None
-                    and float(getattr(u, "movement_points", 0) or 0) > 0
+                    if u.transport_host is None
+                    and float(u.movement_points or 0) > 0
                 ]
                 groups.append(TaskGroup(
                     units=role_units,
@@ -1362,7 +1343,7 @@ class OperationalPlanner:
         if offensive and plan.transport_campaign and plan.beachhead_slots:
             loaded_fleet_groups: List[TaskGroup] = []
             for g in [x for x in groups if x.has_fleet]:
-                fleet_unit = next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
+                fleet_unit = next((u for u in g.units if u.is_fleet()), None)
                 if self._fleet_has_embarked_ground_for_transport(fleet_unit):
                     loaded_fleet_groups.append(g)
                     loaded_fleet_group_keys.add(_task_group_key(g))
@@ -1370,9 +1351,9 @@ class OperationalPlanner:
                     empty_fleet_group_keys.add(_task_group_key(g))
                     debug_print(f"[TRANSPORT] skip_slot_assignment empty_fleet={getattr(fleet_unit, 'id', '?')}")
             needed_loaded_keys = {
-                _unit_key(next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None))
+                _unit_key(next((u for u in g.units if u.is_fleet()), None))
                 for g in loaded_fleet_groups
-                if next((u for u in g.units if getattr(u, "unit_type", None) == UnitType.FLEET), None) is not None
+                if next((u for u in g.units if u.is_fleet()), None) is not None
             }
             existing_assignments = dict(plan.fleet_slot_assignments or {})
             reusable_assignments = {
@@ -1468,12 +1449,7 @@ class OperationalPlanner:
                 continue
 
             if offensive and plan.transport_campaign and main_hex:
-                group_has_ashore_committed = any(
-                    _unit_key(u) in ashore_committed
-                    for u in group.units
-                    if getattr(u, "is_army", lambda: False)()
-                    and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-                )
+                group_has_ashore_committed = any(_unit_key(u) in ashore_committed for u in group.units if u.is_army())
                 if group.has_fleet:
                     if group_key in empty_fleet_group_keys:
                         target = group.hex
@@ -1486,7 +1462,7 @@ class OperationalPlanner:
                         ))
                         continue
                     assigned_slot = None
-                    fleet_unit = next((u for u in group.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
+                    fleet_unit = next((u for u in group.units if u.is_fleet()), None)
                     assigned_offset = plan.fleet_slot_assignments.get(_unit_key(fleet_unit)) if (fleet_unit and plan.fleet_slot_assignments) else None
                     if assigned_offset:
                         assigned_slot = Hex.offset_to_axial(assigned_offset[0], assigned_offset[1])
@@ -1607,8 +1583,8 @@ class OperationalPlanner:
                     stack = ctx.game_state.map.get_units_in_hex(group.hex.q, group.hex.r)
                     defenders = [
                         u for u in stack
-                        if getattr(u, "allegiance", None) == ctx.side
-                           and getattr(u, "is_on_map", False)
+                        if u.allegiance == ctx.side
+                           and u.is_on_map
                            and u.is_combat_unit()
                     ]
                     garrison_count = len(defenders)
@@ -1713,16 +1689,15 @@ class OperationalPlanner:
             col, row = slot.axial_to_offset()
             existing_ground = sum(
                 1 for u in ctx.game_state.map.get_units_in_hex(col, row)
-                if getattr(u, "allegiance", None) == ctx.side
-                and getattr(u, "is_on_map", False)
-                and getattr(u, "is_army", lambda: False)()
-                and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                if u.allegiance == ctx.side
+                and u.is_on_map
+                and u.is_army()
             )
             cap = max(0, 2 - existing_ground)
             slot_capacity[(col, row)] = cap
             debug_print(f"[TRANSPORT_SLOT_ASSIGN] slot=({col},{row}) current_ground={existing_ground} capacity={cap} projected_load={projected_load[(col,row)]}")
         for group in sorted(fleet_groups, key=lambda g: (_task_group_key(g), -g.power)):
-            fleet = next((u for u in group.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
+            fleet = next((u for u in group.units if u.is_fleet()), None)
             if fleet is None:
                 continue
             fleet_key = _unit_key(fleet)
@@ -2197,11 +2172,7 @@ class TacticalPlanner:
         main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
 
         ready_fleets = sorted(
-            [
-                u for u in ready_units
-                if getattr(u, "unit_type", None) == UnitType.FLEET
-                   and getattr(u, "status", None) == UnitState.READY
-            ],
+            [u for u in ready_units if u.is_fleet() and u.status == UnitState.READY],
             key=_unit_key,
         )
         if not ready_fleets:
@@ -2251,9 +2222,9 @@ class TacticalPlanner:
                 existing_stack = ctx.game_state.map.get_units_in_hex(h.q, h.r)
                 existing_friendly_fleets = sum(
                     1 for u in existing_stack
-                    if getattr(u, "allegiance", None) == ctx.side
-                    and getattr(u, "unit_type", None) == UnitType.FLEET
-                    and getattr(u, "is_on_map", False)
+                    if u.allegiance == ctx.side
+                    and u.is_fleet()
+                    and u.is_on_map
                 )
                 if existing_friendly_fleets > 0:
                     score -= existing_friendly_fleets * 500.0
@@ -2301,22 +2272,17 @@ class TacticalPlanner:
         # Collect on-map friendly fleet hexes
         fleet_hexes = []
         for u in ctx.game_state.units:
-            if (getattr(u, "allegiance", None) == ctx.side and
-                getattr(u, "unit_type", None) == UnitType.FLEET and
-                getattr(u, "is_on_map", False) and
-                getattr(u, "position", None)):
+            if (u.allegiance == ctx.side and
+                u.is_fleet() and
+                u.is_on_map and
+                u.position):
                 fleet_hexes.append(Hex.offset_to_axial(*u.position))
 
         if not fleet_hexes:
             return 0
 
         # Collect READY ground armies
-        ready_armies = [
-            u for u in ready_units
-            if (getattr(u, "is_army", lambda: False)() and
-                getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET) and
-                getattr(u, "status", None) == UnitState.READY)
-        ]
+        ready_armies = [u for u in ready_units if (u.is_army() and u.status == UnitState.READY)]
         if not ready_armies:
             return 0
 
@@ -2423,19 +2389,13 @@ class TacticalPlanner:
             is_coastal = ctx.game_state.map.is_coastal(deploy_hex)
             is_port = bool(loc and getattr(loc, "loc_type", None) == LocType.PORT.value)
 
-            is_ground_army = (
-                    getattr(unit, "is_army", lambda: False)()
-                    and getattr(unit, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-            )
-            is_fleet = getattr(unit, "unit_type", None) == UnitType.FLEET
-
-            if is_ground_army:
+            if unit.is_army():
                 if is_coastal:
                     score += 12.0
                 if is_port:
                     score += 18.0
 
-            if is_fleet:
+            if unit.is_fleet():
                 if is_coastal:
                     score += 6.0
                 if is_port:
@@ -2445,17 +2405,17 @@ class TacticalPlanner:
                 stack = ctx.game_state.map.get_units_in_hex(deploy_hex.q, deploy_hex.r)
                 friendly_fleets_here = sum(
                     1 for u in stack
-                    if getattr(u, "allegiance", None) == ctx.side
-                    and getattr(u, "unit_type", None) == UnitType.FLEET
-                    and getattr(u, "is_on_map", False)
+                    if u.allegiance == ctx.side
+                    and u.is_fleet()
+                    and u.is_on_map
                 )
                 if friendly_fleets_here > 0:
                     score -= friendly_fleets_here * 80.0
 
                 friendly_combat_here = sum(
                     1 for u in stack
-                    if getattr(u, "allegiance", None) == ctx.side
-                    and getattr(u, "is_on_map", False)
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
                     and u.is_combat_unit()
                 )
                 if friendly_combat_here > 4:
@@ -2671,7 +2631,7 @@ class TacticalPlanner:
             assigned_preserved = target_offset in candidates
 
         if mission.mission_type == "transport_main_effort" and mission.group.has_fleet:
-            fleet = next((u for u in group.units if getattr(u, "unit_type", None) == UnitType.FLEET), None)
+            fleet = next((u for u in group.units if u.is_fleet()), None)
             fleet_id = getattr(fleet, "id", "?")
             pos = current
             assigned_dbg = target_offset if target_offset is not None else None
@@ -2746,7 +2706,7 @@ class TacticalPlanner:
                 next_dist = target_hex.distance_to(assigned_target)
                 has_embarked_any = False
                 for fleet_unit in mission.group.units:
-                    if getattr(fleet_unit, "unit_type", None) != UnitType.FLEET:
+                    if not fleet_unit.is_fleet():
                         continue
                     passengers = getattr(fleet_unit, "passengers", []) or []
                     if any(p.allegiance == ctx.side and p.is_army() for p in passengers):
@@ -2771,7 +2731,7 @@ class TacticalPlanner:
                 # Penalize targets where current embarked armies cannot legally unboard.
                 legal_unload_here = False
                 for fleet_unit in mission.group.units:
-                    if getattr(fleet_unit, "unit_type", None) != UnitType.FLEET:
+                    if not fleet_unit.is_fleet():
                         continue
                     passengers = getattr(fleet_unit, "passengers", []) or []
                     for p in passengers:
@@ -3072,7 +3032,7 @@ class TacticalPlanner:
         threat = ctx.overlays.get("threat")
         selected_fleets: Set[Tuple[str, int]] = set()
         for unit in sorted(ctx.friendly_units, key=_unit_key):
-            if getattr(unit, "unit_type", None) != UnitType.FLEET:
+            if not unit.is_fleet():
                 continue
             if not getattr(unit, "position", None) or unit.position[0] is None:
                 continue
@@ -3394,13 +3354,13 @@ class TacticalPlanner:
             group = mission.group
             if not group.units:
                 continue
-            if all(getattr(u, "attacked_this_turn", False) for u in group.units):
+            if all(u.attacked_this_turn for u in group.units):
                 continue
             for neighbor in group.hex.neighbors():
                 if (neighbor.q, neighbor.r) in failed_targets:
                     continue
                 defenders = board.get_units_in_hex(neighbor.q, neighbor.r)
-                defenders = [u for u in defenders if getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False)]
+                defenders = [u for u in defenders if u.allegiance == ctx.enemy and u.is_on_map]
                 if not defenders:
                     continue
                 if not ctx.game_state.combat_service.can_units_attack_stack(group.units, defenders):
@@ -3422,8 +3382,8 @@ class TacticalPlanner:
             for package in self._generate_attack_packages(eligible_groups, max_groups=4):
                 attackers = [
                     u for g in package for u in g.units
-                    if getattr(u, "is_on_map", False)
-                    and not getattr(u, "attacked_this_turn", False)
+                    if u.is_on_map
+                    and not u.attacked_this_turn
                 ]
                 if not attackers:
                     continue
@@ -3465,7 +3425,7 @@ class TacticalPlanner:
             return False
 
         target_hex = best["target_hex"]
-        attackers = [u for u in best["attackers"] if getattr(u, "is_on_map", False)]
+        attackers = [u for u in best["attackers"] if u.is_on_map]
         defenders_before = list(ctx.game_state.get_units_at(target_hex))
         resolution = ctx.game_state.combat_service.resolve_combat(attackers, target_hex)
         show_combat_result_popup(
@@ -3587,8 +3547,8 @@ class TacticalPlanner:
                 }
 
         air_combat = [u for u in attackers if u.is_combat_unit()]
-        ground_present = any(getattr(u, "is_army", lambda: False)() and getattr(u, "unit_type", None) != UnitType.FLEET for u in air_combat)
-        air_only = bool(air_combat) and not ground_present and any(getattr(u, "is_wing", lambda: False)() or getattr(u, "is_citadel", lambda: False)() for u in air_combat)
+        ground_present = any(u.is_army() for u in air_combat)
+        air_only = bool(air_combat) and not ground_present and any(u.is_wing() or u.is_citadel() for u in air_combat)
         if air_only and not self._is_air_special_opportunity(ctx, target_hex, defenders, is_main_objective_hex):
             return {"allow": False, "note": "air_only_gate", "odds": odds}
 
@@ -3680,13 +3640,7 @@ class TacticalPlanner:
     def _crossing_attack_penalty(ctx: AIContext, attackers: List[object], target_hex: Hex) -> float:
         penalty = 0.0
         for u in attackers:
-            if not getattr(u, "is_on_map", False):
-                continue
-            if not getattr(u, "position", None) or u.position[0] is None:
-                continue
-            if getattr(u, "unit_type", None) == UnitType.FLEET:
-                continue
-            if not getattr(u, "is_army", lambda: False)():
+            if not u.is_army():
                 continue
             src = Hex.offset_to_axial(*u.position)
             if target_hex not in src.neighbors():
@@ -4002,11 +3956,9 @@ class BaselineAIPlayer:
 
             ground_units = [
                 u for u in group.mobile_units
-                if getattr(u, "is_on_map", False)
-                   and getattr(u, "is_army", lambda: False)()
-                   and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
-                   and getattr(u, "position", None)
-                   and u.position[0] is not None
+                if u.is_on_map
+                   and u.is_army()
+                   and u.position and None not in u.position
             ]
             if not ground_units:
                 continue
@@ -4323,16 +4275,15 @@ class BaselineAIPlayer:
     def _compute_transport_signature(self, ctx: AIContext) -> Tuple[Tuple[Any, ...], ...]:
         rows: List[Tuple[Any, ...]] = []
         for u in sorted(ctx.friendly_units, key=_unit_key):
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
-            if not getattr(u, "is_on_map", False):
+            if not u.is_on_map:
                 continue
             pos = tuple(getattr(u, "position", (None, None)) or (None, None))
             embarked_ground = sum(
                 1 for p in list(getattr(u, "passengers", []) or [])
-                if getattr(p, "allegiance", None) == ctx.side
-                and getattr(p, "is_army", lambda: False)()
-                and getattr(p, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+                if p.allegiance == ctx.side
+                and p.is_army()
             )
             rows.append((_unit_key(u), pos, embarked_ground))
         return tuple(rows)
@@ -4344,14 +4295,12 @@ class BaselineAIPlayer:
         board = self.game_state.map
         embarked_ground = []
         for u in ctx.friendly_units:
-            if getattr(u, "unit_type", None) != UnitType.FLEET:
+            if not u.is_fleet():
                 continue
             for p in list(getattr(u, "passengers", []) or []):
-                if getattr(p, "allegiance", None) != ctx.side:
+                if p.allegiance != ctx.side:
                     continue
-                if not getattr(p, "is_army", lambda: False)():
-                    continue
-                if getattr(p, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+                if not p.is_army():
                     continue
                 embarked_ground.append(p)
         for item in slots:
@@ -4468,15 +4417,13 @@ class BaselineAIPlayer:
         # Conservative by default: only clear if unit is no longer a valid on-map friendly ground army.
         if unit is None:
             return
-        if not getattr(unit, "is_army", lambda: False)():
-            return
-        if getattr(unit, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
+        if not unit.is_army():
             return
         state = self._get_invasion_state(side)
         key = _unit_key(unit)
         if key not in state.get("ashore_committed_armies", set()):
             return
-        if getattr(unit, "allegiance", None) != side or not getattr(unit, "is_on_map", False):
+        if unit.allegiance != side or not unit.is_on_map:
             state["ashore_committed_armies"].discard(key)
 
     def _prune_ashore_committed_state(self, side: str):
@@ -4487,19 +4434,16 @@ class BaselineAIPlayer:
         valid = {
             _unit_key(u)
             for u in self.game_state.units
-            if getattr(u, "allegiance", None) == side
-            and getattr(u, "is_on_map", False)
-            and getattr(u, "is_army", lambda: False)()
-            and getattr(u, "unit_type", None) not in (UnitType.WING, UnitType.FLEET)
+            if u.allegiance == side
+            and u.is_on_map
+            and u.is_army()
         }
         state["ashore_committed_armies"] = committed.intersection(valid)
 
     def _clear_landed_flag_if_inland(self, side: str, unit):
-        if not getattr(unit, "is_army", lambda: False)():
+        if not unit.is_army():
             return
-        if getattr(unit, "unit_type", None) in (UnitType.WING, UnitType.FLEET):
-            return
-        if not getattr(unit, "position", None) or unit.position[0] is None:
+        if not unit.position or None in unit.position:
             return
         state = self._get_invasion_state(side)
         key = _unit_key(unit)
