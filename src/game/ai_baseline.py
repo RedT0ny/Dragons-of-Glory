@@ -993,14 +993,10 @@ class StrategicPlanner:
     def _compute_urgency(self, ctx: AIContext, deadline_turn: Optional[int], is_offensive_side: bool) -> float:
         if deadline_turn is not None:
             turns_left = deadline_turn - ctx.turn
-            if turns_left <= 0:
-                return 1.0
-            if turns_left <= 2:
-                return 0.9
-            if turns_left <= 4:
-                return 0.7
-            if turns_left <= 6:
-                return 0.5
+            if turns_left <= 0: return 1.0
+            if turns_left <= 2: return 0.9
+            if turns_left <= 4: return 0.7
+            if turns_left <= 6: return 0.5
             return 0.3
         end_turn = int(getattr(ctx.game_state.scenario_spec, "end_turn", 0) or 0)
         if end_turn:
@@ -1055,10 +1051,7 @@ class StrategicPlanner:
             u for u in ctx.game_state.units
             if u.allegiance == ctx.side
             and u.is_fleet()
-            and (
-                u.is_on_map
-                or u.status == UnitState.READY
-            )
+            and (u.is_on_map or u.status == UnitState.READY)
         ]
         if not fleets:
             return False
@@ -1076,10 +1069,7 @@ class StrategicPlanner:
             u for u in ctx.game_state.units
             if u.allegiance == ctx.side
             and u.is_army()
-            and (
-                u.is_on_map
-                or u.status == UnitState.READY
-            )
+            and (u.is_on_map or u.status == UnitState.READY)
         ]
         if not ground_units:
             return False
@@ -2441,10 +2431,10 @@ class TacticalPlanner:
         # Always give location bonus if loc exists
         if loc:
             score += 3
-        # Always give base capital bonus if is_capital
-        if loc and getattr(loc, "is_capital", False):
-            score += 5
-        
+            # Always give base capital bonus if is_capital
+            if getattr(loc, "is_capital", False):
+                score += 5
+
         # Defensive posture: strongly reward own capital if undergarrisoned
         is_defensive = (plan.posture == "defensive" or plan.offensive_side != ctx.side)
         if is_own_capital and is_defensive:
@@ -2455,7 +2445,7 @@ class TacticalPlanner:
                    and getattr(u, "is_on_map", False)
                    and u.is_combat_unit()
             ]
-            garrison_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+            garrison_power = sum(float(u.combat_rating) for u in defenders)
             garrison_count = len(defenders)
             min_garrison_power = max(8.0, threat * 4.0)
             min_garrison_units = 2 if threat < 2.0 else 3
@@ -2473,10 +2463,7 @@ class TacticalPlanner:
         # Defensive: reward threatened friendly objectives, penalize low-threat rear hexes
         if is_defensive:
             # Penalize very low-threat rear hexes for ground infantry
-            unit_type = getattr(unit, "unit_type", None)
-            is_ground_infantry = (unit_type in (UnitType.INFANTRY, UnitType.CAVALRY) 
-                                  or getattr(unit, "is_army", lambda: False)())
-            if is_ground_infantry and threat < 0.5:
+            if unit.is_army() and threat < 0.5:
                 score -= 15.0
 
         # Avoid deploying ground armies into terrain/hexside pockets with no legal exits.
@@ -2907,7 +2894,7 @@ class TacticalPlanner:
             and u.is_on_map
             and u.is_combat_unit()
         ]
-        enemy_power = sum(float(u.combat_rating for u in enemy_combat))
+        enemy_power = sum(float(u.combat_rating) for u in enemy_combat)
         loc = ctx.game_state.map.get_location(target_hex)
         is_enemy_location = bool(loc and getattr(loc, "occupier", None) == ctx.enemy)
 

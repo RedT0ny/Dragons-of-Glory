@@ -46,6 +46,7 @@ scenario:
   active_events:
     blue_crystal_staff: all
     golden_general: all
+    good_dragons: all
     soths_legions: all
     dragon_orb: 1
 
