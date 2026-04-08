@@ -95,7 +95,7 @@ jobs:
 
           test -d "$QT_DEPLOY_CACHE/android-sdk" || { echo "Qt helper did not create android-sdk cache"; exit 1; }
           test -d "$QT_DEPLOY_CACHE/android-sdk/ndk/26.1.10909125" || { echo "Qt helper did not create expected NDK cache"; exit 1; }
-
+          
       - name: Export Qt helper SDK/NDK paths
         run: |
           echo "ANDROID_SDK_ROOT=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
