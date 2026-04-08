@@ -77,7 +77,7 @@ jobs:
           source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
           pip install -r requirements-android.txt
-          pip install buildozer==1.5.0 Cython==0.29.34 setuptools
+          pip install buildozer==1.5.0 Cython==0.29.34 setuptools GitPython tqdm Jinja2
 
       - name: Download Android prerequisites using Qt helper
         run: |
