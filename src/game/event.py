@@ -1,4 +1,6 @@
 from typing import Any, Callable, Optional
+
+from content.tools import TextFormatter
 from ..content.specs import (
     RequirementType,
     ASSET_REQUIREMENTS,
@@ -61,6 +63,7 @@ class Asset:
         """
         Check if a unit can equip this asset based on requirements.
         """
+        unit_id = TextFormatter.format_unit_log_string(unit)
         if not self.is_equippable:
             if log_reason:
                 print(f"Asset '{self.id}' is not equippable.")
@@ -68,7 +71,7 @@ class Asset:
 
         if not unit.is_on_map:
             if log_reason:
-                print(f"Cannot equip '{self.id}' to '{unit.id}': Unit is not on the map.")
+                print(f"Cannot equip '{self.id}' to '{unit_id}': Unit is not on the map.")
             return False
 
         for requirement in self.requirements:
@@ -77,7 +80,7 @@ class Asset:
 
             if not self._check_requirement(unit, req_type, req_value):
                 if log_reason:
-                    print(f"Cannot equip '{self.id}' to '{unit.id}': Requirement {req_type}='{req_value}' failed.")
+                    print(f"Cannot equip '{self.id}' to '{unit_id}': Requirement {req_type}='{req_value}' failed.")
                 return False
         return True
 
@@ -124,7 +127,7 @@ class Asset:
             self._apply_runtime_effects(unit)
             if on_assign_callback is not None:
                 on_assign_callback(self)
-            print(f"'{unit.id}' equipped '{self.id}'!")
+            print(f"'{TextFormatter.format_unit_log_string(unit)}' equipped '{self.id}'!")
 
     def remove_from(self, unit):
         """Remove asset effects from a unit."""

@@ -90,7 +90,7 @@ TODO BUGFIX:
 - Fix map subset not working correctly (use full map for now).
 - Interceptions still involving ground armies. Should ignore location bonuses as well.
 - Avoid garrisons (units that cannot move) being boarded onto ships.
-- Units shall not retreat into neutral countries.
+- AI not deploying units created by events until next replacements phase.
 
 Notes:
 

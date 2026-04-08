@@ -3,6 +3,7 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
+from content.tools import TextFormatter
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyService
@@ -215,7 +216,7 @@ class GameController(QObject):
                 self.on_ready_unit_clicked(unit, self.replacements_dialog.allow_territory_deploy)
 
         self._schedule_deferred(_deferred_redeploy_sync)
-        print(f"Unit {unit.id} returned to READY for redeployment.")
+        print(f"Unit {TextFormatter.format_unit_log_string(unit)} returned to READY for redeployment.")
 
     def start_game(self):
         """Initializes the loop and immediately processes the first phase."""
@@ -732,7 +733,7 @@ class GameController(QObject):
                 unit.moved_this_turn = True
         self._deployment_session_unit_ids.add(unit.id)
         RuntimeDiagnostics.record_event(
-            f"Deployment applied: unit={unit.id} target={target_hex.axial_to_offset()}"
+            f"Deployment applied: unit={TextFormatter.format_unit_log_string(unit)} target={target_hex.axial_to_offset()}"
         )
         
         # Sync the map on next tick; defer heavy dialog rebuild slightly to avoid
@@ -746,7 +747,7 @@ class GameController(QObject):
                 self._refresh_info_panel()
         self._schedule_deferred(_deferred_sync)
         
-        print(f"Unit {unit.id} deployed to {target_hex.axial_to_offset()} via controller")
+        print(f"Unit {TextFormatter.format_unit_log_string(unit)} deployed to {target_hex.axial_to_offset()} via controller")
 
     def _queue_replacements_dialog_refresh(self):
         dlg = self.replacements_dialog

@@ -39,7 +39,6 @@ jobs:
         run: |
           echo "VENV_PATH=$RUNNER_TEMP/android-venv" >> "$GITHUB_ENV"
           echo "WHEEL_DIR=$GITHUB_WORKSPACE/android-wheels" >> "$GITHUB_ENV"
-          echo "QT_DEPLOY_CACHE=$HOME/.pyside6-android-deploy" >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         run: |
@@ -77,7 +76,7 @@ jobs:
           source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
           pip install -r requirements-android.txt
-          pip install buildozer==1.5.0 Cython==0.29.34 setuptools
+          pip install buildozer==1.5.0 Cython==0.29.34 setuptools GitPython tqdm Jinja2
 
       - name: Download Android prerequisites using Qt helper
         run: |
@@ -85,7 +84,7 @@ jobs:
           source "$VENV_PATH/bin/activate"
 
           rm -rf pyside-setup
-          git clone --depth 1 https://code.qt.io/pyside/pyside-setup
+          git clone --depth 1 https://github.com/pyside/pyside-setup.git pyside-setup
           cd pyside-setup
 
           python tools/cross_compile_android/main.py \
@@ -93,8 +92,15 @@ jobs:
             --skip-update \
             --auto-accept-license
 
-          test -d "$QT_DEPLOY_CACHE/android-sdk" || { echo "Qt helper did not create android-sdk cache"; exit 1; }
-          test -d "$QT_DEPLOY_CACHE/android-sdk/ndk/26.1.10909125" || { echo "Qt helper did not create expected NDK cache"; exit 1; }
+          if [ -d "$HOME/.pyside6_android_deploy/android-sdk" ]; then
+            echo "QT_DEPLOY_CACHE=$HOME/.pyside6_android_deploy" >> "$GITHUB_ENV"
+          elif [ -d "$HOME/.pyside6-android-deploy/android-sdk" ]; then
+            echo "QT_DEPLOY_CACHE=$HOME/.pyside6-android-deploy" >> "$GITHUB_ENV"
+          else
+            echo "Qt helper did not create a detectable Android SDK cache"
+            ls -la "$HOME"
+            exit 1
+          fi
 
       - name: Export Qt helper SDK/NDK paths
         run: |
@@ -103,6 +109,9 @@ jobs:
           echo "ANDROID_NDK_VERSION=26.1.10909125" >> "$GITHUB_ENV"
           echo "ANDROID_API_LEVEL=34" >> "$GITHUB_ENV"
           echo "ANDROID_BUILD_TOOLS=35.0.0" >> "$GITHUB_ENV"
+
+          test -d "$QT_DEPLOY_CACHE/android-sdk" || { echo "Missing Android SDK cache"; exit 1; }
+          test -d "$QT_DEPLOY_CACHE/android-sdk/ndk/26.1.10909125" || { echo "Missing expected NDK cache"; exit 1; }
 
       - name: Download Android wheels
         run: |

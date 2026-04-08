@@ -1213,10 +1213,10 @@ class CombatService:
                 continue
             unit.status = UnitState.ACTIVE
             unit._healed_this_combat_turn = True
-            logs.append(f"Healing activated: {unit.id} restored to ACTIVE.")
+            logs.append(f"Healing activated: {TextFormatter.format_unit_log_string(unit)} restored to ACTIVE.")
             if getattr(healing_asset, "is_consumable", False):
                 self._consume_asset(healing_asset, unit)
-                logs.append(f"Healing asset consumed: {healing_asset.id} on {unit.id}.")
+                logs.append(f"Healing asset consumed: {healing_asset.id} on {TextFormatter.format_unit_log_string(unit)}.")
         return logs
 
     def _get_equipped_other_bonus_asset(self, unit, bonus_name):

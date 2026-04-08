@@ -2,6 +2,8 @@ import random
 from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
+
+from content.tools import TextFormatter
 from src.game.combat import CombatService
 from src.game.diplomacy import ConquestService
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
@@ -807,6 +809,7 @@ class GameState:
             "options": [Hex, ...] (for emerge)
         }
         """
+        unit_id = TextFormatter.format_unit_log_string(unit)
         roll = random.randint(1, 10)
         result = {"roll": roll, "unit": unit}
 
@@ -814,7 +817,7 @@ class GameState:
         if roll == 1:
             result["effect"] = "sink"
             self.damage_unit(unit, mode="destroy")
-            print(f"Maelstrom Effect (Roll {roll}): Ship {unit.id} destroyed!")
+            print(f"Maelstrom Effect (Roll {roll}): Ship {unit_id} destroyed!")
 
         # 2-5. Stay
         elif 2 <= roll <= 5:
@@ -824,7 +827,7 @@ class GameState:
             # Ensure it is in the maelstrom hex (if passed for placement)
             if maelstrom_hex:
                 self.move_unit(unit, maelstrom_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Ship {unit.id} trapped for the turn.")
+            print(f"Maelstrom Effect (Roll {roll}): Ship {unit_id} trapped for the turn.")
 
         # 6-8. Opponent Chooses Exit
         elif 6 <= roll <= 8:
@@ -834,7 +837,7 @@ class GameState:
             # Identify current location to find neighbors
             current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
             result["options"] = self.map.get_maelstrom_exits(current_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Opponent chooses exit for {unit.id}.")
+            print(f"Maelstrom Effect (Roll {roll}): Opponent chooses exit for {unit_id}.")
 
         # 9-10. Player Chooses Exit
         else: # 9, 10
@@ -843,7 +846,7 @@ class GameState:
 
             current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
             result["options"] = self.map.get_maelstrom_exits(current_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Player chooses exit for {unit.id}.")
+            print(f"Maelstrom Effect (Roll {roll}): Player chooses exit for {unit_id}.")
 
         return result
 
@@ -863,7 +866,7 @@ class GameState:
         # Roll for each ship belonging to the active player
         for unit, hex_obj in trapped_ships:
             if unit.allegiance == self.active_player:
-                print(f"Processing Maelstrom check for trapped ship: {unit.id}")
+                print(f"Processing Maelstrom check for trapped ship: {TextFormatter.format_unit_log_string(unit)}")
                 self.resolve_maelstrom_entry(unit, hex_obj)
                 # Note: The 'emerge' result requires handling by the Controller/UI
                 # to prompt selection from result['options'].
@@ -1240,10 +1243,11 @@ class GameState:
         Centralizes the move: updates unit.position AND the spatial map.
         target_hex: Hex object (axial)
         """
+        unit_id = TextFormatter.format_unit_log_string(unit)
         # Prevent moving units that are transported aboard a carrier
         if getattr(unit, 'transport_host', None) is not None:
             # Transported armies cannot move on their own while aboard
-            print(f"Unit {unit.id} is transported aboard {unit.transport_host.id} and cannot move independently.")
+            print(f"Unit {unit_id} is transported aboard {unit.transport_host.id} and cannot move independently.")
             return
 
         # 1. Deduct Movement Points (Only in Movement Phase)
@@ -1264,11 +1268,11 @@ class GameState:
                     prev_hex, prev_side = state_path[i - 1]
                     curr_hex, curr_side = state_path[i]
                     if prev_side is None and curr_side is not None:
-                        print(f"Fleet {unit.id} enters deep_river hexside {curr_side} (hex -> hexside).")
+                        print(f"{unit_id} enters deep_river hexside {curr_side} (hex -> hexside).")
                     elif prev_side is not None and curr_side is None:
-                        print(f"Fleet {unit.id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
+                        print(f"{unit_id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
                     elif prev_side is not None and curr_side != prev_side:
-                        print(f"Fleet {unit.id} moves along deep_river to hexside {curr_side}.")
+                        print(f"{unit_id} moves along deep_river to hexside {curr_side}.")
 
             effective_mp = effective_movement_points(unit)
             if cost > effective_mp:

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Set, Tuple
 
+from content.tools import TextFormatter
 from src.content.constants import WS, HL
 from src.content.specs import GamePhase, UnitType, LocType, UnitState
 from src.game.map import Hex
@@ -174,16 +175,17 @@ class DeploymentService:
         highlord_allegiance: str = HL,
     ) -> UnitDeploymentResult:
         # Deployment may only place READY units from off-map.
+        unit_id = TextFormatter.format_unit_log_string(unit)
         if unit.status != UnitState.READY:
-            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: unit is not READY.")
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit_id}: unit is not READY.")
         if getattr(unit, "is_on_map", False):
-            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: unit is already on map.")
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit_id}: unit is already on map.")
 
         if not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
-            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: invalid terrain.")
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit_id}: invalid terrain.")
 
         if not self.game_state.map.can_stack_move_to([unit], target_hex):
-            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit.id}: stacking limit or enemy presence.")
+            return UnitDeploymentResult(success=False, error=f"Cannot deploy {unit_id}: stacking limit or enemy presence.")
 
         self.game_state.move_unit(unit, target_hex)
         unit.status = UnitState.ACTIVE

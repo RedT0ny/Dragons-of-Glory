@@ -10,6 +10,7 @@ from collections import defaultdict
 import random
 from typing import List, Tuple
 
+from content.tools import TextFormatter
 from game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
@@ -30,11 +31,12 @@ def evaluate_unit_move(game_state, unit, target_hex):
     Shared movement validation/cost calculation used by UI and move execution.
     Returns: (ok, reason, cost, start_hex, fleet_state_path)
     """
+    unit_id = TextFormatter.format_unit_log_string(unit)
     if getattr(unit, "transport_host", None) is not None:
-        return False, f"{unit.id} is transported and cannot move independently.", 0, None, []
+        return False, f"{unit_id} is transported and cannot move independently.", 0, None, []
 
     if not unit.is_fleet() and not game_state.map.can_unit_land_on_hex(unit, target_hex):
-        return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
+        return False, f"{unit_id} cannot end movement on that terrain.", 0, None, []
 
     if not unit.position or None in unit.position:
         return True, None, 0, None, []
@@ -44,14 +46,14 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if unit.is_fleet():
         state_path, cost = game_state.map.find_fleet_route(unit, start_hex, target_hex)
         if cost == float("inf") or (not state_path and start_hex != target_hex):
-            return False, f"{unit.id} has no valid path.", 0, start_hex, []
+            return False, f"{unit_id} has no valid path.", 0, start_hex, []
         if cost > max_mp:
-            return False, f"{unit.id} lacks movement points.", cost, start_hex, state_path
+            return False, f"{unit_id} lacks movement points.", cost, start_hex, state_path
         return True, None, cost, start_hex, state_path
 
     path = game_state.map.find_shortest_path(unit, start_hex, target_hex)
     if not path and start_hex != target_hex:
-        return False, f"{unit.id} has no valid path.", 0, start_hex, []
+        return False, f"{unit_id} has no valid path.", 0, start_hex, []
 
     cost = 0
     current = start_hex
@@ -61,7 +63,7 @@ def evaluate_unit_move(game_state, unit, target_hex):
         current = next_step
 
     if cost > max_mp:
-        return False, f"{unit.id} lacks movement points.", cost, start_hex, []
+        return False, f"{unit_id} lacks movement points.", cost, start_hex, []
 
     return True, None, cost, start_hex, []
 
@@ -730,7 +732,7 @@ class MovementService:
         for unit in units:
             ok, reason = self._can_unit_reach_target(unit, target_hex)
             if not ok:
-                errors.append(reason or f"{unit.id} cannot move.")
+                errors.append(reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move.")
 
         if errors:
             return MoveUnitsResult(moved=[], errors=errors)
@@ -751,7 +753,7 @@ class MovementService:
             if verify_target and getattr(unit, "position", None) != target_offset:
                 return MoveUnitsResult(
                     moved=moved,
-                    errors=[f"{unit.id} cannot move."],
+                    errors=[f"{TextFormatter.format_unit_log_string(unit)} cannot move."],
                 )
             moved.append(unit)
         if moved:
@@ -764,7 +766,7 @@ class MovementService:
         for unit in units:
             ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
             if not ok:
-                return MoveUnitsResult(moved=[], errors=[reason or f"{unit.id} cannot move."])
+                return MoveUnitsResult(moved=[], errors=[reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
             if unit is lead and unit.is_fleet():
                 lead_state_path = state_path
 
@@ -790,7 +792,7 @@ class MovementService:
                     invalidate_overlays=False,
                 )
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
-                    return MoveUnitsResult(moved=[], errors=[f"{unit.id} cannot move."])
+                    return MoveUnitsResult(moved=[], errors=[f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
 
             movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
             if not movers_alive:
