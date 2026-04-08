@@ -85,7 +85,7 @@ jobs:
           source "$VENV_PATH/bin/activate"
 
           rm -rf pyside-setup
-          git clone --depth 1 https://code.qt.io/pyside/pyside-setup
+          git clone --depth 1 https://github.com/pyside/pyside-setup.git pyside-setup
           cd pyside-setup
 
           python tools/cross_compile_android/main.py \
