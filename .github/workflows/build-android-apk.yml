@@ -15,9 +15,6 @@ jobs:
       PYTHON_VERSION: "3.11"
       QT_PYSIDE_VERSION: "6.10.2"
       TARGET_ARCH: "aarch64"
-      ANDROID_API_LEVEL: "34"
-      ANDROID_BUILD_TOOLS: "35.0.0"
-      ANDROID_NDK_VERSION: "26.1.10909125"
 
     steps:
       - name: Checkout
@@ -41,9 +38,8 @@ jobs:
       - name: Define dynamic paths
         run: |
           echo "VENV_PATH=$RUNNER_TEMP/android-venv" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> "$GITHUB_ENV"
           echo "WHEEL_DIR=$GITHUB_WORKSPACE/android-wheels" >> "$GITHUB_ENV"
+          echo "QT_DEPLOY_CACHE=$HOME/.pyside6-android-deploy" >> "$GITHUB_ENV"
 
       - name: Install system dependencies
         run: |
@@ -83,30 +79,30 @@ jobs:
           pip install -r requirements-android.txt
           pip install buildozer==1.5.0 Cython==0.29.34 setuptools
 
-      - name: Install Android SDK command-line tools
+      - name: Download Android prerequisites using Qt helper
         run: |
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          unzip -q cmdline-tools.zip -d "$ANDROID_SDK_ROOT/cmdline-tools"
-          mv "$ANDROID_SDK_ROOT/cmdline-tools/cmdline-tools" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          set -Eeuo pipefail
+          source "$VENV_PATH/bin/activate"
 
-      - name: Create legacy sdkmanager path for Buildozer compatibility
-        run: |
-          mkdir -p "$ANDROID_SDK_ROOT/tools/bin"
-          ln -sf "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
-                 "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
-          test -x "$ANDROID_SDK_ROOT/tools/bin/sdkmanager"
+          rm -rf pyside-setup
+          git clone --depth 1 https://code.qt.io/pyside/pyside-setup
+          cd pyside-setup
 
-      - name: Install Android SDK/NDK packages
+          python tools/cross_compile_android/main.py \
+            --download-only \
+            --skip-update \
+            --auto-accept-license
+
+          test -d "$QT_DEPLOY_CACHE/android-sdk" || { echo "Qt helper did not create android-sdk cache"; exit 1; }
+          test -d "$QT_DEPLOY_CACHE/android-sdk/ndk/26.1.10909125" || { echo "Qt helper did not create expected NDK cache"; exit 1; }
+
+      - name: Export Qt helper SDK/NDK paths
         run: |
-          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-          yes | sdkmanager --licenses
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-${ANDROID_API_LEVEL}" \
-            "build-tools;${ANDROID_BUILD_TOOLS}" \
-            "ndk;${ANDROID_NDK_VERSION}" \
-            "cmake;3.22.1"
+          echo "ANDROID_SDK_ROOT=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_VERSION=26.1.10909125" >> "$GITHUB_ENV"
+          echo "ANDROID_API_LEVEL=34" >> "$GITHUB_ENV"
+          echo "ANDROID_BUILD_TOOLS=35.0.0" >> "$GITHUB_ENV"
 
       - name: Download Android wheels
         run: |
@@ -168,7 +164,6 @@ jobs:
           wheel_dir = os.environ["WHEEL_DIR"]
           venv_path = os.environ["VENV_PATH"]
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
-          ndk_ver = os.environ["ANDROID_NDK_VERSION"]
 
           cfg["app"]["project_file"] = "pyproject.toml"
 
@@ -180,7 +175,7 @@ jobs:
 
           cfg["buildozer"]["mode"] = "debug"
           cfg["buildozer"]["sdk_path"] = sdk_root
-          cfg["buildozer"]["ndk_path"] = f"{sdk_root}/ndk/{ndk_ver}"
+          cfg["buildozer"]["ndk_path"] = f"{sdk_root}/ndk/26.1.10909125"
           cfg["buildozer"]["arch"] = arch
 
           with spec_path.open("w", encoding="utf-8") as f:
@@ -196,27 +191,20 @@ jobs:
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          # Normalize Android environment
-          unset ANDROID_NDK ANDROID_NDK_HOME ANDROID_NDK_ROOT ANDROID_NDK_LATEST_HOME
-          unset ANDROIDSDK ANDROIDNDK ANDROIDAPI ANDROIDMINAPI
-
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
           export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
-
-          export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/$ANDROID_NDK_VERSION"
+          export ANDROID_NDK="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
+          export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
           export ANDROIDSDK="$ANDROID_SDK_ROOT"
-
-          export ANDROID_NDK="$ANDROIDNDK"
-          export ANDROID_NDK_HOME="$ANDROIDNDK"
-          export ANDROID_NDK_ROOT="$ANDROIDNDK"
-
           export ANDROIDAPI=34
           export ANDROIDMINAPI=24
 
           export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
 
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee ci-debug/build-apk.log
-          echo "ANDROID_NDK=$ANDROIDNDK" | tee -a ci-debug/build-apk.log
+          echo "ANDROID_NDK=$ANDROID_NDK" | tee -a ci-debug/build-apk.log
           echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
           echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
 
@@ -224,7 +212,7 @@ jobs:
             --verbose \
             --config-file pysidedeploy.spec \
             --sdk-path "$ANDROID_SDK_ROOT" \
-            --ndk-path "$ANDROIDNDK" \
+            --ndk-path "$ANDROID_NDK" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee -a ci-debug/build-apk.log
 

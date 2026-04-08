@@ -299,15 +299,9 @@ class InfoPanel(QFrame):
         # Check for Flying
         # FlyingCitadel is a class, Wing is a class. Or use unit_type.
         # Check UnitType enum if available on unit.
-        is_flying = False
-        if unit.unit_type in (UnitType.WING, UnitType.CITADEL):
-            is_flying = True
-
-        is_fleet = (unit.unit_type == UnitType.FLEET)
-
-        if is_flying:
+        if unit.is_flier():
             self.lbl_terrain.setText("Flying")
-        elif is_fleet:
+        elif unit.is_fleet():
             self.lbl_terrain.setText("Ocean")
         elif unit.spec.terrain_affinity:
             self.lbl_terrain.setText(unit.spec.terrain_affinity.title())

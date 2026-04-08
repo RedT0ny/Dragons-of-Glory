@@ -33,7 +33,7 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if getattr(unit, "transport_host", None) is not None:
         return False, f"{unit.id} is transported and cannot move independently.", 0, None, []
 
-    if unit.unit_type != UnitType.FLEET and not game_state.map.can_unit_land_on_hex(unit, target_hex):
+    if not unit.is_fleet() and not game_state.map.can_unit_land_on_hex(unit, target_hex):
         return False, f"{unit.id} cannot end movement on that terrain.", 0, None, []
 
     if not unit.position or None in unit.position:
@@ -41,7 +41,7 @@ def evaluate_unit_move(game_state, unit, target_hex):
 
     max_mp = effective_movement_points(unit)
     start_hex = Hex.offset_to_axial(*unit.position)
-    if unit.unit_type == UnitType.FLEET:
+    if unit.is_fleet():
         state_path, cost = game_state.map.find_fleet_route(unit, start_hex, target_hex)
         if cost == float("inf") or (not state_path and start_hex != target_hex):
             return False, f"{unit.id} has no valid path.", 0, start_hex, []
@@ -498,7 +498,7 @@ class MovementService:
         unit.moved_this_turn = True
         unit.transport_host = carrier
 
-        if carrier.unit_type == UnitType.FLEET:
+        if carrier.is_fleet():
             in_port = False
             if carrier.position:
                 hex_obj = Hex.offset_to_axial(*carrier.position)
@@ -525,7 +525,7 @@ class MovementService:
         if dest_hex is None:
             return False
 
-        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+        if carrier.is_fleet():
             loc = self.game_state.map.get_location(dest_hex)
             is_stateless_neutral_port = bool(
                 loc
@@ -551,7 +551,7 @@ class MovementService:
 
         carrier_hex = Hex.offset_to_axial(*carrier.position)
         candidates = [carrier_hex]
-        if getattr(carrier, "unit_type", None) == UnitType.FLEET:
+        if carrier.is_fleet():
             candidates.extend(carrier_hex.neighbors())
 
         passengers = [passenger] if passenger is not None else list(getattr(carrier, "passengers", []) or [])
@@ -591,7 +591,7 @@ class MovementService:
             if hasattr(carrier, "movement_points"):
                 carrier.movement_points = 0
             carrier.moved_this_turn = True
-        elif carrier.unit_type == UnitType.FLEET:
+        elif carrier.is_fleet():
             in_port = False
             if carrier.position:
                 loc = self.game_state.map.get_location(Hex.offset_to_axial(*carrier.position))
@@ -765,13 +765,13 @@ class MovementService:
             ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or f"{unit.id} cannot move."])
-            if unit is lead and unit.unit_type == UnitType.FLEET:
+            if unit is lead and unit.is_fleet():
                 lead_state_path = state_path
 
         path = self._build_movement_hex_path(
             units,
             target_hex,
-            precomputed_state_path=lead_state_path if lead.unit_type == UnitType.FLEET else None,
+            precomputed_state_path=lead_state_path if lead.is_fleet() else None,
         )
         if path is None:
             return MoveUnitsResult(moved=[], errors=["Selected stack has no valid path."])
@@ -819,7 +819,7 @@ class MovementService:
         if start_hex == target_hex:
             return []
 
-        if lead.unit_type == UnitType.FLEET:
+        if lead.is_fleet():
             state_path = precomputed_state_path
             if state_path is None:
                 ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, lead, target_hex)
@@ -953,7 +953,7 @@ class MovementService:
         for hex_obj in connected_hexes:
             stack_units = stacks_by_hex.get(hex_obj, [])
             for unit in stack_units:
-                if unit.unit_type == UnitType.FLEET:
+                if unit.is_fleet():
                     continue
                 if not self._unit_has_movement(unit):
                     continue

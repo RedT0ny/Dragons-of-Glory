@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from collections import defaultdict
+from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple, Set
 
+from content.tools import TextFormatter
 from src.content import loader
 from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL
@@ -270,6 +272,9 @@ class AIContext:
     country_hexes_by_id: Optional[Dict[str, List[Hex]]] = None
     country_port_counts: Optional[Dict[str, int]] = None
     neutral_front_cache: Optional[Dict[str, Any]] = None
+    movement_logs: List[str] = field(default_factory=list)
+    enemy_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
+    friendly_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
 
 
 @dataclass
@@ -1482,11 +1487,7 @@ class OperationalPlanner:
                     (beach_slots and any(group.hex.distance_to(s) <= 1 for s in beach_slots))
                     or group_has_ashore_committed
                 ):
-                    nearby_enemy = 0
-                    for neighbor in group.hex.neighbors():
-                        nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                        if any(u.allegiance == ctx.enemy and u.is_combat_unit() for u in nstack):
-                            nearby_enemy += 1
+                    nearby_enemy = ctx.enemy_adjacent_combat_count.get((group.hex.q, group.hex.r), 0)
                     push_objective = None
                     if main_objective and getattr(main_objective, "owner", None) == ctx.enemy:
                         push_objective = main_objective
@@ -1931,6 +1932,10 @@ class TacticalPlanner:
         "screen": {"objective": 6, "threat": -7, "support": 2, "capture": 2},
         "reserve_screen": {"objective": 5, "threat": -6, "support": 2, "capture": 2},
     }
+
+    def __init__(self):
+        self._reachable_cache_phase_key: Optional[Tuple[int, str, Any]] = None
+        self._reachable_cache: Dict[Tuple[Any, ...], Any] = {}
     
     @staticmethod
     def _can_army_exit_landing_hex(ctx: AIContext, army, landing_hex: Hex) -> bool:
@@ -2545,10 +2550,57 @@ class TacticalPlanner:
                 movable.append(coords)
         return movable if movable else valid
 
+    def _ensure_reachable_cache_phase(self, ctx: AIContext):
+        phase_key = (ctx.turn, ctx.side, ctx.phase)
+        if self._reachable_cache_phase_key != phase_key:
+            self._reachable_cache_phase_key = phase_key
+            self._reachable_cache.clear()
+
+    @staticmethod
+    def _group_reachability_signature(group: TaskGroup) -> Tuple[Tuple[Any, ...], ...]:
+        rows = []
+        for u in sorted(group.units, key=_unit_key):
+            host = u.transport_host
+            host_key = _unit_key(host) if host is not None else None
+            rows.append((
+                _unit_key(u),
+                tuple(u.position) if u.position else (None, None),
+                int(float(u.movement_points or 0)),
+                bool(u.moved_this_turn),
+                host_key,
+            ))
+        return tuple(rows)
+
+    def _get_reachable_hexes_cached(self, ctx: AIContext, group: TaskGroup):
+        self._ensure_reachable_cache_phase(ctx)
+        cache_key = (
+            _task_group_key(group),
+            group.hex.q,
+            group.hex.r,
+            self._group_reachability_signature(group),
+        )
+        cached = self._reachable_cache.get(cache_key)
+        if cached is not None:
+            return cached, True
+        computed = ctx.movement_service.get_reachable_hexes(group.units)
+        self._reachable_cache[cache_key] = computed
+        return computed, False
+
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
-        if self._maybe_execute_transport_action(ctx, plan):
+        transport_t0 = perf_counter()
+        transport_executed = self._maybe_execute_transport_action(ctx, plan)
+        transport_ms = (perf_counter() - transport_t0) * 1000.0
+        if transport_executed:
+            ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
             return True
 
+        eval_start = perf_counter()
+        eval_reach_ms = 0.0
+        eval_score_ms = 0.0
+        eval_candidates = 0
+        eval_missions = 0
+        cache_hits = 0
+        cache_misses = 0
         actions = []
         for mission in missions:
             if ctx.moved_task_groups is not None:
@@ -2556,9 +2608,25 @@ class TacticalPlanner:
                     continue
             if not mission.group.mobile_units:
                 continue
-            action = self._best_move_for_mission(ctx, plan, mission)
+            action, perf = self._best_move_for_mission(ctx, plan, mission)
+            eval_missions += 1
+            eval_reach_ms += float(perf.get("reach_ms", 0.0))
+            eval_score_ms += float(perf.get("score_ms", 0.0))
+            eval_candidates += int(perf.get("candidates", 0))
+            if perf.get("cache_hit"):
+                cache_hits += 1
+            else:
+                cache_misses += 1
             if action:
                 actions.append(action)
+        eval_total_ms = (perf_counter() - eval_start) * 1000.0
+        ctx.movement_logs.append(
+            "movement_tactical "
+            f"eval_total={eval_total_ms:.1f}ms "
+            f"missions_eval={eval_missions} candidates={eval_candidates} "
+            f"reach={eval_reach_ms:.1f}ms score={eval_score_ms:.1f}ms "
+            f"cache_hits={cache_hits} cache_misses={cache_misses}"
+        )
         if not actions:
             return False
 
@@ -2579,9 +2647,24 @@ class TacticalPlanner:
                 attempt_invasion(decision.country_id or "unknown")
                 return True
 
+        before_positions = {u: tuple(u.position) if u.position else (None, None) for u in best.group.units}
+        execute_t0 = perf_counter()
         move_result = ctx.movement_service.move_units_to_hex(best.group.units, target_hex)
+        execute_ms = (perf_counter() - execute_t0) * 1000.0
+        ctx.movement_logs.append(
+            "movement_tactical_exec "
+            f"transport_action={transport_ms:.1f}ms "
+            f"move_units={execute_ms:.1f}ms "
+            f"units_in_group={len(best.group.units)} moved_units={len(move_result.moved)} "
+            f"errors={len(move_result.errors)}"
+        )
         if move_result.errors:
             return False
+        for unit in move_result.moved:
+            prev = before_positions.get(unit, (None, None))
+            now = tuple(unit.position) if unit.position else (None, None)
+            unit_name = TextFormatter.format_unit_log_string(unit)
+            ctx.movement_logs.append(f"movement unit={unit_name} from={prev} to={now}")
         if ctx.moved_task_groups is not None:
             ctx.moved_task_groups.add(_task_group_key(best.group))
         return True
@@ -2591,12 +2674,19 @@ class TacticalPlanner:
         ctx: AIContext,
         plan: StrategicPlan,
         mission: Mission,
-    ) -> Optional[TacticalAction]:
+    ) -> Tuple[Optional[TacticalAction], Dict[str, Any]]:
         group = mission.group
-        move_range = ctx.movement_service.get_reachable_hexes(group.units)
+        t0 = perf_counter()
+        move_range, cache_hit = self._get_reachable_hexes_cached(ctx, group)
+        t1 = perf_counter()
         candidates = list(move_range.reachable_coords)
         if not candidates:
-            return None
+            return None, {
+                "reach_ms": (t1 - t0) * 1000.0,
+                "score_ms": 0.0,
+                "candidates": 0,
+                "cache_hit": cache_hit,
+            }
         current = group.hex.axial_to_offset()
         if current not in candidates:
             candidates.append(current)
@@ -2628,6 +2718,7 @@ class TacticalPlanner:
                 f"assigned_preserved={assigned_preserved}"
             )
 
+        score_start = perf_counter()
         best_action = None
         for col, row in candidates:
             target_hex = Hex.offset_to_axial(col, row)
@@ -2652,7 +2743,13 @@ class TacticalPlanner:
                 f"[TRANSPORT_MOVE_RESULT] fleet={fleet_id} chosen={chosen} assigned={assigned} "
                 f"dist_before={dist_before} dist_after={dist_after} on_slot={on_slot}"
             )
-        return best_action
+        score_end = perf_counter()
+        return best_action, {
+            "reach_ms": (t1 - t0) * 1000.0,
+            "score_ms": (score_end - score_start) * 1000.0,
+            "candidates": len(candidates),
+            "cache_hit": cache_hit,
+        }
 
     @staticmethod
     def _fleet_has_embarked_ground(fleet) -> bool:
@@ -2793,10 +2890,7 @@ class TacticalPlanner:
                 score -= (next_dist - current_dist) * 6
             if current_hex.distance_to(target_hex) <= 1:
                 score += 8
-            for neighbor in target_hex.neighbors():
-                nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                if any(getattr(u, "allegiance", None) == ctx.enemy and u.is_combat_unit() for u in nstack):
-                    score += 6
+            score += 6 * ctx.enemy_adjacent_combat_count.get((target_hex.q, target_hex.r), 0)
 
         if mission.mission_type == "prepare_assault" and mission.target_hex is not None:
             front_dist = target_hex.distance_to(mission.target_hex)
@@ -2808,14 +2902,8 @@ class TacticalPlanner:
                 score -= 20
 
             # Avoid isolated forward staging on contested fronts.
-            adj_friendly = 0
-            adj_enemy = 0
-            for neighbor in target_hex.neighbors():
-                nstack = ctx.game_state.map.get_units_in_hex(neighbor.q, neighbor.r)
-                if any(u.allegiance == ctx.side and u.is_combat_unit() for u in nstack):
-                    adj_friendly += 1
-                if any(u.allegiance == ctx.enemy and u.is_combat_unit() for u in nstack):
-                    adj_enemy += 1
+            adj_friendly = ctx.friendly_adjacent_combat_count.get((target_hex.q, target_hex.r), 0)
+            adj_enemy = ctx.enemy_adjacent_combat_count.get((target_hex.q, target_hex.r), 0)
             if front_dist <= 1 and adj_friendly < adj_enemy:
                 score -= 18
 
@@ -3764,8 +3852,8 @@ class BaselineAIPlayer:
         while True:
             reserve_units = [
                 u for u in self.game_state.units
-                if getattr(u, "allegiance", None) == side
-                and getattr(u, "status", None) == UnitState.RESERVE
+                if u.allegiance == side
+                and u.status == UnitState.RESERVE
             ]
             if len(reserve_units) < 2:
                 break
@@ -3797,9 +3885,9 @@ class BaselineAIPlayer:
     @staticmethod
     def _conscription_sort_key(unit):
         return (
-            int(getattr(unit, "combat_rating", 0) or 0),
-            int(getattr(unit, "movement", 0) or 0),
-            str(getattr(unit, "id", "")),
+            int(unit.combat_rating),
+            int(unit.movement),
+            str(unit.id),
             -int(getattr(unit, "ordinal", 1)),
         )
 
@@ -4015,8 +4103,10 @@ class BaselineAIPlayer:
 
     # ---------- Movement ----------
     def execute_best_movement(self, side: str, attempt_invasion=None) -> bool:
+        t0 = perf_counter()
         moved_groups = self._ensure_movement_phase_memory()
         ctx = self._build_context(side, moved_task_groups=moved_groups)
+        t1 = perf_counter()
         phase_key = (
             int(getattr(self.game_state, "turn", 0) or 0),
             getattr(self.game_state, "active_player", None),
@@ -4068,8 +4158,11 @@ class BaselineAIPlayer:
                 "transport_actions_count": transport_actions_count,
             }
             debug_print(f"[TRANSPORT] phase_plan_recomputed reason={recompute_reason}")
+        t2 = perf_counter()
         groups = self._operational.build_task_groups(ctx)
+        t3 = perf_counter()
         missions = self._operational.build_missions(ctx, plan, groups)
+        t4 = perf_counter()
         
         # Debug print for transport: show objective vs beachhead separation
         if plan.transport_campaign:
@@ -4082,12 +4175,36 @@ class BaselineAIPlayer:
         
         # Neutral invasion override
         if self._try_neutral_invasion(ctx, plan, attempt_invasion):
+            t5 = perf_counter()
+            self._log(
+                "movement_timing "
+                f"context={((t1 - t0) * 1000):.1f}ms "
+                f"plan={((t2 - t1) * 1000):.1f}ms "
+                f"groups={((t3 - t2) * 1000):.1f}ms "
+                f"missions={((t4 - t3) * 1000):.1f}ms "
+                f"tactical={((t5 - t4) * 1000):.1f}ms "
+                f"total={((t5 - t0) * 1000):.1f}ms "
+                f"groups_n={len(groups)} missions_n={len(missions)} cache_reused={reuse_cached}"
+            )
             return True
         
         # Keep neutral invasion centralized in _try_neutral_invasion to avoid invalid popup churn.
         moved = self._tactical.execute_best_movement(ctx, plan, missions, attempt_invasion=None)
+        t5 = perf_counter()
         if moved:
             self._log(f"movement: executed ({plan.posture})")
+            for line in ctx.movement_logs:
+                self._log(line)
+        self._log(
+            "movement_timing "
+            f"context={((t1 - t0) * 1000):.1f}ms "
+            f"plan={((t2 - t1) * 1000):.1f}ms "
+            f"groups={((t3 - t2) * 1000):.1f}ms "
+            f"missions={((t4 - t3) * 1000):.1f}ms "
+            f"tactical={((t5 - t4) * 1000):.1f}ms "
+            f"total={((t5 - t0) * 1000):.1f}ms "
+            f"groups_n={len(groups)} missions_n={len(missions)} cache_reused={reuse_cached}"
+        )
         return moved
 
     # ---------- Combat ----------
@@ -4145,6 +4262,10 @@ class BaselineAIPlayer:
         for u in friendly_units:
             self._clear_landed_flag_if_inland(side, u)
             self._clear_ashore_committed_flag_if_explicitly_retasked(side, u)
+        enemy_adjacent_combat_count, friendly_adjacent_combat_count = self._build_adjacent_combat_maps(
+            friendly_units=friendly_units,
+            enemy_units=enemy_units,
+        )
         
         return AIContext(
             game_state=self.game_state,
@@ -4167,7 +4288,33 @@ class BaselineAIPlayer:
             country_hexes_by_id=country_hexes_by_id,
             country_port_counts=country_port_counts,
             neutral_front_cache=neutral_front_cache,
+            enemy_adjacent_combat_count=enemy_adjacent_combat_count,
+            friendly_adjacent_combat_count=friendly_adjacent_combat_count,
         )
+
+    @staticmethod
+    def _build_adjacent_combat_maps(friendly_units: List[object], enemy_units: List[object]) -> Tuple[Dict[Tuple[int, int], int], Dict[Tuple[int, int], int]]:
+        def combat_hexes(units: List[object]) -> Set[Tuple[int, int]]:
+            out: Set[Tuple[int, int]] = set()
+            for unit in units:
+                if not unit.is_combat_unit():
+                    continue
+                if not unit.position or unit.position[0] is None or unit.position[1] is None:
+                    continue
+                h = Hex.offset_to_axial(*unit.position)
+                out.add((h.q, h.r))
+            return out
+
+        def adjacent_counts(source_hexes: Set[Tuple[int, int]]) -> Dict[Tuple[int, int], int]:
+            counts: Dict[Tuple[int, int], int] = defaultdict(int)
+            for q, r in source_hexes:
+                for neighbor in Hex(q, r).neighbors():
+                    counts[(neighbor.q, neighbor.r)] += 1
+            return dict(counts)
+
+        enemy_hexes = combat_hexes(enemy_units)
+        friendly_hexes = combat_hexes(friendly_units)
+        return adjacent_counts(enemy_hexes), adjacent_counts(friendly_hexes)
 
     def _current_scenario_id(self) -> str:
         return str(getattr(getattr(self.game_state, "scenario_spec", None), "id", "") or "")

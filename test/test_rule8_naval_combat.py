@@ -82,13 +82,13 @@ class DummyUnit:
         return self.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
 
     def is_fleet(self):
-        return self.unit_type == UnitType.FLEET
+        return self.is_fleet()
 
     def is_wing(self):
-        return self.unit_type == UnitType.WING
+        return self.is_wing()
 
     def is_citadel(self):
-        return self.unit_type == UnitType.CITADEL
+        return self.is_citadel()
 
     def deplete(self):
         if self.status == UnitState.ACTIVE:

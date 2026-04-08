@@ -122,7 +122,7 @@ class Unit:
             elif "combat" in bonus:
                 total = self._apply_numeric_bonus(total, bonus.get("combat"))
         if self.status == UnitState.DEPLETED:
-            if self.unit_type == UnitType.FLEET:
+            if self.is_fleet():
                 return max(0, total - 1)
             return max(0, total // 2)
         return int(total)
@@ -178,7 +178,7 @@ class Unit:
         # 3. Transport logic
         # Passenger movement reduction applies only to Wings.
         has_passengers = getattr(self, 'passengers', False)
-        if has_passengers and self.unit_type == UnitType.WING:
+        if has_passengers and self.is_wing():
             return int(base // 2)
 
         return int(base)

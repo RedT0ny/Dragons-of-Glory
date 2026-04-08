@@ -44,22 +44,22 @@ class DummyUnit:
         return self.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
 
     def is_wing(self):
-        return self.unit_type == UnitType.WING
+        return self.is_wing()
 
     def is_fleet(self):
-        return self.unit_type == UnitType.FLEET
+        return self.is_fleet()
 
     def is_flier(self):
         return self.unit_type in (UnitType.WING, UnitType.FLEET)
 
     def is_dragon(self):
-        return self.race == UnitRace.DRAGON and self.unit_type == UnitType.WING
+        return self.race == UnitRace.DRAGON and self.is_wing()
 
     def is_draconid(self):
         return self.race == UnitRace.DRACONIAN
 
     def is_citadel(self):
-        return self.unit_type == UnitType.CITADEL
+        return self.is_citadel()
 
     def is_leader(self):
         return self.unit_type in {

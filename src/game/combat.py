@@ -1904,7 +1904,7 @@ class CombatClickHandler:
             if mode == "naval":
                 friendly_units = [u for u in friendly_units if u.is_fleet()]
             elif mode == "land":
-                friendly_units = [u for u in friendly_units if u.unit_type != UnitType.FLEET]
+                friendly_units = [u for u in friendly_units if not u.is_fleet()]
             if not friendly_units:
                 return
 

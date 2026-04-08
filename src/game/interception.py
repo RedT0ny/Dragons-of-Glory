@@ -106,13 +106,13 @@ class InterceptionService:
             return
 
         for interceptor in interceptors:
-            if getattr(interceptor, "is_on_map", False):
+            if interceptor.is_on_map:
                 self.movement_service._teleport_unit_no_cost(interceptor, adjacent_hex)
 
         previous_active_player = self.game_state.active_player
         self.game_state.active_player = interceptors[0].allegiance
         try:
-            live_interceptors = [u for u in interceptors if getattr(u, "is_on_map", False)]
+            live_interceptors = [u for u in interceptors if u.is_on_map]
             if live_interceptors:
                 air_defenders = [u for u in moving_units if u.is_on_map and (u.is_wing() or u.is_fleet())]
                 if not air_defenders:
@@ -148,7 +148,7 @@ class InterceptionService:
             self.game_state.active_player = previous_active_player
 
         for interceptor in interceptors:
-            if not getattr(interceptor, "is_on_map", False):
+            if not interceptor.is_on_map:
                 continue
             self.movement_service._teleport_unit_no_cost(interceptor, origin_hex)
             state = original_states.get(interceptor, {})

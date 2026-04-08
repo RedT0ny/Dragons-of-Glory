@@ -167,7 +167,7 @@ class InfluenceMap(OverlayBase):
 
             start_hex = Hex.offset_to_axial(*unit.position)
 
-            if unit.unit_type == UnitType.FLEET:
+            if unit.is_fleet():
                 for (q, r), units in board.unit_map.items():
                     target_hex = Hex(q, r)
                     if game_state.combat_service.can_fleet_attack_hex(unit, target_hex):
