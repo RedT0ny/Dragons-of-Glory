@@ -2638,6 +2638,20 @@ class TacticalPlanner:
         target_hex = best.target_hex
         if target_hex is None:
             return False
+        if target_hex.q == best.group.hex.q and target_hex.r == best.group.hex.r:
+            ctx.movement_logs.append(
+                "movement_tactical_exec "
+                f"transport_action={transport_ms:.1f}ms "
+                "move_units=0.0ms "
+                f"units_in_group={len(best.group.units)} moved_units={len(best.group.units)} errors=0 no_op=True"
+            )
+            for unit in best.group.units:
+                pos = tuple(unit.position) if unit.position else (None, None)
+                unit_name = TextFormatter.format_unit_log_string(unit)
+                ctx.movement_logs.append(f"movement unit={unit_name} from={pos} to={pos}")
+            if ctx.moved_task_groups is not None:
+                ctx.moved_task_groups.add(_task_group_key(best.group))
+            return True
 
         decision = ctx.movement_service.evaluate_neutral_entry(target_hex)
         if decision.is_neutral_entry:

@@ -13,6 +13,9 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+SRC_DIR = ROOT_DIR / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 from src.content.config import LOGS_DIR, SCENARIOS_DIR
 from src.content.constants import HL, WS
@@ -67,9 +70,31 @@ class MatchResult:
     victory_points: dict[str, int]
     movement_actions: int
     combat_actions: int
-    invasions_attempted: int
-    invasions_succeeded: int
     activations_succeeded: int
+    movement_timing_total_ms_avg: float | None = None
+    movement_tactical_eval_ms_avg: float | None = None
+    movement_tactical_move_units_ms_avg: float | None = None
+    movement_tactical_no_op_count: int = 0
+    movement_tactical_samples: int = 0
+
+
+def _parse_kv_metrics(msg: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for token in msg.split():
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        out[key.strip()] = value.strip().rstrip(",")
+    return out
+
+
+def _to_float_ms(value: str | None) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value.removesuffix("ms"))
+    except Exception:
+        return None
 
 
 def _run_one_game(
@@ -96,28 +121,39 @@ def _run_one_game(
 
     movement_actions = 0
     combat_actions = 0
-    invasions_attempted = 0
-    invasions_succeeded = 0
     activations_succeeded = 0
     movement_undo_context: tuple[int, str, GamePhase] | None = None
+    movement_timing_total_ms: list[float] = []
+    movement_tactical_eval_ms: list[float] = []
+    movement_tactical_move_units_ms: list[float] = []
+    movement_tactical_no_op_count = 0
+    movement_tactical_samples = 0
 
-    def attempt_invasion(country_id: str):
-        nonlocal invasions_attempted, invasions_succeeded
-        invasions_attempted += 1
-        invasion_data = movement_service.get_invasion_force(country_id)
-        outcome = diplomacy_service.resolve_invasion(country_id, invasion_data)
-        if outcome.success and outcome.winner:
-            invasions_succeeded += 1
-            # New checkpoint like controller behavior.
-            game_state.clear_movement_undo()
-            ai.deploy_all_ready_units(
-                outcome.winner,
-                allow_territory_wide=True,
-                country_filter=country_id,
-                invasion_deployment_active=True,
-                invasion_deployment_allegiance=outcome.winner,
-                invasion_deployment_country_id=country_id,
-            )
+    original_log = ai._log
+
+    def _instrumented_log(msg: str):
+        nonlocal movement_tactical_no_op_count, movement_tactical_samples
+        if msg.startswith("movement_timing "):
+            metrics = _parse_kv_metrics(msg)
+            total_ms = _to_float_ms(metrics.get("total"))
+            if total_ms is not None:
+                movement_timing_total_ms.append(total_ms)
+        elif msg.startswith("movement_tactical "):
+            metrics = _parse_kv_metrics(msg)
+            eval_ms = _to_float_ms(metrics.get("eval_total"))
+            if eval_ms is not None:
+                movement_tactical_eval_ms.append(eval_ms)
+        elif msg.startswith("movement_tactical_exec "):
+            movement_tactical_samples += 1
+            metrics = _parse_kv_metrics(msg)
+            move_units_ms = _to_float_ms(metrics.get("move_units"))
+            if move_units_ms is not None:
+                movement_tactical_move_units_ms.append(move_units_ms)
+            if metrics.get("no_op", "").lower() == "true":
+                movement_tactical_no_op_count += 1
+        original_log(msg)
+
+    ai._log = _instrumented_log
 
     stdout_ctx = redirect_stdout(io.StringIO()) if quiet else nullcontext()
     ticks = 0
@@ -138,7 +174,7 @@ def _run_one_game(
                 continue
 
             if current_phase == GamePhase.STRATEGIC_EVENTS:
-                event = game_state.draw_strategic_event(active_player)
+                event = game_state.event_system.draw_strategic_event(active_player)
                 if event:
                     event.force_activate(game_state)
                 ai.assign_assets(active_player)
@@ -169,10 +205,11 @@ def _run_one_game(
             if current_phase == GamePhase.MOVEMENT:
                 context = (game_state.turn, active_player, current_phase)
                 if movement_undo_context != context:
-                    game_state.clear_movement_undo()
+                    if hasattr(movement_service, "clear_movement_undo"):
+                        movement_service.clear_movement_undo()
                     movement_undo_context = context
                 ai.assign_assets(active_player)
-                moved = ai.execute_best_movement(active_player, attempt_invasion=attempt_invasion)
+                moved = ai.execute_best_movement(active_player)
                 if moved:
                     movement_actions += 1
                 else:
@@ -204,9 +241,21 @@ def _run_one_game(
         victory_points=dict(getattr(game_state, "victory_points", {}) or {}),
         movement_actions=movement_actions,
         combat_actions=combat_actions,
-        invasions_attempted=invasions_attempted,
-        invasions_succeeded=invasions_succeeded,
         activations_succeeded=activations_succeeded,
+        movement_timing_total_ms_avg=(
+            sum(movement_timing_total_ms) / len(movement_timing_total_ms)
+            if movement_timing_total_ms else None
+        ),
+        movement_tactical_eval_ms_avg=(
+            sum(movement_tactical_eval_ms) / len(movement_tactical_eval_ms)
+            if movement_tactical_eval_ms else None
+        ),
+        movement_tactical_move_units_ms_avg=(
+            sum(movement_tactical_move_units_ms) / len(movement_tactical_move_units_ms)
+            if movement_tactical_move_units_ms else None
+        ),
+        movement_tactical_no_op_count=movement_tactical_no_op_count,
+        movement_tactical_samples=movement_tactical_samples,
     )
 
 
@@ -217,6 +266,9 @@ def _build_summary(
     supply: str,
     results: list[MatchResult],
 ) -> dict[str, Any]:
+    def _avg(values: list[float]) -> float | None:
+        return (sum(values) / len(values)) if values else None
+
     total = len(results)
     completed = [r for r in results if r.completed]
     timeouts = total - len(completed)
@@ -229,6 +281,11 @@ def _build_summary(
 
     avg_turns = (sum(r.turns for r in completed) / len(completed)) if completed else None
     avg_ticks = (sum(r.ticks for r in results) / len(results)) if results else 0.0
+    movement_total_avgs = [r.movement_timing_total_ms_avg for r in results if r.movement_timing_total_ms_avg is not None]
+    movement_eval_avgs = [r.movement_tactical_eval_ms_avg for r in results if r.movement_tactical_eval_ms_avg is not None]
+    movement_exec_avgs = [r.movement_tactical_move_units_ms_avg for r in results if r.movement_tactical_move_units_ms_avg is not None]
+    no_op_total = sum(r.movement_tactical_no_op_count for r in results)
+    no_op_samples = sum(r.movement_tactical_samples for r in results)
 
     return {
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -249,9 +306,11 @@ def _build_summary(
         "average_ticks_all_games": avg_ticks,
         "average_movement_actions": (sum(r.movement_actions for r in results) / total) if total else 0.0,
         "average_combat_actions": (sum(r.combat_actions for r in results) / total) if total else 0.0,
-        "average_invasions_attempted": (sum(r.invasions_attempted for r in results) / total) if total else 0.0,
-        "average_invasions_succeeded": (sum(r.invasions_succeeded for r in results) / total) if total else 0.0,
         "average_activations_succeeded": (sum(r.activations_succeeded for r in results) / total) if total else 0.0,
+        "average_movement_timing_total_ms": _avg(movement_total_avgs),
+        "average_movement_tactical_eval_ms": _avg(movement_eval_avgs),
+        "average_movement_tactical_move_units_ms": _avg(movement_exec_avgs),
+        "movement_tactical_no_op_rate": (no_op_total / no_op_samples) if no_op_samples else 0.0,
         "results": [asdict(r) for r in results],
     }
 
