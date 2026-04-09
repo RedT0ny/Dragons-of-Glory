@@ -172,7 +172,7 @@ class GameController(QObject):
             expected_allegiance = self._invasion_deployment_allegiance
         if unit.allegiance != expected_allegiance:
             return False
-        if unit.status != UnitState.ACTIVE or not getattr(unit, "is_on_map", False):
+        if unit.status != UnitState.ACTIVE or not unit.is_on_map:
             return False
         return True
 
@@ -932,7 +932,7 @@ class GameController(QObject):
 
     def on_ready_unit_clicked(self, unit, allow_territory_deploy):
         # Ignore stale clicks from a dialog row that no longer represents a deployable unit.
-        if unit.status != UnitState.READY or getattr(unit, "is_on_map", False):
+        if unit.status != UnitState.READY or unit.is_on_map:
             self.view.clear_highlights()
             return
         valid_hexes = self.deployment_service.get_valid_deployment_hexes(

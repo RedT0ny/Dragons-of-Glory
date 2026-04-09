@@ -829,8 +829,8 @@ class DragonDuelResolver:
             "rounds": rounds,
             "attacker_withdrew": attacker_withdrew,
             "defender_withdrew": defender_withdrew,
-            "attacker_survivors": len([u for u in self.attackers if getattr(u, "is_on_map", False)]),
-            "defender_survivors": len([u for u in self.defenders if getattr(u, "is_on_map", False)]),
+            "attacker_survivors": len([u for u in self.attackers if u.is_on_map]),
+            "defender_survivors": len([u for u in self.defenders if u.is_on_map]),
         }
 
     def _roll_hits(self, dragon):
@@ -1272,8 +1272,8 @@ class CombatService:
                 return
 
     def can_units_attack_stack(self, attackers, defenders, target_hex=None):
-        attackers = [u for u in attackers if getattr(u, "is_on_map", False)]
-        defenders = [u for u in defenders if getattr(u, "is_on_map", False)]
+        attackers = [u for u in attackers if u.is_on_map]
+        defenders = [u for u in defenders if u.is_on_map]
         if not attackers or not defenders:
             return False
 
@@ -1809,7 +1809,7 @@ class CombatService:
         )
 
     def _defenders_have_citadel(self, defenders):
-        return any(u.is_citadel() and getattr(u, "is_on_map", False) for u in defenders)
+        return any(u.is_citadel() and u.is_on_map for u in defenders)
 
     def _is_ws_ground_combat_unit(self, unit):
         return bool(unit.allegiance == WS and unit.is_on_map and unit.is_army())

@@ -350,7 +350,7 @@ class Board:
         return (
             other.allegiance != unit.allegiance
             and other.allegiance != NEUTRAL
-            and getattr(other, "is_on_map", True)
+            and other.is_on_map
         )
 
     def _hex_has_enemy_unit_for_fleet(self, hex_obj, unit):

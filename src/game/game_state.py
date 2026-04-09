@@ -1033,8 +1033,8 @@ class GameState:
         return min(
             stack_armies,
             key=lambda u: (
-                0 if getattr(u, "is_on_map", False) else 1,
-                int(getattr(u, "combat_rating", 0) or 0),
+                0 if u.is_on_map else 1,
+                int(u.combat_rating),
                 str(getattr(u, "id", "")),
                 int(getattr(u, "ordinal", 1) or 1),
             ),

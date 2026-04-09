@@ -1806,7 +1806,7 @@ class OperationalPlanner:
                 for neighbor in h.neighbors():
                     ncol, nrow = neighbor.axial_to_offset()
                     nstack = board.get_units_in_hex(ncol, nrow)
-                    if any(getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False) for u in nstack):
+                    if any(u.allegiance == ctx.enemy and u.is_on_map for u in nstack):
                         adj_enemy += 1
                 if adj_enemy >= 2:
                     score -= 20.0
@@ -1828,9 +1828,9 @@ class OperationalPlanner:
                 
                 # Count existing friendly ground armies on hex
                 stack = board.get_units_in_hex(col, row)
-                friendly_ground = sum(1 for u in stack if getattr(u, "allegiance", None) == ctx.side
-                                      and getattr(u, "is_on_map", False)
-                                      and getattr(u, "is_army", lambda: False)())
+                friendly_ground = sum(1 for u in stack if u.allegiance == ctx.side
+                                      and u.is_on_map
+                                      and u.is_army())
                 if friendly_ground >= 2:
                     score -= 40.0  # Soft cap reached
                 elif friendly_ground == 1:
@@ -1870,7 +1870,7 @@ class OperationalPlanner:
 
         defenders = [
             u for u in ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
-            if getattr(u, "allegiance", None) == ctx.enemy and getattr(u, "is_on_map", False)
+            if u.allegiance == ctx.enemy and u.is_on_map
         ]
         defender_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
@@ -2009,9 +2009,9 @@ class TacticalPlanner:
         # Density check: if armies provided, check unload cap
         if armies:
             stack = board.get_units_in_hex(col, row)
-            existing_ground = sum(1 for u in stack if getattr(u, "allegiance", None) == ctx.side
-                                  and getattr(u, "is_on_map", False)
-                                  and getattr(u, "is_army", lambda: False)())
+            existing_ground = sum(1 for u in stack if u.allegiance == ctx.side
+                                  and u.is_on_map
+                                  and u.is_army())
             if existing_ground + len(armies) > 2:
                 return False
         
@@ -2030,9 +2030,9 @@ class TacticalPlanner:
         deployed = 0
         ready_units = [
             u for u in ctx.game_state.units
-            if getattr(u, "allegiance", None) == ctx.side
-            and getattr(u, "status", None) == UnitState.READY
-            and not getattr(u, "is_on_map", False)
+            if u.allegiance == ctx.side
+            and u.status == UnitState.READY
+            and not u.is_on_map
         ]
         if country_filter:
             ready_units = [u for u in ready_units if getattr(u, "land", None) == country_filter]
@@ -2446,8 +2446,8 @@ class TacticalPlanner:
             stack = ctx.game_state.map.get_units_in_hex(deploy_hex.q, deploy_hex.r)
             defenders = [
                 u for u in stack
-                if getattr(u, "allegiance", None) == ctx.side
-                   and getattr(u, "is_on_map", False)
+                if u.allegiance == ctx.side
+                   and u.is_on_map
                    and u.is_combat_unit()
             ]
             garrison_power = sum(float(u.combat_rating) for u in defenders)
@@ -3982,7 +3982,7 @@ class BaselineAIPlayer:
         if not assets:
             return 0
 
-        units = [u for u in ctx.friendly_units if getattr(u, "is_on_map", False)]
+        units = [u for u in ctx.friendly_units if u.is_on_map]
         if not units:
             return 0
 
@@ -4270,8 +4270,8 @@ class BaselineAIPlayer:
         country_port_counts = self._get_country_port_counts()
         neutral_front_cache = self._get_neutral_front_cache(side)
         objectives = self._collect_objectives(side, objective_graph=objective_graph)
-        friendly_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == side and getattr(u, "is_on_map", False)]
-        enemy_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == enemy and getattr(u, "is_on_map", False)]
+        friendly_units = [u for u in self.game_state.units if u.allegiance == side and u.is_on_map]
+        enemy_units = [u for u in self.game_state.units if u.allegiance == enemy and u.is_on_map]
         self._prune_ashore_committed_state(side)
         for u in friendly_units:
             self._clear_landed_flag_if_inland(side, u)

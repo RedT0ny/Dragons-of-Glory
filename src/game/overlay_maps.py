@@ -280,10 +280,10 @@ class ThreatMap(OverlayBase):
 
     def _reference_defender_strength(self, game_state, side):
         ratings = [
-            float(getattr(u, "combat_rating", 0) or 0)
+            float(u.combat_rating)
             for u in game_state.units
-            if getattr(u, "is_on_map", False)
-            and getattr(u, "allegiance", None) == side
+            if u.is_on_map
+            and u.allegiance == side
             and u.is_control_unit()
         ]
         if not ratings:

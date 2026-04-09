@@ -27,7 +27,7 @@ def compute_control_facts(game_state) -> ControlFacts:
     def _stack_control_allegiance(units):
         allies = set()
         for u in units:
-            if not getattr(u, "is_on_map", False):
+            if not u.is_on_map:
                 continue
             if not u.is_control_unit():
                 continue
@@ -41,7 +41,7 @@ def compute_control_facts(game_state) -> ControlFacts:
 
     def _stack_can_project(stack_units, from_hex, to_hex):
         for u in stack_units:
-            if not getattr(u, "is_on_map", False):
+            if not u.is_on_map:
                 continue
             if not u.is_control_unit():
                 continue

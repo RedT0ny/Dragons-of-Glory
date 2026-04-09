@@ -207,7 +207,7 @@ class InterceptionService:
             - Interceptors must not have already attempted interception this turn.
             - Interceptors must meet special commander requirements (e.g. Dragon Wings).
         """
-        moving_types = {getattr(u, "unit_type", None) for u in moving_units if getattr(u, "is_on_map", False)}
+        moving_types = {u.unit_type for u in moving_units if u.is_on_map}
         if interceptor.is_fleet():
             return UnitType.FLEET in moving_types
         if interceptor.is_wing():

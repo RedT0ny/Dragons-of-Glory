@@ -794,12 +794,12 @@ class MovementService:
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
                     return MoveUnitsResult(moved=[], errors=[f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
 
-            movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
+            movers_alive = [u for u in units if u.is_on_map]
             if not movers_alive:
                 return MoveUnitsResult(moved=[], errors=[])
 
             intercepted = self.interception_service.maybe_apply_interception(movers_alive, step_hex)
-            movers_alive = [u for u in units if getattr(u, "is_on_map", False)]
+            movers_alive = [u for u in units if u.is_on_map]
             if not movers_alive:
                 return MoveUnitsResult(moved=[], errors=[])
 
@@ -807,7 +807,7 @@ class MovementService:
                 print(f"Interception resolved at {step_hex.axial_to_offset()}.")
 
         self.game_state.finalize_board_state_change()
-        return MoveUnitsResult(moved=[u for u in units if getattr(u, "is_on_map", False)], errors=[])
+        return MoveUnitsResult(moved=[u for u in units if u.is_on_map], errors=[])
 
     def _build_movement_hex_path(self, units, target_hex, precomputed_state_path=None):
         """
