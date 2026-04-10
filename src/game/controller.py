@@ -4,6 +4,7 @@ from time import monotonic
 import shiboken6
 
 from content.tools import TextFormatter
+from content.translator import Translator
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyService
@@ -58,6 +59,7 @@ class GameController(QObject):
         self._map_view_signals_connected = False  # Track if map view signals are connected
         self.diplomacy_service = DiplomacyService(self.game_state)
         self.ai_baseline = BaselineAIPlayer(self.game_state, self.movement_service, self.diplomacy_service)
+        self.translator = Translator()
         self.turn_engine = TurnEngine(
             self.game_state,
             self.ai_baseline,
@@ -697,11 +699,11 @@ class GameController(QObject):
             allegiance: Allegiance to assign (highlord/whitestone)
         """
         if self.diplomacy_service.activate_country(country_id, allegiance):
-            print(f"Country {country_id} activated for {allegiance} via controller")
+            print(f"Country {self.translator.get_country_name(country_id)} activated for {allegiance} via controller")
             self._refresh_info_panel()
             self._refresh_minimap_allegiance()
         else:
-            print(f"Country {country_id} not found for activation.")
+            print(f"Country {self.translator.get_country_name(country_id)} not found for activation.")
 
     def handle_unit_deployment(self, unit, target_hex):
         """

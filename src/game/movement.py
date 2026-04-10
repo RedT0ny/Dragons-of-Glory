@@ -26,7 +26,7 @@ def effective_movement_points(unit):
     return min(current, unit.movement)
 
 
-def evaluate_unit_move(game_state, unit, target_hex):
+def evaluate_unit_move(game_state, unit, target_hex, enforce_end_terrain: bool = True):
     """
     Shared movement validation/cost calculation used by UI and move execution.
     Returns: (ok, reason, cost, start_hex, fleet_state_path)
@@ -35,8 +35,13 @@ def evaluate_unit_move(game_state, unit, target_hex):
     if getattr(unit, "transport_host", None) is not None:
         return False, f"{unit_id} is transported and cannot move independently.", 0, None, []
 
-    if not unit.is_fleet() and not game_state.map.can_unit_land_on_hex(unit, target_hex):
-        return False, f"{unit_id} cannot end movement on that terrain.", 0, None, []
+    if enforce_end_terrain and not unit.is_fleet() and not game_state.map.can_unit_land_on_hex(unit, target_hex):
+        tcol, trow = target_hex.axial_to_offset()
+        terrain = game_state.map.get_terrain(target_hex)
+        return False, (
+            f"{unit_id} cannot end movement on that terrain "
+            f"(target={tcol},{trow} terrain={getattr(terrain, 'value', terrain)})."
+        ), 0, None, []
 
     if not unit.position or None in unit.position:
         return True, None, 0, None, []
@@ -751,9 +756,11 @@ class MovementService:
                 invalidate_overlays=False,
             )
             if verify_target and getattr(unit, "position", None) != target_offset:
+                ok, reason, _, _, _ = evaluate_unit_move(self.game_state, unit, target_hex)
+                message = reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
                 return MoveUnitsResult(
                     moved=moved,
-                    errors=[f"{TextFormatter.format_unit_log_string(unit)} cannot move."],
+                    errors=[message],
                 )
             moved.append(unit)
         if moved:
@@ -780,7 +787,8 @@ class MovementService:
         if not path:
             return MoveUnitsResult(moved=list(units), errors=[])
 
-        for step_hex in path:
+        for idx, step_hex in enumerate(path):
+            is_final_step = idx == (len(path) - 1)
             for unit in list(units):
                 if not getattr(unit, "is_on_map", False):
                     continue
@@ -790,9 +798,17 @@ class MovementService:
                     invalidate_analysis=False,
                     update_territory=False,
                     invalidate_overlays=False,
+                    enforce_end_terrain=is_final_step,
                 )
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
-                    return MoveUnitsResult(moved=[], errors=[f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
+                    ok, reason, _, _, _ = evaluate_unit_move(
+                        self.game_state,
+                        unit,
+                        step_hex,
+                        enforce_end_terrain=is_final_step,
+                    )
+                    message = reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
+                    return MoveUnitsResult(moved=[], errors=[message])
 
             movers_alive = [u for u in units if u.is_on_map]
             if not movers_alive:

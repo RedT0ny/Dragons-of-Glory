@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 
 from content.tools import TextFormatter
+from content.translator import Translator
 from src.game.combat import CombatService
 from src.game.diplomacy import ConquestService
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
@@ -60,6 +61,7 @@ class GameState:
         self.combat_service = CombatService(self)
         self.conquest_service = ConquestService(self)
         self.calendar = CalendarService()
+        self.translator = Translator()
 
         # Battle Turn State
         self.phase = GamePhase.REPLACEMENTS
@@ -248,7 +250,7 @@ class GameState:
                 "unit_runtime": {
                     f"{u.id}|{u.ordinal}": {
                         "movement_points": u.movement_points,
-                        "river_hexside": u.river_hexside,
+                        "river_hexside": getattr(u, "river_hexside", None),
                         "replacement_ready_turn": getattr(u, "replacement_ready_turn", None),
                     }
                     for u in self.units
@@ -1238,6 +1240,7 @@ class GameState:
         invalidate_analysis: bool = True,
         update_territory: bool = True,
         invalidate_overlays: bool = True,
+        enforce_end_terrain: bool = True,
     ):
         """
         Centralizes the move: updates unit.position AND the spatial map.
@@ -1254,7 +1257,12 @@ class GameState:
         # We check if unit is already on map to avoid cost calculation for deployment/teleport
         fleet_final_hexside = getattr(unit, "river_hexside", None)
         if self.phase == GamePhase.MOVEMENT and unit.position:
-            ok, _, cost, _, state_path = evaluate_unit_move(self, unit, target_hex)
+            ok, _, cost, _, state_path = evaluate_unit_move(
+                self,
+                unit,
+                target_hex,
+                enforce_end_terrain=enforce_end_terrain,
+            )
             if not ok:
                 return
 
@@ -1367,7 +1375,7 @@ class GameState:
 
         self._apply_solamnic_tower_activation(country_id, previous_allegiance)
 
-        print(f"Country {country_id} activated for {allegiance}")
+        print(f"Country {self.translator.get_country_name(country_id)} activated for {allegiance}")
         self.update_territory_overrides()
         self.invalidate_overlays({"control", "territory", "supply"})
 
