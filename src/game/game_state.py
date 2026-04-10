@@ -247,8 +247,8 @@ class GameState:
                 "units": [u.to_dict() for u in self.units],
                 "unit_runtime": {
                     f"{u.id}|{u.ordinal}": {
-                        "movement_points": getattr(u, "movement_points", None),
-                        "river_hexside": getattr(u, "river_hexside", None),
+                        "movement_points": u.movement_points,
+                        "river_hexside": u.river_hexside,
                         "replacement_ready_turn": getattr(u, "replacement_ready_turn", None),
                     }
                     for u in self.units
@@ -261,7 +261,7 @@ class GameState:
                                 "id": asset_id,
                                 "assigned_to": (
                                     [asset.assigned_to.id, asset.assigned_to.ordinal]
-                                    if getattr(asset, "assigned_to", None)
+                                    if asset.assigned_to
                                     else None
                                 ),
                             }

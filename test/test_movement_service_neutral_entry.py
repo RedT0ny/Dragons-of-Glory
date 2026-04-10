@@ -20,7 +20,7 @@ def test_evaluate_neutral_entry_blocks_ws():
     gs = _game_state(WS, _country("icewall", NEUTRAL))
     service = MovementService(gs)
 
-    decision = service.evaluate_neutral_entry(Hex(0, 0))
+    decision = service.invasion_handler.evaluate_neutral_entry(Hex(0, 0))
 
     assert decision.is_neutral_entry is True
     assert decision.country_id == "icewall"
@@ -32,7 +32,7 @@ def test_evaluate_neutral_entry_prompts_hl_confirmation():
     gs = _game_state(HL, _country("icewall", NEUTRAL))
     service = MovementService(gs)
 
-    decision = service.evaluate_neutral_entry(Hex(0, 0))
+    decision = service.invasion_handler.evaluate_neutral_entry(Hex(0, 0))
 
     assert decision.is_neutral_entry is True
     assert decision.country_id == "icewall"
@@ -44,6 +44,6 @@ def test_evaluate_neutral_entry_returns_non_neutral_when_country_not_neutral():
     gs = _game_state(HL, _country("solamnia", WS))
     service = MovementService(gs)
 
-    decision = service.evaluate_neutral_entry(Hex(0, 0))
+    decision = service.invasion_handler.evaluate_neutral_entry(Hex(0, 0))
 
     assert decision.is_neutral_entry is False

@@ -200,11 +200,11 @@ class GameController(QObject):
             remove_passengers=True,
         )
         unit.status = UnitState.READY
-        if hasattr(unit, "movement_points"):
+        if unit.movement_points:
             unit.movement_points = unit.movement
-        if hasattr(unit, "moved_this_turn"):
+        if unit.moved_this_turn:
             unit.moved_this_turn = False
-        if hasattr(unit, "attacked_this_turn"):
+        if unit.attacked_this_turn:
             unit.attacked_this_turn = False
 
         def _deferred_redeploy_sync():
@@ -616,7 +616,7 @@ class GameController(QObject):
             col, row = hex_obj.axial_to_offset()
             if (col, row) in self.neutral_warning_hexes:
                 from PySide6.QtWidgets import QMessageBox
-                decision = self.movement_service.evaluate_neutral_entry(hex_obj)
+                decision = self.movement_service.invasion_handler.evaluate_neutral_entry(hex_obj)
                 if not decision.is_neutral_entry:
                     pass
                 elif decision.blocked_message:
@@ -785,7 +785,7 @@ class GameController(QObject):
         if not selected:
             return
         from PySide6.QtWidgets import QMessageBox
-        decision = self.movement_service.evaluate_unboard_neutral_entry(selected)
+        decision = self.movement_service.invasion_handler.evaluate_unboard_neutral_entry(selected)
         if decision.is_neutral_entry:
             if decision.blocked_message:
                 QMessageBox.information(

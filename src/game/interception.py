@@ -107,7 +107,7 @@ class InterceptionService:
 
         for interceptor in interceptors:
             if interceptor.is_on_map:
-                self.movement_service._teleport_unit_no_cost(interceptor, adjacent_hex)
+                self.movement_service.relocate_unit_on_board(interceptor, adjacent_hex)
 
         previous_active_player = self.game_state.active_player
         self.game_state.active_player = interceptors[0].allegiance
@@ -150,7 +150,7 @@ class InterceptionService:
         for interceptor in interceptors:
             if not interceptor.is_on_map:
                 continue
-            self.movement_service._teleport_unit_no_cost(interceptor, origin_hex)
+            self.movement_service.relocate_unit_on_board(interceptor, origin_hex)
             state = original_states.get(interceptor, {})
             if state.get("movement_points") is not None:
                 interceptor.movement_points = state["movement_points"]

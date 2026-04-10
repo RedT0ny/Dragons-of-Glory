@@ -215,18 +215,18 @@ class UnitTable(QTableWidget):
         cache_key = (
             UNIT_ICON_SIZE,
             color_key,
-            str(getattr(unit, "id", "")),
-            int(getattr(unit, "ordinal", 0) or 0),
-            str(getattr(getattr(unit, "unit_type", None), "value", getattr(unit, "unit_type", ""))),
-            str(getattr(getattr(unit, "race", None), "value", getattr(unit, "race", ""))),
-            str(getattr(unit, "allegiance", "")),
-            str(getattr(getattr(unit, "status", None), "name", getattr(unit, "status", ""))),
-            int(getattr(unit, "movement", 0) or 0),
-            int(getattr(unit, "movement_points", getattr(unit, "movement", 0)) or 0),
-            bool(getattr(unit, "attacked_this_turn", False)),
-            int(getattr(unit, "combat_rating", 0) or 0),
-            int(getattr(unit, "tactical_rating", 0) or 0),
-            bool(getattr(unit, "is_transported", False)),
+            str(unit.id),
+            int(unit.ordinal),
+            str(unit.unit_type.value),
+            str(unit.race.value),
+            str(unit.allegiance),
+            str(unit.status.name),
+            int(unit.movement),
+            int(unit.movement_points),
+            bool(unit.attacked_this_turn),
+            int(unit.combat_rating),
+            int(unit.tactical_rating),
+            bool(unit.is_transported),
             (
                 str(getattr(getattr(unit, "transport_host", None), "id", "")),
                 int(getattr(getattr(unit, "transport_host", None), "ordinal", 0) or 0),
@@ -247,18 +247,18 @@ class UnitTable(QTableWidget):
         # Then paint badges directly onto the pixmap to avoid Qt scene instability
         # with transport-host object references during rapid UI refresh.
         icon_unit = SimpleNamespace(
-            id=getattr(unit, "id", ""),
-            ordinal=getattr(unit, "ordinal", 0),
-            unit_type=getattr(unit, "unit_type", None),
-            race=getattr(unit, "race", None),
-            land=getattr(unit, "land", None),
-            allegiance=getattr(unit, "allegiance", None),
-            status=getattr(unit, "status", None),
-            movement=getattr(unit, "movement", 0),
-            movement_points=getattr(unit, "movement_points", getattr(unit, "movement", 0)),
-            attacked_this_turn=getattr(unit, "attacked_this_turn", False),
-            combat_rating=getattr(unit, "combat_rating", 0),
-            tactical_rating=getattr(unit, "tactical_rating", 0),
+            id=unit.id,
+            ordinal=unit.ordinal,
+            unit_type=unit.unit_type,
+            race=unit.race,
+            land=unit.land,
+            allegiance=unit.allegiance,
+            status=unit.status,
+            movement=unit.movement,
+            movement_points=unit.movement_points,
+            attacked_this_turn=unit.attacked_this_turn,
+            combat_rating=unit.combat_rating,
+            tactical_rating=unit.tactical_rating,
             passengers=[],
             is_transported=False,
             transport_host=None,
@@ -305,10 +305,10 @@ class UnitTable(QTableWidget):
             painter.drawText(badge_rect, Qt.AlignCenter, badge_text)
 
         # Transported marker badge (host ordinal)
-        if bool(getattr(unit, "is_transported", False)):
-            host = getattr(unit, "transport_host", None)
+        if bool(unit.is_transported):
+            host = unit.transport_host
             if host is not None:
-                host_num = getattr(host, "ordinal", None)
+                host_num = host.ordinal
                 if host_num is None:
                     host_num = getattr(host, "ordinal_index", None)
                 if host_num is not None:
@@ -437,7 +437,7 @@ class AllegiancePanel(QWidget):
                 units_by_land[getattr(u, "land", None)].append(u)
         allegiance_units = (preindexed or {}).get("units_by_allegiance", {}).get(self.allegiance) if preindexed else None
         if allegiance_units is None:
-            allegiance_units = [u for u in self.game_state.units if getattr(u, "allegiance", None) == self.allegiance]
+            allegiance_units = [u for u in self.game_state.units if u.allegiance == self.allegiance]
 
         for country in countries:
             units = list(units_by_land.get(country.id, []))

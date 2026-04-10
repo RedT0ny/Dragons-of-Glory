@@ -272,14 +272,14 @@ class InvasionHandler:
     def _can_extra_unit_invade_target(self, unit, target_hexes):
         carrier = getattr(unit, "transport_host", None)
         if carrier is None:
-            if not getattr(unit, "position", None) or unit.position[0] is None or unit.position[1] is None:
+            if not unit.position or None in unit.position:
                 return False
             pos = tuple(unit.position)
             if pos in target_hexes:
                 return True
             start_hex = Hex.offset_to_axial(pos[0], pos[1])
             return self.movement_service._unit_can_reach_country(unit, start_hex, target_hexes)
-        if not getattr(carrier, "position", None) or carrier.position[0] is None or carrier.position[1] is None:
+        if not carrier.position or None in carrier.position:
             return False
         landing_hex = Hex.offset_to_axial(*carrier.position)
         if landing_hex.axial_to_offset() not in target_hexes:
@@ -303,9 +303,9 @@ class InvasionHandler:
         return landing
 
     def _append_landing_unit(self, landing, passenger, carrier):
-        if not carrier or not getattr(carrier, "position", None):
+        if not carrier or not carrier.position:
             return
-        if getattr(passenger, "allegiance", None) != self.game_state.active_player:
+        if passenger.allegiance != self.game_state.active_player:
             return
         carrier_hex = Hex.offset_to_axial(*carrier.position)
         col, row = carrier_hex.axial_to_offset()
@@ -334,13 +334,13 @@ class MovementService:
         for unit in self.game_state.units:
             unit_states.append({
                 "unit": unit,
-                "position": tuple(unit.position) if getattr(unit, "position", None) else (None, None),
+                "position": tuple(unit.position),
                 "status": unit.status,
-                "movement_points": getattr(unit, "movement_points", None),
-                "moved_this_turn": getattr(unit, "moved_this_turn", False),
-                "attacked_this_turn": getattr(unit, "attacked_this_turn", False),
-                "is_transported": getattr(unit, "is_transported", False),
-                "transport_host": getattr(unit, "transport_host", None),
+                "movement_points": unit.movement_points,
+                "moved_this_turn": unit.moved_this_turn,
+                "attacked_this_turn": unit.attacked_this_turn,
+                "is_transported": unit.is_transported,
+                "transport_host": unit.transport_host,
                 "river_hexside": getattr(unit, "river_hexside", None),
                 "passengers": list(getattr(unit, "passengers", [])),
                 "escaped": bool(getattr(unit, "escaped", False)),
@@ -713,12 +713,12 @@ class MovementService:
 
         # Mixed stacks that include ground armies can legally enter enemy-fleet hexes.
         # Validate these as a stack, not unit-by-unit, to avoid false "no valid path".
-        if len(units) > 1 and any(self._is_ground_army(u) for u in units):
+        if len(units) > 1 and any(u.is_army() for u in units):
             ok, reason = self._can_stack_reach_target(units, target_hex)
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
 
-            ordered_units = sorted(units, key=lambda u: 0 if self._is_ground_army(u) else 1)
+            ordered_units = sorted(units, key=lambda u: 0 if u.is_army() else 1)
             return self._execute_unit_move_batch(
                 ordered_units,
                 target_hex,
@@ -842,29 +842,6 @@ class MovementService:
             return None
         return path
 
-    def _teleport_unit_no_cost(self, unit, target_hex):
-        """Temporarily moves a unit to a new hex without applying movement costs or rules, used for interception resolution."""
-        self._relocate_unit_no_refresh(unit, target_hex)
-
-    def _relocate_unit_no_refresh(self, unit, target_hex, set_escaped: bool = False, apply_escape: bool = False):
-        self.relocate_unit_on_board(
-            unit,
-            target_hex,
-            clear_escaped=set_escaped,
-        )
-        if apply_escape:
-            apply_escape_fn = getattr(self.game_state, "_apply_escape_if_eligible", None)
-            if callable(apply_escape_fn):
-                apply_escape_fn(unit, unit.position)
-
-    @staticmethod
-    def _is_ground_army(unit):
-        return (
-            hasattr(unit, "is_army")
-            and unit.is_army()
-            and unit.unit_type not in (UnitType.FLEET, UnitType.WING)
-        )
-
     def _can_stack_reach_target(self, units, target_hex):
         """Checks if a stack of units can reach a target hex, considering movement points and terrain."""
         start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
@@ -876,15 +853,6 @@ class MovementService:
         if target_hex in reachable:
             return True, None
         return False, "Selected stack has no valid path."
-
-    def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
-        """Evaluates whether a neutral entry can be made at the target hex.
-
-        Returns a NeutralEntryDecision object indicating the decision result."""
-        return self.invasion_handler.evaluate_neutral_entry(target_hex)
-
-    def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:
-        return self.invasion_handler.evaluate_unboard_neutral_entry(selected_units)
 
     def _is_neutral_hex(self, hex_obj):
         col, row = hex_obj.axial_to_offset()

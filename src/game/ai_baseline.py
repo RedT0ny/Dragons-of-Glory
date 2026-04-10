@@ -2653,7 +2653,7 @@ class TacticalPlanner:
                 ctx.moved_task_groups.add(_task_group_key(best.group))
             return True
 
-        decision = ctx.movement_service.evaluate_neutral_entry(target_hex)
+        decision = ctx.movement_service.invasion_handler.evaluate_neutral_entry(target_hex)
         if decision.is_neutral_entry:
             if decision.blocked_message:
                 return False
@@ -4096,7 +4096,7 @@ class BaselineAIPlayer:
             return False
 
         probe_hex = target_hexes[0]
-        probe = ctx.movement_service.evaluate_neutral_entry(probe_hex)
+        probe = ctx.movement_service.invasion_handler.evaluate_neutral_entry(probe_hex)
         if not probe or not getattr(probe, "is_neutral_entry", False):
             return False
         if getattr(probe, "blocked_message", None):

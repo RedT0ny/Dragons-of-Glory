@@ -4,7 +4,6 @@ from time import perf_counter
 from collections import defaultdict
 
 from content.tools import debug_print
-from src.content.config import DEBUG
 from src.content.constants import WS, HL, NEUTRAL
 from src.gui.unit_panel import AllegiancePanel
 from src.content.specs import UnitColumn
@@ -43,26 +42,16 @@ class StatusTab(QWidget):
     def _country_counts_by_allegiance(self):
         counts = {WS: 0, HL: 0, NEUTRAL: 0}
         for country in self.game_state.countries.values():
-            allegiance = getattr(country, "allegiance", None)
+            allegiance = country.allegiance
             if allegiance in counts:
                 counts[allegiance] += 1
         return counts
-
-    @staticmethod
-    def _allegiance_label(allegiance: str) -> str:
-        if allegiance == WS:
-            return "Whitestone"
-        if allegiance == HL:
-            return "Highlord"
-        if allegiance == NEUTRAL:
-            return "Neutral"
-        return str(allegiance).title()
 
     def _build_preindex(self):
         units_by_land = defaultdict(list)
         units_by_allegiance = {WS: [], HL: [], NEUTRAL: []}
         for u in self.game_state.units:
-            units_by_land[getattr(u, "land", None)].append(u)
+            units_by_land[u.land].append(u)
             allegiance = u.allegiance
             if allegiance in units_by_allegiance:
                 units_by_allegiance[allegiance].append(u)
@@ -76,22 +65,22 @@ class StatusTab(QWidget):
             return None
         countries = []
         for cid, country in self.game_state.countries.items():
-            countries.append((str(cid), str(getattr(country, "allegiance", ""))))
+            countries.append((str(cid), str(country.allegiance)))
         countries.sort()
         units = []
         for u in self.game_state.units:
             units.append((
-                str(getattr(u, "allegiance", "")),
-                str(getattr(u, "land", "")),
-                str(getattr(u, "id", "")),
-                int(getattr(u, "ordinal", 0)),
-                str(getattr(getattr(u, "status", None), "name", getattr(u, "status", ""))),
-                tuple(getattr(u, "position", (None, None)) or (None, None)),
-                int(getattr(u, "movement_points", getattr(u, "movement", 0))),
-                bool(getattr(u, "attacked_this_turn", False)),
-                int(getattr(u, "combat_rating", 0)),
-                int(getattr(u, "tactical_rating", 0)),
-                bool(getattr(u, "is_transported", False)),
+                str(u.allegiance),
+                str(u.land),
+                str(u.id),
+                int(u.ordinal),
+                str(u.status.name),
+                tuple(u.position),
+                int(u.movement_points),
+                bool(u.attacked_this_turn),
+                int(u.combat_rating),
+                int(u.tactical_rating),
+                bool(u.is_transported),
                 (
                     str(getattr(getattr(u, "transport_host", None), "id", "")),
                     int(getattr(getattr(u, "transport_host", None), "ordinal", 0)),
@@ -105,7 +94,7 @@ class StatusTab(QWidget):
         signature = self._build_signature()
         country_counts = self._country_counts_by_allegiance()
         for allegiance, panel in self.panels.items():
-            panel.set_title_text(f"{self._allegiance_label(allegiance)} ({country_counts.get(allegiance, 0)})")
+            panel.set_title_text(f"{allegiance.capitalize()} ({country_counts.get(allegiance, 0)})")
         if signature == self._last_signature:
             debug_print("[perf] StatusTab.refresh skipped (signature unchanged)")
             return
