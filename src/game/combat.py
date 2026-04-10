@@ -1351,8 +1351,8 @@ class CombatService:
         return leader.race in (UnitRace.SOLAMNIC, UnitRace.ELF)
 
     def _all_highlords_destroyed(self):
-        highlords = [u for u in self.units if getattr(u, "unit_type", None) == UnitType.HIGHLORD]
-        return bool(highlords) and all(getattr(u, "status", None) == UnitState.DESTROYED for u in highlords)
+        highlords = [u for u in self.units if u.unit_type == UnitType.HIGHLORD]
+        return bool(highlords) and all(u.status == UnitState.DESTROYED for u in highlords)
 
     def _all_ws_dragon_commanders_destroyed(self):
         ws_commanders = [
