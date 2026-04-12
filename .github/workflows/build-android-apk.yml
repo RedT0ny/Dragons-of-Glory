@@ -92,26 +92,21 @@ jobs:
             --skip-update \
             --auto-accept-license
 
-          if [ -d "$HOME/.pyside6_android_deploy/android-sdk" ]; then
+          if [ -d "$HOME/.pyside6_android_deploy" ]; then
             echo "QT_DEPLOY_CACHE=$HOME/.pyside6_android_deploy" >> "$GITHUB_ENV"
-          elif [ -d "$HOME/.pyside6-android-deploy/android-sdk" ]; then
+          elif [ -d "$HOME/.pyside6-android-deploy" ]; then
             echo "QT_DEPLOY_CACHE=$HOME/.pyside6-android-deploy" >> "$GITHUB_ENV"
           else
-            echo "Qt helper did not create a detectable Android SDK cache"
+            echo "Qt helper did not create a detectable cache directory"
             ls -la "$HOME"
             exit 1
           fi
 
-      - name: Export Qt helper SDK/NDK paths
+      - name: Confirm Qt helper cache exists
         run: |
-          echo "ANDROID_SDK_ROOT=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_HOME=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_VERSION=26.1.10909125" >> "$GITHUB_ENV"
-          echo "ANDROID_API_LEVEL=34" >> "$GITHUB_ENV"
-          echo "ANDROID_BUILD_TOOLS=35.0.0" >> "$GITHUB_ENV"
-
-          test -d "$QT_DEPLOY_CACHE/android-sdk" || { echo "Missing Android SDK cache"; exit 1; }
-          test -d "$QT_DEPLOY_CACHE/android-sdk/ndk/26.1.10909125" || { echo "Missing expected NDK cache"; exit 1; }
+          test -n "$QT_DEPLOY_CACHE" || { echo "QT_DEPLOY_CACHE is empty"; exit 1; }
+          test -d "$QT_DEPLOY_CACHE" || { echo "Qt helper cache directory does not exist"; exit 1; }
+          find "$QT_DEPLOY_CACHE" -maxdepth 3 -type d | sort | sed -n '1,120p'
 
       - name: Download Android wheels
         run: |
@@ -172,7 +167,6 @@ jobs:
           arch = os.environ["TARGET_ARCH"]
           wheel_dir = os.environ["WHEEL_DIR"]
           venv_path = os.environ["VENV_PATH"]
-          sdk_root = os.environ["ANDROID_SDK_ROOT"]
 
           cfg["app"]["project_file"] = "pyproject.toml"
 
@@ -183,9 +177,12 @@ jobs:
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
 
           cfg["buildozer"]["mode"] = "debug"
-          cfg["buildozer"]["sdk_path"] = sdk_root
-          cfg["buildozer"]["ndk_path"] = f"{sdk_root}/ndk/26.1.10909125"
           cfg["buildozer"]["arch"] = arch
+
+          # Leave sdk_path / ndk_path empty so pyside6-android-deploy
+          # can auto-detect them from the Qt helper cache.
+          cfg["buildozer"]["sdk_path"] = ""
+          cfg["buildozer"]["ndk_path"] = ""
 
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
@@ -200,28 +197,11 @@ jobs:
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
-          export ANDROID_HOME="$ANDROID_SDK_ROOT"
-          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
-          export ANDROID_NDK="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
-          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
-          export ANDROID_NDK_ROOT="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
-          export ANDROIDNDK="$ANDROID_SDK_ROOT/ndk/26.1.10909125"
-          export ANDROIDSDK="$ANDROID_SDK_ROOT"
-          export ANDROIDAPI=34
-          export ANDROIDMINAPI=24
-
-          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
-
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee ci-debug/build-apk.log
-          echo "ANDROID_NDK=$ANDROID_NDK" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDAPI=$ANDROIDAPI" | tee -a ci-debug/build-apk.log
-          echo "ANDROIDMINAPI=$ANDROIDMINAPI" | tee -a ci-debug/build-apk.log
+          echo "QT_DEPLOY_CACHE=$QT_DEPLOY_CACHE" | tee ci-debug/build-apk.log
 
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
-            --sdk-path "$ANDROID_SDK_ROOT" \
-            --ndk-path "$ANDROID_NDK" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee -a ci-debug/build-apk.log
 
