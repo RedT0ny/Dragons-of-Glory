@@ -108,6 +108,42 @@ jobs:
           test -d "$QT_DEPLOY_CACHE" || { echo "Qt helper cache directory does not exist"; exit 1; }
           find "$QT_DEPLOY_CACHE" -maxdepth 3 -type d | sort | sed -n '1,120p'
 
+      - name: Detect Android NDK root inside Qt helper cache
+        run: |
+          set -Eeuo pipefail
+
+          NDK_READOBJ="$(find "$QT_DEPLOY_CACHE" -type f -path '*/toolchains/llvm/prebuilt/*/bin/llvm-readobj' | head -n 1 || true)"
+
+          if [ -z "$NDK_READOBJ" ]; then
+            echo "Could not find llvm-readobj inside Qt helper cache"
+            find "$QT_DEPLOY_CACHE" -maxdepth 5 -type d | sort | sed -n '1,200p'
+            exit 1
+          fi
+
+          ANDROID_NDK_PATH="$(python - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["NDK_READOBJ"])
+          print(p.parents[5])
+          PY
+          )"
+          echo "ANDROID_NDK_PATH=$ANDROID_NDK_PATH" >> "$GITHUB_ENV"
+
+          test -d "$ANDROID_NDK_PATH" || { echo "Resolved NDK root does not exist"; exit 1; }
+          test -f "$ANDROID_NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readobj" || {
+            echo "Resolved NDK root is invalid"
+            exit 1
+          }
+
+          echo "Resolved NDK root: $ANDROID_NDK_PATH"
+        env:
+          NDK_READOBJ: ${{ env.NDK_READOBJ }}
+
+      - name: Export Android SDK path from Qt helper cache
+        run: |
+          echo "ANDROID_SDK_ROOT=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$QT_DEPLOY_CACHE/android-sdk" >> "$GITHUB_ENV"
+
       - name: Download Android wheels
         run: |
           set -euo pipefail
@@ -167,6 +203,8 @@ jobs:
           arch = os.environ["TARGET_ARCH"]
           wheel_dir = os.environ["WHEEL_DIR"]
           venv_path = os.environ["VENV_PATH"]
+          sdk_root = os.environ["ANDROID_SDK_ROOT"]
+          ndk_root = os.environ["ANDROID_NDK_PATH"]
 
           cfg["app"]["project_file"] = "pyproject.toml"
 
@@ -178,11 +216,8 @@ jobs:
 
           cfg["buildozer"]["mode"] = "debug"
           cfg["buildozer"]["arch"] = arch
-
-          # Leave sdk_path / ndk_path empty so pyside6-android-deploy
-          # can auto-detect them from the Qt helper cache.
-          cfg["buildozer"]["sdk_path"] = ""
-          cfg["buildozer"]["ndk_path"] = ""
+          cfg["buildozer"]["sdk_path"] = sdk_root
+          cfg["buildozer"]["ndk_path"] = ndk_root
 
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
@@ -197,11 +232,26 @@ jobs:
           mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
+          export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          export ANDROID_SDK_ROOT="$ANDROID_SDK_ROOT"
+          export ANDROID_NDK="$ANDROID_NDK_PATH"
+          export ANDROID_NDK_HOME="$ANDROID_NDK_PATH"
+          export ANDROID_NDK_ROOT="$ANDROID_NDK_PATH"
+          export ANDROIDNDK="$ANDROID_NDK_PATH"
+          export ANDROIDSDK="$ANDROID_SDK_ROOT"
+
+          # The helper cache uses the legacy tools layout
+          export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/tools/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
           echo "QT_DEPLOY_CACHE=$QT_DEPLOY_CACHE" | tee ci-debug/build-apk.log
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee -a ci-debug/build-apk.log
+          echo "ANDROID_NDK_PATH=$ANDROID_NDK_PATH" | tee -a ci-debug/build-apk.log
 
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
+            --sdk-path "$ANDROID_SDK_ROOT" \
+            --ndk-path "$ANDROID_NDK_PATH" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee -a ci-debug/build-apk.log
 
