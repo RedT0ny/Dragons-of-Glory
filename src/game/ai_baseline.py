@@ -95,7 +95,7 @@ def _victory_category_for_type(node_type: str) -> Optional[str]:
 
 
 def _extract_victory_metadata(raw: Any) -> Dict[str, Any]:
-    categories_by_tier = {"major": [], "minor": [], "marginal": []}
+    categories_by_tier = {"major": [], "minor": []}
     location_targets: Set[str] = set()
     country_targets: Set[str] = set()
     location_deadlines: Dict[str, int] = {}
@@ -146,14 +146,14 @@ def _extract_victory_metadata(raw: Any) -> Dict[str, Any]:
                 walk(child, tier)
 
     if isinstance(raw, dict):
-        for tier in ("major", "minor", "marginal"):
+        for tier in ("major", "minor"):
             if tier in raw:
                 walk(raw.get(tier), tier)
     elif isinstance(raw, list):
         walk(raw, "minor")
 
     def pick_primary_category() -> Optional[str]:
-        for tier in ("major", "minor", "marginal"):
+        for tier in ("major", "minor"):
             cats = categories_by_tier.get(tier) or []
             if not cats:
                 continue
@@ -304,7 +304,7 @@ class ObjectiveAnalyzer:
 
     @staticmethod
     def _walk_victory_nodes(raw: Any, graph: ObjectiveGraph, own: bool):
-        tier_weight = {"major": 3.0, "minor": 2.0, "marginal": 1.0}
+        tier_weight = {"major": 3.0, "minor": 1.0}
 
         def walk(node: Any, tier: str):
             if isinstance(node, dict):
@@ -350,7 +350,7 @@ class ObjectiveAnalyzer:
                     walk(child, tier)
 
         if isinstance(raw, dict):
-            for tier in ("major", "minor", "marginal"):
+            for tier in ("major", "minor"):
                 if tier in raw:
                     walk(raw.get(tier), tier)
         elif isinstance(raw, list):
@@ -4632,7 +4632,6 @@ class BaselineAIPlayer:
         if isinstance(raw, dict):
             walk(raw.get("major"))
             walk(raw.get("minor"))
-            walk(raw.get("marginal"))
         elif isinstance(raw, list):
             walk(raw)
         return locations, countries

@@ -255,6 +255,38 @@ jobs:
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
             2>&1 | tee -a ci-debug/build-apk.log
 
+      - name: Collect config.log files on failure
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          mkdir -p ci-debug/config-logs
+
+          # Find all config.log files under the Buildozer working tree
+          mapfile -t CFGS < <(find .buildozer -type f -name config.log 2>/dev/null | sort || true)
+
+          printf "%s\n" "${CFGS[@]}" > ci-debug/configlog-paths.txt
+
+          if [ "${#CFGS[@]}" -eq 0 ]; then
+            echo "No config.log files were found under .buildozer" | tee ci-debug/configlog-tail.txt
+            echo "Relevant libffi directories (if any):" | tee -a ci-debug/configlog-tail.txt
+            find .buildozer -type d 2>/dev/null | grep -i 'libffi\|other_builds' | sort | tee -a ci-debug/configlog-tail.txt || true
+            exit 0
+          fi
+
+          for f in "${CFGS[@]}"; do
+            rel="${f#./}"
+            mkdir -p "ci-debug/config-logs/$(dirname "$rel")"
+            cp "$f" "ci-debug/config-logs/$rel"
+
+            {
+              echo "================================================================"
+              echo "FILE: $f"
+              echo "================================================================"
+              tail -n 200 "$f"
+              echo
+            } | tee -a ci-debug/configlog-tail.txt
+          done
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4

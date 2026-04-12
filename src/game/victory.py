@@ -108,8 +108,6 @@ class VictoryConditionEvaluator:
             normalized["major"] = self._normalize_node(major)
 
         minor = raw_side.get("minor")
-        if minor is None and "marginal" in raw_side:
-            minor = raw_side.get("marginal")
         normalized["minor"] = self._normalize_minor(minor)
         return normalized
 

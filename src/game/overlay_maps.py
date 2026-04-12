@@ -3,13 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, Optional
 
-from game.unit import Unit
 from src.content.config import CRT_DATA
 from src.content.constants import HL, WS
 from src.content.loader import load_data
-from src.content.specs import UnitType, TerrainType, HexsideType
-from src.game.map import Hex
+from src.content.specs import TerrainType, HexsideType
 from src.game import board_analysis
+from src.game.map import Hex
 
 
 @dataclass
@@ -355,10 +354,8 @@ def _min_max(values: Dict[Tuple[int, int], float]):
     return float(mins), float(maxs)
 
 def _enemy_of(side: Optional[str]):
-    if side == HL:
-        return WS
-    if side == WS:
-        return HL
+    if side == HL: return WS
+    if side == WS: return HL
     return None
 
 def _odds_from_power(attacker: float, defender: float) -> str:

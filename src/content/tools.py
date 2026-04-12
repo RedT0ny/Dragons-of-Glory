@@ -133,8 +133,6 @@ class TextFormatter:
             lines.append(f"{major_label}: {self._format_node(major)}")
 
         minor = victory_block.get("minor")
-        if minor is None and "marginal" in victory_block:
-            minor = victory_block.get("marginal")
         if minor is not None:
             minor_label = self._tr("victory.labels.minor", "Minor")
             lines.extend(self._format_minor(minor_label, minor))

@@ -105,10 +105,6 @@ class InterceptionService:
             print(f"Interception cancelled: no adjacent attack hex for stack at {origin_offset}.")
             return
 
-        for interceptor in interceptors:
-            if interceptor.is_on_map:
-                self.movement_service.relocate_unit_on_board(interceptor, adjacent_hex)
-
         previous_active_player = self.game_state.active_player
         self.game_state.active_player = interceptors[0].allegiance
         try:
@@ -129,6 +125,10 @@ class InterceptionService:
                         f"Interception cancelled: projected ratio {odds_ratio:.2f} below 1:1."
                     )
                     return
+
+                for interceptor in interceptors:
+                    if interceptor.is_on_map:
+                        self.movement_service.relocate_unit_on_board(interceptor, adjacent_hex)
 
                 resolution = self.game_state.combat_service.resolve_combat(
                     live_interceptors,

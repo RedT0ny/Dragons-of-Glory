@@ -51,7 +51,7 @@ def show_combat_result_popup(
     is highlighted in red using the "warning" highlight channel, and the map
     view is centered on that hex.
     """
-    if not game_state.has_human_player():
+    if not _is_verbose(game_state) or not game_state.has_human_player():
         return
 
     result = (resolution or {}).get("result", "-/-")
