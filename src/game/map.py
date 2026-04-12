@@ -516,9 +516,12 @@ class Board:
                 continue
 
             current_hex, _ = current_state
-            if current_hex == target_hex and current_cost < best_target_cost:
+            if current_hex == target_hex:
                 best_target_key = current_key
                 best_target_cost = current_cost
+                return self._reconstruct_fleet_path(
+                    came_from, state_by_key, current_key, start_key
+                ), current_cost
 
             for next_state, step_cost in self._fleet_neighbor_states(unit, current_state):
                 next_key = self._fleet_state_key(next_state)
@@ -530,17 +533,16 @@ class Board:
                     heapq.heappush(frontier, (new_cost, counter, next_state))
                     counter += 1
 
-        if best_target_key is None:
-            return [], float("inf")
+        return [], float("inf")
 
+    def _reconstruct_fleet_path(self, came_from, state_by_key, end_key, start_key):
         rev_keys = []
-        node = best_target_key
+        node = end_key
         while node is not None:
             rev_keys.append(node)
             node = came_from.get(node)
         rev_keys.reverse()
-        path = [state_by_key[k] for k in rev_keys]
-        return path, best_target_cost
+        return [state_by_key[k] for k in rev_keys]
 
     def get_reachable_hexes_for_fleet(self, unit):
         if not getattr(unit, "position", None):
