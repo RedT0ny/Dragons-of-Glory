@@ -271,6 +271,8 @@ class AIContext:
     invasion_state: Optional[Dict[str, Any]] = None
     country_hexes_by_id: Optional[Dict[str, List[Hex]]] = None
     country_port_counts: Optional[Dict[str, int]] = None
+    coastal_hexes: Optional[List[Hex]] = None
+    country_id_by_offset: Optional[Dict[Tuple[int, int], str]] = None
     neutral_front_cache: Optional[Dict[str, Any]] = None
     movement_logs: List[str] = field(default_factory=list)
     enemy_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
@@ -403,7 +405,10 @@ class GeographyAnalyzer:
                 embarked_ground.append(p)
         if not embarked_ground:
             return []
-        for h in GeographyAnalyzer.get_country_coastal_hexes(ctx.game_state, country_id):
+        country_hexes = list((ctx.country_hexes_by_id or {}).get(country_id, []))
+        for h in country_hexes:
+            if not board.is_coastal(h):
+                continue
             if h.distance_to(objective_hex) > 6:
                 continue
             if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
@@ -742,64 +747,61 @@ class StrategicPlanner:
         primary_scored = []
         secondary_scored = []
         fallback_scored = []
-        for col in range(int(getattr(board, "width", 0) or 0)):
-            for row in range(int(getattr(board, "height", 0) or 0)):
-                h = Hex.offset_to_axial(col, row)
-                dist_anchor = h.distance_to(beachhead_hex)
-                if dist_anchor > 3:
+        for h in list(ctx.coastal_hexes or []):
+            col, row = h.axial_to_offset()
+            dist_anchor = h.distance_to(beachhead_hex)
+            if dist_anchor > 3:
+                continue
+            if target_countries:
+                country_id = (ctx.country_id_by_offset or {}).get((col, row))
+                if country_id is not None and country_id not in target_countries and h.distance_to(objective_hex) > 4:
                     continue
-                if not board.is_coastal(h):
+            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                continue
+            if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
+                continue
+            inland_exit_count = 0
+            for neighbor in h.neighbors():
+                ncol, nrow = neighbor.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
                     continue
-                if target_countries:
-                    country = ctx.game_state.get_country_by_hex(col, row)
-                    if country is not None and getattr(country, "id", None) not in target_countries and h.distance_to(objective_hex) > 4:
-                        continue
-                if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                if board.is_coastal(neighbor) and not board.get_location(neighbor):
                     continue
-                if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
+                if not ctx.game_state.can_control_probe_project_across_hexside(h, neighbor, allegiance=ctx.side):
                     continue
-                inland_exit_count = 0
-                for neighbor in h.neighbors():
-                    ncol, nrow = neighbor.axial_to_offset()
-                    if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
-                        continue
-                    if board.is_coastal(neighbor) and not board.get_location(neighbor):
-                        continue
-                    if not ctx.game_state.can_control_probe_project_across_hexside(h, neighbor, allegiance=ctx.side):
-                        continue
-                    inland_exit_count += 1
-                if inland_exit_count == 0:
-                    continue
-                threat_val = _overlay_value(threat, col, row, 0.0)
-                loc = board.get_location(h)
-                existing_ground = sum(
-                    1 for u in board.get_units_in_hex(col, row)
-                    if u.allegiance == ctx.side
-                    and u.is_on_map
-                    and u.is_army()
-                )
-                score = 0.0
-                score += (12.0 - h.distance_to(objective_hex)) * 3.0
-                score -= threat_val * 2.0
-                if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
-                    score += 8.0
-                    country = ctx.game_state.get_country_by_hex(col, row)
-                    if country is not None and getattr(country, "id", None) in target_countries:
-                        score += 10.0
-                score -= existing_ground * 5.0
-                if inland_exit_count == 1:
-                    score -= 25.0
-                else:
-                    score += inland_exit_count * 6.0
-                if h == beachhead_hex:
-                    score += 6.0
-                debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
-                if inland_exit_count >= 3:
-                    primary_scored.append((score, h))
-                elif inland_exit_count == 2:
-                    secondary_scored.append((score, h))
-                else:
-                    fallback_scored.append((score, h))
+                inland_exit_count += 1
+            if inland_exit_count == 0:
+                continue
+            threat_val = _overlay_value(threat, col, row, 0.0)
+            loc = board.get_location(h)
+            existing_ground = sum(
+                1 for u in board.get_units_in_hex(col, row)
+                if u.allegiance == ctx.side
+                and u.is_on_map
+                and u.is_army()
+            )
+            score = 0.0
+            score += (12.0 - h.distance_to(objective_hex)) * 3.0
+            score -= threat_val * 2.0
+            if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
+                score += 8.0
+                country_id = (ctx.country_id_by_offset or {}).get((col, row))
+                if country_id in target_countries:
+                    score += 10.0
+            score -= existing_ground * 5.0
+            if inland_exit_count == 1:
+                score -= 25.0
+            else:
+                score += inland_exit_count * 6.0
+            if h == beachhead_hex:
+                score += 6.0
+            debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
+            if inland_exit_count >= 3:
+                primary_scored.append((score, h))
+            elif inland_exit_count == 2:
+                secondary_scored.append((score, h))
+            else:
+                fallback_scored.append((score, h))
 
         primary_scored.sort(key=lambda item: item[0], reverse=True)
         secondary_scored.sort(key=lambda item: item[0], reverse=True)
@@ -836,45 +838,32 @@ class StrategicPlanner:
         best = None
         best_score = float("-inf")
         
-        # Search for REAL coastal landing hexes within 6 hexes of main objective
-        # Beachhead MUST be coastal - fleets cannot land on inland hexes
-        for col in range(int(getattr(board, "width", 0) or 0)):
-            for row in range(int(getattr(board, "height", 0) or 0)):
-                h = Hex.offset_to_axial(col, row)
-                
-                # CRITICAL: Must be coastal for fleet landing
-                # Port locations are good, but hex MUST still be coastal
-                if not board.is_coastal(h):
-                    continue
-                
-                # Must be reasonably close to main objective
-                dist = h.distance_to(main_hex)
-                if dist > 6:
-                    continue
-                
-                # Authoritative legality from game rules.
-                if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
-                    continue
-                
-                score = 0.0
-                # Prefer closer hexes
-                score += (6.0 - dist) * 4.0
-                # Lower threat
-                threat_val = _overlay_value(threat, col, row, 0.0)
-                score -= threat_val * 2.0
-                # Enemy coast is good
-                territory = ctx.overlays.get("territory")
-                tval = territory.values.get((col, row)) if territory else None
-                if tval == ctx.enemy:
-                    score += 10.0
-                # Port locations are preferred landing points
-                loc = board.get_location(h)
-                if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
-                    score += 20.0
-                
-                if score > best_score:
-                    best = h
-                    best_score = score
+        # Search real coastal landing hexes near the main objective.
+        for h in list(ctx.coastal_hexes or []):
+            col, row = h.axial_to_offset()
+            dist = h.distance_to(main_hex)
+            if dist > 6:
+                continue
+
+            # Authoritative legality from game rules.
+            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                continue
+
+            score = 0.0
+            score += (6.0 - dist) * 4.0
+            threat_val = _overlay_value(threat, col, row, 0.0)
+            score -= threat_val * 2.0
+            territory = ctx.overlays.get("territory")
+            tval = territory.values.get((col, row)) if territory else None
+            if tval == ctx.enemy:
+                score += 10.0
+            loc = board.get_location(h)
+            if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
+                score += 20.0
+
+            if score > best_score:
+                best = h
+                best_score = score
         
         return best
 
@@ -3822,6 +3811,8 @@ class BaselineAIPlayer:
         self._static_geo_cache_scenario_id: Optional[str] = None
         self._country_hexes_by_id_cache: Optional[Dict[str, List[Hex]]] = None
         self._country_port_counts_cache: Optional[Dict[str, int]] = None
+        self._coastal_hexes_cache: Optional[List[Hex]] = None
+        self._country_id_by_offset_cache: Optional[Dict[Tuple[int, int], str]] = None
         self._unit_last_position: Dict[Tuple[str, int], Tuple[int, int]] = {}
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
@@ -4268,6 +4259,8 @@ class BaselineAIPlayer:
         invasion_state = self._get_invasion_state(side)
         country_hexes_by_id = self._get_country_hexes_by_id()
         country_port_counts = self._get_country_port_counts()
+        coastal_hexes = self._get_coastal_hexes()
+        country_id_by_offset = self._get_country_id_by_offset()
         neutral_front_cache = self._get_neutral_front_cache(side)
         objectives = self._collect_objectives(side, objective_graph=objective_graph)
         friendly_units = [u for u in self.game_state.units if u.allegiance == side and u.is_on_map]
@@ -4301,6 +4294,8 @@ class BaselineAIPlayer:
             invasion_state=invasion_state,
             country_hexes_by_id=country_hexes_by_id,
             country_port_counts=country_port_counts,
+            coastal_hexes=coastal_hexes,
+            country_id_by_offset=country_id_by_offset,
             neutral_front_cache=neutral_front_cache,
             enemy_adjacent_combat_count=enemy_adjacent_combat_count,
             friendly_adjacent_combat_count=friendly_adjacent_combat_count,
@@ -4339,12 +4334,21 @@ class BaselineAIPlayer:
             return
         board = self.game_state.map
         country_hexes: Dict[str, List[Hex]] = defaultdict(list)
+        country_id_by_offset: Dict[Tuple[int, int], str] = {}
+        for country in self.game_state.countries.values():
+            cid = str(getattr(country, "id", "") or "")
+            if not cid:
+                continue
+            for col, row in list(getattr(country, "territories", []) or []):
+                country_hexes[cid].append(Hex.offset_to_axial(col, row))
+                country_id_by_offset[(int(col), int(row))] = cid
+
+        coastal_hexes: List[Hex] = []
         for col in range(int(getattr(board, "width", 0) or 0)):
             for row in range(int(getattr(board, "height", 0) or 0)):
-                country = self.game_state.get_country_by_hex(col, row)
-                if country is None or not getattr(country, "id", None):
-                    continue
-                country_hexes[str(country.id)].append(Hex.offset_to_axial(col, row))
+                h = Hex.offset_to_axial(col, row)
+                if board.is_coastal(h):
+                    coastal_hexes.append(h)
         port_counts: Dict[str, int] = {}
         for cid, country in self.game_state.countries.items():
             port_counts[cid] = sum(
@@ -4354,6 +4358,8 @@ class BaselineAIPlayer:
         self._static_geo_cache_scenario_id = scenario_id
         self._country_hexes_by_id_cache = dict(country_hexes)
         self._country_port_counts_cache = dict(port_counts)
+        self._coastal_hexes_cache = list(coastal_hexes)
+        self._country_id_by_offset_cache = dict(country_id_by_offset)
 
     def _get_country_hexes_by_id(self) -> Dict[str, List[Hex]]:
         self._ensure_static_geo_cache()
@@ -4362,6 +4368,14 @@ class BaselineAIPlayer:
     def _get_country_port_counts(self) -> Dict[str, int]:
         self._ensure_static_geo_cache()
         return self._country_port_counts_cache or {}
+
+    def _get_coastal_hexes(self) -> List[Hex]:
+        self._ensure_static_geo_cache()
+        return self._coastal_hexes_cache or []
+
+    def _get_country_id_by_offset(self) -> Dict[Tuple[int, int], str]:
+        self._ensure_static_geo_cache()
+        return self._country_id_by_offset_cache or {}
 
     def _get_neutral_front_cache(self, side: str) -> Dict[str, Any]:
         phase_key = (
@@ -4637,4 +4651,4 @@ class BaselineAIPlayer:
         return locations, countries
 
     def _log(self, msg: str):
-        print(f"AI[{self.game_state.active_player}] {msg}")
+        debug_print(f"AI[{self.game_state.active_player}] {msg}")
