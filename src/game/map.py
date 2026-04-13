@@ -717,12 +717,6 @@ class Board:
 
         return True
 
-    def can_unit_move_to(self, unit, target_hex):
-        """
-        Wrapper for single unit checks (used by deployment).
-        """
-        return self.can_stack_move_to([unit], target_hex)
-
     def can_unit_enter_from_hex(self, unit, from_hex, target_hex, available_mp=None):
         """
         Single-step movement legality for a concrete unit from `from_hex` to `target_hex`.
@@ -840,9 +834,7 @@ class Board:
             return False
 
         hexside_type = self.get_effective_hexside(from_hex, to_hex)
-        if hexside_type == HexsideType.SEA:
-            return False
-        if hexside_type == HexsideType.MOUNTAIN:
+        if hexside_type in (HexsideType.SEA, HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER):
             return False
         return True
 
@@ -901,8 +893,7 @@ class Board:
 
 
     def is_maelstrom(self, hex_obj):
-        """Checks if the hex is part of the Maelstrom region."""
-        # Maelstrom is a specific terrain type in the CSV (e.g. 'maelstrom')
+        """Checks if hex_obj is part of the Maelstrom."""
         return self.get_terrain(hex_obj) == TerrainType.MAELSTROM
 
     def get_maelstrom_exits(self, hex_obj):
@@ -956,12 +947,8 @@ class Board:
         if terrain == TerrainType.MOUNTAIN and hexside_type != HexsideType.PASS:
                 return float('inf')
 
-        # Jungle costs 2
-        if terrain == TerrainType.JUNGLE:
-            cost += 1
-
-        # Forest costs 2, unless unit has Forest affinity (Elves/Kender)
-        if terrain == TerrainType.FOREST:
+        # Jungle and Forest cost 2, unless unit has affinity (e.g. Elves/Kender and Forests)
+        if terrain in (TerrainType.JUNGLE,TerrainType.FOREST):
             if not unit.terrain_affinity == terrain:
                 cost += 1
 
