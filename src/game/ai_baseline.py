@@ -54,6 +54,24 @@ def _slugify(value: str) -> str:
 
     return re.sub(r"[^a-z0-9]+", "_", str(value or "").lower()).strip("_")
 
+_PROTECTIVE_OWN_CATEGORIES = {"control", "prevent", "survive"}
+_PROTECTIVE_ENEMY_CATEGORIES = {"capture", "conquer"}
+
+
+def _needs_capital_defense(side: str, hl_category: Optional[str], ws_category: Optional[str]) -> bool:
+    if side == HL:
+        own_cat = hl_category
+        enemy_cat = ws_category
+    else:
+        own_cat = ws_category
+        enemy_cat = hl_category
+    if own_cat and own_cat.lower() in _PROTECTIVE_OWN_CATEGORIES:
+        return True
+    if enemy_cat and enemy_cat.lower() in _PROTECTIVE_ENEMY_CATEGORIES:
+        return True
+    return False
+
+
 _AI_STANCE_CACHE: Optional[Dict[str, Dict[str, str]]] = None
 _VICTORY_CATEGORY_PRIORITY = [
     "capture",
@@ -214,6 +232,7 @@ class StrategicPlan:
     offensive_side: Optional[str] = None
     must_act: bool = False
     victory_category: Optional[str] = None
+    enemy_victory_category: Optional[str] = None
     notes: List[str] = field(default_factory=list)
     # Simplified invasion planning - single beachhead hex only
     beachhead_hex: Optional[Hex] = None
@@ -428,7 +447,7 @@ class GeographyAnalyzer:
 class StrategicPlanner:
 
     def build_plan(self, ctx: AIContext, beachhead_memory: Optional[Dict[str, Optional[Hex]]] = None) -> StrategicPlan:
-        posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category = self._choose_posture(
+        posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category, enemy_victory_category = self._choose_posture(
             ctx)
         objectives = self._prioritize_objectives(ctx)
 
@@ -484,6 +503,7 @@ class StrategicPlanner:
             offensive_side=offensive_side,
             must_act=must_act,
             victory_category=victory_category,
+            enemy_victory_category=enemy_victory_category,
             notes=notes,
             beachhead_hex=beachhead_hex,
             beachhead_slots=beachhead_slots,
@@ -867,7 +887,7 @@ class StrategicPlanner:
         
         return best
 
-    def _choose_posture(self, ctx: AIContext) -> Tuple[str, List[str], Optional[str], Optional[Objective], Optional[int], float, bool, Optional[str]]:
+    def _choose_posture(self, ctx: AIContext) -> Tuple[str, List[str], Optional[str], Optional[Objective], Optional[int], float, bool, Optional[str], Optional[str]]:
         notes = []
         victory_conditions = getattr(ctx.game_state.scenario_spec, "victory_conditions", {}) or {}
         hl_meta = _extract_victory_metadata(victory_conditions.get(HL, {}))
@@ -877,6 +897,7 @@ class StrategicPlanner:
         offensive_side = _determine_offensive_side(hl_category, ws_category)
         side_meta = hl_meta if ctx.side == HL else ws_meta
         victory_category = side_meta.get("primary_category")
+        enemy_victory_category = ws_category if ctx.side == HL else hl_category
 
         friendly_power = sum(
             float(getattr(u, "combat_rating", 0) or 0)
@@ -934,7 +955,7 @@ class StrategicPlanner:
         if deadline_turn:
             notes.append(f"deadline_turn={deadline_turn}")
         notes.append(f"urgency={urgency_score:.2f}")
-        return posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category
+        return posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category, enemy_victory_category
 
     def _select_main_objective(self, ctx: AIContext, side_meta: Dict[str, Any], offensive_side: Optional[str]):
         objectives = list(ctx.objectives or [])
@@ -1302,6 +1323,10 @@ class OperationalPlanner:
         invasion_adjacent_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         invasion_force_ready = False
 
+        capital_defense_groups: Dict[Hex, TaskGroup] = {}
+        if _needs_capital_defense(ctx.side, plan.victory_category, plan.enemy_victory_category):
+            capital_defense_groups = self._assign_capital_defenders(ctx, groups, threat)
+
         if offensive and ctx.side == HL and getattr(plan, "invasion_target", None):
             target_country = ctx.game_state.countries.get(plan.invasion_target)
             if target_country and _country_alignment_for_side(target_country, ctx.side) > -10:
@@ -1395,6 +1420,24 @@ class OperationalPlanner:
             loc = locations.get((col, row))
             local_threat = _overlay_value(threat, col, row, 0.0)
             group_key = _task_group_key(group)
+
+            if capital_defense_groups:
+                assigned_to_capital = False
+                for capital_hex, assigned_group in capital_defense_groups.items():
+                    if _task_group_key(assigned_group) == group_key:
+                        capital_col, capital_row = capital_hex.axial_to_offset()
+                        capital_threat = _overlay_value(threat, capital_col, capital_row, 0.0)
+                        missions.append(Mission(
+                            group=group,
+                            mission_type="defend_allied_capital",
+                            target_hex=capital_hex,
+                            objective=None,
+                            priority=130 + capital_threat * 15,
+                        ))
+                        assigned_to_capital = True
+                        break
+                if assigned_to_capital:
+                    continue
 
             # HL neutral-invasion staging:
             # If a neutral target has been selected but border concentration is not yet sufficient,
@@ -1887,6 +1930,70 @@ class OperationalPlanner:
         return locations
 
     @staticmethod
+    def _get_allied_capitals_needing_defenders(
+            ctx: AIContext,
+            groups: List[TaskGroup],
+            threat: Any,
+    ) -> List[Tuple[Hex, float]]:
+        capitals_needing_defense = []
+        for country in ctx.game_state.countries.values():
+            if getattr(country, "allegiance", None) != ctx.side:
+                continue
+            for loc in country.locations.values():
+                if not getattr(loc, "is_capital", False):
+                    continue
+                if not loc.coords:
+                    continue
+                capital_hex = Hex.offset_to_axial(loc.coords[0], loc.coords[1])
+                col, row = loc.coords[0], loc.coords[1]
+                stack = ctx.game_state.map.get_units_in_hex(capital_hex.q, capital_hex.r)
+                defenders = [
+                    u for u in stack
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
+                    and u.is_combat_unit()
+                ]
+                garrison_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders)
+                local_threat = _overlay_value(threat, col, row, 0.0)
+                min_garrison_power = 6.0
+                if garrison_power < min_garrison_power:
+                    capitals_needing_defense.append((capital_hex, garrison_power))
+        capitals_needing_defense.sort(key=lambda x: x[1])
+        return capitals_needing_defense
+
+    @staticmethod
+    def _assign_capital_defenders(
+            ctx: AIContext,
+            groups: List[TaskGroup],
+            threat: Any,
+    ) -> Dict[Hex, TaskGroup]:
+        assignments: Dict[Hex, TaskGroup] = {}
+        capitals = OperationalPlanner._get_allied_capitals_needing_defenders(ctx, groups, threat)
+        if not capitals:
+            return assignments
+        low_power_groups = [
+            g for g in groups
+            if g.has_army
+            and not g.has_fleet
+            and g.power <= 12.0
+        ]
+        low_power_groups.sort(key=lambda g: g.power)
+        for capital_hex, current_power in capitals:
+            if not low_power_groups:
+                break
+            best_group = None
+            best_distance = 999
+            for g in low_power_groups:
+                dist = g.hex.distance_to(capital_hex)
+                if dist < best_distance:
+                    best_distance = dist
+                    best_group = g
+            if best_group is not None:
+                assignments[capital_hex] = best_group
+                low_power_groups.remove(best_group)
+        return assignments
+
+    @staticmethod
     def _nearest_objective(start_hex: Hex, objectives: List[Objective]) -> Tuple[Optional[Objective], float]:
         if not objectives:
             return None, 999.0
@@ -1916,6 +2023,7 @@ class TacticalPlanner:
         "fleet_support": {"objective": 7, "threat": -5, "support": 4, "capture": 2},
         "defend": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
         "defend_key_location": {"objective": 4, "threat": -10, "support": 4, "capture": 2},
+        "defend_allied_capital": {"objective": 6, "threat": -10, "support": 4, "capture": 2},
         "reinforce": {"objective": 9, "threat": -6, "support": 3, "capture": 2},
         "hold": {"objective": 2, "threat": -8, "support": 2, "capture": 1},
         "screen": {"objective": 6, "threat": -7, "support": 2, "capture": 2},

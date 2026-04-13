@@ -229,7 +229,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           rm -rf .buildozer buildozer.spec src/deployment bin build ci-debug
-          mkdir -p ci-debug/config-snapshots
+          mkdir -p ci-debug
           source "$VENV_PATH/bin/activate"
 
           export ANDROID_HOME="$ANDROID_SDK_ROOT"
@@ -246,25 +246,22 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee -a ci-debug/build-apk.log
           echo "ANDROID_NDK_PATH=$ANDROID_NDK_PATH" | tee -a ci-debug/build-apk.log
 
-          # Snapshot config.log files while the build is running, because
-          # pyside6-android-deploy may remove .buildozer on exit.
+          LIBFFI_CFG=".buildozer/android/platform/build-arm64-v8a/build/other_builds/libffi/arm64-v8a__ndk_target_21/libffi/config.log"
+
+          # Snapshot the exact libffi config.log while the build is running,
+          # because pyside6-android-deploy removes .buildozer on exit.
           (
             set +e
             while true; do
-              if [ -d .buildozer ]; then
-                while IFS= read -r -d '' f; do
-                  rel="${f#./}"
-                  dst="ci-debug/config-snapshots/$rel"
-                  mkdir -p "$(dirname "$dst")"
-                  cp -f "$f" "$dst" 2>/dev/null || true
-                done < <(find .buildozer -type f -name config.log -print0 2>/dev/null)
+              if [ -f "$LIBFFI_CFG" ]; then
+                cp -f "$LIBFFI_CFG" ci-debug/libffi-config.log 2>/dev/null || true
+                tail -n 200 "$LIBFFI_CFG" > ci-debug/libffi-config.tail.txt 2>/dev/null || true
               fi
-              sleep 2
+              sleep 1
             done
           ) &
           SNAP_PID=$!
 
-          # Always stop the snapshotter on exit from this step
           cleanup_snap() {
             kill "$SNAP_PID" 2>/dev/null || true
             wait "$SNAP_PID" 2>/dev/null || true

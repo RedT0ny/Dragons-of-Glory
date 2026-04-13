@@ -1,5 +1,6 @@
 import random
 
+from content.tools import TextFormatter
 from src.content.config import UNITS_DATA
 from src.content.specs import UnitType
 from src.game.event import check_requirements
@@ -85,7 +86,7 @@ class EventSystem:
         )
         self.game_state.units.extend(created)
         for u in created:
-            print(f"Unit {u.id} added/ready for {allegiance}")
+            print(f"Unit {TextFormatter.format_unit_log_string(u)} added/ready for {allegiance}")
 
     def apply_event_effect_by_spec(self, spec):
         """
