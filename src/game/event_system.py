@@ -56,7 +56,7 @@ class EventSystem:
         # 2. Flying Citadel
         elif unit_key == "citadel":
             candidates = [s for s in available_specs
-                          if s.is_citadel().value and s.allegiance == allegiance]
+                          if s.unit_type == UnitType.CITADEL.value and s.allegiance == allegiance]
             candidates = candidates[:1]
 
         # 3. Golden General (Laurana)
@@ -67,7 +67,7 @@ class EventSystem:
         # 4. Good Dragons
         elif unit_key == "good_dragons":
             candidates = [s for s in available_specs
-                          if s.is_wing().value and s.allegiance == "whitestone"]
+                          if s.unit_type == UnitType.WING.value and s.allegiance == "whitestone"]
 
         # Fallback: Try to find by direct ID match
         if not candidates:
