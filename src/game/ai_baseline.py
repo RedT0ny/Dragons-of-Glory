@@ -780,18 +780,21 @@ class StrategicPlanner:
                 continue
             if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
                 continue
-            inland_exit_count = 0
-            for neighbor in h.neighbors():
-                ncol, nrow = neighbor.axial_to_offset()
-                if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
-                    continue
-                if board.is_coastal(neighbor) and not board.get_location(neighbor):
-                    continue
-                if not ctx.game_state.can_control_probe_project_across_hexside(h, neighbor, allegiance=ctx.side):
-                    continue
-                inland_exit_count += 1
-            if inland_exit_count == 0:
+            if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, objective_hex, max_depth=18):
+                debug_print(f"[TRANSPORT] skip_slot=({col},{row}) not_land_reachable_to_objective")
                 continue
+            # inland_exit_count = 0
+            # for neighbor in h.neighbors():
+            #     ncol, nrow = neighbor.axial_to_offset()
+            #     if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
+            #         continue
+            #     if board.is_coastal(neighbor) and not board.get_location(neighbor):
+            #         continue
+            #     if not ctx.game_state.can_control_probe_project_across_hexside(h, neighbor, allegiance=ctx.side):
+            #         continue
+            #     inland_exit_count += 1
+            # if inland_exit_count == 0:
+            #     continue
             threat_val = _overlay_value(threat, col, row, 0.0)
             loc = board.get_location(h)
             existing_ground = sum(
@@ -809,19 +812,19 @@ class StrategicPlanner:
                 if country_id in target_countries:
                     score += 10.0
             score -= existing_ground * 5.0
-            if inland_exit_count == 1:
-                score -= 25.0
-            else:
-                score += inland_exit_count * 6.0
+            # if inland_exit_count == 1:
+            #     score -= 25.0
+            # else:
+            #     score += inland_exit_count * 6.0
             if h == beachhead_hex:
                 score += 6.0
-            debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
-            if inland_exit_count >= 3:
-                primary_scored.append((score, h))
-            elif inland_exit_count == 2:
-                secondary_scored.append((score, h))
-            else:
-                fallback_scored.append((score, h))
+            # debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
+            # if inland_exit_count >= 3:
+            #     primary_scored.append((score, h))
+            # elif inland_exit_count == 2:
+            #     secondary_scored.append((score, h))
+            # else:
+            fallback_scored.append((score, h))
 
         primary_scored.sort(key=lambda item: item[0], reverse=True)
         secondary_scored.sort(key=lambda item: item[0], reverse=True)
@@ -867,6 +870,11 @@ class StrategicPlanner:
 
             # Authoritative legality from game rules.
             if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
+                continue
+
+            # Reject hexes where landed armies cannot reach the objective by ground.
+            if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, main_hex, max_depth=18):
+                debug_print(f"[TRANSPORT] skip_beachhead candidate=({col},{row}) not_land_reachable_to_objective")
                 continue
 
             score = 0.0
