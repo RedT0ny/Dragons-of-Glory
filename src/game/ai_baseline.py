@@ -417,8 +417,6 @@ class GeographyAnalyzer:
             if not u.is_fleet():
                 continue
             for p in u.passengers or []:  # Cycle through passengers
-                if p.allegiance != ctx.side:
-                    continue
                 if not p.is_army():
                     continue
                 embarked_ground.append(p)
@@ -641,7 +639,6 @@ class StrategicPlanner:
             return anchor, valid_slots
         debug_print(f"[TRANSPORT] recompute_landing_plan reason={recompute_reason}")
 
-        anchor = fallback_anchor if fallback_anchor is not None else self._simple_beachhead_choice(ctx, main_objective)
         target_countries = list(objective_graph.get("offensive_target_countries", set()) or set())
         if not target_countries and getattr(main_objective, "country_id", None):
             target_countries = [main_objective.country_id]
@@ -650,6 +647,10 @@ class StrategicPlanner:
             geo_candidates.extend(GeographyAnalyzer.get_country_landing_candidates(ctx, str(country_id), main_objective))
         if geo_candidates:
             anchor = geo_candidates[0]
+        elif fallback_anchor is not None:
+            anchor = fallback_anchor
+        else:
+            anchor = self._simple_beachhead_choice(ctx, main_objective)
         slots = self._build_beachhead_slots(ctx, anchor, main_objective) if anchor else []
         if slots:
             new_anchor = slots[0]
@@ -742,6 +743,12 @@ class StrategicPlanner:
         return new_score - old_score
 
     def _build_beachhead_slots(self, ctx: AIContext, beachhead_hex: Optional[Hex], main_objective: Optional[Objective]) -> List[Hex]:
+        """
+        Given a beachhead hex, find up to 4 coastal hexes (including the beachhead) that are good landing/unloading
+        spots for currently embarked armies.
+        Prioritize those that are closer to the main objective, have lower threat, and allow inland movement on the
+        next turn.
+        """
         if beachhead_hex is None or main_objective is None:
             return []
         board = ctx.game_state.map
@@ -774,12 +781,12 @@ class StrategicPlanner:
                 continue
             if target_countries:
                 country_id = (ctx.country_id_by_offset or {}).get((col, row))
-                if country_id is not None and country_id not in target_countries and h.distance_to(objective_hex) > 4:
+                if country_id is not None and country_id not in target_countries and h.distance_to(objective_hex) > 6:
                     continue
             if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in embarked_ground):
                 continue
-            if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
-                continue
+            # if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
+            #     continue
             if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, objective_hex, max_depth=18):
                 debug_print(f"[TRANSPORT] skip_slot=({col},{row}) not_land_reachable_to_objective")
                 continue
@@ -850,8 +857,6 @@ class StrategicPlanner:
             if not u.is_fleet():
                 continue
             for p in list(getattr(u, "passengers", []) or []):
-                if p.allegiance != ctx.side:
-                    continue
                 if not p.is_army():
                     continue
                 embarked_ground.append(p)

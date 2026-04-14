@@ -92,6 +92,8 @@ jobs:
             --skip-update \
             --auto-accept-license
 
+          cd ..
+
           if [ -d "$HOME/.pyside6_android_deploy" ]; then
             echo "QT_DEPLOY_CACHE=$HOME/.pyside6_android_deploy" >> "$GITHUB_ENV"
           elif [ -d "$HOME/.pyside6-android-deploy" ]; then
@@ -101,6 +103,9 @@ jobs:
             ls -la "$HOME"
             exit 1
           fi
+
+          # IMPORTANT: remove the helper checkout so it is not copied into the APK input tree
+          rm -rf pyside-setup
 
       - name: Confirm Qt helper cache exists
         run: |
@@ -268,12 +273,14 @@ jobs:
           }
           trap cleanup_snap EXIT
 
+          rm -rf pyside-setup
+
           pyside6-android-deploy \
             --verbose \
             --config-file pysidedeploy.spec \
             --sdk-path "$ANDROID_SDK_ROOT" \
             --ndk-path "$ANDROID_NDK_PATH" \
-            --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels \
+            --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels,pyside-setup \
             2>&1 | tee -a ci-debug/build-apk.log
 
       - name: Upload build logs
