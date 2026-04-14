@@ -1,5 +1,5 @@
 [app]
-title = Dragons of Glory
+title = DragonsOfGlory
 input_file = main.py
 project_dir = .
 project_file = pyproject.toml
