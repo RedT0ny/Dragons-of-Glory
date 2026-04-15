@@ -752,7 +752,7 @@ class StrategicPlanner:
                     continue
             if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in ctx.embarked_ground):
                 continue
-            if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, objective_hex, max_depth=18):
+            if not StrategicPlanner._is_land_reachable(ctx, h, objective_hex, max_depth=18):
                 debug_print(f"[TRANSPORT] skip_slot=({col},{row}) not_land_reachable_to_objective")
                 continue
             threat_val = _overlay_value(threat, col, row, 0.0)
@@ -813,7 +813,7 @@ class StrategicPlanner:
                 continue
 
             # Reject hexes where landed armies cannot reach the objective by ground.
-            if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, main_hex, max_depth=18):
+            if not StrategicPlanner._is_land_reachable(ctx, h, main_hex, max_depth=18):
                 debug_print(f"[TRANSPORT] skip_beachhead candidate=({col},{row}) not_land_reachable_to_objective")
                 continue
 
@@ -1010,15 +1010,15 @@ class StrategicPlanner:
     ) -> bool:
         if offensive_side != ctx.side:
             return False
-        fleets = [
-            u for u in ctx.game_state.units
-            if u.allegiance == ctx.side
-            and u.is_fleet()
-            and (u.is_on_map or u.status == UnitState.READY)
-        ]
-        if not fleets:
-            return False
-        if not objectives:
+        fleets = []
+        ground_units = []
+
+        for u in ctx.game_state.units:
+            if u.allegiance == ctx.side and (u.is_on_map or u.status == UnitState.READY):
+                if u.is_fleet(): fleets.append(u)
+                elif u.is_army(): ground_units.append(u)
+
+        if not fleets or not objectives or not ground_units:
             return False
 
         target_objectives = []
@@ -1026,15 +1026,6 @@ class StrategicPlanner:
             target_objectives.append(main_objective)
         target_objectives.extend([o for o in objectives if o.owner != ctx.side and o is not main_objective][:3])
         if not target_objectives:
-            return False
-
-        ground_units = [
-            u for u in ctx.game_state.units
-            if u.allegiance == ctx.side
-            and u.is_army()
-            and (u.is_on_map or u.status == UnitState.READY)
-        ]
-        if not ground_units:
             return False
 
         starts: List[Hex] = []
@@ -1051,7 +1042,7 @@ class StrategicPlanner:
 
         for obj in target_objectives:
             target_hex = Hex.offset_to_axial(obj.coords[0], obj.coords[1])
-            reachable = any(self._is_plausibly_land_reachable(ctx, s, target_hex, max_depth=18) for s in starts[:10])
+            reachable = any(self._is_land_reachable(ctx, s, target_hex, max_depth=18) for s in starts[:10])
             if not reachable:
                 return True
             if all_start_coastal and ctx.game_state.map.is_coastal(target_hex):
@@ -1061,7 +1052,11 @@ class StrategicPlanner:
         return False
 
     @staticmethod
-    def _is_plausibly_land_reachable(ctx: AIContext, start_hex: Hex, target_hex: Hex, max_depth: int = 18) -> bool:
+    def _is_land_reachable(ctx: AIContext, start_hex: Hex, target_hex: Hex, max_depth: int = 18) -> bool:
+        """
+        Determine if a land path exists from start_hex to target_hex within max_depth steps, considering
+        only hexes that can be legally moved across by a ground unit.
+        """
         if start_hex == target_hex:
             return True
         board = ctx.game_state.map
