@@ -780,7 +780,16 @@ class StrategicPlanner:
         secondary_scored.sort(key=lambda item: item[0], reverse=True)
         fallback_scored.sort(key=lambda item: item[0], reverse=True)
         ordered = primary_scored + secondary_scored + fallback_scored
-        slots = [h for _, h in ordered[:4]]
+        
+        required_capacity = len(ctx.embarked_ground)
+        required_slots = (required_capacity + 1) // 2  # ceil division by 2
+        max_slots = max(4, required_slots)
+        slots = [h for _, h in ordered[:max_slots]]
+        
+        total_capacity = len(slots) * 2
+        if total_capacity < required_capacity:
+            debug_print(f"[TRANSPORT] WARNING: insufficient landing capacity ({total_capacity}) for {required_capacity} armies")
+        
         if len(slots) < 2:
             return slots
         return slots
