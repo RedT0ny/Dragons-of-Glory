@@ -443,8 +443,14 @@ class GeographyAnalyzer:
 
 
 class StrategicPlanner:
-
-    def build_plan(self, ctx: AIContext, beachhead_memory: Optional[Dict[str, Optional[Hex]]] = None) -> StrategicPlan:
+    """
+    Determines posture (offensive/defensive/balanced/desperate)
+    Selects main objective based on victory conditions
+    Decides whether to use transport (amphibious) campaigns
+    Chooses beachhead locations for naval invasions
+    Selects neutral expansion targets
+    """
+    def build_plan(self, ctx: AIContext) -> StrategicPlan:
         posture, notes, offensive_side, main_objective, deadline_turn, urgency_score, must_act, victory_category, enemy_victory_category = self._choose_posture(
             ctx)
         objectives = self._prioritize_objectives(ctx)
@@ -469,22 +475,10 @@ class StrategicPlanner:
 
         transport_campaign = self._should_use_transport(ctx, objectives, offensive_side, main_objective)
 
-        # Beachhead selection for transport campaigns - reuse stored beachhead if available
-        beachhead_hex = None
         if transport_campaign and offensive_side == ctx.side and main_objective:
-            if beachhead_memory and ctx.side in beachhead_memory:
-                beachhead_hex = beachhead_memory[ctx.side]
-                if beachhead_hex:
-                    pass
-                else:
-                    beachhead_hex = self._simple_beachhead_choice(ctx, main_objective)
-                    beachhead_memory[ctx.side] = beachhead_hex
-            else:
-                beachhead_hex = self._simple_beachhead_choice(ctx, main_objective)
-
-        if transport_campaign and offensive_side == ctx.side and main_objective:
-            beachhead_hex, beachhead_slots = self._compute_landing_plan(ctx, main_objective, beachhead_hex)
+            beachhead_hex, beachhead_slots = self._compute_landing_plan(ctx, main_objective, None)
         else:
+            beachhead_hex = None
             beachhead_slots = []
 
         if beachhead_slots:
@@ -663,7 +657,7 @@ class StrategicPlanner:
             if old_anchor is not None:
                 improvement = self._score_anchor_improvement(ctx, new_anchor, old_anchor, main_objective)
                 if improvement <= 12.0 and any(
-                    old_anchor.axial_to_offset() == s.axial_to_offset() for s in slots
+                    old_anchor == s for s in slots
                 ):
                     new_anchor = old_anchor
             anchor = new_anchor
@@ -1180,6 +1174,12 @@ class StrategicPlanner:
         return best
 
 class OperationalPlanner:
+    """
+    Groups units into task groups by role (army/air/fleet)
+    Assigns missions to each task group (attack, defend, transport, etc.)
+    Manages capital defense assignments
+    Assigns fleets to specific beachhead slots
+    """
     @staticmethod
     def _fleet_has_embarked_ground_for_transport(fleet) -> bool:
         if fleet is None:
@@ -2021,6 +2021,13 @@ class OperationalPlanner:
         return best, best_dist
 
 class TacticalPlanner:
+    """
+    Deploys ready units from reserve
+    Executes movement with hex-by-hex scoring
+    Executes combat with odds-based filtering
+    Manages transport operations (boarding/unboarding)
+    Handles dragon commander boarding for HL
+    """
     MOVE_WEIGHTS = {
         "push_objective": {"objective": 12, "threat": -4, "support": 2, "capture": 8},
         "post_landing_push": {"objective": 14, "threat": -4, "support": 2, "capture": 9},
@@ -4268,8 +4275,7 @@ class BaselineAIPlayer:
             plan = cache.get("plan")
             debug_print(f"[TRANSPORT] phase_plan_reused side={side} objective={cache.get('objective_id')}")
         else:
-            beachhead_memory = self._ensure_beachhead_phase_memory()
-            plan = self._strategic.build_plan(ctx, beachhead_memory=beachhead_memory)
+            plan = self._strategic.build_plan(ctx)
             self._update_invasion_state_from_plan(side, plan)
             updated_state = self._get_invasion_state(side)
             self._movement_phase_plan_cache_by_side[side] = {
