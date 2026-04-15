@@ -3,12 +3,8 @@ name = "Dragons of Glory"
 
 [tool.pyside6-project]
 files = [
-  "main.py",
-  "src/main.py",
-  "src/game/controller.py",
-  "src/gui/main_window.py",
-  "src/gui/map_view.py",
-  "src/gui/info_panel.py",
-  "src/gui/replacements_dialog.py",
-  "src/game/combat.py"
+    "main.py",
+    "src/",
+    "data/",
+    "assets/"
 ]

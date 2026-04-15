@@ -752,23 +752,9 @@ class StrategicPlanner:
                     continue
             if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in ctx.embarked_ground):
                 continue
-            # if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
-            #     continue
             if not StrategicPlanner._is_plausibly_land_reachable(ctx, h, objective_hex, max_depth=18):
                 debug_print(f"[TRANSPORT] skip_slot=({col},{row}) not_land_reachable_to_objective")
                 continue
-            # inland_exit_count = 0
-            # for neighbor in h.neighbors():
-            #     ncol, nrow = neighbor.axial_to_offset()
-            #     if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
-            #         continue
-            #     if board.is_coastal(neighbor) and not board.get_location(neighbor):
-            #         continue
-            #     if not ctx.game_state.can_control_probe_project_across_hexside(h, neighbor, allegiance=ctx.side):
-            #         continue
-            #     inland_exit_count += 1
-            # if inland_exit_count == 0:
-            #     continue
             threat_val = _overlay_value(threat, col, row, 0.0)
             loc = board.get_location(h)
             existing_ground = sum(
@@ -786,18 +772,8 @@ class StrategicPlanner:
                 if country_id in target_countries:
                     score += 10.0
             score -= existing_ground * 5.0
-            # if inland_exit_count == 1:
-            #     score -= 25.0
-            # else:
-            #     score += inland_exit_count * 6.0
             if h == beachhead_hex:
                 score += 6.0
-            # debug_print(f"[TRANSPORT] slot_candidate=({col},{row}) exits={inland_exit_count} score={score:.1f}")
-            # if inland_exit_count >= 3:
-            #     primary_scored.append((score, h))
-            # elif inland_exit_count == 2:
-            #     secondary_scored.append((score, h))
-            # else:
             fallback_scored.append((score, h))
 
         primary_scored.sort(key=lambda item: item[0], reverse=True)
@@ -1776,83 +1752,6 @@ class OperationalPlanner:
         return True
 
     @staticmethod
-    def _best_landing_hex_for_objective(ctx: AIContext, main_hex: Hex, fallback: Hex) -> Hex:
-        """Find best landing hex near main objective with safety and density considerations."""
-        board = ctx.game_state.map
-        best = None
-        best_score = float("-inf")
-        threat = ctx.overlays.get("threat")
-        territory = ctx.overlays.get("territory")
-        friendly_power = ctx.overlays.get("ws_power") if ctx.side == WS else ctx.overlays.get("hl_power")
-        transport_actions = ctx.transport_actions_in_phase
-        
-        for col in range(int(getattr(board, "width", 0) or 0)):
-            for row in range(int(getattr(board, "height", 0) or 0)):
-                h = Hex.offset_to_axial(col, row)
-                # Must be coastal or have a location
-                if not board.is_coastal(h) and not board.get_location(h):
-                    continue
-                
-                # Inland-expansion validation: reject coastal dead ends
-                if not StrategicPlanner._landing_hex_has_inland_access(ctx, h, main_hex, max_depth=8):
-                    continue  # Skip isolated coastal pockets
-                
-                score = 0.0
-                
-                # a) Closeness to main objective (important)
-                dist = h.distance_to(main_hex)
-                score += (10.0 - dist) * 3.0
-                
-                # b) Lower threat overlay is better
-                threat_val = _overlay_value(threat, col, row, 0.0)
-                score -= threat_val * 2.0
-                
-                # c) Friendly support nearby is better
-                support = _overlay_value(friendly_power, col, row, 0.0)
-                score += support * 1.5
-                
-                # d) Avoid hexes adjacent to strong enemy presence unless objective is urgent
-                adj_enemy = 0
-                for neighbor in h.neighbors():
-                    ncol, nrow = neighbor.axial_to_offset()
-                    nstack = board.get_units_in_hex(ncol, nrow)
-                    if any(u.allegiance == ctx.enemy and u.is_on_map for u in nstack):
-                        adj_enemy += 1
-                if adj_enemy >= 2:
-                    score -= 20.0
-                elif adj_enemy == 1:
-                    score -= 8.0
-                
-                # e) Prefer enemy/final-approach coast near objective
-                tval = territory.values.get((col, row)) if territory else None
-                if tval == ctx.enemy and dist <= 3:
-                    score += 15.0
-                elif tval == ctx.side and dist <= 2:
-                    score += 5.0
-                
-                # f) Penalize hexes already reserved or with too many friendly ground armies
-                if transport_actions:
-                    reserve_key = ("landing_reserve", (col, row))
-                    if reserve_key in transport_actions:
-                        score -= 50.0  # Already reserved by another fleet
-                
-                # Count existing friendly ground armies on hex
-                stack = board.get_units_in_hex(col, row)
-                friendly_ground = sum(1 for u in stack if u.allegiance == ctx.side
-                                      and u.is_on_map
-                                      and u.is_army())
-                if friendly_ground >= 2:
-                    score -= 40.0  # Soft cap reached
-                elif friendly_ground == 1:
-                    score -= 15.0
-                
-                if score > best_score:
-                    best = h
-                    best_score = score
-        
-        return best or fallback
-
-    @staticmethod
     def _best_embark_hex(ctx: AIContext, group: TaskGroup, main_hex: Hex) -> Hex:
         fleet_hexes = []
         for u in ctx.friendly_units:
@@ -2057,47 +1956,6 @@ class TacticalPlanner:
                 return True
         
         return False
-    
-    @staticmethod
-    def _is_valid_amphibious_unload_hex(ctx: AIContext, hex_obj: Hex, armies=None) -> bool:
-        """Validate hex for amphibious unloading: terrain, inland access, not trapped."""
-        board = ctx.game_state.map
-        col, row = hex_obj.axial_to_offset()
-        
-        # Must be coastal or location hex suitable for fleet unloading
-        if not board.is_coastal(hex_obj) and not board.get_location(hex_obj):
-            return False
-        
-        # Explicitly reject bad coastal terrain: swamp, desert
-        # Check terrain overlay if available
-        terrain = ctx.overlays.get("territory")
-        if terrain:
-            # If terrain data is available, reject swamp/desert coastal hexes
-            # This is a conservative check - could be expanded with explicit terrain types
-            pass  # Terrain validation handled by can_control_probe_project_across_hexside
-        
-        # Check location type - allow cities, ports, fortresses
-        loc = board.get_location(hex_obj)
-        if loc:
-            loc_type = getattr(loc, "loc_type", None)
-            if loc_type not in (LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value):
-                # Unknown location type - be conservative
-                pass
-        
-        # Require true inland expansion capability (not just any neighbor)
-        if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, hex_obj):
-            return False
-        
-        # Density check: if armies provided, check unload cap
-        if armies:
-            stack = board.get_units_in_hex(col, row)
-            existing_ground = sum(1 for u in stack if u.allegiance == ctx.side
-                                  and u.is_on_map
-                                  and u.is_army())
-            if existing_ground + len(armies) > 2:
-                return False
-        
-        return True
 
     def deploy_ready_units(
         self,
