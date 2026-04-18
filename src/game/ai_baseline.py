@@ -39,10 +39,6 @@ def _task_group_key(group) -> Tuple[Tuple[str, int], ...]:
     return tuple(sorted(_unit_key(u) for u in group.units))
 
 
-def _hex_distance(a: Hex, b: Hex) -> int:
-    return a.distance_to(b)
-
-
 def _overlay_value(overlay, col: int, row: int, default: float = 0.0) -> float:
     if overlay is None:
         return default
@@ -73,15 +69,6 @@ def _needs_capital_defense(side: str, hl_category: Optional[str], ws_category: O
 
 
 _AI_STANCE_CACHE: Optional[Dict[str, Dict[str, str]]] = None
-_VICTORY_CATEGORY_PRIORITY = [
-    "capture",
-    "conquer",
-    "control",
-    "destroy",
-    "prevent",
-    "escape",
-    "survive",
-]
 
 
 def _load_ai_stance_matrix() -> Dict[str, Dict[str, str]]:
@@ -89,111 +76,6 @@ def _load_ai_stance_matrix() -> Dict[str, Dict[str, str]]:
     if _AI_STANCE_CACHE is None:
         _AI_STANCE_CACHE = loader.load_ai_stance_csv(AI_STANCE_DATA)
     return _AI_STANCE_CACHE or {}
-
-
-def _victory_category_for_type(node_type: str) -> Optional[str]:
-    key = str(node_type or "").strip().lower()
-    if not key:
-        return None
-    if key.startswith("capture"):
-        return "capture"
-    if key.startswith("conquer"):
-        return "conquer"
-    if key.startswith("control"):
-        return "control"
-    if key.startswith("destroy"):
-        return "destroy"
-    if key.startswith("prevent"):
-        return "prevent"
-    if key.startswith("escape"):
-        return "escape"
-    if key.startswith("survive"):
-        return "survive"
-    return None
-
-
-def _extract_victory_metadata(raw: Any) -> Dict[str, Any]:
-    categories_by_tier = {"major": [], "minor": []}
-    location_targets: Set[str] = set()
-    country_targets: Set[str] = set()
-    location_deadlines: Dict[str, int] = {}
-    country_deadlines: Dict[str, int] = {}
-    overall_deadline: Optional[int] = None
-
-    def record_deadline(deadline: Optional[int], bucket: Dict[str, int], key: str):
-        nonlocal overall_deadline
-        if deadline is None:
-            return
-        bucket[key] = min(deadline, bucket.get(key, deadline))
-        overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
-
-    def walk(node: Any, tier: str):
-        nonlocal overall_deadline
-        if isinstance(node, dict):
-            if "all" in node:
-                for child in node.get("all", []) or []:
-                    walk(child, tier)
-            if "any" in node:
-                for child in node.get("any", []) or []:
-                    walk(child, tier)
-            if "type" in node:
-                node_type = str(node.get("type", "") or "")
-                category = _victory_category_for_type(node_type)
-                if category:
-                    categories_by_tier[tier].append(category)
-                deadline = node.get("by_turn")
-                try:
-                    deadline = int(deadline) if deadline is not None else None
-                except Exception:
-                    deadline = None
-                if node_type in {"capture_location", "prevent_location_captured"}:
-                    loc_id = _slugify(node.get("location", ""))
-                    if loc_id:
-                        location_targets.add(loc_id)
-                        record_deadline(deadline, location_deadlines, loc_id)
-                elif node_type in {"conquer_country", "prevent_country_conquered"}:
-                    country_id = _slugify(node.get("country", ""))
-                    if country_id:
-                        country_targets.add(country_id)
-                        record_deadline(deadline, country_deadlines, country_id)
-                elif deadline is not None:
-                    overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
-            return
-        if isinstance(node, list):
-            for child in node:
-                walk(child, tier)
-
-    if isinstance(raw, dict):
-        for tier in ("major", "minor"):
-            if tier in raw:
-                walk(raw.get(tier), tier)
-    elif isinstance(raw, list):
-        walk(raw, "minor")
-
-    def pick_primary_category() -> Optional[str]:
-        for tier in ("major", "minor"):
-            cats = categories_by_tier.get(tier) or []
-            if not cats:
-                continue
-            counts: Dict[str, int] = {}
-            for cat in cats:
-                counts[cat] = counts.get(cat, 0) + 1
-            best = sorted(
-                counts.items(),
-                key=lambda item: (item[1], -_VICTORY_CATEGORY_PRIORITY.index(item[0])),
-                reverse=True,
-            )
-            return best[0][0] if best else None
-        return None
-
-    return {
-        "primary_category": pick_primary_category(),
-        "location_targets": location_targets,
-        "country_targets": country_targets,
-        "location_deadlines": location_deadlines,
-        "country_deadlines": country_deadlines,
-        "deadline": overall_deadline,
-    }
 
 
 def _determine_offensive_side(hl_category: Optional[str], ws_category: Optional[str]) -> Optional[str]:
@@ -378,63 +260,6 @@ class ObjectiveAnalyzer:
         elif isinstance(raw, list):
             walk(raw, "minor")
 
-
-class GeographyAnalyzer:
-    @staticmethod
-    def get_country_ports(game_state, country_id: str) -> List[object]:
-        country = game_state.countries.get(country_id)
-        if not country:
-            return []
-        return [
-            loc for loc in country.locations.values()
-            if getattr(loc, "coords", None) and getattr(loc, "loc_type", None) == LocType.PORT.value
-        ]
-
-    @staticmethod
-    def get_country_coastal_hexes(game_state, country_id: str) -> List[Hex]:
-        board = game_state.map
-        out: List[Hex] = []
-        for col in range(int(getattr(board, "width", 0) or 0)):
-            for row in range(int(getattr(board, "height", 0) or 0)):
-                h = Hex.offset_to_axial(col, row)
-                if not board.is_coastal(h):
-                    continue
-                country = game_state.get_country_by_hex(col, row)
-                if country and getattr(country, "id", None) == country_id:
-                    out.append(h)
-        return out
-
-    @staticmethod
-    def get_country_landing_candidates(ctx: AIContext, country_id: str, main_objective: Objective) -> List[Hex]:
-        """
-        Return coastal hexes in the target country that are within distance 6 of the main objective and can be reached
-        by at least one currently embarked ground unit, and where the disembarking army can move inland on the next turn.
-        """
-        board = ctx.game_state.map
-        objective_hex = Hex.offset_to_axial(*main_objective.coords)
-        candidates: List[Hex] = []
-        if not ctx.embarked_ground:
-            return []
-        country_hexes = list((ctx.country_hexes_by_id or {}).get(country_id, []))
-        for h in country_hexes:
-            if not board.is_coastal(h):
-                continue
-            if h.distance_to(objective_hex) > 6:
-                continue
-            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in ctx.embarked_ground):
-                continue
-            if not TacticalPlanner._can_army_exit_landing_hex(ctx, None, h):
-                continue
-            candidates.append(h)
-        ports = GeographyAnalyzer.get_country_ports(ctx.game_state, country_id)
-        port_hexes = {
-            Hex.offset_to_axial(loc.coords[0], loc.coords[1])
-            for loc in ports if getattr(loc, "coords", None)
-        }
-        candidates.sort(key=lambda h: ((h not in port_hexes), h.distance_to(objective_hex)))
-        return candidates
-
-
 class StrategicPlanner:
     """
     Determines posture (offensive/defensive/balanced/desperate)
@@ -618,7 +443,6 @@ class StrategicPlanner:
 
     def _compute_landing_plan(self, ctx: AIContext, main_objective: Objective, fallback_anchor: Optional[Hex]) -> Tuple[Optional[Hex], List[Hex]]:
         state = ctx.invasion_state or {}
-        objective_graph = ctx.objective_graph or {}
         needs_recompute, valid_slots, recompute_reason = self._evaluate_existing_landing_plan(ctx, main_objective, state)
         if not needs_recompute and valid_slots:
             anchor = valid_slots[0]
@@ -626,18 +450,15 @@ class StrategicPlanner:
             return anchor, valid_slots
         debug_print(f"[TRANSPORT] recompute_landing_plan reason={recompute_reason}")
 
-        target_countries = list(objective_graph.get("offensive_target_countries", set()) or set())
-        if not target_countries and getattr(main_objective, "country_id", None):
-            target_countries = [main_objective.country_id]
-        geo_candidates: List[Hex] = []
-        for country_id in target_countries:
-            geo_candidates.extend(GeographyAnalyzer.get_country_landing_candidates(ctx, str(country_id), main_objective))
-        if geo_candidates:
-            anchor = geo_candidates[0]
-        elif fallback_anchor is not None:
+        if not ctx.embarked_ground or not main_objective.coords:
+            return None, []
+
+        loc_hex = Hex.offset_to_axial(*main_objective.coords)
+        anchor, _ = StrategicPlanner._compute_beachhead_for_location(ctx, loc_hex)
+
+        if not anchor and fallback_anchor is not None:
             anchor = fallback_anchor
-        else:
-            anchor = self._simple_beachhead_choice(ctx, main_objective)
+
         slots = self._build_beachhead_slots(ctx, anchor, main_objective) if anchor else []
         if slots:
             new_anchor = slots[0]
@@ -671,17 +492,6 @@ class StrategicPlanner:
         if not valid_slots:
             return True, [], "slots_invalid"
         return False, valid_slots, "reuse"
-
-    def _should_recompute_landing_plan(self, ctx: AIContext, main_objective: Objective, state: Dict[str, Any]) -> bool:
-        objective_id = str(getattr(main_objective, "id", "") or "")
-        if str(state.get("primary_objective_id") or "") != objective_id:
-            return True
-        if not state.get("anchor_hex") or not state.get("landing_slots"):
-            return True
-        valid_slots = self._validate_existing_landing_slots(ctx, state, main_objective)
-        if not valid_slots:
-            return True
-        return False
 
     def _validate_existing_landing_slots(self, ctx: AIContext, state: Dict[str, Any], main_objective: Objective) -> List[Hex]:
         board = ctx.game_state.map
@@ -793,62 +603,12 @@ class StrategicPlanner:
         if len(slots) < 2:
             return slots
         return slots
-    
-    def _simple_beachhead_choice(self, ctx: AIContext, main_objective: Objective) -> Optional[Hex]:
-        """Choose ONE beachhead hex: REAL coastal landing hex near main_objective.
-        
-        IMPORTANT: Beachhead must be a REAL amphibious landing hex (coastal/port-capable).
-        The main_objective may be inland (e.g. Qualinost city), but beachhead_hex must be
-        a coastal hex where fleets can actually land and unload troops.
-        """
-        board = ctx.game_state.map
-        threat = ctx.overlays.get("threat")
-        main_hex = Hex.offset_to_axial(*main_objective.coords)
-        if not ctx.embarked_ground:
-            return None
-        
-        best = None
-        best_score = float("-inf")
-        
-        # Search real coastal landing hexes near the main objective.
-        for h in list(ctx.coastal_hexes or []):
-            col, row = h.axial_to_offset()
-            dist = h.distance_to(main_hex)
-            if dist > 6:
-                continue
-
-            # Authoritative legality from game rules.
-            if not any(ctx.movement_service.can_unboard_unit_to_hex(p, h) for p in ctx.embarked_ground):
-                continue
-
-            # Reject hexes where landed armies cannot reach the objective by ground.
-            if not StrategicPlanner._is_land_reachable(ctx, h, main_hex, max_depth=18):
-                debug_print(f"[TRANSPORT] skip_beachhead candidate=({col},{row}) not_land_reachable_to_objective")
-                continue
-
-            score = 0.0
-            score += (6.0 - dist) * 4.0
-            threat_val = _overlay_value(threat, col, row, 0.0)
-            score -= threat_val * 2.0
-            territory = ctx.overlays.get("territory")
-            tval = territory.values.get((col, row)) if territory else None
-            if tval == ctx.enemy:
-                score += 10.0
-            loc = board.get_location(h)
-            if loc and getattr(loc, "loc_type", None) == LocType.PORT.value:
-                score += 20.0
-
-            if score > best_score:
-                best = h
-                best_score = score
-        
-        return best
 
     def _choose_posture(self, ctx: AIContext) -> Tuple[str, List[str], Optional[str], Optional[Objective], Optional[int], float, bool, Optional[str], Optional[str]]:
         notes = []
-        victory_conditions = getattr(ctx.game_state.scenario_spec, "victory_conditions", {}) or {}
-        hl_meta = _extract_victory_metadata(victory_conditions.get(HL, {}))
-        ws_meta = _extract_victory_metadata(victory_conditions.get(WS, {}))
+        victory_evaluator = getattr(ctx.game_state, "victory_evaluator", None)
+        hl_meta = victory_evaluator.get_victory_metadata(HL) if victory_evaluator else {}
+        ws_meta = victory_evaluator.get_victory_metadata(WS) if victory_evaluator else {}
         hl_category = hl_meta.get("primary_category")
         ws_category = ws_meta.get("primary_category")
         offensive_side = _determine_offensive_side(hl_category, ws_category)
@@ -1093,6 +853,152 @@ class StrategicPlanner:
                 visited.add(key)
                 frontier.append((neighbor, depth + 1))
         return False
+
+    @staticmethod
+    def _dijkstra_to_coastal(
+        ctx: AIContext,
+        start_hex: Hex,
+        coastal_hexes: List[Hex],
+        max_depth: int = 24,
+        ignore_enemy_armies: bool = False,
+    ) -> Dict[Hex, Tuple[int, Optional[Hex]]]:
+        """
+        Run Dijkstra from start_hex to find the best paths to each coastal_hex.
+        Returns: dict mapping coastal_hex -> (distance, next_hex_on_path)
+        If ignore_enemy_armies=True, treat enemy armies as passable (for fallback).
+        """
+        from collections import deque
+
+        coastal_set = {h: True for h in coastal_hexes}
+        dist: Dict[Hex, int] = {start_hex: 0}
+        prev: Dict[Hex, Hex] = {}
+        visited: Set[Hex] = set()
+
+        frontier = [(0, start_hex)]
+        import heapq
+        heapq.heapify(frontier)
+
+        while frontier:
+            current_dist, current = heapq.heappop(frontier)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            if current in coastal_set and current != start_hex:
+                continue
+
+            if current_dist > max_depth:
+                continue
+
+            for neighbor in current.neighbors():
+                if neighbor in visited:
+                    continue
+                col, row = neighbor.axial_to_offset()
+                if not ctx.game_state.is_hex_in_bounds(col, row):
+                    continue
+                if not ctx.game_state.can_control_probe_project_across_hexside(current, neighbor, allegiance=ctx.side):
+                    continue
+
+                movement_cost = 1
+                board = ctx.game_state.map
+                if not ignore_enemy_armies and board.has_enemy_army(neighbor, ctx.side):
+                    continue
+
+                new_dist = current_dist + movement_cost
+                if neighbor not in dist or new_dist < dist[neighbor]:
+                    dist[neighbor] = new_dist
+                    prev[neighbor] = current
+                    heapq.heappush(frontier, (new_dist, neighbor))
+
+        result: Dict[Hex, Tuple[int, Optional[Hex]]] = {}
+        for coastal_hex in coastal_hexes:
+            if coastal_hex in dist:
+                next_hex = coastal_hex
+                while next_hex in prev and prev[next_hex] != start_hex:
+                    next_hex = prev[next_hex]
+                result[coastal_hex] = (dist[coastal_hex], next_hex if next_hex != coastal_hex else None)
+            else:
+                result[coastal_hex] = (999, None)
+        return result
+
+    @staticmethod
+    def _compute_beachhead_for_location(
+        ctx: AIContext,
+        location_hex: Hex,
+    ) -> Tuple[Optional[Hex], List[Hex]]:
+        """
+        For a given location_hex (target location in enemy country), compute the best beachhead hexes.
+        Returns (best_beachhead, candidates_by_priority) where candidates_by_priority is sorted by:
+        1. closest ports not blocked by enemy armies
+        2. closest coastal hexes not blocked by enemy armies
+        3. ports closest to location even if blocked
+        4. coastal hexes closest to location even if blocked
+        """
+        board = ctx.game_state.map
+        all_coastal = list(ctx.coastal_hexes or [])
+        port_hexes = set()
+
+        for loc in board.locations.values():
+            if getattr(loc, "loc_type", None) == LocType.PORT.value and getattr(loc, "coords", None):
+                port_hex = Hex.offset_to_axial(loc.coords[0], loc.coords[1])
+                if board.is_coastal(port_hex):
+                    port_hexes.add(port_hex)
+
+        coastal_only = [h for h in all_coastal if h not in port_hexes]
+
+        dijkstra_unblocked = StrategicPlanner._dijkstra_to_coastal(
+            ctx, location_hex, all_coastal, max_depth=24, ignore_enemy_armies=False
+        )
+
+        dijkstra_blocked = StrategicPlanner._dijkstra_to_coastal(
+            ctx, location_hex, all_coastal, max_depth=24, ignore_enemy_armies=True
+        )
+
+        tier1_ports = []
+        tier2_coastal = []
+        tier3_ports_blocked = []
+        tier4_coastal_blocked = []
+
+        for port_hex in port_hexes:
+            dist_unblocked, _ = dijkstra_unblocked.get(port_hex, (999, None))
+            dist_blocked, path_hex = dijkstra_blocked.get(port_hex, (999, None))
+
+            can_unload = any(
+                ctx.movement_service.can_unboard_unit_to_hex(p, port_hex)
+                for p in ctx.embarked_ground
+            ) if ctx.embarked_ground else True
+
+            if dist_unblocked < 999 and can_unload:
+                tier1_ports.append((dist_unblocked, port_hex))
+            elif dist_blocked < 999:
+                tier3_ports_blocked.append((dist_blocked, port_hex))
+
+        for coastal_hex in coastal_only:
+            dist_unblocked, _ = dijkstra_unblocked.get(coastal_hex, (999, None))
+            dist_blocked, path_hex = dijkstra_blocked.get(coastal_hex, (999, None))
+
+            can_unload = any(
+                ctx.movement_service.can_unboard_unit_to_hex(p, coastal_hex)
+                for p in ctx.embarked_ground
+            ) if ctx.embarked_ground else True
+
+            if dist_unblocked < 999 and can_unload:
+                tier2_coastal.append((dist_unblocked, coastal_hex))
+            elif dist_blocked < 999:
+                tier4_coastal_blocked.append((dist_blocked, coastal_hex))
+
+        tier1_ports.sort(key=lambda x: x[0])
+        tier2_coastal.sort(key=lambda x: x[0])
+        tier3_ports_blocked.sort(key=lambda x: x[0])
+        tier4_coastal_blocked.sort(key=lambda x: x[0])
+
+        candidates = [h for _, h in tier1_ports] + [h for _, h in tier2_coastal] + [h for _, h in tier3_ports_blocked] + [h for _, h in tier4_coastal_blocked]
+        best = candidates[0] if candidates else None
+
+        debug_print(f"[TRANSPORT] Best landing slot: {best}\n"
+                    f"[TRANSPORT] List of candidates: {candidates}")
+
+        return best, candidates
 
     def _choose_invasion_target(self, ctx: AIContext, objectives: List[Objective]) -> Optional[str]:
         cache = ctx.neutral_front_cache if isinstance(ctx.neutral_front_cache, dict) else None
@@ -2725,7 +2631,7 @@ class TacticalPlanner:
 
         score = 0.0
         if mission.target_hex is not None:
-            distance = _hex_distance(target_hex, mission.target_hex)
+            distance = target_hex.distance_to(mission.target_hex)
             score += weights["objective"] * (max(0.0, 12.0 - distance))
         score += weights["threat"] * threat
         score += weights["support"] * support
@@ -4382,20 +4288,13 @@ class BaselineAIPlayer:
                 for uk in state.get("landed_armies", set()) or set():
                     self._transport_actions_in_phase.add(("landed_army", uk))
         return self._transport_actions_in_phase
-    
-    def _ensure_beachhead_phase_memory(self) -> Dict[str, Optional[Hex]]:
-        """Get or create beachhead memory for current phase. Returns dict mapping side -> beachhead_hex."""
-        key = (
-            int(getattr(self.game_state, "turn", 0) or 0),
-            getattr(self.game_state, "active_player", None),
-            getattr(self.game_state, "phase", None),
-        )
-        if self._beachhead_phase_key != key:
-            self._beachhead_phase_key = key
-            self._beachhead_by_side_in_phase = {}
-        return self._beachhead_by_side_in_phase
 
     def _compute_transport_signature(self, ctx: AIContext) -> Tuple[Tuple[Any, ...], ...]:
+        """
+        Compute a signature of the current transport state, to determine if cached transport plans are still valid.
+        This includes the positions of all fleets, and the count of embarked ground units in each fleet, since that
+        affects disembarkation possibilities.
+        """
         rows: List[Tuple[Any, ...]] = []
         for u in sorted(ctx.friendly_units, key=_unit_key):
             if not u.is_fleet():
@@ -4412,6 +4311,10 @@ class BaselineAIPlayer:
         return tuple(rows)
 
     def _cached_slots_still_valid(self, ctx: AIContext, cache: Dict[str, Any]) -> bool:
+        """
+        Check if cached beachhead landing slots are still valid.
+        If no slots cached, consider valid (may be waiting on slot generation).
+        """
         slots = list(cache.get("beachhead_slots", []) or [])
         if not slots:
             return True
@@ -4493,10 +4396,6 @@ class BaselineAIPlayer:
             }
         return self._invasion_state_by_side[side]
 
-    def _reset_invasion_state(self, side: str):
-        self._invasion_state_by_side.pop(side, None)
-        self._get_invasion_state(side)
-
     def _update_invasion_state_from_plan(self, side: str, plan: StrategicPlan):
         state = self._get_invasion_state(side)
         old_anchor = state.get("anchor_hex")
@@ -4513,18 +4412,6 @@ class BaselineAIPlayer:
             state["version"] = int(state.get("version", 0) or 0) + 1
         if plan.fleet_slot_assignments:
             state["fleet_assignments"] = dict(plan.fleet_slot_assignments)
-
-    def _mark_army_landed(self, side: str, unit):
-        self._get_invasion_state(side)["landed_armies"].add(_unit_key(unit))
-
-    def _is_army_landed(self, side: str, unit) -> bool:
-        return _unit_key(unit) in self._get_invasion_state(side).get("landed_armies", set())
-
-    def _mark_army_ashore_committed(self, side: str, unit):
-        self._get_invasion_state(side)["ashore_committed_armies"].add(_unit_key(unit))
-
-    def _is_army_ashore_committed(self, side: str, unit) -> bool:
-        return _unit_key(unit) in self._get_invasion_state(side).get("ashore_committed_armies", set())
 
     def _clear_ashore_committed_flag_if_explicitly_retasked(self, side: str, unit):
         # Conservative by default: only clear if unit is no longer a valid on-map friendly ground army.
@@ -4566,40 +4453,6 @@ class BaselineAIPlayer:
         landing_slots = [Hex.offset_to_axial(int(c), int(r)) for (c, r) in state.get("landing_slots", []) or []]
         if (not self.game_state.map.is_coastal(unit_hex)) or all(unit_hex.distance_to(h) > 1 for h in landing_slots):
             state["landed_armies"].discard(key)
-
-    def _extract_victory_targets(self, raw: Any) -> Tuple[set[str], set[str]]:
-        locations = set()
-        countries = set()
-
-        def walk(node: Any):
-            if isinstance(node, dict):
-                if "all" in node:
-                    for child in node.get("all", []) or []:
-                        walk(child)
-                if "any" in node:
-                    for child in node.get("any", []) or []:
-                        walk(child)
-                if "type" in node:
-                    node_type = str(node.get("type"))
-                    if node_type in {"capture_location", "prevent_location_captured"}:
-                        loc_id = _slugify(node.get("location", ""))
-                        if loc_id:
-                            locations.add(loc_id)
-                    if node_type in {"conquer_country", "prevent_country_conquered"}:
-                        country_id = _slugify(node.get("country", ""))
-                        if country_id:
-                            countries.add(country_id)
-                return
-            if isinstance(node, list):
-                for child in node:
-                    walk(child)
-
-        if isinstance(raw, dict):
-            walk(raw.get("major"))
-            walk(raw.get("minor"))
-        elif isinstance(raw, list):
-            walk(raw)
-        return locations, countries
 
     def _log(self, msg: str):
         debug_print(f"AI[{self.game_state.active_player}] {msg}")

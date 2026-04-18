@@ -943,12 +943,6 @@ class CombatService:
     def movement_service(self):
         return self.game_state.movement_service
 
-    def is_hex_in_bounds(self, q: int, r: int) -> bool:
-        return self.game_state.is_hex_in_bounds(q, r)
-
-    def can_units_attack_target_hex(self, attackers, target_hex) -> bool:
-        return self.game_state.can_units_attack_target_hex(attackers, target_hex)
-
     def _project_combat_odds(self, attackers, defenders, hex_position):
         terrain = self.game_state.map.get_terrain(hex_position)
         resolver = CombatResolver(attackers, defenders, terrain, game_state=self.game_state)
@@ -1282,7 +1276,7 @@ class CombatService:
                 if getattr(d, "position", None) and d.position[0] is not None and d.position[1] is not None:
                     target_hex = Hex.offset_to_axial(*d.position)
                     break
-        if target_hex and not self.can_units_attack_target_hex(attackers, target_hex):
+        if target_hex and not self.game_state.can_units_attack_target_hex(attackers, target_hex):
             return False
 
         defenders_have_dragons = any(u.is_on_map and u.is_dragon() for u in defenders)
@@ -1613,7 +1607,7 @@ class CombatService:
         valid = []
         for neighbor in start_hex.neighbors():
             col, row = neighbor.axial_to_offset()
-            if not self.is_hex_in_bounds(col, row):
+            if not self.game_state.is_hex_in_bounds(col, row):
                 continue
             if not self.map.can_unit_land_on_hex(unit, neighbor):
                 continue

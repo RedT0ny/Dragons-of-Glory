@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Set, Tuple
 
 from src.content.constants import HL, WS
 from src.content.specs import UnitState, UnitType
@@ -9,6 +9,38 @@ from src.game.map import Hex
 def _slugify(s: str) -> str:
     import re
     return re.sub(r"[^a-z0-9]+", "_", str(s).lower()).strip("_")
+
+
+_VICTORY_CATEGORY_PRIORITY = [
+    "capture",
+    "conquer",
+    "control",
+    "destroy",
+    "prevent",
+    "escape",
+    "survive",
+]
+
+
+def _victory_category_for_type(node_type: str) -> str | None:
+    key = str(node_type or "").strip().lower()
+    if not key:
+        return None
+    if key.startswith("capture"):
+        return "capture"
+    if key.startswith("conquer"):
+        return "conquer"
+    if key.startswith("control"):
+        return "control"
+    if key.startswith("destroy"):
+        return "destroy"
+    if key.startswith("prevent"):
+        return "prevent"
+    if key.startswith("escape"):
+        return "escape"
+    if key.startswith("survive"):
+        return "survive"
+    return None
 
 
 @dataclass
@@ -83,6 +115,110 @@ class VictoryConditionEvaluator:
                 status.reason = "draw"
 
         return status
+
+    def get_victory_metadata(self, side: str) -> Dict[str, Any]:
+        """Extract strategic metadata from victory conditions for AI planning.
+
+        Returns a dict with:
+        - primary_category: dominant victory type (capture/conquer/control/etc)
+        - location_targets: set of location IDs to capture/defend
+        - country_targets: set of country IDs to conquer/defend
+        - location_deadlines: dict of location_id -> turn deadline
+        - country_deadlines: dict of country_id -> turn deadline
+        - deadline: earliest overall deadline
+        """
+        raw = self._side_victory_raw(side)
+        if not raw:
+            return {
+                "primary_category": None,
+                "location_targets": set(),
+                "country_targets": set(),
+                "location_deadlines": {},
+                "country_deadlines": {},
+                "deadline": None,
+            }
+
+        categories_by_tier = {"major": [], "minor": []}
+        location_targets: Set[str] = set()
+        country_targets: Set[str] = set()
+        location_deadlines: Dict[str, int] = {}
+        country_deadlines: Dict[str, int] = {}
+        overall_deadline: int | None = None
+
+        def record_deadline(deadline: int | None, bucket: Dict[str, int], key: str):
+            nonlocal overall_deadline
+            if deadline is None:
+                return
+            bucket[key] = min(deadline, bucket.get(key, deadline))
+            overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
+
+        def walk(node: Any, tier: str):
+            nonlocal overall_deadline
+            if isinstance(node, dict):
+                if "all" in node:
+                    for child in node.get("all", []) or []:
+                        walk(child, tier)
+                if "any" in node:
+                    for child in node.get("any", []) or []:
+                        walk(child, tier)
+                if "type" in node:
+                    node_type = str(node.get("type", "") or "")
+                    category = _victory_category_for_type(node_type)
+                    if category:
+                        categories_by_tier[tier].append(category)
+                    deadline = node.get("by_turn")
+                    try:
+                        deadline = int(deadline) if deadline is not None else None
+                    except Exception:
+                        deadline = None
+                    if node_type in {"capture_location", "prevent_location_captured"}:
+                        loc_id = _slugify(node.get("location", ""))
+                        if loc_id:
+                            location_targets.add(loc_id)
+                            record_deadline(deadline, location_deadlines, loc_id)
+                    elif node_type in {"conquer_country", "prevent_country_conquered"}:
+                        country_id = _slugify(node.get("country", ""))
+                        if country_id:
+                            country_targets.add(country_id)
+                            record_deadline(deadline, country_deadlines, country_id)
+                    elif deadline is not None:
+                        overall_deadline = min(deadline, overall_deadline) if overall_deadline is not None else deadline
+                return
+            if isinstance(node, list):
+                for child in node:
+                    walk(child, tier)
+
+        if isinstance(raw, dict):
+            for tier in ("major", "minor"):
+                if tier in raw:
+                    walk(raw.get(tier), tier)
+        elif isinstance(raw, list):
+            walk(raw, "minor")
+
+        def pick_primary_category() -> str | None:
+            for tier in ("major", "minor"):
+                cats = categories_by_tier.get(tier, [])
+                if not cats:
+                    continue
+                counts: Dict[str, int] = {}
+                for cat in cats:
+                    counts[cat] = counts.get(cat, 0) + 1
+                best = sorted(
+                    counts.items(),
+                    key=lambda item: (item[1], -_VICTORY_CATEGORY_PRIORITY.index(item[0])),
+                    reverse=True,
+                )
+                return best[0][0] if best else None
+            return None
+
+        return {
+            "primary_category": pick_primary_category(),
+            "location_targets": location_targets,
+            "country_targets": country_targets,
+            "location_deadlines": location_deadlines,
+            "country_deadlines": country_deadlines,
+            "deadline": overall_deadline,
+        }
 
     def _side_victory_raw(self, side: str) -> Any:
         """Return the raw victory definition for a given side from the scenario.

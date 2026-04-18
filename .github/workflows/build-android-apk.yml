@@ -165,8 +165,8 @@ jobs:
 
       - name: Prepare main.py for Android deploy
         run: |
+          test -f main.py || { echo "Missing root main.py"; exit 1; }
           test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
-          ln -sf src/main.py main.py
 
       - name: Remove UTF-8 BOM from Python files
         run: |
@@ -211,7 +211,9 @@ jobs:
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
           ndk_root = os.environ["ANDROID_NDK_PATH"]
 
-          cfg["app"]["project_file"] = "pyproject.toml"
+          cfg["app"]["input_file"] = "main.py"
+          cfg["app"]["project_dir"] = "."
+          cfg["app"]["project_file"] = ""
 
           cfg["python"]["python_path"] = f"{venv_path}/bin/python"
           cfg["python"]["android_packages"] = "buildozer==1.5.0,Cython==0.29.34,setuptools"
