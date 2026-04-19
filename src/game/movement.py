@@ -15,62 +15,9 @@ from game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
 from src.game.interception import InterceptionService
-from src.game.map import Hex
+from src.game.map import Hex, Hexside
 
 _KEEP_FIELD = object()
-
-
-def effective_movement_points(unit):
-    current = getattr(unit, "movement_points", unit.movement)
-    # Passengers can reduce effective movement (e.g. Wings/Fleets).
-    return min(current, unit.movement)
-
-
-def evaluate_unit_move(game_state, unit, target_hex, enforce_end_terrain: bool = True):
-    """
-    Shared movement validation/cost calculation used by UI and move execution.
-    Returns: (ok, reason, cost, start_hex, fleet_state_path)
-    """
-    unit_id = TextFormatter.format_unit_log_string(unit)
-    if getattr(unit, "transport_host", None) is not None:
-        return False, f"{unit_id} is transported and cannot move independently.", 0, None, []
-
-    if enforce_end_terrain and not unit.is_fleet() and not game_state.map.can_unit_land_on_hex(unit, target_hex):
-        tcol, trow = target_hex.axial_to_offset()
-        terrain = game_state.map.get_terrain(target_hex)
-        return False, (
-            f"{unit_id} cannot end movement on that terrain "
-            f"(target={tcol},{trow} terrain={getattr(terrain, 'value', terrain)})."
-        ), 0, None, []
-
-    if not unit.position or None in unit.position:
-        return True, None, 0, None, []
-
-    max_mp = effective_movement_points(unit)
-    start_hex = Hex.offset_to_axial(*unit.position)
-    if unit.is_fleet():
-        state_path, cost = game_state.map.find_fleet_route(unit, start_hex, target_hex)
-        if cost == float("inf") or (not state_path and start_hex != target_hex):
-            return False, f"{unit_id} has no valid path.", 0, start_hex, []
-        if cost > max_mp:
-            return False, f"{unit_id} lacks movement points.", cost, start_hex, state_path
-        return True, None, cost, start_hex, state_path
-
-    path = game_state.map.find_shortest_path(unit, start_hex, target_hex)
-    if not path and start_hex != target_hex:
-        return False, f"{unit_id} has no valid path.", 0, start_hex, []
-
-    cost = 0
-    current = start_hex
-    for next_step in path:
-        step_cost = game_state.map.get_movement_cost(unit, current, next_step)
-        cost += step_cost
-        current = next_step
-
-    if cost > max_mp:
-        return False, f"{unit_id} lacks movement points.", cost, start_hex, []
-
-    return True, None, cost, start_hex, []
 
 
 @dataclass
@@ -92,6 +39,17 @@ class MoveUnitsResult:
     """Result of moving units to a hex."""
     moved: List[object]
     errors: List[str]
+
+
+@dataclass
+class MoveEvaluation:
+    ok: bool
+    reason: str | None
+    cost: int
+    start_hex: Hex | None
+    path_hexes: List[Hex]
+    fleet_state_path: List[Tuple[Hex, Hexside | None]]
+    final_river_hexside: Hexside | None
 
 
 @dataclass
@@ -326,6 +284,155 @@ class MovementService:
         self.interception_service = InterceptionService(game_state, self, rng=random)
         self._movement_undo_stack = []
         self.invasion_handler = InvasionHandler(self)
+
+    def _effective_mp(self, unit):
+        current = getattr(unit, "movement_points", unit.movement)
+        return min(current, unit.movement)
+
+    @staticmethod
+    def _fleet_hex_path_from_state_path(state_path):
+        if not state_path:
+            return []
+        hex_path = []
+        prev_hex = state_path[0][0]
+        for curr_hex, _ in state_path[1:]:
+            if curr_hex != prev_hex:
+                hex_path.append(curr_hex)
+            prev_hex = curr_hex
+        return hex_path
+
+    def _format_river_hexside_for_log(self, river_hexside):
+        master = self.game_state.map.hexside_to_tuple(river_hexside)
+        if master is None:
+            return "None"
+        board = self.game_state.map
+        try:
+            local_a = board._local_hex_from_master_coords(master[0][0], master[0][1]).axial_to_offset()
+            local_b = board._local_hex_from_master_coords(master[1][0], master[1][1]).axial_to_offset()
+            return f"{local_a}<->{local_b}"
+        except Exception:
+            return "Unknown"
+
+    def _log_fleet_transition(self, unit, prev_hex, prev_side, curr_hex, curr_side):
+        unit_id = TextFormatter.format_unit_log_string(unit)
+        prev_hex_offset = prev_hex.axial_to_offset()
+        curr_hex_offset = curr_hex.axial_to_offset()
+        prev_side_text = self._format_river_hexside_for_log(prev_side)
+        curr_side_text = self._format_river_hexside_for_log(curr_side)
+
+        if prev_side is None and curr_side is None and prev_hex != curr_hex:
+            print(f"{unit_id} sails sea/coastal hex {prev_hex_offset} -> {curr_hex_offset}.")
+            return
+
+        if prev_side is None and curr_side is not None:
+            print(
+                f"{unit_id} enters deep_river hexside {curr_side_text} from hex {prev_hex_offset} "
+                f"(now at endpoint {curr_hex_offset})."
+            )
+            return
+
+        if prev_side is not None and curr_side is None:
+            print(
+                f"{unit_id} exits deep_river hexside {prev_side_text} to hex {curr_hex_offset} "
+                f"(from endpoint {prev_hex_offset})."
+            )
+            return
+
+        if prev_side is not None and curr_side == prev_side and prev_hex != curr_hex:
+            print(f"{unit_id} shifts along deep_river endpoint {prev_hex_offset} -> {curr_hex_offset} on {curr_side_text}.")
+            return
+
+        if prev_side is not None and curr_side != prev_side:
+            print(
+                f"{unit_id} changes deep_river hexside {prev_side_text} -> {curr_side_text} "
+                f"at/near endpoint {curr_hex_offset}."
+            )
+            return
+
+        if prev_side == curr_side and prev_hex == curr_hex:
+            print(f"{unit_id} remains at hex {curr_hex_offset} (hexside={curr_side}).")
+
+    def evaluate_move(self, unit, target_hex, enforce_end_terrain: bool = True) -> MoveEvaluation:
+        unit_id = TextFormatter.format_unit_log_string(unit)
+        if getattr(unit, "transport_host", None) is not None:
+            return MoveEvaluation(False, f"{unit_id} is transported and cannot move independently.", 0, None, [], [], None)
+
+        if enforce_end_terrain and not unit.is_fleet() and not self.game_state.map.can_unit_land_on_hex(unit, target_hex):
+            tcol, trow = target_hex.axial_to_offset()
+            terrain = self.game_state.map.get_terrain(target_hex)
+            return MoveEvaluation(
+                False,
+                f"{unit_id} cannot end movement on that terrain (target={tcol},{trow} terrain={getattr(terrain, 'value', terrain)}).",
+                0,
+                None,
+                [],
+                [],
+                None,
+            )
+
+        if not unit.position or None in unit.position:
+            return MoveEvaluation(True, None, 0, None, [], [], None)
+
+        max_mp = self._effective_mp(unit)
+        start_hex = Hex.offset_to_axial(*unit.position)
+        if unit.is_fleet():
+            state_path, cost = self.game_state.map.find_fleet_route(unit, start_hex, target_hex)
+            if cost == float("inf") or (not state_path and start_hex != target_hex):
+                return MoveEvaluation(False, f"{unit_id} has no valid path.", 0, start_hex, [], [], None)
+            final_river_hexside = state_path[-1][1] if state_path else getattr(unit, "river_hexside", None)
+            path_hexes = self._fleet_hex_path_from_state_path(state_path)
+            if cost > max_mp:
+                return MoveEvaluation(False, f"{unit_id} lacks movement points.", cost, start_hex, path_hexes, state_path, final_river_hexside)
+            return MoveEvaluation(True, None, cost, start_hex, path_hexes, state_path, final_river_hexside)
+
+        path = self.game_state.map.find_shortest_path(unit, start_hex, target_hex)
+        if not path and start_hex != target_hex:
+            return MoveEvaluation(False, f"{unit_id} has no valid path.", 0, start_hex, [], [], None)
+
+        cost = 0
+        current = start_hex
+        for next_step in path:
+            step_cost = self.game_state.map.get_movement_cost(unit, current, next_step)
+            cost += step_cost
+            current = next_step
+
+        if cost > max_mp:
+            return MoveEvaluation(False, f"{unit_id} lacks movement points.", cost, start_hex, path, [], None)
+
+        return MoveEvaluation(True, None, cost, start_hex, path, [], None)
+
+    def execute_move(self, unit, target_hex, evaluation: MoveEvaluation, enforce_end_terrain: bool = True):
+        if not evaluation.ok:
+            return False
+        if enforce_end_terrain:
+            follow_up = self.evaluate_move(unit, target_hex, enforce_end_terrain=True)
+            if not follow_up.ok:
+                return False
+            evaluation = follow_up
+
+        if self.game_state.phase == GamePhase.MOVEMENT and unit.position:
+            if not hasattr(unit, "movement_points"):
+                unit.movement_points = unit.movement
+            effective_mp = self._effective_mp(unit)
+            if evaluation.cost > effective_mp:
+                return False
+            unit.movement_points = max(0, effective_mp - evaluation.cost)
+
+        kwargs = {
+            "invalidate_analysis": False,
+            "update_territory": False,
+            "invalidate_overlays": False,
+            "enforce_end_terrain": enforce_end_terrain,
+        }
+        if self.game_state.phase == GamePhase.MOVEMENT and unit.is_fleet():
+            kwargs["river_hexside"] = evaluation.final_river_hexside
+        self.game_state.move_unit(unit, target_hex, **kwargs)
+        if unit.is_fleet() and evaluation.fleet_state_path:
+            for i in range(1, len(evaluation.fleet_state_path)):
+                prev_hex, prev_side = evaluation.fleet_state_path[i - 1]
+                curr_hex, curr_side = evaluation.fleet_state_path[i]
+                self._log_fleet_transition(unit, prev_hex, prev_side, curr_hex, curr_side)
+        return getattr(unit, "position", None) == target_hex.axial_to_offset() or not getattr(unit, "is_on_map", False)
 
     # --- Movement Undo State ---
     def clear_movement_undo(self):
@@ -672,7 +779,7 @@ class MovementService:
             start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
             if not start_hex:
                 return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
-            most_restrictive_fleet = min(units, key=effective_movement_points)
+            most_restrictive_fleet = min(units, key=self._effective_mp)
             return self._range_result_from_hexes(
                 self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
             )
@@ -724,11 +831,7 @@ class MovementService:
                 return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
 
             ordered_units = sorted(units, key=lambda u: 0 if u.is_army() else 1)
-            return self._execute_unit_move_batch(
-                ordered_units,
-                target_hex,
-                verify_target=True,
-            )
+            return self._execute_unit_move_batch(ordered_units, target_hex)
 
         if self.interception_service.should_check_interception(units):
             return self._move_units_with_interception(units, target_hex)
@@ -744,24 +847,16 @@ class MovementService:
 
         return self._execute_unit_move_batch(units, target_hex)
 
-    def _execute_unit_move_batch(self, units, target_hex, verify_target: bool = False) -> MoveUnitsResult:
+    def _execute_unit_move_batch(self, units, target_hex) -> MoveUnitsResult:
         moved = []
-        target_offset = target_hex.axial_to_offset() if verify_target else None
         for unit in units:
-            self.game_state.move_unit(
-                unit,
-                target_hex,
-                invalidate_analysis=False,
-                update_territory=False,
-                invalidate_overlays=False,
-            )
-            if verify_target and getattr(unit, "position", None) != target_offset:
-                ok, reason, _, _, _ = evaluate_unit_move(self.game_state, unit, target_hex)
-                message = reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
-                return MoveUnitsResult(
-                    moved=moved,
-                    errors=[message],
-                )
+            evaluation = self.evaluate_move(unit, target_hex)
+            if not evaluation.ok:
+                message = evaluation.reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
+                return MoveUnitsResult(moved=moved, errors=[message])
+            if not self.execute_move(unit, target_hex, evaluation):
+                message = evaluation.reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
+                return MoveUnitsResult(moved=moved, errors=[message])
             moved.append(unit)
         if moved:
             self.game_state.finalize_board_state_change()
@@ -769,45 +864,62 @@ class MovementService:
 
     def _move_units_with_interception(self, units, target_hex):
         lead = units[0]
-        lead_state_path = None
+        evaluations = {}
+        lead_evaluation = None
         for unit in units:
-            ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, unit, target_hex)
-            if not ok:
-                return MoveUnitsResult(moved=[], errors=[reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
-            if unit is lead and unit.is_fleet():
-                lead_state_path = state_path
+            evaluation = self.evaluate_move(unit, target_hex)
+            evaluations[id(unit)] = evaluation
+            if not evaluation.ok:
+                return MoveUnitsResult(moved=[], errors=[evaluation.reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."])
+            if unit is lead:
+                lead_evaluation = evaluation
 
         path = self._build_movement_hex_path(
             units,
             target_hex,
-            precomputed_state_path=lead_state_path if lead.is_fleet() else None,
+            precomputed_evaluation=lead_evaluation,
         )
         if path is None:
             return MoveUnitsResult(moved=[], errors=["Selected stack has no valid path."])
         if not path:
             return MoveUnitsResult(moved=list(units), errors=[])
 
+        moving_units = [u for u in units if getattr(u, "is_on_map", False)]
+        for unit in moving_units:
+            evaluation = evaluations[id(unit)]
+            if self.game_state.phase == GamePhase.MOVEMENT and getattr(unit, "position", None):
+                if not hasattr(unit, "movement_points"):
+                    unit.movement_points = unit.movement
+                effective_mp = self._effective_mp(unit)
+                if evaluation.cost > effective_mp:
+                    return MoveUnitsResult(moved=[], errors=[evaluation.reason or f"{TextFormatter.format_unit_log_string(unit)} lacks movement points."])
+                unit.movement_points = max(0, effective_mp - evaluation.cost)
+
         for idx, step_hex in enumerate(path):
             is_final_step = idx == (len(path) - 1)
             for unit in list(units):
                 if not getattr(unit, "is_on_map", False):
                     continue
-                self.game_state.move_unit(
-                    unit,
-                    step_hex,
-                    invalidate_analysis=False,
-                    update_territory=False,
-                    invalidate_overlays=False,
-                    enforce_end_terrain=is_final_step,
-                )
+                prev_hex = None
+                prev_side = None
+                if unit.is_fleet() and getattr(unit, "position", None) and None not in unit.position:
+                    prev_hex = Hex.offset_to_axial(*unit.position)
+                    prev_side = getattr(unit, "river_hexside", None)
+                kwargs = {
+                    "invalidate_analysis": False,
+                    "update_territory": False,
+                    "invalidate_overlays": False,
+                    "enforce_end_terrain": is_final_step,
+                }
+                if self.game_state.phase == GamePhase.MOVEMENT and unit.is_fleet() and is_final_step:
+                    kwargs["river_hexside"] = evaluations[id(unit)].final_river_hexside
+                self.game_state.move_unit(unit, step_hex, **kwargs)
+                if unit.is_fleet() and prev_hex is not None and getattr(unit, "position", None) and None not in unit.position:
+                    curr_hex = Hex.offset_to_axial(*unit.position)
+                    curr_side = getattr(unit, "river_hexside", None)
+                    self._log_fleet_transition(unit, prev_hex, prev_side, curr_hex, curr_side)
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
-                    ok, reason, _, _, _ = evaluate_unit_move(
-                        self.game_state,
-                        unit,
-                        step_hex,
-                        enforce_end_terrain=is_final_step,
-                    )
-                    message = reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move."
+                    message = f"{TextFormatter.format_unit_log_string(unit)} cannot move."
                     return MoveUnitsResult(moved=[], errors=[message])
 
             movers_alive = [u for u in units if u.is_on_map]
@@ -825,7 +937,7 @@ class MovementService:
         self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=[u for u in units if u.is_on_map], errors=[])
 
-    def _build_movement_hex_path(self, units, target_hex, precomputed_state_path=None):
+    def _build_movement_hex_path(self, units, target_hex, precomputed_evaluation=None):
         """
         Builds a hex path for a group of units to move to a target hex.
         Returns a list of hex coordinates or None if the path cannot be computed.
@@ -838,20 +950,15 @@ class MovementService:
             return []
 
         if lead.is_fleet():
-            state_path = precomputed_state_path
+            state_path = None
+            if isinstance(precomputed_evaluation, MoveEvaluation):
+                state_path = precomputed_evaluation.fleet_state_path
             if state_path is None:
-                ok, reason, _, _, state_path = evaluate_unit_move(self.game_state, lead, target_hex)
-                if not ok:
+                evaluation = self.evaluate_move(lead, target_hex)
+                if not evaluation.ok:
                     return None
-            if not state_path:
-                return []
-            hex_path = []
-            prev_hex = state_path[0][0]
-            for curr_hex, _ in state_path[1:]:
-                if curr_hex != prev_hex:
-                    hex_path.append(curr_hex)
-                prev_hex = curr_hex
-            return hex_path
+                state_path = evaluation.fleet_state_path
+            return self._fleet_hex_path_from_state_path(state_path)
 
         path = self.game_state.map.find_shortest_path(lead, start_hex, target_hex)
         if not path and start_hex != target_hex:
@@ -976,11 +1083,11 @@ class MovementService:
         return self._unit_movement_points(unit) > 0
 
     def _unit_movement_points(self, unit):
-        return effective_movement_points(unit)
+        return self._effective_mp(unit)
 
     def _can_unit_reach_target(self, unit, target_hex):
-        ok, reason, _, _, _ = evaluate_unit_move(self.game_state, unit, target_hex)
-        return ok, reason
+        evaluation = self.evaluate_move(unit, target_hex)
+        return evaluation.ok, evaluation.reason
 
     def handle_board_action(self, selected_units):
         if not selected_units:

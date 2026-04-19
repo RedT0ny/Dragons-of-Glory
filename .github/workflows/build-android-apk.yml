@@ -48,6 +48,7 @@ jobs:
             zip \
             unzip \
             wget \
+            curl \
             patchelf \
             python3-pip \
             python3-setuptools \
@@ -76,7 +77,33 @@ jobs:
           source "$VENV_PATH/bin/activate"
           python -m pip install --upgrade pip
           pip install -r requirements-android.txt
-          pip install buildozer==1.5.0 Cython==0.29.34 setuptools GitPython tqdm Jinja2
+
+          # Force the deploy tooling to match the Android wheels version exactly
+          pip install --force-reinstall --no-cache-dir \
+            "PySide6==${QT_PYSIDE_VERSION}" \
+            "shiboken6==${QT_PYSIDE_VERSION}" \
+            buildozer==1.5.0 \
+            Cython==0.29.34 \
+            setuptools \
+            GitPython \
+            tqdm \
+            Jinja2
+
+          python - <<'PY'
+          import pathlib
+          import PySide6
+
+          print("PySide6 version:", PySide6.__version__)
+          root = pathlib.Path(PySide6.__file__).resolve().parent
+          jars = sorted(str(p) for p in root.rglob("*.jar"))
+
+          print("Qt/Android jars visible from installed PySide6:")
+          if jars:
+              for j in jars:
+                  print(" -", j)
+          else:
+              print(" - no jars found under installed PySide6 package")
+          PY
 
       - name: Download Android prerequisites using Qt helper
         run: |
@@ -84,7 +111,7 @@ jobs:
           source "$VENV_PATH/bin/activate"
 
           rm -rf pyside-setup
-          git clone --depth 1 https://github.com/pyside/pyside-setup.git pyside-setup
+          git clone --depth 1 --branch "${QT_PYSIDE_VERSION}" https://github.com/pyside/pyside-setup.git pyside-setup
           cd pyside-setup
 
           python tools/cross_compile_android/main.py \
@@ -104,7 +131,7 @@ jobs:
             exit 1
           fi
 
-          # IMPORTANT: remove the helper checkout so it is not copied into the APK input tree
+          # Do not let the helper checkout be picked up as app input
           rm -rf pyside-setup
 
       - name: Confirm Qt helper cache exists
@@ -125,13 +152,15 @@ jobs:
             exit 1
           fi
 
-          ANDROID_NDK_PATH="$(python - <<'PY'
+          ANDROID_NDK_PATH="$(
+            NDK_READOBJ="$NDK_READOBJ" python - <<'PY'
           from pathlib import Path
           import os
           p = Path(os.environ["NDK_READOBJ"])
           print(p.parents[5])
           PY
           )"
+
           echo "ANDROID_NDK_PATH=$ANDROID_NDK_PATH" >> "$GITHUB_ENV"
 
           test -d "$ANDROID_NDK_PATH" || { echo "Resolved NDK root does not exist"; exit 1; }
@@ -141,8 +170,6 @@ jobs:
           }
 
           echo "Resolved NDK root: $ANDROID_NDK_PATH"
-        env:
-          NDK_READOBJ: ${{ env.NDK_READOBJ }}
 
       - name: Export Android SDK path from Qt helper cache
         run: |
@@ -151,22 +178,45 @@ jobs:
 
       - name: Download Android wheels
         run: |
-          set -euo pipefail
+          set -Eeuo pipefail
           mkdir -p "$WHEEL_DIR"
 
           PYSIDE_WHEEL="PySide6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
           SHIBOKEN_WHEEL="shiboken6-${QT_PYSIDE_VERSION}-${QT_PYSIDE_VERSION}-cp311-cp311-android_${TARGET_ARCH}.whl"
 
-          wget -q -O "$WHEEL_DIR/$PYSIDE_WHEEL" \
-            "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${PYSIDE_WHEEL}"
+          PYSIDE_OFFICIAL="https://download.qt.io/official_releases/QtForPython/pyside6/${PYSIDE_WHEEL}"
+          SHIBOKEN_OFFICIAL="https://download.qt.io/official_releases/QtForPython/shiboken6/${SHIBOKEN_WHEEL}"
 
-          wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" \
-            "https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
+          PYSIDE_SNAPSHOT="https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${PYSIDE_WHEEL}"
+          SHIBOKEN_SNAPSHOT="https://download.qt.io/snapshots/ci/pyside/${QT_PYSIDE_VERSION}/latest/pyside6/${SHIBOKEN_WHEEL}"
 
-      - name: Prepare main.py for Android deploy
+          if wget -q --spider "$PYSIDE_OFFICIAL"; then
+            echo "Downloading official PySide6 Android wheel"
+            wget -q -O "$WHEEL_DIR/$PYSIDE_WHEEL" "$PYSIDE_OFFICIAL"
+          else
+            echo "Official PySide6 Android wheel URL not reachable, falling back to snapshot"
+            wget -q -O "$WHEEL_DIR/$PYSIDE_WHEEL" "$PYSIDE_SNAPSHOT"
+          fi
+
+          if wget -q --spider "$SHIBOKEN_OFFICIAL"; then
+            echo "Downloading official shiboken6 Android wheel"
+            wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" "$SHIBOKEN_OFFICIAL"
+          else
+            echo "Official shiboken6 Android wheel URL not reachable, falling back to snapshot"
+            wget -q -O "$WHEEL_DIR/$SHIBOKEN_WHEEL" "$SHIBOKEN_SNAPSHOT"
+          fi
+
+          ls -lh "$WHEEL_DIR"
+
+      - name: Create root main.py wrapper for Android deploy
         run: |
-          test -f main.py || { echo "Missing root main.py"; exit 1; }
           test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
+          cat > main.py <<'PY'
+          import runpy
+
+          if __name__ == "__main__":
+              runpy.run_module("src.main", run_name="__main__")
+          PY
 
       - name: Remove UTF-8 BOM from Python files
         run: |
@@ -255,8 +305,6 @@ jobs:
 
           LIBFFI_CFG=".buildozer/android/platform/build-arm64-v8a/build/other_builds/libffi/arm64-v8a__ndk_target_21/libffi/config.log"
 
-          # Snapshot the exact libffi config.log while the build is running,
-          # because pyside6-android-deploy removes .buildozer on exit.
           (
             set +e
             while true; do
@@ -278,12 +326,40 @@ jobs:
           rm -rf pyside-setup
 
           pyside6-android-deploy \
+            --force \
+            --keep-deployment-files \
             --verbose \
             --config-file pysidedeploy.spec \
             --sdk-path "$ANDROID_SDK_ROOT" \
             --ndk-path "$ANDROID_NDK_PATH" \
             --extra-ignore-dirs .git,.github,build,dist,venv,__pycache__,android-wheels,pyside-setup \
             2>&1 | tee -a ci-debug/build-apk.log
+
+      - name: Inspect generated Qt Android artifacts
+        if: always()
+        run: |
+          source "$VENV_PATH/bin/activate"
+
+          echo "==== Installed PySide6 version ===="
+          python - <<'PY'
+          import pathlib
+          import PySide6
+
+          print("PySide6 version:", PySide6.__version__)
+          root = pathlib.Path(PySide6.__file__).resolve().parent
+          jars = sorted(root.rglob("*.jar"))
+          if jars:
+              for p in jars:
+                  print(p)
+          else:
+              print("No *.jar files found under installed PySide6 package")
+          PY
+
+          echo "==== Generated deployment files ===="
+          find src/deployment .buildozer -type f \( -name "*.jar" -o -name "buildozer.spec" -o -name "*.java" \) 2>/dev/null | sort | sed -n '1,300p'
+
+          echo "==== References to QtActivity / QtActivityBase ===="
+          grep -RIn "QtActivityBase\|QtActivity" src/deployment .buildozer 2>/dev/null | sed -n '1,300p'
 
       - name: Upload build logs
         if: always()

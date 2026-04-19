@@ -1742,7 +1742,7 @@ class OperationalPlanner:
                 ]
                 garrison_power = sum(float(getattr(u, "combat_rating", 0) or 0) for u in defenders)
                 local_threat = _overlay_value(threat, col, row, 0.0)
-                min_garrison_power = 6.0
+                min_garrison_power = 4.0
                 if garrison_power < min_garrison_power:
                     capitals_needing_defense.append((capital_hex, garrison_power))
         capitals_needing_defense.sort(key=lambda x: x[1])
@@ -1762,7 +1762,7 @@ class OperationalPlanner:
             g for g in groups
             if g.has_army
             and not g.has_fleet
-            and g.power <= 12.0
+            and g.power <= 9.0
         ]
         low_power_groups.sort(key=lambda g: g.power)
         for capital_hex, current_power in capitals:

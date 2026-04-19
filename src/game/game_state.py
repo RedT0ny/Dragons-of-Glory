@@ -15,7 +15,7 @@ from src.content import loader, factory
 from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
-from src.game.movement import MovementService, evaluate_unit_move, effective_movement_points
+from src.game.movement import MovementService
 from src.game.phase_manager import PhaseManager, CalendarService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
@@ -27,6 +27,8 @@ from src.game.overlay_maps import (
     InfluenceMap,
     ThreatMap,
 )
+
+_KEEP_FIELD = object()
 
 
 class GameState:
@@ -250,7 +252,7 @@ class GameState:
                 "unit_runtime": {
                     f"{u.id}|{u.ordinal}": {
                         "movement_points": u.movement_points,
-                        "river_hexside": getattr(u, "river_hexside", None),
+                        "river_hexside": self.map.hexside_to_tuple(getattr(u, "river_hexside", None)),
                         "replacement_ready_turn": getattr(u, "replacement_ready_turn", None),
                     }
                     for u in self.units
@@ -435,7 +437,8 @@ class GameState:
                         and len(river_hexside) == 2
                         and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in river_hexside)
                     ):
-                        unit.river_hexside = tuple((int(p[0]), int(p[1])) for p in river_hexside)
+                        normalized = tuple((int(p[0]), int(p[1])) for p in river_hexside)
+                        unit.river_hexside = self.map._coerce_hexside(normalized)
                     else:
                         unit.river_hexside = None
                 if runtime.get("replacement_ready_turn") is not None:
@@ -1241,6 +1244,7 @@ class GameState:
         update_territory: bool = True,
         invalidate_overlays: bool = True,
         enforce_end_terrain: bool = True,
+        river_hexside=_KEEP_FIELD,
     ):
         """
         Centralizes the move: updates unit.position AND the spatial map.
@@ -1253,47 +1257,13 @@ class GameState:
             print(f"Unit {unit_id} is transported aboard {unit.transport_host.id} and cannot move independently.")
             return
 
-        # 1. Deduct Movement Points (Only in Movement Phase)
-        # We check if unit is already on map to avoid cost calculation for deployment/teleport
-        fleet_final_hexside = getattr(unit, "river_hexside", None)
-        if self.phase == GamePhase.MOVEMENT and unit.position:
-            ok, _, cost, _, state_path = evaluate_unit_move(
-                self,
-                unit,
-                target_hex,
-                enforce_end_terrain=enforce_end_terrain,
-            )
-            if not ok:
-                return
-
-            # Ensure attribute exists (defensive coding)
-            if not hasattr(unit, 'movement_points'):
-                unit.movement_points = unit.movement
-
-            if unit.is_fleet() and state_path:
-                fleet_final_hexside = state_path[-1][1]
-                for i in range(1, len(state_path)):
-                    prev_hex, prev_side = state_path[i - 1]
-                    curr_hex, curr_side = state_path[i]
-                    if prev_side is None and curr_side is not None:
-                        print(f"{unit_id} enters deep_river hexside {curr_side} (hex -> hexside).")
-                    elif prev_side is not None and curr_side is None:
-                        print(f"{unit_id} exits deep_river at hex {curr_hex.axial_to_offset()} (hexside -> hex).")
-                    elif prev_side is not None and curr_side != prev_side:
-                        print(f"{unit_id} moves along deep_river to hexside {curr_side}.")
-
-            effective_mp = effective_movement_points(unit)
-            if cost > effective_mp:
-                return
-            unit.movement_points = max(0, effective_mp - cost)
-
-        # 2. Update Position and spatial map (single movement mutation path)
+        # Update position and spatial map (single movement mutation path)
         offset_coords = target_hex.axial_to_offset()
-        if self.phase == GamePhase.MOVEMENT and unit.is_fleet():
+        if unit.is_fleet() and river_hexside is not _KEEP_FIELD:
             self.movement_service.relocate_unit_on_board(
                 unit,
                 target_hex,
-                river_hexside=fleet_final_hexside,
+                river_hexside=river_hexside,
                 clear_escaped=True,
             )
         else:

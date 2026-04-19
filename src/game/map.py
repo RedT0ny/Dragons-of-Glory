@@ -1,5 +1,6 @@
 import heapq
 from collections import defaultdict
+from dataclasses import dataclass, field
 
 from src.content.specs import HexsideType, UnitType, UnitRace, LocType, TerrainType
 from src.content.constants import NEUTRAL
@@ -23,7 +24,7 @@ class Hex:
 
     def axial_to_offset(self):
         """Converts axial (q, r) to offset (col, row) for the rectangular map."""
-        # Asumiendo 'pointy top' y 'odd-r' (común en mapas rectangulares)
+        # Assuming 'pointy top' y 'odd-r' offset coordinates:
         col = self.q + (self.r - (self.r & 1)) // 2
         row = self.r
         return col, row
@@ -78,6 +79,27 @@ class Hex:
         return hash((self.q, self.r))
 
 
+@dataclass(frozen=True)
+class Hexside:
+    a: tuple[int, int]
+    b: tuple[int, int]
+    type: HexsideType | None = field(default=None, compare=False)
+
+    def __post_init__(self):
+        a = (int(self.a[0]), int(self.a[1]))
+        b = (int(self.b[0]), int(self.b[1]))
+        if b < a:
+            a, b = b, a
+        object.__setattr__(self, "a", a)
+        object.__setattr__(self, "b", b)
+
+    def as_tuple(self):
+        return self.a, self.b
+
+    def with_type(self, side_type):
+        return Hexside(self.a, self.b, side_type)
+
+
 class Board:
     """
     The Game Board model (Single Source of Truth).
@@ -92,7 +114,7 @@ class Board:
         self.offset_row = offset_row
 
         self.grid = {}  # (q, r) -> terrain_type
-        self.hexside_data = {}  # ((q1,r1), (q2,r2)) -> border_type
+        self.hexside_data = {}  # Hexside -> border_type
         # Add a way to quickly find which hexsides are rivers
         self.navigable_edges = set()
         self.unit_map = defaultdict(list)
@@ -161,13 +183,13 @@ class Board:
 
     def add_hexside(self, q1, r1, q2, r2, side_type):
         """Registers a special border between two hexes (River/Mountain)."""
-        key = tuple(sorted([(q1, r1), (q2, r2)]))
-        self.hexside_data[key] = self._to_hexside_type(side_type)
+        side = Hexside((q1, r1), (q2, r2), self._to_hexside_type(side_type))
+        self.hexside_data[side] = side.type
 
         # Rule 4: Ships can only move along Deep Rivers.
         # Fords and Bridges are for ground units and usually block large ships.
-        if self._to_hexside_type(side_type) == HexsideType.DEEP_RIVER:
-            self.navigable_edges.add(key)
+        if side.type == HexsideType.DEEP_RIVER:
+            self.navigable_edges.add(side)
 
     @staticmethod
     def _to_hexside_type(value):
@@ -238,7 +260,7 @@ class Board:
         Rule 4: A ship in a river hexside acts as a bridge for
         friendly armies during any Turn in which it does not move.
         """
-        key = tuple(sorted([(from_hex.q, from_hex.r), (to_hex.q, to_hex.r)]))
+        key = self._hexside_between(from_hex, to_hex)
 
         # 1. Must be a deep_river to have a ship there
         if key not in self.navigable_edges:
@@ -250,7 +272,7 @@ class Board:
             for u in units:
                 if u.is_fleet() and u.allegiance == alliance:
                     # Check if this ship is stationed on THIS specific hexside
-                    if getattr(u, 'river_hexside', None) == key and not getattr(u, "moved_this_turn", False):
+                    if self._coerce_hexside(getattr(u, "river_hexside", None)) == key and not getattr(u, "moved_this_turn", False):
                         return True
         return False
 
@@ -293,16 +315,39 @@ class Board:
         raw_terrain = self.grid.get((master_q, master_r), "")
         return raw_terrain.startswith("c_")
 
-    def get_hexside(self, from_hex, to_hex):
+    @staticmethod
+    def _coerce_hexside(value, side_type=None):
+        if value is None:
+            return None
+        if isinstance(value, Hexside):
+            return value if side_type is None else value.with_type(side_type)
+        if (
+            isinstance(value, (tuple, list))
+            and len(value) == 2
+            and all(isinstance(p, (tuple, list)) and len(p) == 2 for p in value)
+        ):
+            return Hexside((value[0][0], value[0][1]), (value[1][0], value[1][1]), side_type)
+        return None
+
+    @staticmethod
+    def hexside_to_tuple(value):
+        side = Board._coerce_hexside(value)
+        return side.as_tuple() if side else None
+
+    def _hexside_between(self, from_hex, to_hex, side_type=None):
         m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
         m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
-        key = tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
-        return self._to_hexside_type(self.hexside_data.get(key))
+        return Hexside((m1_q, m1_r), (m2_q, m2_r), side_type)
+
+    def get_hexside(self, from_hex, to_hex):
+        key = self._hexside_between(from_hex, to_hex)
+        side_type = self._to_hexside_type(self.hexside_data.get(key))
+        if side_type is None:
+            return None
+        return key.with_type(side_type)
 
     def get_hexside_key(self, from_hex, to_hex):
-        m1_q, m1_r = self.to_master_coords(from_hex.q, from_hex.r)
-        m2_q, m2_r = self.to_master_coords(to_hex.q, to_hex.r)
-        return tuple(sorted([(m1_q, m1_r), (m2_q, m2_r)]))
+        return self._hexside_between(from_hex, to_hex)
 
     def get_effective_hexside(self, from_hex, to_hex):
         """
@@ -310,7 +355,8 @@ class Board:
         Rule: all six hexsides adjacent to a mountain hex are treated as mountain,
         except when explicitly defined as a pass.
         """
-        raw = self._to_hexside_type(self.get_hexside(from_hex, to_hex))
+        raw_side = self.get_hexside(from_hex, to_hex)
+        raw = raw_side.type if raw_side else None
         if raw == HexsideType.PASS:
             return raw
 
@@ -325,7 +371,8 @@ class Board:
     @staticmethod
     def _fleet_state_key(state):
         hex_obj, river_hexside = state
-        return (hex_obj.q, hex_obj.r, river_hexside)
+        side = Board._coerce_hexside(river_hexside)
+        return (hex_obj.q, hex_obj.r, side.as_tuple() if side else None)
 
     def _local_hex_from_master_coords(self, master_q, master_r):
         master_col, master_row = Hex(master_q, master_r).axial_to_offset()
@@ -334,9 +381,10 @@ class Board:
         return Hex.offset_to_axial(local_col, local_row)
 
     def _river_endpoints_local(self, river_hexside):
-        if not river_hexside:
+        side = self._coerce_hexside(river_hexside)
+        if not side:
             return []
-        (q1, r1), (q2, r2) = river_hexside
+        (q1, r1), (q2, r2) = side.as_tuple()
         return [
             self._local_hex_from_master_coords(q1, r1),
             self._local_hex_from_master_coords(q2, r2),
@@ -345,6 +393,36 @@ class Board:
     def _is_valid_local_hex(self, hex_obj):
         col, row = hex_obj.axial_to_offset()
         return 0 <= col < self.width and 0 <= row < self.height
+
+    @staticmethod
+    def _neighbor_direction(from_hex, to_hex):
+        for idx, neighbor in enumerate(from_hex.neighbors()):
+            if neighbor == to_hex:
+                return idx
+        return None
+
+    def _river_other_endpoint(self, river_hexside, endpoint_hex):
+        endpoints = self._river_endpoints_local(river_hexside)
+        if len(endpoints) != 2:
+            return None
+        a, b = endpoints
+        if endpoint_hex == a:
+            return b
+        if endpoint_hex == b:
+            return a
+        return None
+
+    def _fleet_vertex_adjacent_switch(self, endpoint_hex, current_side, next_side):
+        current_other = self._river_other_endpoint(current_side, endpoint_hex)
+        next_other = self._river_other_endpoint(next_side, endpoint_hex)
+        if current_other is None or next_other is None:
+            return False
+        d1 = self._neighbor_direction(endpoint_hex, current_other)
+        d2 = self._neighbor_direction(endpoint_hex, next_other)
+        if d1 is None or d2 is None:
+            return False
+        turn = (d2 - d1) % 6
+        return turn in (1, 5)
 
     def _is_enemy_for_fleet(self, unit, other):
         return (
@@ -360,18 +438,24 @@ class Board:
         return False
 
     def _hexside_has_enemy_ship(self, river_hexside, unit):
+        side = self._coerce_hexside(river_hexside)
+        if side is None:
+            return False
         for units in self.unit_map.values():
             for other in units:
                 if (
                     other is not unit
                     and other.is_fleet()
-                    and getattr(other, "river_hexside", None) == river_hexside
+                    and self._coerce_hexside(getattr(other, "river_hexside", None)) == side
                     and self._is_enemy_for_fleet(unit, other)
                 ):
                     return True
         return False
 
     def _fleet_count_on_river_hexside(self, river_hexside, exclude_unit=None):
+        side = self._coerce_hexside(river_hexside)
+        if side is None:
+            return 0
         count = 0
         for units in self.unit_map.values():
             for other in units:
@@ -379,7 +463,7 @@ class Board:
                     continue
                 if (
                     other.is_fleet()
-                    and getattr(other, "river_hexside", None) == river_hexside
+                    and self._coerce_hexside(getattr(other, "river_hexside", None)) == side
                     and other.is_on_map
                 ):
                     count += 1
@@ -401,10 +485,14 @@ class Board:
         return terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM) or self.is_coastal(hex_obj)
 
     def _fleet_can_enter_river_hexside(self, unit, river_hexside):
-        if self._hexside_has_enemy_ship(river_hexside, unit):
+        side = self._coerce_hexside(river_hexside)
+        if side is None:
             return False
 
-        endpoints = self._river_endpoints_local(river_hexside)
+        if self._hexside_has_enemy_ship(side, unit):
+            return False
+
+        endpoints = self._river_endpoints_local(side)
         if len(endpoints) != 2:
             return False
 
@@ -414,10 +502,11 @@ class Board:
         if any(self._hex_has_enemy_unit_for_fleet(h, unit) for h in endpoints):
             return False
 
-        return self._fleet_count_on_river_hexside(river_hexside, exclude_unit=unit) < 2
+        return self._fleet_count_on_river_hexside(side, exclude_unit=unit) < 2
 
     def _fleet_neighbor_states(self, unit, state):
         current_hex, river_hexside = state
+        river_hexside = self._coerce_hexside(river_hexside)
         neighbors = []
 
         if river_hexside is None:
@@ -429,30 +518,15 @@ class Board:
                     next_side = self.get_hexside_key(current_hex, next_hex)
                     if not self._fleet_can_enter_river_hexside(unit, next_side):
                         continue
-                    neighbors.append(((current_hex, next_side), 1))
-                    neighbors.append(((next_hex, next_side), 1))
+                    # Port rule: choosing the first deep-river hexside from port costs 0.
+                    loc = self.get_location(current_hex)
+                    enter_cost = 0 if (loc and loc.loc_type == LocType.PORT.value) else 1
+                    neighbors.append(((current_hex, next_side), enter_cost))
+                    neighbors.append(((next_hex, next_side), enter_cost))
                     continue
 
                 if self._fleet_can_enter_hex(unit, next_hex):
                     neighbors.append(((next_hex, None), 1))
-
-            # Port special-case: a fleet in port may enter an adjacent deep-river
-            # hexside formed by two neighboring hexes of the port.
-            loc = self.get_location(current_hex)
-            if loc and loc.loc_type == LocType.PORT.value:
-                adjacent = [h for h in current_hex.neighbors() if self._is_valid_local_hex(h)]
-                for i in range(len(adjacent)):
-                    for j in range(i + 1, len(adjacent)):
-                        a = adjacent[i]
-                        b = adjacent[j]
-                        edge = self.get_effective_hexside(a, b)
-                        if edge != HexsideType.DEEP_RIVER:
-                            continue
-                        side = self.get_hexside_key(a, b)
-                        if not self._fleet_can_enter_river_hexside(unit, side):
-                            continue
-                        neighbors.append(((a, side), 1))
-                        neighbors.append(((b, side), 1))
             return neighbors
 
         endpoints = self._river_endpoints_local(river_hexside)
@@ -466,16 +540,7 @@ class Board:
 
         for endpoint in endpoints:
             if self._fleet_can_enter_hex(unit, endpoint):
-                neighbors.append(((endpoint, None), 1))
-
-            for next_hex in endpoint.neighbors():
-                if not self._is_valid_local_hex(next_hex):
-                    continue
-                edge = self.get_effective_hexside(endpoint, next_hex)
-                if edge == HexsideType.DEEP_RIVER:
-                    continue
-                if self._fleet_can_enter_hex(unit, next_hex):
-                    neighbors.append(((next_hex, None), 1))
+                neighbors.append(((endpoint, None), 0))
 
             for next_hex in endpoint.neighbors():
                 if not self._is_valid_local_hex(next_hex):
@@ -488,16 +553,20 @@ class Board:
                     continue
                 if not self._fleet_can_enter_river_hexside(unit, next_side):
                     continue
+                if not self._fleet_vertex_adjacent_switch(endpoint, river_hexside, next_side):
+                    continue
                 neighbors.append(((endpoint, next_side), 1))
-                neighbors.append(((next_hex, next_side), 1))
         return neighbors
 
-    def find_fleet_route(self, unit, start_hex, target_hex):
-        """
-        Finds minimum-MP route for fleets using hex/hexside state.
-        Returns (state_path, cost), where state_path includes start and end states.
-        """
-        start_state = (start_hex, getattr(unit, "river_hexside", None))
+    def _search_fleet_states(
+        self,
+        unit,
+        start_state,
+        *,
+        max_cost=None,
+        stop_predicate=None,
+        collect_predicate=None,
+    ):
         start_key = self._fleet_state_key(start_state)
         frontier = []
         heapq.heappush(frontier, (0, 0, start_state))
@@ -505,27 +574,36 @@ class Board:
         came_from = {start_key: None}
         state_by_key = {start_key: start_state}
         counter = 1
-
-        best_target_key = None
-        best_target_cost = float("inf")
+        collected = []
 
         while frontier:
             current_cost, _, current_state = heapq.heappop(frontier)
             current_key = self._fleet_state_key(current_state)
             if current_cost > cost_so_far.get(current_key, float("inf")):
                 continue
+            if max_cost is not None and current_cost > max_cost:
+                continue
 
-            current_hex, _ = current_state
-            if current_hex == target_hex:
-                best_target_key = current_key
-                best_target_cost = current_cost
-                return self._reconstruct_fleet_path(
-                    came_from, state_by_key, current_key, start_key
-                ), current_cost
+            if collect_predicate and collect_predicate(current_state, current_cost):
+                collected.append(current_state)
+
+            if stop_predicate and stop_predicate(current_state, current_cost):
+                return {
+                    "found_state": current_state,
+                    "found_key": current_key,
+                    "found_cost": current_cost,
+                    "came_from": came_from,
+                    "state_by_key": state_by_key,
+                    "start_key": start_key,
+                    "cost_so_far": cost_so_far,
+                    "collected": collected,
+                }
 
             for next_state, step_cost in self._fleet_neighbor_states(unit, current_state):
                 next_key = self._fleet_state_key(next_state)
                 new_cost = current_cost + step_cost
+                if max_cost is not None and new_cost > max_cost:
+                    continue
                 if new_cost < cost_so_far.get(next_key, float("inf")):
                     cost_so_far[next_key] = new_cost
                     came_from[next_key] = current_key
@@ -533,9 +611,18 @@ class Board:
                     heapq.heappush(frontier, (new_cost, counter, next_state))
                     counter += 1
 
-        return [], float("inf")
+        return {
+            "found_state": None,
+            "found_key": None,
+            "found_cost": float("inf"),
+            "came_from": came_from,
+            "state_by_key": state_by_key,
+            "start_key": start_key,
+            "cost_so_far": cost_so_far,
+            "collected": collected,
+        }
 
-    def _reconstruct_fleet_path(self, came_from, state_by_key, end_key, start_key):
+    def _reconstruct_fleet_path(self, came_from, state_by_key, end_key):
         rev_keys = []
         node = end_key
         while node is not None:
@@ -544,42 +631,43 @@ class Board:
         rev_keys.reverse()
         return [state_by_key[k] for k in rev_keys]
 
+    def find_fleet_route(self, unit, start_hex, target_hex):
+        """
+        Finds minimum-MP route for fleets using hex/hexside state.
+        Returns (state_path, cost), where state_path includes start and end states.
+        """
+        start_state = (start_hex, self._coerce_hexside(getattr(unit, "river_hexside", None)))
+        target_is_hex_destination = self._fleet_can_enter_hex(unit, target_hex)
+        result = self._search_fleet_states(
+            unit,
+            start_state,
+            stop_predicate=(
+                (lambda state, _: state[0] == target_hex and state[1] is None)
+                if target_is_hex_destination
+                else (lambda state, _: state[0] == target_hex and state[1] is not None)
+            ),
+        )
+        if result["found_key"] is None:
+            return [], float("inf")
+        return self._reconstruct_fleet_path(
+            result["came_from"],
+            result["state_by_key"],
+            result["found_key"],
+        ), result["found_cost"]
+
     def get_reachable_hexes_for_fleet(self, unit):
         if not getattr(unit, "position", None):
             return []
         start_hex = Hex.offset_to_axial(*unit.position)
         max_mp = getattr(unit, "movement_points", unit.movement)
-        start_state = (start_hex, getattr(unit, "river_hexside", None))
-        start_key = self._fleet_state_key(start_state)
-        frontier = []
-        heapq.heappush(frontier, (0, 0, start_state))
-        cost_so_far = {start_key: 0}
-        counter = 1
-        reachable = set()
-
-        while frontier:
-            current_cost, _, state = heapq.heappop(frontier)
-            state_key = self._fleet_state_key(state)
-            if current_cost > cost_so_far.get(state_key, float("inf")):
-                continue
-            if current_cost > max_mp:
-                continue
-
-            current_hex, _ = state
-            if current_hex != start_hex and self.can_stack_move_to([unit], current_hex):
-                reachable.add(current_hex)
-
-            for next_state, step_cost in self._fleet_neighbor_states(unit, state):
-                new_cost = current_cost + step_cost
-                if new_cost > max_mp:
-                    continue
-                next_key = self._fleet_state_key(next_state)
-                if new_cost < cost_so_far.get(next_key, float("inf")):
-                    cost_so_far[next_key] = new_cost
-                    heapq.heappush(frontier, (new_cost, counter, next_state))
-                    counter += 1
-
-        return list(reachable)
+        start_state = (start_hex, self._coerce_hexside(getattr(unit, "river_hexside", None)))
+        result = self._search_fleet_states(
+            unit,
+            start_state,
+            max_cost=max_mp,
+            collect_predicate=lambda state, _: state[0] != start_hex and self.can_stack_move_to([unit], state[0]),
+        )
+        return list({state[0] for state in result["collected"]})
 
     def _is_safe_fleet_displacement_state(self, fleet, state):
         current_hex, river_hexside = state
@@ -594,31 +682,14 @@ class Board:
         Finds the nearest legal destination state (hex or deep-river hexside endpoint)
         for a displaced fleet. Returns (hex_obj, river_hexside) or None.
         """
-        start_state = (start_hex, getattr(fleet, "river_hexside", None))
+        start_state = (start_hex, self._coerce_hexside(getattr(fleet, "river_hexside", None)))
         start_key = self._fleet_state_key(start_state)
-        frontier = []
-        heapq.heappush(frontier, (0, 0, start_state))
-        cost_so_far = {start_key: 0}
-        counter = 1
-
-        while frontier:
-            current_cost, _, state = heapq.heappop(frontier)
-            state_key = self._fleet_state_key(state)
-            if current_cost > cost_so_far.get(state_key, float("inf")):
-                continue
-
-            if state_key != start_key and self._is_safe_fleet_displacement_state(fleet, state):
-                return state
-
-            for next_state, step_cost in self._fleet_neighbor_states(fleet, state):
-                next_key = self._fleet_state_key(next_state)
-                new_cost = current_cost + step_cost
-                if new_cost < cost_so_far.get(next_key, float("inf")):
-                    cost_so_far[next_key] = new_cost
-                    heapq.heappush(frontier, (new_cost, counter, next_state))
-                    counter += 1
-
-        return None
+        result = self._search_fleet_states(
+            fleet,
+            start_state,
+            stop_predicate=lambda state, _: self._fleet_state_key(state) != start_key and self._is_safe_fleet_displacement_state(fleet, state),
+        )
+        return result["found_state"]
 
     def get_location(self, hex_coord):
         """Returns Location if one exists at this hex."""
