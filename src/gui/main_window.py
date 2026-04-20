@@ -456,6 +456,8 @@ class MainWindow(QMainWindow):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.units_clicked.connect(controller.on_map_units_clicked)
+        if hasattr(self.map_view, "depleted_stack_clicked"):
+            self.map_view.depleted_stack_clicked.connect(controller.on_map_depleted_stack_clicked)
         self.map_view.right_clicked.connect(controller.reset_combat_selection)
         if hasattr(self, "assets_tab"):
             self.assets_tab.asset_assign_requested.connect(controller.on_asset_assign_requested)

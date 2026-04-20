@@ -194,6 +194,34 @@ class GameController(QObject):
             return
         self._return_unit_to_ready_for_redeployment(candidate)
 
+    def on_map_depleted_stack_clicked(self, clicked_units):
+        """Controller-owned depleted merge eligibility/rule handling."""
+        if self.game_state.phase != GamePhase.REPLACEMENTS:
+            return
+        if not self._is_human_interactive_turn():
+            return
+        if not clicked_units:
+            return
+
+        candidates = [
+            u for u in clicked_units
+            if u.status == UnitState.DEPLETED
+            and u.allegiance == self.game_state.active_player
+            and (u.is_fleet() or u.is_army())
+        ]
+        if len(candidates) < 2:
+            return
+
+        from collections import defaultdict
+        by_group = defaultdict(list)
+        for unit in candidates:
+            by_group[self.game_state.get_replacement_group_key(unit)].append(unit)
+
+        for _, units in by_group.items():
+            if len(units) >= 2:
+                self.on_depleted_merge_requested(units[0], units[1])
+                break
+
     def _return_unit_to_ready_for_redeployment(self, unit):
         self.game_state.movement_service.remove_unit_from_board(
             unit,

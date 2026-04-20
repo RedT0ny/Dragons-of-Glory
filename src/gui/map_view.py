@@ -1,6 +1,6 @@
 import math
 
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene, QMessageBox
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
@@ -8,7 +8,7 @@ import shiboken6
 from game.map import Hexside
 from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
-from src.content.specs import UnitState, GamePhase, UnitType, HexsideType
+from src.content.specs import GamePhase, HexsideType
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
@@ -23,6 +23,7 @@ class AnsalonMapView(QGraphicsView):
     unit_deployment_requested = Signal(object, object)  # unit, target_hex
     unit_movement_requested = Signal(object, object)    # unit, target_hex
     depleted_merge_requested = Signal(object, object)   # unit1, unit2
+    depleted_stack_clicked = Signal(list)               # clicked units (controller decides)
 
     def __init__(self, game_state, parent=None, overlay_alpha=50):
         super().__init__(parent)
@@ -173,33 +174,6 @@ class AnsalonMapView(QGraphicsView):
 
     def mousePressEvent(self, event: QMouseEvent):
         """Handle clicks for deployment or depleted unit interaction."""
-        current_player = getattr(self.game_state, "current_player", None)
-        is_human = bool(current_player and not getattr(current_player, "is_ai", False))
-        interactive_phase = self.game_state.phase in {
-            GamePhase.DEPLOYMENT,
-            GamePhase.REPLACEMENTS,
-            GamePhase.MOVEMENT,
-            GamePhase.COMBAT,
-        }
-        deployment_active = self.deploying_unit is not None
-        deployment_session_active = False
-        try:
-            win = self.window()
-            controller = getattr(win, "controller", None)
-            if controller and hasattr(controller, "_is_deployment_session_active"):
-                deployment_session_active = bool(controller._is_deployment_session_active())
-        except Exception:
-            deployment_session_active = False
-        if not is_human and not deployment_session_active:
-            super().mousePressEvent(event)
-            return
-        if not interactive_phase and not deployment_active and not deployment_session_active:
-            # Ignore map clicks outside normal human-interactive phases,
-            # except when an explicit deployment selection is active
-            # (e.g. strategic event/activation triggered deployments).
-            super().mousePressEvent(event)
-            return
-
         # Scenario 1: Right-click Deselect
         if event.button() == Qt.RightButton:
             self.right_clicked.emit()
@@ -304,36 +278,15 @@ class AnsalonMapView(QGraphicsView):
             # Note: Let controller handle unit state updates and model sync
 
     def handle_depleted_stack_click(self, scene_pos):
-        # Find units at this location
-        # This requires spatial query
-        # Simplified:
+        # View emits clicked stack; controller decides merge legality/rules.
         items = self.scene.items(scene_pos)
         clicked_units = []
         for item in items:
             if isinstance(item, UnitCounter):
                 clicked_units.append(item.unit)
 
-        if not clicked_units:
-            return
-
-        # Filter for Depleted + Active Player + eligible conscription types.
-        candidates = [u for u in clicked_units
-                      if u.status == UnitState.DEPLETED
-                      and u.allegiance == self.game_state.active_player
-                      and (u.is_fleet() or u.is_army())]
-
-        # Group by replacement rule key (army country/dragonflight or fleet country).
-        from collections import defaultdict
-        by_group = defaultdict(list)
-        for u in candidates:
-            by_group[self.game_state.get_replacement_group_key(u)].append(u)
-
-        for _, units in by_group.items():
-            if len(units) >= 2:
-                # Defer signal to avoid scene mutation during event processing.
-                u1, u2 = units[0], units[1]
-                QTimer.singleShot(0, lambda a=u1, b=u2: self.depleted_merge_requested.emit(a, b))
-                break # Handle one pair at a time
+        if clicked_units:
+            QTimer.singleShot(0, lambda units=list(clicked_units): self.depleted_stack_clicked.emit(units))
 
     def highlight_deployment_targets(self, valid_coords_list, unit):
         """Highlights hexes where the 'ready' unit can be placed."""
