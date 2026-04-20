@@ -5,6 +5,7 @@ from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
 
+from game.map import Hexside
 from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import UnitState, GamePhase, UnitType, HexsideType
@@ -384,7 +385,6 @@ class AnsalonMapView(QGraphicsView):
 
                 # 1. Terrain info from Board
                 t_type = board.get_terrain(hex_obj)
-                is_coastal = board.is_coastal(hex_obj)
 
                 # 2. Coastal Directions (Dynamic check)
                 coastal_dirs = []
@@ -395,20 +395,22 @@ class AnsalonMapView(QGraphicsView):
 
                 for idx, neighbor in enumerate(neighbors):
                     hexside = board.get_hexside(hex_obj, neighbor)
+                    side_type = hexside.type if hexside else None
 
-                    if hexside == HexsideType.SEA:
+                    if side_type == HexsideType.SEA:
                         coastal_dirs.append(idx)
-                    elif hexside == HexsideType.PASS:
+                    elif side_type == HexsideType.PASS:
                         pass_directions.append(idx)
 
                     # 4. Draw Hexside Items (Rivers, etc)
                     # To avoid duplicates, we only draw for specific directions (e.g. E, SE, SW)
-                    if idx in [0, 1, 2] and hexside in {HexsideType.RIVER, HexsideType.DEEP_RIVER, HexsideType.MOUNTAIN}:
-                        # Calculate vertices for this edge
-                        # Edge i connects vertex i and (i+1)%6
-                        p1 = self.get_vertex(center, idx)
-                        p2 = self.get_vertex(center, (idx + 1) % 6)
-                        self.scene.addItem(HexsideItem(p1, p2, hexside.value))
+                    if DEBUG:
+                        if idx in [0, 1, 2] and side_type in {HexsideType.RIVER, HexsideType.DEEP_RIVER, HexsideType.MOUNTAIN}:
+                            # Calculate vertices for this edge
+                            # Edge i connects vertex i and (i+1)%6
+                            p1 = self.get_vertex(center, idx)
+                            p2 = self.get_vertex(center, (idx + 1) % 6)
+                            self.scene.addItem(HexsideItem(p1, p2, side_type.value))
 
                 # Draw Base Hex
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),
@@ -427,11 +429,12 @@ class AnsalonMapView(QGraphicsView):
                 self.overlay_items_by_coords[(col, row)] = overlay_item
 
                 # 5. Draw Location if present
-                # loc_data = board.get_location(hex_obj)
-                # if loc_data:
-                #     loc_item = LocationItem(center, loc_data['location_id'],
-                #                              loc_data['type'], loc_data['is_capital'])
-                #     self.scene.addItem(loc_item)
+                if DEBUG:
+                    loc_data = board.get_location(hex_obj)
+                    if loc_data:
+                        loc_item = LocationItem(center, loc_data['location_id'],
+                                                 loc_data['type'], loc_data['is_capital'])
+                        self.scene.addItem(loc_item)
 
         self.refresh_overlay()
 

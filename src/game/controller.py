@@ -11,6 +11,7 @@ from src.game.diplomacy import DiplomacyService
 from src.game.ai_baseline import BaselineAIPlayer
 from src.game.phase_manager import TurnAction, TurnEngine
 from src.content.runtime_diagnostics import RuntimeDiagnostics
+from src.game.map import Hex
 
 
 class GameController(QObject):
@@ -664,6 +665,8 @@ class GameController(QObject):
             # Defer redraw to avoid mutating the scene while click dispatch is active.
             self._schedule_deferred(self.view.sync_with_model)
             self._schedule_deferred(self._refresh_info_panel)
+            moved_stack = list(self.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r))
+            self._schedule_deferred(lambda units=moved_stack: self.view.units_clicked.emit(units))
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
 
@@ -817,6 +820,14 @@ class GameController(QObject):
         for message in result.messages:
             print(message)
         if result.force_sync:
+            anchor_hex = None
+            for unit in selected:
+                host = getattr(unit, "transport_host", None)
+                base = host if host is not None else unit
+                pos = getattr(base, "position", None)
+                if pos and None not in pos:
+                    anchor_hex = Hex.offset_to_axial(*pos)
+                    break
             # Selection can contain now-stale transport relationships after (Un)Board.
             # Reset it before syncing to avoid acting on outdated references.
             self.selected_units_for_movement = []
@@ -824,6 +835,11 @@ class GameController(QObject):
             self.view.highlight_movement_range([])
             self._schedule_deferred(self.view.sync_with_model)
             self._schedule_deferred(self._refresh_info_panel)
+            if anchor_hex is not None:
+                stack_units = list(self.game_state.map.get_units_in_hex(anchor_hex.q, anchor_hex.r))
+                self._schedule_deferred(lambda units=stack_units: self.view.units_clicked.emit(units))
+            else:
+                self._schedule_deferred(lambda: self.view.units_clicked.emit([]))
 
     def _handle_deployment_from_event(self, effects, active_player):
         """

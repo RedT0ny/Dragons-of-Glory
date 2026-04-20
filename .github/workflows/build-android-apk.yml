@@ -131,7 +131,6 @@ jobs:
             exit 1
           fi
 
-          # Do not let the helper checkout be picked up as app input
           rm -rf pyside-setup
 
       - name: Confirm Qt helper cache exists
@@ -208,6 +207,61 @@ jobs:
 
           ls -lh "$WHEEL_DIR"
 
+      - name: Stage Qt Android jars from downloaded wheel
+        run: |
+          set -Eeuo pipefail
+
+          python - <<'PY'
+          import os
+          import shutil
+          import zipfile
+          from pathlib import Path
+
+          wheel_dir = Path(os.environ["WHEEL_DIR"])
+          qt_ver = os.environ["QT_PYSIDE_VERSION"]
+          arch = os.environ["TARGET_ARCH"]
+          run_temp = Path(os.environ["RUNNER_TEMP"])
+
+          wheel_path = wheel_dir / f"PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          out_dir = run_temp / "qt-android-jars"
+          out_dir.mkdir(parents=True, exist_ok=True)
+
+          if not wheel_path.exists():
+              raise SystemExit(f"Android wheel not found: {wheel_path}")
+
+          extracted = []
+          with zipfile.ZipFile(wheel_path) as zf:
+              jar_members = [n for n in zf.namelist() if n.endswith(".jar")]
+              print("Jar files inside wheel:")
+              for name in jar_members:
+                  print(" -", name)
+                  target = out_dir / Path(name).name
+                  with zf.open(name) as src, target.open("wb") as dst:
+                      shutil.copyfileobj(src, dst)
+                  extracted.append(str(target))
+
+          print("Extracted jars:")
+          if extracted:
+              for p in extracted:
+                  print(" -", p)
+          else:
+              print(" - none")
+
+          required = ["Qt6Android.jar", "Qt6AndroidBindings.jar"]
+          missing = [name for name in required if not (out_dir / name).exists()]
+          if missing:
+              raise SystemExit(f"Missing required Qt Android jar(s): {missing}")
+          PY
+
+          echo "QT_ANDROID_JARS_DIR=$RUNNER_TEMP/qt-android-jars" >> "$GITHUB_ENV"
+
+      - name: Verify staged Qt Android jars
+        run: |
+          echo "QT_ANDROID_JARS_DIR=$QT_ANDROID_JARS_DIR"
+          ls -lah "$QT_ANDROID_JARS_DIR"
+          test -f "$QT_ANDROID_JARS_DIR/Qt6Android.jar" || { echo "Missing Qt6Android.jar"; exit 1; }
+          test -f "$QT_ANDROID_JARS_DIR/Qt6AndroidBindings.jar" || { echo "Missing Qt6AndroidBindings.jar"; exit 1; }
+
       - name: Create root main.py wrapper for Android deploy
         run: |
           test -f src/main.py || { echo "Missing src/main.py"; exit 1; }
@@ -260,6 +314,7 @@ jobs:
           venv_path = os.environ["VENV_PATH"]
           sdk_root = os.environ["ANDROID_SDK_ROOT"]
           ndk_root = os.environ["ANDROID_NDK_PATH"]
+          jars_dir = os.environ["QT_ANDROID_JARS_DIR"]
 
           cfg["app"]["input_file"] = "main.py"
           cfg["app"]["project_dir"] = "."
@@ -270,11 +325,13 @@ jobs:
 
           cfg["android"]["wheel_pyside"] = f"{wheel_dir}/PySide6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
           cfg["android"]["wheel_shiboken"] = f"{wheel_dir}/shiboken6-{qt_ver}-{qt_ver}-cp311-cp311-android_{arch}.whl"
+          cfg["android"]["local_libs"] = "plugins_platforms_qtforandroid"
 
           cfg["buildozer"]["mode"] = "debug"
           cfg["buildozer"]["arch"] = arch
           cfg["buildozer"]["sdk_path"] = sdk_root
           cfg["buildozer"]["ndk_path"] = ndk_root
+          cfg["buildozer"]["jars_dir"] = jars_dir
 
           with spec_path.open("w", encoding="utf-8") as f:
               cfg.write(f)
@@ -302,6 +359,7 @@ jobs:
           echo "QT_DEPLOY_CACHE=$QT_DEPLOY_CACHE" | tee ci-debug/build-apk.log
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" | tee -a ci-debug/build-apk.log
           echo "ANDROID_NDK_PATH=$ANDROID_NDK_PATH" | tee -a ci-debug/build-apk.log
+          echo "QT_ANDROID_JARS_DIR=$QT_ANDROID_JARS_DIR" | tee -a ci-debug/build-apk.log
 
           LIBFFI_CFG=".buildozer/android/platform/build-arm64-v8a/build/other_builds/libffi/arm64-v8a__ndk_target_21/libffi/config.log"
 
@@ -355,11 +413,18 @@ jobs:
               print("No *.jar files found under installed PySide6 package")
           PY
 
-          echo "==== Generated deployment files ===="
-          find src/deployment .buildozer -type f \( -name "*.jar" -o -name "buildozer.spec" -o -name "*.java" \) 2>/dev/null | sort | sed -n '1,300p'
+          echo "==== Staged Qt Android jars ===="
+          echo "QT_ANDROID_JARS_DIR=$QT_ANDROID_JARS_DIR"
+          ls -lah "$QT_ANDROID_JARS_DIR" || true
 
-          echo "==== References to QtActivity / QtActivityBase ===="
-          grep -RIn "QtActivityBase\|QtActivity" src/deployment .buildozer 2>/dev/null | sed -n '1,300p'
+          echo "==== Generated buildozer.spec ===="
+          sed -n '1,260p' buildozer.spec || true
+
+          echo "==== Generated deployment files ===="
+          find src/deployment .buildozer -type f \( -name "*.jar" -o -name "buildozer.spec" -o -name "*.java" -o -name "build.gradle" \) 2>/dev/null | sort | sed -n '1,400p'
+
+          echo "==== References to QtActivity / QtActivityBase / Qt6Android ===="
+          grep -RIn "QtActivityBase\|QtActivity\|Qt6Android" src/deployment .buildozer 2>/dev/null | sed -n '1,400p'
 
       - name: Upload build logs
         if: always()

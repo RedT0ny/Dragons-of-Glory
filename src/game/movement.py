@@ -10,7 +10,7 @@ from collections import defaultdict
 import random
 from typing import List, Tuple
 
-from content.tools import TextFormatter
+from content.tools import TextFormatter, debug_print
 from game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
@@ -321,36 +321,36 @@ class MovementService:
         curr_side_text = self._format_river_hexside_for_log(curr_side)
 
         if prev_side is None and curr_side is None and prev_hex != curr_hex:
-            print(f"{unit_id} sails sea/coastal hex {prev_hex_offset} -> {curr_hex_offset}.")
+            debug_print(f"{unit_id} sails sea/coastal hex {prev_hex_offset} -> {curr_hex_offset}.")
             return
 
         if prev_side is None and curr_side is not None:
-            print(
+            debug_print(
                 f"{unit_id} enters deep_river hexside {curr_side_text} from hex {prev_hex_offset} "
                 f"(now at endpoint {curr_hex_offset})."
             )
             return
 
         if prev_side is not None and curr_side is None:
-            print(
+            debug_print(
                 f"{unit_id} exits deep_river hexside {prev_side_text} to hex {curr_hex_offset} "
                 f"(from endpoint {prev_hex_offset})."
             )
             return
 
         if prev_side is not None and curr_side == prev_side and prev_hex != curr_hex:
-            print(f"{unit_id} shifts along deep_river endpoint {prev_hex_offset} -> {curr_hex_offset} on {curr_side_text}.")
+            debug_print(f"{unit_id} shifts along deep_river endpoint {prev_hex_offset} -> {curr_hex_offset} on {curr_side_text}.")
             return
 
         if prev_side is not None and curr_side != prev_side:
-            print(
+            debug_print(
                 f"{unit_id} changes deep_river hexside {prev_side_text} -> {curr_side_text} "
                 f"at/near endpoint {curr_hex_offset}."
             )
             return
 
         if prev_side == curr_side and prev_hex == curr_hex:
-            print(f"{unit_id} remains at hex {curr_hex_offset} (hexside={curr_side}).")
+            debug_print(f"{unit_id} remains at hex {curr_hex_offset} (hexside={curr_side}).")
 
     def evaluate_move(self, unit, target_hex, enforce_end_terrain: bool = True) -> MoveEvaluation:
         unit_id = TextFormatter.format_unit_log_string(unit)

@@ -1975,6 +1975,8 @@ class CombatClickHandler:
 
                 # Clear all
                 self.reset_selection()
+                post_combat_units = list(self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r))
+                self.view.units_clicked.emit(post_combat_units)
 
                 if is_naval:
                     self.view.sync_with_model()
@@ -2221,6 +2223,9 @@ class CombatClickHandler:
             )
             if moved_units:
                 print(f"Advance after combat: moved {len(moved_units)} units.")
+            focus_hex = self.pending_advance["target_hex"]
+            post_advance_units = list(self.game_state.map.get_units_in_hex(focus_hex.q, focus_hex.r))
+            self.view.units_clicked.emit(post_advance_units)
 
         self.pending_advance = None
         self.view.sync_with_model()
