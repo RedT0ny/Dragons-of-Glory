@@ -3866,8 +3866,8 @@ class BaselineAIPlayer:
         return score
 
     def _try_neutral_invasion(self, ctx, plan, attempt_invasion) -> bool:
-        """Trigger neutral invasion only for the selected target, and only after
-        meaningful force concentration on that border."""
+        """Trigger neutral invasion only for the selected target, using the same
+        force eligibility and odds baseline as movement+diplomacy services."""
         if not attempt_invasion:
             return False
 
@@ -3879,86 +3879,39 @@ class BaselineAIPlayer:
         if not target_country:
             return False
 
-        # Hard ban strongly hostile neutral countries.
-        if _country_alignment_for_side(target_country, ctx.side) <= -10:
+        probe_hexes = list((ctx.country_hexes_by_id or {}).get(target_country_id, []))
+        if not probe_hexes:
             return False
 
-        border_groups = []
-        adjacent_unit_count = 0
-        adjacent_power = 0.0
-        target_hexes = list((ctx.country_hexes_by_id or {}).get(target_country_id, []))
-        target_hex_set = set((h.q, h.r) for h in target_hexes)
-        if not target_hex_set:
-            return False
-
-        for group in self._operational.build_task_groups(ctx):
-            if not group.has_army or not group.mobile_units:
-                continue
-
-            ground_units = [
-                u for u in group.mobile_units
-                if u.is_on_map
-                   and u.is_army()
-                   and u.position and None not in u.position
-            ]
-            if not ground_units:
-                continue
-
-            group_adjacent = False
-            for unit in ground_units:
-                unit_hex = Hex.offset_to_axial(*unit.position)
-                for neighbor in unit_hex.neighbors():
-                    col, row = neighbor.axial_to_offset()
-                    if not ctx.game_state.is_hex_in_bounds(col, row):
-                        continue
-                    if (neighbor.q, neighbor.r) not in target_hex_set:
-                        continue
-                    group_adjacent = True
-                    break
-                if group_adjacent:
-                    break
-
-            if not group_adjacent:
-                continue
-
-            group_power = sum(
-                float(getattr(u, "combat_rating", 0) or 0)
-                for u in ground_units
-                if u.is_combat_unit()
-            )
-
-            adjacent_unit_count += len(ground_units)
-            adjacent_power += group_power
-            border_groups.append((group_power, group.hex, ground_units))
-
-        if not border_groups:
-            return False
-
-        # Require real concentration before invading.
-        # Tune these two numbers if needed.
-        min_adjacent_units = 3
-        min_adjacent_power = max(8.0, float(getattr(target_country, "strength", 0) or 0))
-
-        if adjacent_unit_count < min_adjacent_units or adjacent_power < min_adjacent_power:
-            debug_print(
-                f"[INVASION] Delaying invasion of {target_country_id}: "
-                f"adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f} "
-                f"required_units>={min_adjacent_units} required_power>={min_adjacent_power:.1f}"
-            )
-            return False
-
-        probe_hex = target_hexes[0]
-        probe = ctx.movement_service.invasion_handler.evaluate_neutral_entry(probe_hex)
+        probe = ctx.movement_service.invasion_handler.evaluate_neutral_entry(probe_hexes[0])
         if not probe or not getattr(probe, "is_neutral_entry", False):
             return False
         if getattr(probe, "blocked_message", None):
             debug_print(f"[INVASION] Delaying invasion of {target_country_id}: {probe.blocked_message}")
             return False
 
-        best_group_power, best_hex, _ = max(border_groups, key=lambda item: item[0])
+        invasion_data = ctx.movement_service.get_invasion_force(target_country_id)
+        invader_sp = int(invasion_data.get("strength", 0) or 0)
+        if invader_sp <= 0:
+            reason = invasion_data.get("reason") or "No eligible invasion force."
+            debug_print(f"[INVASION] Delaying invasion of {target_country_id}: {reason}")
+            return False
+
+        defender_sp = int(getattr(target_country, "strength", 0) or 0)
+        modifier = self.diplomacy_service._invasion_modifier(invader_sp, defender_sp)
+        alignment = getattr(target_country, "alignment", (0, 0)) or (0, 0)
+        ws_base = int(alignment[0] if len(alignment) > 0 else 0) + 2
+        hl_base = int(alignment[1] if len(alignment) > 1 else 0) + modifier
+        if hl_base <= ws_base:
+            debug_print(
+                f"[INVASION] Delaying invasion of {target_country_id}: "
+                f"hl_base={hl_base} ws_base={ws_base} invader_sp={invader_sp} defender_sp={defender_sp}"
+            )
+            return False
+
         debug_print(
-            f"[INVASION] Triggering invasion of {target_country_id} from {best_hex.axial_to_offset()} "
-            f"with adjacent_units={adjacent_unit_count} adjacent_power={adjacent_power:.1f}"
+            f"[INVASION] Triggering invasion of {target_country_id}: "
+            f"hl_base={hl_base} ws_base={ws_base} invader_sp={invader_sp} defender_sp={defender_sp}"
         )
         attempt_invasion(target_country_id)
         post_country = ctx.game_state.countries.get(target_country_id)
