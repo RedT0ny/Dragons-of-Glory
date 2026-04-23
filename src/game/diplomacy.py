@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional
 
+from content.translator import Translator
 from src.content.constants import HL, WS
 from src.content.specs import LocType, UnitState, UnitType
 from src.game.map import Hex
@@ -47,6 +48,7 @@ class DiplomacyService:
 
     def __init__(self, game_state):
         self.game_state = game_state
+        self.translator = Translator()
 
     def is_country_neutral(self, country_id: str) -> bool:
         country = self.game_state.countries.get(country_id)
@@ -182,7 +184,7 @@ class DiplomacyService:
             f"Modifier: {modifier}",
             "Rolls:",
             *rounds,
-            f"{country_id.capitalize()} joins {winner.title()}",
+            f"{self.translator.get_country_name(country_id)} joins {winner.title()}",
         ]
         message = "\n".join(summary_lines)
         title = f"Invasion!"
@@ -256,11 +258,6 @@ class ConquestService:
                     destroyed_count += 1
                 continue
 
-            is_army = hasattr(unit, "is_army") and unit.is_army()
-            is_wing = hasattr(unit, "is_wing") and unit.is_wing()
-            is_leader = hasattr(unit, "is_leader") and unit.is_leader()
-            if not (is_army or is_wing or is_leader):
-                continue
             if unit.status == UnitState.DESTROYED:
                 continue
 
@@ -270,13 +267,13 @@ class ConquestService:
 
         country.allegiance = conqueror
         country.conquered = True
-        print(f"Country {country.id} conquered. Destroyed units: {destroyed_count}")
+        print(f"Country {self.translator.get_country_name(country.id)} conquered. Destroyed units: {destroyed_count}")
 
     def _apply_country_conquest_or_liberation(self, country, conqueror: str):
         if country.conquered:
             country.allegiance = conqueror
             country.conquered = False
-            print(f"Country {country.id} liberated for {conqueror}.")
+            print(f"Country {self.translator.get_country_name(country.id)} liberated for {conqueror}.")
             return
         self._destroy_country_upon_conquest(country, conqueror)
 

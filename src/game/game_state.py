@@ -1398,10 +1398,13 @@ class GameState:
             return
 
         tower.allegiance = WS
+        target_hex = Hex.offset_to_axial(*tower.capital.coords)
+
         for u in self.units:
             if u.land == tower.id:
-                u.status = UnitState.READY
                 u.allegiance = WS
+                u.status = UnitState.READY
+                self.deployment_service.deploy_unit(u, target_hex)
 
         print(f"Country {self.translator.get_country_name(tower.id)} activated for Whitestone (first Solamnic activation).")
 

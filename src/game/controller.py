@@ -753,7 +753,7 @@ class GameController(QObject):
         )
         if not result.success:
             RuntimeDiagnostics.record_event(
-                f"Deployment blocked: unit={unit.id} target={target_hex.axial_to_offset()} error={result.error}"
+                f"Deployment blocked: unit={TextFormatter.format_unit_log_string(unit)} target={target_hex.axial_to_offset()} error={result.error}"
             )
             print(result.error)
             return
