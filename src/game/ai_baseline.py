@@ -401,8 +401,25 @@ class StrategicPlanner:
         if frontier_count > 0:
             score += 40.0
 
+        country_strength = float(getattr(country, "strength", 0) or 0)
+
         # Strength matters, but should not outweigh frontier + alignment.
-        score += float(getattr(country, "strength", 0) or 0) * 0.8
+        score += country_strength * 0.8
+
+        # Strongly penalize highly WS-leaning countries that would require a large invasion effort.
+        ws_alignment = float(getattr(country, "alignment", (0, 0))[0] if len(getattr(country, "alignment", (0, 0)) or ()) > 0 else 0.0)
+        score -= max(0.0, ws_alignment) * 18.0
+
+        # Prefer invasion fronts that are already materially feasible with nearby force.
+        invasion_data = ctx.movement_service.get_invasion_force(country.id)
+        invasion_strength = float(invasion_data.get("strength", 0) or 0)
+        force_gap = country_strength - invasion_strength
+        if invasion_strength <= 0:
+            score -= 180.0
+        elif force_gap > 0:
+            score -= force_gap * 10.0
+        else:
+            score += min(80.0, abs(force_gap) * 4.0)
 
         # Ports/capitals add some value, but do not dominate.
         port_count = int((ctx.country_port_counts or {}).get(country.id, 0))
@@ -1286,23 +1303,26 @@ class OperationalPlanner:
                 # Offensive force concentration: commit MAJORITY of mobile force to main effort
                 # Scale by urgency and posture - high urgency means more commitment
                 is_high_urgency = plan.urgency_score >= 0.5 or plan.must_act
-                is_desperate = plan.posture == "desperate_offensive"
 
-                if is_desperate:
-                    # Desperate offensive: commit 75-80% of force
-                    main_count = max(3, (len(candidates) * 75) // 100)
+                if plan.posture == "desperate_offensive":
+                    # Desperate offensive: commit 80-85% of force
+                    main_count = max(3, (len(candidates) * 80) // 100)
                     support_count = max(2, (len(candidates) * 15) // 100)
                 elif is_high_urgency:
-                    # High urgency: commit 65-70% of force
-                    main_count = max(3, (len(candidates) * 65) // 100)
+                    # High urgency: commit 70-75% of force
+                    main_count = max(3, (len(candidates) * 70) // 100)
                     support_count = max(2, (len(candidates) * 15) // 100)
-                elif plan.posture in ("offensive", "cautious_offensive"):
-                    # Standard offensive: commit 55-60% of force
+                elif plan.posture == "offensive":
+                    # Standard offensive: commit 60-65% of force
+                    main_count = max(2, (len(candidates) * 60) // 100)
+                    support_count = max(1, (len(candidates) * 15) // 100)
+                elif plan.posture == "cautious_offensive":
+                    # Cautious offensive: commit 55-60% of force
                     main_count = max(2, (len(candidates) * 55) // 100)
                     support_count = max(1, (len(candidates) * 15) // 100)
                 else:
                     # Balanced: conservative but still meaningful commitment
-                    main_count = max(2, (len(candidates) * 45) // 100)
+                    main_count = max(2, (len(candidates) * 50) // 100)
                     support_count = max(1, (len(candidates) * 15) // 100)
 
                 # Clamp to available candidates
@@ -1318,6 +1338,36 @@ class OperationalPlanner:
             loc = locations.get((col, row))
             local_threat = _overlay_value(threat, col, row, 0.0)
             group_key = _task_group_key(group)
+
+            if (
+                offensive
+                and loc
+                and getattr(loc, "is_capital", False)
+                and getattr(loc, "occupier", None) == ctx.side
+                and group.has_army
+                and not group.has_fleet
+            ):
+                stack = ctx.game_state.map.get_units_in_hex(group.hex.q, group.hex.r)
+                defenders = [
+                    u for u in stack
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
+                    and u.is_combat_unit()
+                ]
+                is_failsafe_garrison = (
+                    len(defenders) == 1
+                    and len([u for u in group.units if u.is_army()]) == 1
+                    and all(not u.is_leader() for u in group.units)
+                )
+                if is_failsafe_garrison:
+                    append_mission(Mission(
+                        group=group,
+                        mission_type="defend_allied_capital",
+                        target_hex=group.hex,
+                        objective=None,
+                        priority=160 + local_threat * 10,
+                    ))
+                    continue
 
             if capital_defense_groups:
                 assigned_to_capital = False
@@ -1418,7 +1468,6 @@ class OperationalPlanner:
                     or group_has_ashore_committed
                 ):
                     nearby_enemy = ctx.enemy_adjacent_combat_count.get((group.hex.q, group.hex.r), 0)
-                    push_objective = None
                     if main_objective and getattr(main_objective, "owner", None) == ctx.enemy:
                         push_objective = main_objective
                     else:
@@ -1817,26 +1866,25 @@ class OperationalPlanner:
         capitals = OperationalPlanner._get_allied_capitals_needing_defenders(ctx, groups, threat)
         if not capitals:
             return assignments
-        low_power_groups = [
+        candidate_groups = [
             g for g in groups
             if g.has_army
             and not g.has_fleet
-            and g.power <= 9.0
         ]
-        low_power_groups.sort(key=lambda g: g.power)
+        candidate_groups.sort(key=lambda g: g.power)
         for capital_hex, current_power in capitals:
-            if not low_power_groups:
+            if not candidate_groups:
                 break
             best_group = None
-            best_distance = 999
-            for g in low_power_groups:
-                dist = g.hex.distance_to(capital_hex)
-                if dist < best_distance:
-                    best_distance = dist
+            best_key = None
+            for g in candidate_groups:
+                key = (g.hex.distance_to(capital_hex), g.power, len(g.units))
+                if best_key is None or key < best_key:
+                    best_key = key
                     best_group = g
             if best_group is not None:
                 assignments[capital_hex] = best_group
-                low_power_groups.remove(best_group)
+                candidate_groups.remove(best_group)
         return assignments
 
     @staticmethod
@@ -2052,10 +2100,11 @@ class TacticalPlanner:
         ready_armies = [
             u for u in ready_units
             if u.is_army()
+            and u.unit_type == UnitType.INFANTRY
             and getattr(u, "land", None) == country_filter
-            and not getattr(u, "is_on_map", False)
+            and not u.is_on_map
         ]
-        ready_armies.sort(key=lambda u: (float(getattr(u, "combat_rating", 0) or 0), _unit_key(u)))
+        ready_armies.sort(key=lambda u: (float(u.combat_rating), _unit_key(u)))
 
         valid_capital = tuple(capital_loc.coords)
         for army in ready_armies:
