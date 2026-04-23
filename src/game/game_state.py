@@ -1403,7 +1403,7 @@ class GameState:
                 u.status = UnitState.READY
                 u.allegiance = WS
 
-        print(f"Country {tower.id} activated for whitestone (first Solamnic activation).")
+        print(f"Country {self.translator.get_country_name(tower.id)} activated for Whitestone (first Solamnic activation).")
 
     def _country_has_tag(self, country, tag: str) -> bool:
         if hasattr(country, "has_tag"):
@@ -1419,35 +1419,6 @@ class GameState:
         if allegiance == WS:
             return HL
         return None
-
-    def can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
-        """
-        Rule 9 deployment ownership:
-        - Only friendly-occupied locations are eligible.
-        """
-        if allegiance not in (HL, WS):
-            return False
-        if not location or not location.coords:
-            return False
-
-        return location.occupier == allegiance
-
-    def get_solamnic_group_deployment_locations(self, allegiance: str):
-        """
-        Returns deployable locations in the Solamnic conquest group for the given side.
-        Used to allow pooled replacements before the group is fully conquered.
-        """
-        coords = []
-        for country in self._countries_with_tag(self.tag_knight_countries):
-            if country.allegiance != allegiance:
-                continue
-            if country.conquered:
-                continue
-            for loc in country.locations.values():
-                if loc.coords and self.can_use_location_for_deployment(country, loc, allegiance):
-                    coords.append(loc.coords)
-        return coords
-
 
     def resolve_event(self, event):
         pass

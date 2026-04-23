@@ -105,7 +105,7 @@ def apply_gnome_tech_bonus(
         if not carrier or not tech:
             continue
         if not decide_use(carrier, side_name):
-            logs.append(f"Gnome tech ({side_name}) not used by {carrier.id}.")
+            logs.append(f"Gnome tech ({side_name}) not used by {TextFormatter.format_unit_log_string(carrier)}.")
             continue
 
         d1 = roll_d6()

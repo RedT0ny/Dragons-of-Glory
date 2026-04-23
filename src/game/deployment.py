@@ -153,17 +153,33 @@ class DeploymentService:
 
     def _can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
         """
-        Deployment rule gateway. Keep logic centralized in GameState,
-        but make DeploymentService the single caller.
+        Rule 9 deployment ownership:
+        - Only friendly-occupied locations are eligible.
         """
-        return self.game_state.can_use_location_for_deployment(country, location, allegiance)
+        if allegiance not in (HL, WS):
+            return False
+        if not location or not location.coords:
+            return False
+
+        return location.occupier == allegiance
 
     def _get_solamnic_group_deployment_locations(self, allegiance: str):
         """
-        Deployment rule gateway. Keep logic centralized in GameState,
-        but make DeploymentService the single caller.
+        Returns deployable locations in the Solamnic conquest group for the given side.
+        Used to allow pooled replacements before the group is fully conquered.
         """
-        return self.game_state.get_solamnic_group_deployment_locations(allegiance)
+        coords = []
+        for country in self.game_state.countries.values():
+            if not hasattr(country, "spec") or self.game_state.tag_knight_countries not in country.spec.tags:
+                continue
+            if country.allegiance != allegiance:
+                continue
+            if country.conquered:
+                continue
+            for loc in country.locations.values():
+                if loc.coords and self._can_use_location_for_deployment(country, loc, allegiance):
+                    coords.append(loc.coords)
+        return coords
 
     def deploy_unit(
         self,

@@ -1162,27 +1162,27 @@ class MovementService:
             for u in transported:
                 carrier = u.transport_host
                 if not carrier or not carrier.position:
-                    messages.append(f"Cannot unboard {u.id}: carrier missing position")
+                    messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(u)}: carrier missing position")
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
                 if carrier.is_wing():
                     if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
-                        messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
+                        messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(u)}: destination terrain invalid for passenger")
                         continue
                 elif carrier.is_citadel():
                     if not self.game_state.map.can_unit_land_on_hex(u, carrier_hex):
-                        messages.append(f"Cannot unboard {u.id}: destination terrain invalid for passenger")
+                        messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(u)}: destination terrain invalid for passenger")
                         continue
                 else:
                     is_coastal = self.game_state.map.is_coastal(carrier_hex)
                     loc = self.game_state.map.get_location(carrier_hex)
                     is_port = bool(loc and loc.loc_type == LocType.PORT.value)
                     if not (is_coastal or is_port):
-                        messages.append(f"Cannot unboard {u.id}: carrier not in coastal hex or port")
+                        messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(u)}: carrier not in coastal hex or port")
                         continue
                 success = self.unboard_unit(u)
                 if not success:
-                    messages.append(f"Failed to unboard {u.id} due to stacking or location.")
+                    messages.append(f"Failed to unboard {TextFormatter.format_unit_log_string(u)} due to stacking or location.")
             return BoardActionResult(handled=True, messages=messages, force_sync=True)
 
         # Unboarding variant: Because transported units cannot be selected (they're removed from the spatial map),
@@ -1192,26 +1192,26 @@ class MovementService:
         if carriers_with_passengers:
             for carrier in carriers_with_passengers:
                 if not carrier.position:
-                    messages.append(f"Carrier {carrier.id} has no position, skipping unboard.")
+                    messages.append(f"Carrier {TextFormatter.format_unit_log_string(carrier)} has no position, skipping unboard.")
                     continue
                 carrier_hex = Hex.offset_to_axial(*carrier.position)
                 if carrier.is_wing():
-                    for p in carrier.passengers[:]:
-                        if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
-                            messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
+                    for passenger in carrier.passengers[:]:
+                        if not self.game_state.map.can_unit_land_on_hex(passenger, carrier_hex):
+                            messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(passenger)} from {TextFormatter.format_unit_log_string(carrier)}: destination terrain invalid")
                             continue
-                        ok = self.unboard_unit(p)
+                        ok = self.unboard_unit(passenger)
                         if not ok:
-                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
+                            messages.append(f"Failed to unboard {TextFormatter.format_unit_log_string(passenger)} from {TextFormatter.format_unit_log_string(carrier)} (stacking or neutral country).")
                     continue
                 if carrier.is_citadel():
-                    for p in carrier.passengers[:]:
-                        if not self.game_state.map.can_unit_land_on_hex(p, carrier_hex):
-                            messages.append(f"Cannot unboard {p.id} from {carrier.id}: destination terrain invalid")
+                    for passenger in carrier.passengers[:]:
+                        if not self.game_state.map.can_unit_land_on_hex(passenger, carrier_hex):
+                            messages.append(f"Cannot unboard {TextFormatter.format_unit_log_string(passenger)} from {TextFormatter.format_unit_log_string(carrier)}: destination terrain invalid")
                             continue
-                        ok = self.unboard_unit(p)
+                        ok = self.unboard_unit(passenger)
                         if not ok:
-                            messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or neutral country).")
+                            messages.append(f"Failed to unboard {TextFormatter.format_unit_log_string(passenger)} from {TextFormatter.format_unit_log_string(carrier)} (stacking or neutral country).")
                     continue
                 #is_coastal = self.game_state.map.is_coastal(carrier_hex)
                 loc = self.game_state.map.get_location(carrier_hex)
@@ -1220,14 +1220,14 @@ class MovementService:
                     is_port = (loc.loc_type == LocType.PORT.value)
 
                 if self.game_state.map.is_open_sea(carrier_hex):
-                    messages.append(f"Carrier {carrier.id} is in open sea, cannot unboard.")
+                    messages.append(f"Carrier {TextFormatter.format_unit_log_string(carrier)} is in open sea, cannot unboard.")
                     continue
 
                 # Unboard all passengers (copy list since unboard_unit mutates passengers)
-                for p in carrier.passengers[:]:
-                    ok = self.unboard_unit(p)
+                for passenger in carrier.passengers[:]:
+                    ok = self.unboard_unit(passenger)
                     if not ok:
-                        messages.append(f"Failed to unboard {p.id} from {carrier.id} (stacking or other).")
+                        messages.append(f"Failed to unboard {TextFormatter.format_unit_log_string(passenger)} from {TextFormatter.format_unit_log_string(carrier)} (stacking or other).")
 
                 # Movement restriction: if carrier is in a coastal land hex (coastal but NOT port), it cannot move further this Turn
                 if not is_port:
@@ -1246,22 +1246,22 @@ class MovementService:
             loaded = False
             for carrier in carriers:
                 if self.board_unit(carrier, army):
-                    messages.append(f"Boarded army {army.id} onto {carrier.id}")
+                    messages.append(f"Boarded army {TextFormatter.format_unit_log_string(army)} onto {TextFormatter.format_unit_log_string(carrier)}")
                     loaded = True
                     break
             if not loaded:
-                messages.append(f"Failed to board army {army.id} onto selected carriers.")
+                messages.append(f"Failed to board army {TextFormatter.format_unit_log_string(army)} onto selected carriers.")
 
         # Load leaders into the first selected carrier that can accept each leader.
         if leaders and carriers:
-            for l in leaders:
+            for leader in leaders:
                 loaded = False
                 for carrier in carriers:
-                    if self.board_unit(carrier, l):
-                        messages.append(f"Boarded leader {l.id} onto {carrier.id}")
+                    if self.board_unit(carrier, leader):
+                        messages.append(f"Boarded leader {TextFormatter.format_unit_log_string(leader)} onto {TextFormatter.format_unit_log_string(carrier)}")
                         loaded = True
                         break
                 if not loaded:
-                    messages.append(f"Failed to board leader {l.id} onto selected carriers.")
+                    messages.append(f"Failed to board leader {TextFormatter.format_unit_log_string(leader)} onto selected carriers.")
 
         return BoardActionResult(handled=True, messages=messages, force_sync=True)
