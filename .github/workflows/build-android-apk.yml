@@ -352,42 +352,40 @@ jobs:
           text = deploy_py.read_text(encoding="utf-8")
 
           marker = 'logging.info("[DEPLOY] Running buildozer deployment")'
-          patch_marker = "# COPILOT_PATCH_INCLUDE_ALL_QT_ANDROID_JARS"
+          patch_marker = "COPILOT_PATCH_INCLUDE_ALL_QT_ANDROID_JARS"
 
           if patch_marker in text:
               print("android_deploy.py already patched")
               raise SystemExit(0)
 
-          injection = '''
-          # COPILOT_PATCH_INCLUDE_ALL_QT_ANDROID_JARS
-          from pathlib import Path as _Path
-          import re as _re
+          lines = text.splitlines()
 
-          _spec = _Path("buildozer.spec")
-          if _spec.exists():
-              _spec_text = _spec.read_text(encoding="utf-8")
-              _jar_glob = str((_Path.cwd() / "deployment" / "jar" / "PySide6" / "jar" / "*.jar").resolve())
+          for i, line in enumerate(lines):
+              if marker in line:
+                  indent = line[:len(line) - len(line.lstrip())]
 
-              if _re.search(r"^android\\.add_jars\\s*=.*$", _spec_text, flags=_re.M):
-                  _spec_text = _re.sub(
-                      r"^android\\.add_jars\\s*=.*$",
-                      f"android.add_jars = {_jar_glob}",
-                      _spec_text,
-                      flags=_re.M,
-                  )
-              else:
-                  _spec_text += f"\\nandroid.add_jars = {_jar_glob}\\n"
+                  block = [
+                      f"{indent}# {patch_marker}",
+                      f"{indent}from pathlib import Path as _Path",
+                      f"{indent}import re as _re",
+                      f'{indent}_spec = _Path("buildozer.spec")',
+                      f"{indent}if _spec.exists():",
+                      f'{indent}    _spec_text = _spec.read_text(encoding="utf-8")',
+                      f'{indent}    _jar_glob = str((_Path.cwd() / "deployment" / "jar" / "PySide6" / "jar" / "*.jar").resolve())',
+                      f'{indent}    if _re.search(r"^android\\.add_jars\\s*=.*$", _spec_text, flags=_re.M):',
+                      f'{indent}        _spec_text = _re.sub(r"^android\\.add_jars\\s*=.*$", f"android.add_jars = {{_jar_glob}}", _spec_text, flags=_re.M)',
+                      f"{indent}    else:",
+                      f'{indent}        _spec_text += f"\\nandroid.add_jars = {{_jar_glob}}\\n"',
+                      f'{indent}    _spec.write_text(_spec_text, encoding="utf-8")',
+                      f'{indent}    print(f"[PATCH] buildozer.spec android.add_jars -> {{_jar_glob}}")',
+                  ]
 
-              _spec.write_text(_spec_text, encoding="utf-8")
-              print(f"[PATCH] buildozer.spec android.add_jars -> {_jar_glob}")
-          '''
-
-          if marker not in text:
+                  lines[i:i] = block
+                  break
+          else:
               raise SystemExit(f"Could not find marker in {deploy_py}")
 
-          text = text.replace(marker, injection + "\n" + marker)
-          deploy_py.write_text(text, encoding="utf-8")
-
+          deploy_py.write_text("\n".join(lines) + "\n", encoding="utf-8")
           print(f"Patched {deploy_py}")
           PY
 

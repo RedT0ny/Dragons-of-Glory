@@ -944,5 +944,3 @@ master_map:
       - { id: "wayreth", coords: [18, 40] }
     port:
       - { id: "zhea_harbor", coords: [14, 31] }
-    undercity:
-      - { id: "mount_nevermind", coords: [42, 28] }

@@ -385,8 +385,8 @@ class AnsalonMapView(QGraphicsView):
                 if DEBUG:
                     loc_data = board.get_location(hex_obj)
                     if loc_data:
-                        loc_item = LocationItem(center, loc_data['location_id'],
-                                                 loc_data['type'], loc_data['is_capital'])
+                        loc_item = LocationItem(center, loc_data.id,
+                                                 loc_data.loc_type, loc_data.is_capital)
                         self.scene.addItem(loc_item)
 
         self.refresh_overlay()

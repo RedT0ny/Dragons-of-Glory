@@ -691,7 +691,7 @@ class Board:
         )
         return result["found_state"]
 
-    def get_location(self, hex_coord):
+    def get_location(self, hex_coord) -> Location | None:
         """Returns Location if one exists at this hex."""
         return self.locations.get((hex_coord.q, hex_coord.r))
 
