@@ -3539,7 +3539,7 @@ class TacticalPlanner:
     @staticmethod
     def _attack_group_strength(ctx: AIContext, group: TaskGroup) -> float:
         combat_power = sum(
-            float(getattr(u, "combat_rating", 0) or 0)
+            float(u.combat_rating)
             for u in group.units
             if u.is_combat_unit()
         )
