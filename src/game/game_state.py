@@ -799,7 +799,7 @@ class GameState:
 
         if candidate:
             candidate.ready()  # Move to READY so it appears in the dialog
-            print(f"Dark Temple produced: {candidate.id}")
+            print(f"Dark Temple produced: {TextFormatter.format_unit_log_string(candidate)}")
 
     def resolve_maelstrom_entry(self, unit, maelstrom_hex=None):
         """

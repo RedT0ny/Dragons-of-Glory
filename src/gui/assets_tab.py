@@ -8,11 +8,14 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
+from content.tools import TextFormatter
+from content.translator import Translator
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
 from src.content.constants import WS, HL
 from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR, DEBUG
 
+translator = Translator()
 
 class AssetDetails(QFrame):
     """Lower section of the Assets Tab showing details."""
@@ -109,13 +112,10 @@ class AssetDetails(QFrame):
             return
 
         # Show instance number in name if it's a multi-instance asset
-        display_name = asset.spec.id.replace("_", " ").title()
-        if asset.id != asset.base_id:
-            match = re.match(r'^.+_(\d+)$', asset.id)
-            if match:
-                instance_num = match.group(1)
-                display_name = f"{display_name} #{instance_num}"
-        
+        display_name = translator.get_asset_name(asset.base_id)
+        if asset.instance_num > 0:
+            display_name = f"{display_name} #{asset.instance_num}"
+
         self.name_label.setText(display_name)
         self.desc_field.setText(asset.description)
 
@@ -321,20 +321,16 @@ class AssetsTab(QWidget):
 
         for asset_id, asset in player.assets.items():
             # Display name: Use instance ID for artifacts with multiple instances, otherwise use base name
-            display_name = asset.spec.id.replace("_", " ").title()
+            display_name = translator.get_asset_name(asset.base_id)
 
             # Add instance number suffix for artifacts that have multiple instances
-            if asset.id != asset.base_id:
-                # Extract instance number from asset.id (e.g., "dragonarmor_2" -> " #2")
-                match = re.match(r'^.+_(\d+)$', asset.id)
-                if match:
-                    instance_num = match.group(1)
-                    display_name = f"{display_name} #{instance_num}"
+            if asset.instance_num > 0:
+                display_name = f"{display_name} #{asset.instance_num}"
 
             # For artifact assets, show assigned_to info
             if asset.asset_type == AssetType.ARTIFACT:
                 if asset.assigned_to is not None:
-                    unit_name = asset.assigned_to.id.replace("_", " ").title()
+                    unit_name = TextFormatter.format_unit_log_string(asset.assigned_to)
                     display_name += f" ({unit_name})"
                 else:
                     display_name += " (Unassigned)"

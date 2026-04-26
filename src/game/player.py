@@ -1,5 +1,7 @@
 import re
 from typing import Set, Dict, Any, Optional, Callable, List, Union
+
+from content.translator import Translator
 from src.content.specs import PlayerSpec
 from src.game.country import Country
 
@@ -74,7 +76,7 @@ class Player:
         new_asset.owner = self
 
         self.assets[instance_id] = new_asset
-        print(f"Player {self.allegiance} received asset: {spec.id} ({spec.asset_type}) [Instance: {instance_id}]")
+        print(f"Player {self.allegiance.capitalize()} received asset: {self.translator.get_asset_name(spec.id)} ({spec.asset_type}) [Instance: {new_asset.instance_num}]")
 
     def has_asset(self, asset_id: str) -> bool:
         return asset_id in self.assets

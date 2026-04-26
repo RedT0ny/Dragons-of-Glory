@@ -215,10 +215,11 @@ class DiplomacyService:
 
 
 class ConquestService:
-    """Rule 9 conquest/libration domain logic."""
+    """Rule 9 conquest/liberation domain logic."""
 
     def __init__(self, game_state):
         self.game_state = game_state
+        self.translator = Translator()
 
     def _update_location_occupiers(self):
         gs = self.game_state

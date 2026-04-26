@@ -569,6 +569,8 @@ class GameController(QObject):
             self.replacements_dialog.close()
             self.replacements_dialog = None
         self._end_deployment_session()
+        self.view.clear_highlights()
+        self.view.deploying_unit = None
 
         # Clear movement highlights/selection
         self.selected_units_for_movement = []

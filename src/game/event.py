@@ -45,7 +45,8 @@ class Asset:
     def __init__(self, spec, instance_id: Optional[str] = None):
         self.spec = spec
         self.id = instance_id if instance_id else spec.id
-        self.base_id = spec.id  # The original spec ID for type checking
+        self.base_id = spec.id
+        self.instance_num = int(instance_id.split('_')[-1]) if instance_id and '_' in instance_id else 0
         self.description = spec.description
         self.bonus = spec.bonus
         self.requirements = spec.requirements
