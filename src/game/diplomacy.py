@@ -7,6 +7,7 @@ from src.content.constants import HL, WS
 from src.content.specs import LocType, UnitState, UnitType
 from src.game.map import Hex
 
+translator = Translator()
 
 @dataclass(frozen=True)
 class ActivationAttempt:
@@ -48,7 +49,6 @@ class DiplomacyService:
 
     def __init__(self, game_state):
         self.game_state = game_state
-        self.translator = Translator()
 
     def is_country_neutral(self, country_id: str) -> bool:
         country = self.game_state.countries.get(country_id)
@@ -184,7 +184,7 @@ class DiplomacyService:
             f"Modifier: {modifier}",
             "Rolls:",
             *rounds,
-            f"{self.translator.get_country_name(country_id)} joins {winner.title()}",
+            f"{translator.get_country_name(country_id)} joins {winner.title()}",
         ]
         message = "\n".join(summary_lines)
         title = f"Invasion!"
@@ -219,7 +219,6 @@ class ConquestService:
 
     def __init__(self, game_state):
         self.game_state = game_state
-        self.translator = Translator()
 
     def _update_location_occupiers(self):
         gs = self.game_state
@@ -268,13 +267,13 @@ class ConquestService:
 
         country.allegiance = conqueror
         country.conquered = True
-        print(f"Country {self.translator.get_country_name(country.id)} conquered. Destroyed units: {destroyed_count}")
+        print(f"Country {translator.get_country_name(country.id)} conquered. Destroyed units: {destroyed_count}")
 
     def _apply_country_conquest_or_liberation(self, country, conqueror: str):
         if country.conquered:
             country.allegiance = conqueror
             country.conquered = False
-            print(f"Country {self.translator.get_country_name(country.id)} liberated for {conqueror}.")
+            print(f"Country {translator.get_country_name(country.id)} liberated for {conqueror}.")
             return
         self._destroy_country_upon_conquest(country, conqueror)
 
