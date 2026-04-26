@@ -7,6 +7,7 @@ from src.game.country import Country
 
 class Player:
     def __init__(self, spec: PlayerSpec):
+        self.translator = Translator()
         self.spec = spec
         self.allegiance = spec.allegiance
         self.controlled_countries: Dict[str, Country] = {}

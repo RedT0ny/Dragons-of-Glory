@@ -1,6 +1,7 @@
 from typing import Any, Callable, Optional
 
 from content.tools import TextFormatter
+from content.translator import Translator
 from ..content.specs import (
     RequirementType,
     ASSET_REQUIREMENTS,
@@ -8,6 +9,8 @@ from ..content.specs import (
     UnitType,
     AssetType
 )
+
+translator = Translator()
 
 class Event:
     def __init__(self, spec: 'EventSpec', trigger_func: Callable[[Any], bool], effect_func: Callable[[Any], None]) -> None:
@@ -65,14 +68,15 @@ class Asset:
         Check if a unit can equip this asset based on requirements.
         """
         unit_id = TextFormatter.format_unit_log_string(unit)
+        asset_id = translator.get_asset_name(self.id)
         if not self.is_equippable:
             if log_reason:
-                print(f"Asset '{self.id}' is not equippable.")
+                print(f"Asset '{asset_id}' is not equippable.")
             return False
 
         if not unit.is_on_map:
             if log_reason:
-                print(f"Cannot equip '{self.id}' to '{unit_id}': Unit is not on the map.")
+                print(f"Cannot equip '{asset_id}' to '{unit_id}': Unit is not on the map.")
             return False
 
         for requirement in self.requirements:
@@ -81,7 +85,7 @@ class Asset:
 
             if not self._check_requirement(unit, req_type, req_value):
                 if log_reason:
-                    print(f"Cannot equip '{self.id}' to '{unit_id}': Requirement {req_type}='{req_value}' failed.")
+                    print(f"Cannot equip '{asset_id}' to '{unit_id}': Requirement {req_type}='{req_value}' failed.")
                 return False
         return True
 
@@ -128,7 +132,9 @@ class Asset:
             self._apply_runtime_effects(unit)
             if on_assign_callback is not None:
                 on_assign_callback(self)
-            print(f"'{TextFormatter.format_unit_log_string(unit)}' equipped '{self.id}'!")
+            unit_id = TextFormatter.format_unit_log_string(unit)
+            asset_id = translator.get_asset_name(self.base_id) + (' #'+ str(self.instance_num) if self.instance_num > 1 else '')
+            print(f"'{unit_id}' equipped '{asset_id}'!")
 
     def remove_from(self, unit):
         """Remove asset effects from a unit."""
