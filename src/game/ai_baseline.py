@@ -2821,6 +2821,9 @@ class TacticalPlanner:
         support = _overlay_value(friendly_power_overlay, col, row, 0.0)
         territory = ctx.overlays.get("territory")
         territory_val = territory.values.get((col, row)) if territory else None
+        current_hex = mission.group.hex
+        current_col, current_row = current_hex.axial_to_offset()
+        current_threat = _overlay_value(ctx.overlays.get("threat"), current_col, current_row, 0.0)
 
         score = 0.0
         if mission.target_hex is not None:
@@ -2836,6 +2839,56 @@ class TacticalPlanner:
         loc = ctx.game_state.map.get_location(Hex.offset_to_axial(col, row))
         if loc and loc.occupier != ctx.side:
             score += 10
+
+        # Defensive anchor rule:
+        # if a ground group is already on the hex it is supposed to defend/reinforce,
+        # strongly prefer holding that hex instead of stepping off it.
+        if (
+            mission.target_hex is not None
+            and mission.group.has_army
+            and mission.mission_type in {"defend", "defend_capital", "defend_key_location", "reinforce", "hold"}
+            and current_hex == mission.target_hex
+            and target_hex != current_hex
+        ):
+            hold_pressure = max(
+                float(getattr(mission, "priority", 0.0) or 0.0) / 6.0,
+                current_threat * 6.0,
+            )
+            score -= 70.0 + hold_pressure
+
+            current_loc = ctx.game_state.map.get_location(current_hex)
+            if current_loc and getattr(current_loc, "is_capital", False):
+                score -= 40.0
+            if current_loc and getattr(current_loc, "loc_type", None) in {LocType.FORTRESS.value, LocType.PORT.value, LocType.TEMPLE.value}:
+                score -= 20.0
+            if mission.objective and getattr(mission.objective, "coords", None) == current_hex.axial_to_offset():
+                score -= 35.0
+            if plan.main_objective and getattr(plan.main_objective, "coords", None) == current_hex.axial_to_offset():
+                score -= 35.0
+
+        # Do not peel the last combat defender off a friendly-controlled location.
+        # This especially matters for air groups that would otherwise leave a leader
+        # alone and unprotected on the hex.
+        if (
+            target_hex != current_hex
+            and mission.mission_type in {"defend", "defend_capital", "defend_key_location", "reinforce", "hold"}
+        ):
+            current_loc = ctx.game_state.map.get_location(current_hex)
+            if current_loc and getattr(current_loc, "occupier", None) == ctx.side:
+                moving_markers = {id(u) for u in mission.group.units}
+                remaining_friendly_combat = [
+                    u for u in ctx.game_state.map.get_units_in_hex(current_hex.q, current_hex.r)
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
+                    and u.is_combat_unit()
+                    and id(u) not in moving_markers
+                ]
+                if not remaining_friendly_combat:
+                    score -= 140.0
+                    if getattr(current_loc, "is_capital", False):
+                        score -= 40.0
+                    if getattr(current_loc, "loc_type", None) in {LocType.FORTRESS.value, LocType.PORT.value, LocType.TEMPLE.value}:
+                        score -= 25.0
 
         amphibious_types = {"embark_main_effort", "transport_main_effort", "move_to_landing_area"}
         if mission.mission_type in amphibious_types and plan.main_objective:
@@ -2972,10 +3025,8 @@ class TacticalPlanner:
         offensive_types = {"push_objective", "main_effort_attack", "support_main_effort"}
         if mission.mission_type in offensive_types and plan.main_objective:
             main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
-            current_hex = mission.group.hex
             current_dist = current_hex.distance_to(main_hex)
             next_dist = target_hex.distance_to(main_hex)
-            current_col, current_row = current_hex.axial_to_offset()
             support_now = _overlay_value(friendly_power_overlay, current_col, current_row, 0.0)
             support_gain = support - support_now
 

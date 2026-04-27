@@ -96,9 +96,11 @@ class InfoPanel(QFrame):
         btns = ["Prev", "Undo", "(Un)Board", "Next", "Use", "End Phase"]
         self.btn_board = None
         self.btn_undo = None
+        self.btn_end_phase = None
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
+                self.btn_end_phase = btn
                 btn.clicked.connect(self.end_phase_clicked.emit)
             if name == "Undo":
                 self.btn_undo = btn
@@ -403,6 +405,10 @@ class InfoPanel(QFrame):
     def set_undo_enabled(self, enabled):
         if hasattr(self, "btn_undo") and self.btn_undo:
             self.btn_undo.setEnabled(enabled)
+
+    def set_end_phase_enabled(self, enabled):
+        if hasattr(self, "btn_end_phase") and self.btn_end_phase:
+            self.btn_end_phase.setEnabled(enabled)
 
     def on_item_changed(self, item):
         if item.column() == 0:

@@ -499,6 +499,11 @@ class GameController(QObject):
             phase_label=self._format_phase_label(self.game_state.phase),
         )
 
+        # Enable/disable End Phase button based on whether it's a human interactive turn
+        if hasattr(main_window, "info_panel"):
+            is_human_turn = self._is_human_interactive_turn()
+            main_window.info_panel.set_end_phase_enabled(is_human_turn)
+
     @staticmethod
     def _format_phase_label(phase):
         if hasattr(phase, "name"):
