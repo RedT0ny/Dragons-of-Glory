@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTable
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
+from content.tools import debug_print
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
@@ -417,11 +418,10 @@ class AllegiancePanel(QWidget):
             phase = "updated"
 
         dt_ms = (perf_counter() - t0) * 1000.0
-        if DEBUG:
-            print(
+        debug_print(
                 f"[perf] AllegiancePanel.refresh allegiance={self.allegiance} "
                 f"tables={len(self.tables)} mode={phase} time_ms={dt_ms:.1f}"
-            )
+        )
 
     def _build_groups_data(self, preindexed: Optional[Dict[str, Any]] = None):
         processed_units = set()

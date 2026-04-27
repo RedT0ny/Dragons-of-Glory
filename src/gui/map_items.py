@@ -68,11 +68,11 @@ class HexagonItem(QGraphicsItem):
         visual = TERRAIN_VISUALS.get(self.terrain_type, TERRAIN_VISUALS["grassland"])
     
         # Layer 1: Terrain Color + Pattern
-        if DEBUG:
-            base_brush = QBrush(visual["color"], visual["pattern"])
-            painter.setBrush(base_brush)
-            painter.setPen(QPen(QColor(100, 100, 100, 40), 0.5))
-            painter.drawPath(self.path)
+        # if DEBUG:
+        #     base_brush = QBrush(visual["color"], visual["pattern"])
+        #     painter.setBrush(base_brush)
+        #     painter.setPen(QPen(QColor(100, 100, 100, 40), 0.5))
+        #     painter.drawPath(self.path)
 
         # Layer 2: Country Overlay (if applicable)
         if self.color and self.color.alpha() > 0:
@@ -89,7 +89,7 @@ class HexagonItem(QGraphicsItem):
             if self.pass_directions:
                 self.draw_mountain_passes(painter)
 
-        # Layer 6: Highlight if selected/reachable
+        # Layer 5: Highlight if selected/reachable
         if self.is_highlighted:
             highlight_color = self.highlight_color or UI_COLORS["highlighted_hex"]
             painter.setBrush(QBrush(highlight_color))

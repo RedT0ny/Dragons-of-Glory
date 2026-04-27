@@ -1663,6 +1663,12 @@ class OperationalPlanner:
 
     @staticmethod
     def _assign_fleet_slots(ctx: AIContext, plan: StrategicPlan, fleet_groups: List[TaskGroup], transport_actions: Optional[Set[Tuple]] = None) -> Dict[Tuple[str, int], Tuple[int, int]]:
+        """
+        Assign fleets to specific beachhead slots based on:
+        - Existing assignments from previous turn (if still valid and not over capacity)
+        - Proximity to beachhead and main objective
+        - Avoiding over-concentration in any single slot
+        """
         if not fleet_groups:
             return {}
         slots = list(plan.beachhead_slots or ([] if plan.beachhead_hex is None else [plan.beachhead_hex]))

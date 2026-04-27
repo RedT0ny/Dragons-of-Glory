@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
-from content.tools import TextFormatter
+from content.tools import TextFormatter, debug_print
 from content.translator import Translator
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
@@ -278,8 +278,7 @@ class AssetsTab(QWidget):
 
         signature = self._build_signature()
         if signature == self._last_signature:
-            if DEBUG:
-                print("[perf] AssetsTab.refresh skipped (signature unchanged)")
+            debug_print("[perf] AssetsTab.refresh skipped (signature unchanged)")
             return
         self._last_signature = signature
 
@@ -347,8 +346,7 @@ class AssetsTab(QWidget):
         self.asset_tree.expandAll()
         self.asset_tree.blockSignals(False)
         dt_ms = (perf_counter() - t0) * 1000.0
-        if DEBUG:
-            print(f"[perf] AssetsTab.refresh rebuilt assets={len(player.assets)} time_ms={dt_ms:.1f}")
+        debug_print(f"[perf] AssetsTab.refresh rebuilt assets={len(player.assets)} time_ms={dt_ms:.1f}")
 
     def select_asset_by_id(self, asset_id):
         """Selects an asset in the tree by its ID."""
