@@ -33,7 +33,7 @@ class Translator:
             template = self.translations['units'][f'{mode}_format_generic']
             return template.format(
                 ordinal=ordinal_roman,
-                land=self.get_country_name(unit.country) if unit.country else "",
+                land=self.get_country_name(unit.land) if unit.land else "",
                 race=self.translations.get('races', {}).get(unit.race, {}).get('name', unit.race),
                 type=self.translations.get('unit_types', {}).get(unit.unit_type, {}).get('name', unit.unit_type)
             ).strip().replace("  ", " ")
