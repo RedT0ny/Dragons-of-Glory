@@ -108,7 +108,7 @@ blodehelm:
   capital_id: vantal
   color: "#A52A2A"
   allegiance: neutral
-  alignment: [0, 0]
+  alignment: [1, 5]
   strength: 24
   locations:
     vantal: {loc_type: city, coords: [34, 34]}
@@ -236,7 +236,7 @@ dtemple:
   capital_id: dark_temple
   color: "#8B0000"
   allegiance: neutral
-  alignment: [0, 0]
+  alignment: [-10, -10]
   strength: 0
   locations:
     dark_temple: {loc_type: temple, coords: [38, 22]}

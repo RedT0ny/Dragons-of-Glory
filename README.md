@@ -125,3 +125,6 @@ add a new field 'triggered' to the event dataclass?
 events in the game_state list:
 
 if game_state events list is empty, skip event phase and show a placeholder.
+Disable not only end phase button during AI turn, but also pressing enter key. Activate it in the strategic events turn
+of the player only.
+

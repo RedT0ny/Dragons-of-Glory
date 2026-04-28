@@ -85,7 +85,7 @@ class TextFormatter:
 
     @staticmethod
     def format_unit_log_string(unit):
-        ordinal = getattr(unit, "ordinal", None)
+        ordinal = getattr(unit, "ordinal", None) if not unit.is_leader() else None
         id_text = getattr(unit, "id", "Unknown")
 
         # id_text: For units e.g. taman_human_inf_1

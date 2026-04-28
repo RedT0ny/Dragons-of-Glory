@@ -133,7 +133,7 @@ class DiplomacyDialog(QDialog):
         if attempt.event_activation_bonus:
             stats_text += self.translator.tr(
                 "dialogs.diplomacy.event_bonus",
-                " | Event roll bonus: -{bonus}",
+                "\n Event roll bonus: -{bonus}",
                 bonus=attempt.event_activation_bonus,
             )
         stats_lbl = QLabel(stats_text)

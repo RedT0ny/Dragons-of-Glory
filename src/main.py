@@ -16,8 +16,8 @@ class GameApp:
     def __init__(self):
         self.runtime_diagnostics = RuntimeDiagnostics()
         self.runtime_diagnostics.install()
-        self.app = self.initialize_app()
         self.translator = Translator(lang_code='en')  # Or dynamic detection
+        self.app = self.initialize_app()
         self.audio_manager = AudioManager()
         self.app.audio_manager = self.audio_manager
 
@@ -44,7 +44,7 @@ class GameApp:
         print(f"Locale '{lang_code}' detected for translations.")
 
         # Initialize the Translator
-        translator = Translator(lang_code=lang_code)
+        self.translator = Translator(lang_code=lang_code)
 
         # Create the application instance
         app = QApplication(sys.argv)

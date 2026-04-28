@@ -400,7 +400,7 @@ class InfoPanel(QFrame):
             self.btn_board.setEnabled(is_movement_phase)
         if hasattr(self, 'btn_undo') and self.btn_undo:
             # Controller refines this with stack availability.
-            self.btn_undo.setEnabled(is_movement_phase)
+            self.set_undo_enabled(is_movement_phase)
 
     def set_undo_enabled(self, enabled):
         if hasattr(self, "btn_undo") and self.btn_undo:

@@ -6,6 +6,7 @@ from collections import defaultdict
 from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple, Set
 
+from content.translator import Translator
 from content.tools import TextFormatter
 from src.content import loader
 from src.content.config import AI_STANCE_DATA
@@ -15,6 +16,7 @@ from src.content.tools import debug_print
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
 
+translator = Translator()
 
 def _enemy_of(side: str) -> Optional[str]:
     if side == HL: return WS
@@ -4057,12 +4059,12 @@ class BaselineAIPlayer:
         roll = self.diplomacy_service.roll_activation(attempt.target_rating, roll_bonus=bonus)
 
         if not roll.success:
-            return False, best.id
+            return False, translator.get_country_name(best.id)
 
         self.diplomacy_service.activate_country(best.id, side)
         deployed = self.deploy_all_ready_units(side, allow_territory_wide=True, country_filter=best.id)
         self._log(f"activation success: {best.id} deployed={deployed}")
-        return True, best.id
+        return True, translator.get_country_name(best.id)
 
     # ---------- Assets ----------
     def assign_assets(self, side: str) -> int:

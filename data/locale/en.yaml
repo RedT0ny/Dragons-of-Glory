@@ -123,7 +123,7 @@ countries:
   vingaard:
     name: "Vingaard"
     adjective: "Vingaard"
-  Zhakar:
+  zhakar:
     name: "Zhakar"
     adjective: "Zhakar"
 races:
@@ -298,7 +298,7 @@ dialogs:
     attempt_activate: "Attempt to activate {country} for {side}?"
     rating_needed: "Rating needed: {target} or less"
     rating_base_bonus: " (base {base} + {bonus})"
-    event_bonus: " | Event roll bonus: -{bonus}"
+    event_bonus: " \n Event roll bonus: -{bonus}"
     attempt_roll: "Attempt Roll"
     cancel: "Cancel"
     rolling: "Rolling... {roll}"
