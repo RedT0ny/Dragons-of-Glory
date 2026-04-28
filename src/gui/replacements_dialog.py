@@ -216,15 +216,11 @@ class ReplacementsDialog(QDialog):
         else:
             countries = list(self.game_state.countries.values())
 
-            # Grouping
+            # Only show player countries for the current player's turn
             player_countries = [c for c in countries if c.allegiance == player_side]
-            enemy_countries = [c for c in countries if c.allegiance == enemy_side]
-            neutral_countries = [c for c in countries if c.allegiance == NEUTRAL]
 
             all_groups = [
-                ("Your Allies", player_side, player_countries, True),
-                ("Enemy Forces", enemy_side, enemy_countries, False),
-                ("Neutrals", NEUTRAL, neutral_countries, False)
+                ("Your Units", player_side, player_countries, True),
             ]
 
         row_idx = 0
