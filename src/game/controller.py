@@ -25,6 +25,17 @@ class GameController(QObject):
         combat_details="brief",
         supply="standard",
     ):
+        """Initialize the game controller with state, view, and configuration.
+        
+        Args:
+            game_state: Core game state object managing all game data.
+            view: Game view/UI instance for rendering and user interaction.
+            highlord_ai: Whether the Highlord faction is AI-controlled (default False).
+            whitestone_ai: Whether the Whitestone faction is AI-controlled (default False).
+            difficulty: Game difficulty level (default "normal").
+            combat_details: Level of combat detail to display (default "brief").
+            supply: Supply ruleset variant (default "standard").
+        """
         super().__init__()
         self.game_state = game_state
         self.view = view
@@ -77,6 +88,12 @@ class GameController(QObject):
         self._pending_phase_advance_after_deployment = False
 
     def get_runtime_config(self):
+        """Return current runtime configuration for saving/restoring.
+        
+        Returns:
+            dict: Configuration with keys highlord_ai, whitestone_ai, difficulty,
+                combat_details, supply.
+        """
         return {
             "highlord_ai": bool(self.game_state.players.get(HL).is_ai) if HL in self.game_state.players else False,
             "whitestone_ai": bool(self.game_state.players.get(WS).is_ai) if WS in self.game_state.players else False,
@@ -86,6 +103,16 @@ class GameController(QObject):
         }
 
     def apply_runtime_config(self, config: dict):
+        """Apply runtime configuration to controller and game state.
+        
+        Args:
+            config: Dictionary containing runtime settings to apply, namely:
+                - highlord_ai: Whether the Highlord faction is AI-controlled (default False).
+                - whitestone_ai: Whether the Whitestone faction is AI-controlled (default False).
+                - difficulty: Game difficulty level (default "normal").
+                - combat_details: Level of combat detail to display (default "brief").
+                - supply: Supply ruleset variant (default "standard").
+        """
         hl_ai = bool(config.get("highlord_ai", False))
         ws_ai = bool(config.get("whitestone_ai", False))
         self.difficulty = str(config.get("difficulty", self.difficulty)).strip().lower()
@@ -103,6 +130,13 @@ class GameController(QObject):
             self.game_state.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
     def _schedule_deferred(self, callback):
+        """Schedule a callback to run on the next Qt event loop iteration.
+        
+        Uses epoch tracking to discard stale callbacks from previous states.
+        
+        Args:
+            callback: Callable to execute deferred.
+        """
         epoch = self._deferred_epoch
         callback_name = getattr(callback, "__name__", callback.__class__.__name__)
         QTimer.singleShot(1, lambda: self._run_deferred_if_current(epoch, callback, callback_name))
@@ -117,6 +151,15 @@ class GameController(QObject):
         return self.game_state.phase in {GamePhase.DEPLOYMENT, GamePhase.REPLACEMENTS, GamePhase.MOVEMENT, GamePhase.COMBAT}
 
     def _run_deferred_if_current(self, epoch, callback, callback_name="callback"):
+        """Execute a deferred callback only if the epoch matches current state.
+        
+        Prevents stale callbacks from previous game states from running.
+        
+        Args:
+            epoch: Epoch value when the callback was scheduled.
+            callback: Callable to execute if epoch matches.
+            callback_name: Name for diagnostics logging (default "callback").
+        """
         if epoch != self._deferred_epoch:
             RuntimeDiagnostics.record_event(
                 f"Deferred skipped (epoch mismatch): {callback_name}"
@@ -151,19 +194,39 @@ class GameController(QObject):
         self._end_deployment_session()
 
     def _begin_deployment_session(self):
+        """Initialize a new deployment session to track deployed unit IDs."""
         self._deployment_session_unit_ids = set()
 
     def _end_deployment_session(self):
+        """Clear the current deployment session and reset tracked unit IDs."""
         self._deployment_session_unit_ids.clear()
 
     def _is_deployment_session_active(self):
+        """Check if a deployment session is currently active.
+        
+        Returns:
+            bool: True if the replacements dialog is visible (deployment in progress).
+        """
         return self._is_replacements_dialog_visible()
 
     def _is_replacements_dialog_visible(self):
+        """Check if the replacements/deployment dialog is open and visible.
+        
+        Returns:
+            bool: True if dialog exists, is valid, and currently visible.
+        """
         dlg = self.replacements_dialog
         return bool(dlg and shiboken6.isValid(dlg) and dlg.isVisible())
 
     def _can_redeploy_unit_now(self, unit):
+        """Check if a unit is eligible for redeployment in the current session.
+        
+        Args:
+            unit: Unit object to check eligibility for.
+            
+        Returns:
+            bool: True if unit can be redeployed.
+        """
         if not self._is_deployment_session_active():
             return False
         if getattr(self.view, "deploying_unit", None) is not None:
@@ -223,6 +286,13 @@ class GameController(QObject):
                 break
 
     def _return_unit_to_ready_for_redeployment(self, unit):
+        """Return a unit to READY state for redeployment, removing it from the board.
+        
+        Resets unit movement/attack flags and schedules UI sync.
+        
+        Args:
+            unit: Unit object to return to ready state.
+        """
         self.game_state.movement_service.remove_unit_from_board(
             unit,
             escaped=False,
@@ -362,6 +432,18 @@ class GameController(QObject):
             self._processing_turn_tick = False
 
     def _handle_turn_action(self, action: TurnAction, payload: dict | None) -> bool:
+        """Process turn actions returned by the turn engine.
+        
+        Handles human interaction requests (deployment, events, activation) and
+        pauses the turn loop when waiting for user input.
+        
+        Args:
+            action: TurnAction enum value indicating the action to handle.
+            payload: Additional data for the action, or None.
+            
+        Returns:
+            bool: True if the action requires pausing for human input, False otherwise.
+        """
         payload = payload or {}
 
         if action == TurnAction.NONE:
@@ -435,6 +517,7 @@ class GameController(QObject):
         return False
 
     def _announce_victory_if_needed(self):
+        """Display victory message if the game is over and not yet announced."""
         if not self.game_state.game_over or self._victory_announced:
             return
         self._victory_announced = True
@@ -474,6 +557,7 @@ class GameController(QObject):
             )
 
     def _refresh_minimap_allegiance(self):
+        """Refresh the minimap's allegiance colors if available."""
         main_window = self.view.window()
         info_panel = getattr(main_window, "info_panel", None)
         mini_map = getattr(info_panel, "mini_map", None) if info_panel else None
@@ -485,6 +569,10 @@ class GameController(QObject):
             mini_map.update_allegiance_colors()
 
     def _refresh_turn_panel(self):
+        """Update the main window's turn panel with current game state info.
+        
+        Also toggles the End Phase button based on whether it's a human interactive turn.
+        """
         main_window = self.view.window()
         if not hasattr(main_window, "update_turn_panel"):
             return
@@ -506,6 +594,14 @@ class GameController(QObject):
 
     @staticmethod
     def _format_phase_label(phase):
+        """Format a GamePhase enum into a human-readable label.
+        
+        Args:
+            phase: GamePhase enum value to format.
+            
+        Returns:
+            str: Formatted phase label (e.g., "Deployment Phase").
+        """
         if hasattr(phase, "name"):
             return phase.name.replace("_", " ").title()
         return str(phase)
@@ -596,6 +692,14 @@ class GameController(QObject):
         self._schedule_deferred(self.process_game_turn)
 
     def execute_simple_ai_logic(self, side):
+        """Execute basic AI movement logic for the given side.
+        
+        Args:
+            side: Allegiance side (e.g., HL, WS) to run AI logic for.
+            
+        Returns:
+            Result of the AI movement execution.
+        """
         return self.ai_baseline.execute_best_movement(side, attempt_invasion=self._attempt_invasion)
 
     def on_unit_selection_changed(self, selected_units):
@@ -709,6 +813,11 @@ class GameController(QObject):
             self.handle_combat_click(hex_obj)
 
     def handle_combat_click(self, target_hex):
+        """Delegate combat click handling to the combat click handler.
+        
+        Args:
+            target_hex: Hex object that was clicked during combat phase.
+        """
         if self.combat_click_handler:
             self.combat_click_handler.handle_click(target_hex)
 
@@ -790,6 +899,10 @@ class GameController(QObject):
         print(f"Unit {TextFormatter.format_unit_log_string(unit)} deployed to {target_hex.axial_to_offset()} via controller")
 
     def _queue_replacements_dialog_refresh(self):
+        """Queue a refresh of the replacements dialog, avoiding rapid repeated updates.
+        
+        Prevents dialog rebuild races and throttles refresh calls.
+        """
         dlg = self.replacements_dialog
         if not (dlg and shiboken6.isValid(dlg) and dlg.isVisible()):
             return
@@ -912,6 +1025,10 @@ class GameController(QObject):
         )
 
     def _connect_replacements_dialog_signals(self):
+        """Connect replacements dialog signals to controller slots.
+        
+        Uses UniqueConnection to prevent duplicate signal connections.
+        """
         dlg = self.replacements_dialog
         if not (dlg and shiboken6.isValid(dlg)):
             return
@@ -923,6 +1040,12 @@ class GameController(QObject):
             sig.connect(slot, Qt.UniqueConnection)
 
     def on_conscription_requested(self, kept_unit, discarded_unit):
+        """Handle conscription request from the replacements dialog.
+        
+        Args:
+            kept_unit: Unit to keep after conscription.
+            discarded_unit: Unit to discard during conscription.
+        """
         self.game_state.apply_conscription(kept_unit, discarded_unit)
         if self._is_replacements_dialog_visible():
             self.replacements_dialog.refresh()
@@ -956,6 +1079,12 @@ class GameController(QObject):
             self._refresh_info_panel()
 
     def on_asset_assign_requested(self, asset, unit):
+        """Handle request to assign an asset to a unit (human player only).
+        
+        Args:
+            asset: Asset object to assign.
+            unit: Unit to assign the asset to.
+        """
         if self.game_state.current_player and self.game_state.current_player.is_ai:
             return
         if not asset or not unit:
@@ -964,6 +1093,12 @@ class GameController(QObject):
             asset.apply_to(unit, on_assign_callback=self._on_asset_assigned)
 
     def on_asset_remove_requested(self, asset, unit):
+        """Handle request to remove an asset from a unit (human player only).
+        
+        Args:
+            asset: Asset object to remove.
+            unit: Unit to remove the asset from.
+        """
         if self.game_state.current_player and self.game_state.current_player.is_ai:
             return
         if not asset or not unit:
@@ -977,6 +1112,7 @@ class GameController(QObject):
         self._refresh_assets_tab()
 
     def _refresh_assets_tab(self):
+        """Refresh the assets tab and update the info panel."""
         main_window = self.view.window()
         if hasattr(main_window, "assets_tab"):
             main_window.assets_tab.refresh()
@@ -984,6 +1120,14 @@ class GameController(QObject):
         self._refresh_info_panel()
 
     def on_ready_unit_clicked(self, unit, allow_territory_deploy):
+        """Handle click on a ready (undeployed) unit in the replacements dialog.
+        
+        Highlights valid deployment hexes for the selected unit.
+        
+        Args:
+            unit: Unit object that was clicked.
+            allow_territory_deploy: Whether territory-wide deployment is allowed.
+        """
         # Ignore stale clicks from a dialog row that no longer represents a deployable unit.
         if unit.status != UnitState.READY or unit.is_on_map:
             self.view.clear_highlights()
@@ -998,6 +1142,10 @@ class GameController(QObject):
         self.view.highlight_deployment_targets(valid_hexes, unit)
 
     def on_finish_deployment_clicked(self):
+        """Handle finish deployment button click, closing dialog and advancing phase.
+        
+        Special handling for invasion deployments to return to the main turn flow.
+        """
         if not self._invasion_deployment_active:
             if self._is_replacements_dialog_visible():
                 self.replacements_dialog.close()
@@ -1029,6 +1177,15 @@ class GameController(QObject):
             self._schedule_deferred(self.process_game_turn)
 
     def _attempt_invasion(self, country_id, invasion_units=None):
+        """Attempt to invade a neutral country and resolve the invasion.
+        
+        Args:
+            country_id: ID of the country to invade.
+            invasion_units: Optional list of units to include in the invasion force.
+            
+        Returns:
+            Invasion outcome object with success status, winner, and messages.
+        """
         from PySide6.QtWidgets import QMessageBox
 
         invasion_data = self.movement_service.get_invasion_force(country_id, extra_units=invasion_units)
@@ -1041,6 +1198,7 @@ class GameController(QObject):
         return outcome
 
     def on_undo_clicked(self):
+        """Handle undo button click during movement phase to undo last movement."""
         if not self._is_human_interactive_turn():
             return
         if self.game_state.phase != GamePhase.MOVEMENT:
@@ -1054,6 +1212,14 @@ class GameController(QObject):
         self._refresh_info_panel()
 
     def _start_invasion_deployment(self, country_id, allegiance):
+        """Initiate deployment phase after a successful invasion.
+        
+        Handles AI auto-deployment or opens deployment dialog for human players.
+        
+        Args:
+            country_id: ID of the invaded country.
+            allegiance: Allegiance of the invasion winner.
+        """
         from PySide6.QtWidgets import QMessageBox
         from src.gui.replacements_dialog import ReplacementsDialog
 

@@ -244,6 +244,9 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, lambda p=center: self.map_view.centerOn(p))
 
     def _log_tab_switch_settled(self, seq, tab_name):
+        """
+        Logs the time taken for the tab switch to settle after the initial refresh, including any asynchronous updates.
+        """
         t0 = self._tab_switch_started.pop(seq, None)
         if t0 is None:
             return
@@ -386,7 +389,7 @@ class MainWindow(QMainWindow):
     def on_config_clicked(self):
         if not self.controller:
             return
-        current_player = getattr(self.game_state, "current_player", None)
+        # current_player = getattr(self.game_state, "current_player", None)
         # if current_player and getattr(current_player, "is_ai", False):
         #     QMessageBox.information(
         #         self,
