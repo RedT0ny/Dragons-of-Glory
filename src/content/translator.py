@@ -1,7 +1,7 @@
 import yaml
 import os
-from .tools import to_roman
-from .config import LOCALE_DIR, DEFAULT_LANG
+from src.content.tools import to_roman
+from src.content.config import LOCALE_DIR, DEFAULT_LANG
 
 class Translator:
     def __init__(self, lang_code=DEFAULT_LANG):

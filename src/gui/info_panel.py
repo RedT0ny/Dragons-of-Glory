@@ -5,13 +5,11 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushBu
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QPointF
 from PySide6.QtGui import QIcon, QColor, QPixmap, QFontDatabase, QFont
 
-from content.tools import TextFormatter
+from src.content.tools import TextFormatter
 from src.content.config import UNIT_ICON_SIZE, IMAGES_DIR, FONTS_DIR, LIBRA_FONT
-from src.content.constants import HL, WS
 from src.content.specs import UnitColumn, UnitType
 from src.gui.unit_panel import UnitTable
 from src.gui.map_view import AnsalonMapView
-from src.gui.map_items import HexagonItem
 
 class MiniMapView(AnsalonMapView):
     """

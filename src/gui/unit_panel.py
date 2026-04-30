@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTable
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
-from content.tools import debug_print
+from src.content.tools import debug_print
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn

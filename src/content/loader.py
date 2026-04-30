@@ -1,9 +1,8 @@
-import csv, yaml, json
-import os, re
+import csv, yaml, os, re
 from datetime import datetime, timezone
 from dataclasses import asdict
 from collections import defaultdict
-from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP, HL, WS, NEUTRAL
+from src.content.constants import DRAGONFLIGHTS, DIRECTION_MAP
 from src.content.specs import *
 from src.content.config import APP_NAME, APP_VERSION, ASSETS_DIR
 

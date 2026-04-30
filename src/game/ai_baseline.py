@@ -6,8 +6,8 @@ from collections import defaultdict
 from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple, Set
 
-from content.translator import Translator
-from content.tools import TextFormatter
+from src.content.translator import Translator
+from src.content.tools import TextFormatter
 from src.content import loader
 from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL

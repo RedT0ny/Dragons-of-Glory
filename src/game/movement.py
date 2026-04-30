@@ -12,8 +12,8 @@ from typing import List, Tuple
 
 from shiboken6.Shiboken import Object
 
-from content.tools import TextFormatter, debug_print
-from game.unit import Unit
+from src.content.tools import TextFormatter, debug_print
+from src.game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
 from src.game.interception import InterceptionService

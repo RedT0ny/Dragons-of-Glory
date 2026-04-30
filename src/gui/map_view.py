@@ -5,7 +5,6 @@ from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
 from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
 
-from game.map import Hexside
 from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import GamePhase, HexsideType

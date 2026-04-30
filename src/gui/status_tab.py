@@ -3,7 +3,7 @@ from PySide6.QtCore import Signal
 from time import perf_counter
 from collections import defaultdict
 
-from content.tools import debug_print
+from src.content.tools import debug_print
 from src.content.constants import WS, HL, NEUTRAL
 from src.gui.unit_panel import AllegiancePanel
 from src.content.specs import UnitColumn

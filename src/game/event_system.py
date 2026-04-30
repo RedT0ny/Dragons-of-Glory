@@ -1,6 +1,6 @@
 import random
 
-from content.tools import TextFormatter
+from src.content.tools import TextFormatter
 from src.content.config import UNITS_DATA
 from src.content.specs import UnitType
 from src.game.event import check_requirements

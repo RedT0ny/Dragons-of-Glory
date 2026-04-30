@@ -1,7 +1,7 @@
 import os
 import random
 
-from game.unit import Unit
+from src.game.unit import Unit
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS

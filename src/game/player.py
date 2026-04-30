@@ -1,7 +1,7 @@
 import re
 from typing import Set, Dict, Any, Optional, Callable, List, Union
 
-from content.translator import Translator
+from src.content.translator import Translator
 from src.content.specs import PlayerSpec
 from src.game.country import Country
 

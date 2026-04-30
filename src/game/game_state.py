@@ -3,8 +3,8 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 
-from content.tools import TextFormatter
-from content.translator import Translator
+from src.content.tools import TextFormatter
+from src.content.translator import Translator
 from src.game.combat import CombatService
 from src.game.diplomacy import ConquestService
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler

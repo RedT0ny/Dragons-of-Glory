@@ -1,7 +1,7 @@
 import re
 from typing import Optional, Tuple, List, Any
 
-from content.tools import TextFormatter
+from src.content.tools import TextFormatter
 from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
 from src.content.tools import caption_id

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List, Set, Tuple
 
-from content.tools import TextFormatter
+from src.content.tools import TextFormatter
 from src.content.constants import WS, HL
 from src.content.specs import GamePhase, UnitType, LocType, UnitState
 from src.game.map import Hex

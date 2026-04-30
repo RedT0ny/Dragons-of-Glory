@@ -1,8 +1,6 @@
 from typing import Any, Iterable
 
 from src.content.config import DEBUG
-from src.content.specs import UnitType
-
 
 def to_roman(n: int):
     """Convert an integer to Roman numeral."""
@@ -14,7 +12,6 @@ def to_roman(n: int):
             result += symbol
             n -= value
     return result
-
 
 def caption_id(unit_id: str):
     """Transform a unit ID string according to the specified rules.

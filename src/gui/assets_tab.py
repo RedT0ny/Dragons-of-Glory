@@ -1,5 +1,4 @@
 import os
-import re
 from time import perf_counter
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -8,12 +7,11 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
-from content.tools import TextFormatter, debug_print
-from content.translator import Translator
+from src.content.tools import TextFormatter, debug_print
+from src.content.translator import Translator
 from src.content.specs import AssetType, UnitColumn
 from src.gui.unit_panel import AllegiancePanel
-from src.content.constants import WS, HL
-from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR, DEBUG
+from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR
 
 translator = Translator()
 

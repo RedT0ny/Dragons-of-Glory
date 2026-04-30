@@ -1,8 +1,8 @@
 from typing import Any, Callable, Optional
 
-from content.tools import TextFormatter
-from content.translator import Translator
-from ..content.specs import (
+from src.content.tools import TextFormatter
+from src.content.translator import Translator
+from src.content.specs import (
     RequirementType,
     ASSET_REQUIREMENTS,
     UnitRace,

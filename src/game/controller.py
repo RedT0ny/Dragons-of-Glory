@@ -3,8 +3,8 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
-from content.tools import TextFormatter
-from content.translator import Translator
+from src.content.tools import TextFormatter
+from src.content.translator import Translator
 from src.content.constants import HL, WS
 from src.content.specs import GamePhase, UnitState
 from src.game.diplomacy import DiplomacyService
