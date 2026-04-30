@@ -409,7 +409,9 @@ class VictoryConditionEvaluator:
         for unit in candidates:
             status = getattr(unit, "status", None)
             if mode == "destroy":
-                if status in (UnitState.DESTROYED, UnitState.RESERVE):
+                if status == UnitState.DESTROYED:
+                    score += 4
+                if status == UnitState.RESERVE:
                     score += 2
                 elif status == UnitState.DEPLETED:
                     score += 1
