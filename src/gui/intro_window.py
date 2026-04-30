@@ -1,9 +1,9 @@
 import os
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QPushButton, 
-                             QLabel, QHBoxLayout, QFrame, QSizePolicy, QFileDialog, QDialog)
-from PySide6.QtGui import QPixmap, QFont, QAction, QMovie
-from PySide6.QtCore import Qt, Signal
-from src.content.config import COVER_PICTURE, APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QSizePolicy, QFileDialog, QDialog, QGraphicsScene, QGraphicsView
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
+from PySide6.QtCore import QUrl, Qt, Signal
+from src.content.config import APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
 from src.content.audio_manager import AudioManager
 from src.gui.config_dialog import ConfigDialog
 from src.gui.new_game_dialog import NewGameDialog
@@ -25,43 +25,52 @@ class IntroWindow(QMainWindow):
         self.translator = translator
         self.setWindowTitle(APP_NAME)
 
-        # 1. Fixed Resolution 1920x1080
-        self.setFixedSize(1920, 1080)
+        # Fixed intro presentation size.
+        self.setFixedSize(1600, 1080)
 
-        # 2. Main Container with Background
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # Background Setup
-        self.bg_label = QLabel(self.central_widget)
-        self.bg_label.setGeometry(0, 0, 1920, 1080)
-        self.movie = QMovie(INTRO_VIDEO)
+        self.video_view = QGraphicsView(self.central_widget)
+        self.video_view.setGeometry(0, 0, 1600, 1080)
+        self.video_view.setFrameShape(QGraphicsView.NoFrame)
+        self.video_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.video_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.video_view.setStyleSheet("background: black; border: 0;")
 
-        # 3. (Optional) Scale the movie to fit the screen
-        # Note: Movies don't scale as easily as Pixmaps, so it's best if the
-        # GIF is already 1920x1080. If not, we set the scaled size:
-        self.movie.setScaledSize(self.bg_label.size())
+        self.video_scene = QGraphicsScene(self)
+        self.video_view.setScene(self.video_scene)
 
-        # 4. Assign the movie to the label and start it
-        self.bg_label.setMovie(self.movie)
-        self.movie.start()
+        self.video_item = QGraphicsVideoItem()
+        self.video_item.setSize(self.video_view.size())
+        self.video_scene.addItem(self.video_item)
+        self.video_view.fitInView(self.video_item, Qt.IgnoreAspectRatio)
 
-        # 3. UI Layout Overlay
+        self.overlay_widget = QWidget(self.central_widget)
+        self.overlay_widget.setGeometry(0, 0, 1600, 1080)
+        self.overlay_widget.setAttribute(Qt.WA_TranslucentBackground, True)
+
+        self.video_player = QMediaPlayer(self)
+        self.video_output = QAudioOutput(self)
+        self.video_output.setVolume(0.0)
+
+        self.video_player.setAudioOutput(self.video_output)
+        self.video_player.setVideoOutput(self.video_item)
+        self.video_player.setSource(QUrl.fromLocalFile(INTRO_VIDEO))
+        self.video_player.mediaStatusChanged.connect(self._on_video_media_status_changed)
+        self.video_player.play()
+
         self.setup_ui()
 
     def setup_ui(self):
-        # Create a layout that sits on top of the image
-        main_layout = QVBoxLayout(self.central_widget)
-        main_layout.setContentsMargins(100, 100, 100, 100) # Margin from edges
+        main_layout = QVBoxLayout(self.overlay_widget)
+        main_layout.setContentsMargins(100, 100, 100, 100)
 
-        # Spacer to push menu to the bottom
         main_layout.addStretch()
 
-        # Menu Container (Bottom-Left)
         menu_container = QVBoxLayout()
         menu_container.setSpacing(20)
 
-        # 4. Libra Font 48px Gold Options
         options = [
             ("menu_continue", self.on_continue),
             ("menu_new_game", self.on_new_game),
@@ -90,20 +99,28 @@ class IntroWindow(QMainWindow):
             btn = QPushButton(self.translator.get_text("intro", key))
             btn.setStyleSheet(style)
             btn.setCursor(Qt.PointingHandCursor)
-
-            # FIX: Set the size policy so it doesn't expand horizontally
-            # This makes the button only as wide as the text + padding
             btn.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
             btn.clicked.connect(callback)
             menu_container.addWidget(btn)
 
-        # Optional: ensure the layout itself doesn't force expansion
         menu_container.setAlignment(Qt.AlignLeft)
         main_layout.addLayout(menu_container)
 
-        # 5. Placeholder for Locale Flags (Bottom-Right corner)
-        # (You can implement the flag QHBoxLayout here later)
+    def _on_video_media_status_changed(self, status):
+        if status != QMediaPlayer.MediaStatus.EndOfMedia:
+            return
+        self.video_player.setPosition(0)
+        self.video_player.play()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        size = self.central_widget.size()
+        self.video_view.setGeometry(0, 0, size.width(), size.height())
+        self.overlay_widget.setGeometry(0, 0, size.width(), size.height())
+        self.video_scene.setSceneRect(0, 0, size.width(), size.height())
+        self.video_item.setSize(size)
+        self.video_view.fitInView(self.video_item, Qt.IgnoreAspectRatio)
 
     def on_continue(self):
         """Opens a file dialog to load a game."""

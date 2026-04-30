@@ -75,7 +75,7 @@
 </div>
 
 Design overview:
-![game_layout.svg](assets/img/game_layout.svg)
+![game_layout.svg](assets/design/game_layout.svg)
 
 TODO:
 
