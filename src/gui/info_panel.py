@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushBu
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QPointF
 from PySide6.QtGui import QIcon, QColor, QPixmap, QFontDatabase, QFont
 
+from content.tools import TextFormatter
 from src.content.config import UNIT_ICON_SIZE, IMAGES_DIR, FONTS_DIR, LIBRA_FONT
 from src.content.constants import HL, WS
 from src.content.specs import UnitColumn, UnitType
@@ -248,7 +249,7 @@ class InfoPanel(QFrame):
             self.lbl_unit_img.setText("Img Not Found")
 
         # 2. Name
-        self.lbl_unit_name.setText(str(unit.id))
+        self.lbl_unit_name.setText(TextFormatter.format_unit_log_string(unit))
 
         # 3. Rating
         # Tactical Rating (if Leader subclass), Combat Rating otherwise.

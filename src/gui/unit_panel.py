@@ -19,10 +19,23 @@ class CheckBoxHeader(QHeaderView):
     toggled = Signal(bool)
 
     def __init__(self, orientation, parent=None):
+        """Initialize the checkbox header with the given orientation.
+        
+        Args:
+            orientation: Qt.Orientation (Horizontal/Vertical) for the header.
+            parent: Optional parent widget.
+        """
         super().__init__(orientation, parent)
         self.isChecked = False
 
     def paintSection(self, painter, rect, logicalIndex):
+        """Paint a header section, drawing a checkbox in the first column.
+        
+        Args:
+            painter: QPainter instance to draw with.
+            rect: QRect defining the section's area.
+            logicalIndex: Logical index of the section being painted.
+        """
         painter.save()
         super().paintSection(painter, rect, logicalIndex)
         painter.restore()
@@ -44,6 +57,13 @@ class CheckBoxHeader(QHeaderView):
             self.style().drawPrimitive(QStyle.PE_IndicatorCheckBox, option, painter)
 
     def mousePressEvent(self, event):
+        """Handle mouse press events to toggle the header checkbox.
+        
+        Toggles the checkbox when the first column's header is clicked.
+        
+        Args:
+            event: QMouseEvent instance.
+        """
         if event.button() == Qt.LeftButton:
             logicalIndex = self.logicalIndexAt(event.pos())
             if logicalIndex == 0:
@@ -66,12 +86,19 @@ class UnitTable(QTableWidget):
     _icon_cache_misses = 0
 
     def __init__(self, columns, parent=None):
+        """Initialize the unit table with specified columns.
+        
+        Args:
+            columns: List of UnitColumn enums defining the table's columns.
+            parent: Optional parent widget.
+        """
         super().__init__(parent)
         self.columns_config = columns
         self.current_units = []
         self._init_ui()
         
     def _init_ui(self):
+        """Set up the table's UI elements, columns, and header configuration."""
         self.setColumnCount(len(self.columns_config))
         
         # Use Enum values as header labels
@@ -101,11 +128,24 @@ class UnitTable(QTableWidget):
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
 
     def _get_checkbox_item(self, row):
+        """Retrieve the checkbox item for the given row, if applicable.
+        
+        Args:
+            row: Row index to fetch the checkbox item from.
+            
+        Returns:
+            QTableWidgetItem for the checkbox, or None if not applicable.
+        """
         if UnitColumn.CHECKBOX not in self.columns_config:
             return None
         return self.item(row, 0)
 
     def mousePressEvent(self, event):
+        """Handle mouse press events to toggle checkboxes in non-first columns.
+        
+        Args:
+            event: QMouseEvent instance.
+        """
         if event.button() == Qt.LeftButton:
             index = self.indexAt(event.pos())
             if index.isValid() and UnitColumn.CHECKBOX in self.columns_config:
@@ -117,6 +157,13 @@ class UnitTable(QTableWidget):
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event):
+        """Handle double-click events to select a single row's checkbox.
+        
+        Checks only the double-clicked row, unchecking all others.
+        
+        Args:
+            event: QMouseEvent instance.
+        """
         if event.button() == Qt.LeftButton:
             index = self.indexAt(event.pos())
             if index.isValid() and UnitColumn.CHECKBOX in self.columns_config:
@@ -132,6 +179,14 @@ class UnitTable(QTableWidget):
         super().mouseDoubleClickEvent(event)
 
     def set_units(self, units, game_state=None):
+        """Populate the table with the given list of units.
+        
+        Clears existing rows and creates new entries for each unit.
+        
+        Args:
+            units: List of unit objects to display.
+            game_state: Optional game state for rendering context (e.g., country colors).
+        """
         t0 = perf_counter()
         hits_before, misses_before = self.get_icon_cache_stats()
         self.current_units = units
@@ -162,6 +217,15 @@ class UnitTable(QTableWidget):
             )
 
     def _create_item(self, col_type: UnitColumn, unit):
+        """Create a table item for the given column type and unit.
+        
+        Args:
+            col_type: UnitColumn enum specifying the column type.
+            unit: Unit object to populate the item with.
+            
+        Returns:
+            QTableWidgetItem configured for the column.
+        """
         item = QTableWidgetItem()
         item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
 
@@ -207,6 +271,14 @@ class UnitTable(QTableWidget):
         return item
         
     def _render_unit_icon(self, unit):
+        """Render a unit icon as a QPixmap, using a cache for performance.
+        
+        Args:
+            unit: Unit object to render the icon for.
+            
+        Returns:
+            QPixmap of the rendered unit icon.
+        """
         color = QColor("gray")
         # Need access to game_state for country colors
         if hasattr(self, 'game_state') and self.game_state and unit.land in self.game_state.countries:
@@ -288,6 +360,13 @@ class UnitTable(QTableWidget):
         return pixmap
 
     def _draw_transport_overlays(self, painter, unit, size):
+        """Draw transport-related overlays (passenger count, host marker) on the icon.
+        
+        Args:
+            painter: QPainter to draw with.
+            unit: Unit object to check for transport status.
+            size: Size of the icon pixmap.
+        """
         # Carrier passenger-count badge
         passengers = getattr(unit, "passengers", None) or []
         if len(passengers) > 0:
@@ -330,9 +409,19 @@ class UnitTable(QTableWidget):
 
     @classmethod
     def get_icon_cache_stats(cls):
+        """Return icon cache hit/miss statistics.
+        
+        Returns:
+            Tuple of (cache_hits, cache_misses).
+        """
         return cls._icon_cache_hits, cls._icon_cache_misses
 
     def toggle_all_rows(self, checked):
+        """Toggle all enabled checkbox rows to the given checked state.
+        
+        Args:
+            checked: Boolean indicating whether to check or uncheck all rows.
+        """
         self.blockSignals(True)
         first_enabled_item = None
         for row in range(self.rowCount()):
@@ -355,6 +444,15 @@ class AllegiancePanel(QWidget):
     unit_double_clicked = Signal(object) # Emits the double-clicked unit
 
     def __init__(self, game_state, allegiance, columns, parent=None, title=None):
+        """Initialize the allegiance panel with game state, allegiance, and columns.
+        
+        Args:
+            game_state: Core game state object.
+            allegiance: Allegiance (e.g., HL, WS) to display units for.
+            columns: List of UnitColumn enums for the unit tables.
+            parent: Optional parent widget.
+            title: Optional title for the panel; defaults to allegiance.
+        """
         super().__init__(parent)
         self.game_state = game_state
         self.allegiance = allegiance
@@ -400,10 +498,20 @@ class AllegiancePanel(QWidget):
         self.refresh()
 
     def set_title_text(self, text: str):
+        """Set the panel's title text, falling back to the base title if empty.
+        
+        Args:
+            text: New title text; uses base_title if None/empty.
+        """
         if self.title_label is not None:
             self.title_label.setText(str(text or self.base_title))
 
     def refresh(self, preindexed: Optional[Dict[str, Any]] = None):
+        """Refresh the panel's unit groups, rebuilding or updating widgets as needed.
+        
+        Args:
+            preindexed: Optional precomputed indexes to speed up group building.
+        """
         t0 = perf_counter()
         if not self.game_state:
             return
@@ -424,6 +532,14 @@ class AllegiancePanel(QWidget):
         )
 
     def _build_groups_data(self, preindexed: Optional[Dict[str, Any]] = None):
+        """Build grouped unit data, organized by country and dragonflights.
+        
+        Args:
+            preindexed: Optional precomputed indexes (units_by_land, units_by_allegiance).
+            
+        Returns:
+            List of tuples (group_name, units, style) for each group.
+        """
         processed_units = set()
         groups_data = []
 
@@ -468,6 +584,11 @@ class AllegiancePanel(QWidget):
         return groups_data
 
     def _rebuild_group_widgets(self, groups_data):
+        """Rebuild all group widgets (labels and tables) from scratch.
+        
+        Args:
+            groups_data: List of (group_name, units, style) tuples.
+        """
         while self.container_layout.count():
             item = self.container_layout.takeAt(0)
             if item.widget():
@@ -493,6 +614,13 @@ class AllegiancePanel(QWidget):
         self._group_order = [name for name, _units, _style in groups_data]
 
     def _update_existing_group_widgets(self, groups_data):
+        """Update existing group widgets with new unit data.
+        
+        Rebuilds all widgets if a group name is not found in existing widgets.
+        
+        Args:
+            groups_data: List of (group_name, units, style) tuples.
+        """
         self.tables = []
         for name, units, _style in groups_data:
             pair = self._group_widgets.get(name)
@@ -505,12 +633,22 @@ class AllegiancePanel(QWidget):
             self.tables.append(table)
 
     def _adjust_table_height(self, table):
+        """Adjust the table's fixed height to fit all rows.
+        
+        Args:
+            table: UnitTable instance to adjust.
+        """
         h = table.horizontalHeader().height()
         for r in range(table.rowCount()):
             h += table.rowHeight(r)
         table.setFixedHeight(h + 2)
 
     def on_table_selection(self, sender_table):
+        """Handle table selection changes, enforcing exclusive selection across tables.
+        
+        Args:
+            sender_table: The UnitTable that triggered the selection change.
+        """
         # Enforce exclusive selection across tables
         selected_items = sender_table.selectedItems()
         if not selected_items:
@@ -531,6 +669,11 @@ class AllegiancePanel(QWidget):
             self.unit_selected.emit(unit)
 
     def on_table_item_double_clicked(self, item):
+        """Handle double-click on a table item, emitting the associated unit.
+        
+        Args:
+            item: QTableWidgetItem that was double-clicked.
+        """
         if item is None:
             return
         unit_item = item.tableWidget().item(item.row(), 0)

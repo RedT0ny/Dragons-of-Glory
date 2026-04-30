@@ -28,7 +28,7 @@ scenario:
   initiative_start: "whitestone"  # highlord | whitestone | neutral
 
   # Global Events
-  active_events: ["ws_wizard"]
+  possible_events: null
 
   # Allegiance-based Setup
   initial_setup:
@@ -42,10 +42,13 @@ scenario:
 
       countries:
         kothas:
-          # "all" is a keyword to pull every unit matching this country in units.csv
-          units: all
+          units_by_type:
+            fleet: all
+            admiral: 1
         saifhum:
-          units: all
+          units_by_type:
+            fleet: all
+            admiral: 1
         blue:
           # Explicit partial setup
           units_by_type:
@@ -72,10 +75,13 @@ scenario:
 
       countries:
         mithas:
-          units: all
+          units_by_type:
+            fleet: all
+            admiral: 1
         silvanesti:
           units_by_type:
             fleet: all
+            leader: 1
             wing: 1 # griffon
 
       explicit_units: ["fizban"]
