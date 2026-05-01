@@ -68,7 +68,8 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         "whitestone": setup_raw.get("whitestone", {})
     }
 
-    # Normalize optional per-player setup keys for starting asset catalog.
+    # Normalize optional per-player setup keys for starting asset catalog
+    # and canonical deployment authored in scenario YAML.
     for side in (HL, WS):
         side_cfg = setup.get(side)
         if not isinstance(side_cfg, dict):
@@ -104,6 +105,9 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
             return []
 
         side_cfg["assets"] = _normalize_asset_list(assets_val)
+        side_cfg["canonical_deployment"] = _normalize_canonical_deployment(
+            side_cfg.get("canonical_deployment", [])
+        )
 
     # Consolidated victory conditions from both players if defined at player level
     # or from a top-level victory_conditions key (like in the campaign)
@@ -137,6 +141,42 @@ def load_scenario_yaml(path: str) -> ScenarioSpec:
         picture=data.get("picture", "scenario.jpg"),
         notes=data.get("notes", "")
     )
+
+
+def _normalize_canonical_deployment(value) -> List[CanonicalDeploymentEntry]:
+    if not value:
+        return []
+    if not isinstance(value, list):
+        return []
+
+    entries: List[CanonicalDeploymentEntry] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        unit_id = str(item.get("unit_id", "") or "").strip()
+        if not unit_id:
+            continue
+        try:
+            ordinal = int(item.get("ordinal", 1) or 1)
+        except (TypeError, ValueError):
+            ordinal = 1
+
+        raw_position = item.get("position")
+        if not isinstance(raw_position, (list, tuple)) or len(raw_position) != 2:
+            continue
+        try:
+            position = (int(raw_position[0]), int(raw_position[1]))
+        except (TypeError, ValueError):
+            continue
+
+        entries.append(
+            CanonicalDeploymentEntry(
+                unit_id=unit_id,
+                ordinal=ordinal,
+                position=position,
+            )
+        )
+    return entries
 
 def resolve_scenario_events(spec: ScenarioSpec, events_yaml_path: str) -> List[EventSpec]:
     """

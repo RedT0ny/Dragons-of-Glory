@@ -213,6 +213,10 @@ class ConfigDialog(QDialog):
         self.ui.supComboBox.addItem(tr("dialogs.config.supply_standard", "Standard"), "standard")
         self.ui.supComboBox.addItem(tr("dialogs.config.supply_advanced", "Advanced"), "advanced")
 
+        self.ui.depComboBox.clear()
+        self.ui.depComboBox.addItem(tr("dialogs.config.deployment_canonical", "Canonical"), "canonical")
+        self.ui.depComboBox.addItem(tr("dialogs.config.deployment_manual", "Manual"), "manual")
+
         self.ui.hlComboBox.clear()
         self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
         self.ui.hlComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
@@ -232,6 +236,7 @@ class ConfigDialog(QDialog):
         difficulty = str(config.get("difficulty", "normal")).strip().lower()
         combat_details = str(config.get("combat_details", "brief")).strip().lower()
         supply = str(config.get("supply", "standard")).strip().lower()
+        deployment = str(config.get("deployment", "canonical")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
@@ -243,6 +248,9 @@ class ConfigDialog(QDialog):
         sup_idx = self.ui.supComboBox.findData("advanced" if supply == "advanced" else "standard")
         if sup_idx >= 0:
             self.ui.supComboBox.setCurrentIndex(sup_idx)
+        dep_idx = self.ui.depComboBox.findData("manual" if deployment == "manual" else "canonical")
+        if dep_idx >= 0:
+            self.ui.depComboBox.setCurrentIndex(dep_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
         if hl_idx >= 0:
             self.ui.hlComboBox.setCurrentIndex(hl_idx)
@@ -278,9 +286,11 @@ class ConfigDialog(QDialog):
         difficulty = str(self.ui.diffComboBox.currentData() or "normal")
         combat_details = str(self.ui.cdComboBox.currentData() or "brief")
         supply = str(self.ui.supComboBox.currentData() or "standard")
+        deployment = str(self.ui.depComboBox.currentData() or "canonical")
 
         return {
             "difficulty": difficulty,
             "combat_details": combat_details,
-            "supply": supply
+            "supply": supply,
+            "deployment": deployment,
         }

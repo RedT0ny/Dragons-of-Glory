@@ -84,6 +84,7 @@ class GameState:
         self.activation_bonuses = {HL: 0, WS: 0}
         self.combat_bonuses = {HL: 0, WS: 0}
         self.supply = "standard"
+        self.deployment_mode = "canonical"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -356,6 +357,62 @@ class GameState:
         self._analysis_cache = {}
         self._analysis_dirty = set()
         self._init_overlays()
+        self.deployment_mode = "canonical"
+
+    def get_canonical_deployment(self, allegiance: str):
+        setup = getattr(self.scenario_spec, "setup", {}) or {}
+        side_cfg = setup.get(allegiance, {}) or {}
+        canonical = side_cfg.get("canonical_deployment", [])
+        return list(canonical or [])
+
+    def has_canonical_deployment(self, allegiance: str) -> bool:
+        return bool(self.get_canonical_deployment(allegiance))
+
+    def apply_canonical_deployment(self, allegiance: str) -> int | None:
+        entries = self.get_canonical_deployment(allegiance)
+        if not entries:
+            return None
+
+        by_key = {
+            (str(getattr(unit, "id", "") or ""), int(getattr(unit, "ordinal", 1) or 1)): unit
+            for unit in self.units
+            if getattr(unit, "allegiance", None) == allegiance
+        }
+
+        deployed = 0
+        for entry in entries:
+            unit = by_key.get((entry.unit_id, int(entry.ordinal)))
+            if unit is None:
+                print(
+                    f"Canonical deployment skipped missing unit: "
+                    f"{allegiance} {entry.unit_id}#{entry.ordinal}"
+                )
+                continue
+            if getattr(unit, "is_on_map", False):
+                continue
+
+            target_hex = Hex.offset_to_axial(*entry.position)
+            valid_hexes = self.deployment_service.get_valid_deployment_hexes(
+                unit,
+                allow_territory_wide=False,
+            ) or []
+            if entry.position not in valid_hexes:
+                print(
+                    f"Canonical deployment invalid for {entry.unit_id}#{entry.ordinal} "
+                    f"at {entry.position}"
+                )
+                continue
+
+            result = self.deployment_service.deploy_unit(unit, target_hex)
+            if result.success:
+                deployed += 1
+            else:
+                print(
+                    f"Canonical deployment failed for {entry.unit_id}#{entry.ordinal}: "
+                    f"{result.error}"
+                )
+
+        return deployed
 
     def evaluate_victory_conditions(self):
         if not self.victory_evaluator:
@@ -1425,7 +1482,6 @@ class GameState:
 
     def resolve_event(self, event):
         pass
-
 
 
 

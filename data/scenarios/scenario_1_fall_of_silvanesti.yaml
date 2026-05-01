@@ -59,6 +59,64 @@ scenario:
       # Specific deployment region (subset of countries)
       deployment_area:
         countries: [ "khur" ]
+      canonical_deployment:
+        - unit_id: "taman_human_inf_1"
+          ordinal: 1
+          position: [41, 36]
+        - unit_id: "taman_human_inf_2"
+          ordinal: 2
+          position: [42, 36]
+        - unit_id: "taman_human_inf_3"
+          ordinal: 3
+          position: [42, 35]
+        - unit_id: "taman_human_inf_4"
+          ordinal: 4
+          position: [43, 34]
+        - unit_id: "taman_human_cav_1"
+          ordinal: 1
+          position: [44, 34]
+        - unit_id: "khur_human_inf_1"
+          ordinal: 1
+          position: [41, 36]
+        - unit_id: "khur_human_inf_2"
+          ordinal: 2
+          position: [42, 36]
+        - unit_id: "khur_human_inf_3"
+          ordinal: 3
+          position: [42, 35]
+        - unit_id: "khur_human_inf_4"
+          ordinal: 4
+          position: [43, 34]
+        - unit_id: "khur_human_cav"
+          ordinal: 1
+          position: [44, 34]
+        - unit_id: "sharuk"
+          ordinal: 1
+          position: [44, 34]
+        - unit_id: "green_dragon_wing_1"
+          ordinal: 1
+          position: [43, 34]
+        - unit_id: "green_dragon_wing_2"
+          ordinal: 2
+          position: [42, 36]
+        - unit_id: "blue_dragon_wing_1"
+          ordinal: 1
+          position: [42, 35]
+        - unit_id: "red_dragon_wing_1"
+          ordinal: 1
+          position: [41, 36]
+        - unit_id: "ariakas"
+          ordinal: 1
+          position: [43, 34]
+        - unit_id: "phair_caron"
+          ordinal: 1
+          position: [41, 36]
+        - unit_id: "topus"
+          ordinal: 1
+          position: [42, 35]
+        - unit_id: "salah_khan"
+          ordinal: 1
+          position: [42, 36]
 
       countries:
         dtemple: null
@@ -97,6 +155,52 @@ scenario:
 
     whitestone:
       # Deployment area: If null, defaults to the union of all country territories below
+      canonical_deployment:
+        - unit_id: "lorac"
+          ordinal: 1
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_1"
+          ordinal: 1
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_2"
+          ordinal: 2
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_3"
+          ordinal: 3
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_4"
+          ordinal: 4
+          position: [45, 45]
+        - unit_id: "silvanesti_elf_inf_1"
+          ordinal: 1
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_inf_2"
+          ordinal: 2
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_inf_3"
+          ordinal: 3
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_inf_4"
+          ordinal: 4
+          position: [41, 40]
+        - unit_id: "silvanesti_elf_inf_5"
+          ordinal: 5
+          position: [45, 39]
+        - unit_id: "silvanesti_elf_inf_6"
+          ordinal: 6
+          position: [43, 40]
+        - unit_id: "silvanesti_pegasus_wing_1"
+          ordinal: 1
+          position: [44, 41]
+        - unit_id: "silvanesti_pegasus_wing_2"
+          ordinal: 2
+          position: [43, 40]
+        - unit_id: "silvanesti_pegasus_wing_3"
+          ordinal: 3
+          position: [45, 39]
+        - unit_id: "silvanesti_pegasus_wing_4"
+          ordinal: 4
+          position: [41, 40]
 
       countries:
         silvanesti:

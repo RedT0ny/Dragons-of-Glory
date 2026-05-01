@@ -24,6 +24,7 @@ class GameController(QObject):
         difficulty="normal",
         combat_details="brief",
         supply="standard",
+        deployment="canonical",
     ):
         """Initialize the game controller with state, view, and configuration.
         
@@ -43,9 +44,11 @@ class GameController(QObject):
         self.difficulty = str(difficulty).strip().lower()
         self.combat_details = str(combat_details).strip().lower()
         self.supply = str(supply).strip().lower()
+        self.deployment = str(deployment).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
+        self.game_state.deployment_mode = self.deployment
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -100,6 +103,7 @@ class GameController(QObject):
             "difficulty": self.difficulty,
             "combat_details": self.combat_details,
             "supply": self.supply,
+            "deployment": self.deployment,
         }
 
     def apply_runtime_config(self, config: dict):
@@ -118,9 +122,11 @@ class GameController(QObject):
         self.difficulty = str(config.get("difficulty", self.difficulty)).strip().lower()
         self.combat_details = str(config.get("combat_details", self.combat_details)).strip().lower()
         self.supply = str(config.get("supply", self.supply)).strip().lower()
+        self.deployment = str(config.get("deployment", self.deployment)).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
+        self.game_state.deployment_mode = self.deployment
 
         if HL in self.game_state.players:
             self.game_state.players[HL].set_ai(hl_ai)
@@ -450,6 +456,17 @@ class GameController(QObject):
             return False
 
         if action in {TurnAction.REQUEST_HUMAN_DEPLOYMENT, TurnAction.REQUEST_HUMAN_REPLACEMENTS}:
+            if (
+                action == TurnAction.REQUEST_HUMAN_DEPLOYMENT
+                and str(getattr(self.game_state, "deployment_mode", self.deployment)).strip().lower() == "canonical"
+            ):
+                deployed = self.game_state.apply_canonical_deployment(
+                    payload.get("active_player", self.game_state.active_player)
+                )
+                if deployed is not None:
+                    print(f"Canonical deployment complete. Deployed: {deployed}")
+                    self.game_state.advance_phase()
+                    return False
             if not self._is_replacements_dialog_visible():
                 from src.gui.replacements_dialog import ReplacementsDialog
                 self.replacements_dialog = ReplacementsDialog(

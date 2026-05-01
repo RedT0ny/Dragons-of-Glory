@@ -28,6 +28,10 @@ scenario:
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
       deployment_area: null
+      canonical_deployment:
+        # - unit_id: "example_unit"
+        #   ordinal: 1
+        #   position: [10, 12]
 
       countries:
         taman:
@@ -51,6 +55,10 @@ scenario:
       # Example of specific deployment region (subset of countries)
       deployment_area:
         countries: ["qualinesti", "abanasinia"]
+      canonical_deployment:
+        # - unit_id: "example_unit"
+        #   ordinal: 1
+        #   position: [20, 18]
 
       countries:
         qualinesti:

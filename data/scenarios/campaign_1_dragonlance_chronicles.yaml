@@ -37,7 +37,6 @@ scenario:
         daltigoth: all
         dargaard: all
         haltigoth: all
-        icereach: all
         kaolyn: all
         kharolis: all
         saifhum: all
@@ -63,7 +62,7 @@ scenario:
           ready: 12
         estwilde: null
         gaarlund: null
-        icerreach: all
+        icereach: all
         kern: all
         khur: all
         lemish: all
@@ -136,6 +135,8 @@ scenario:
         - [13, 37]
         - [12, 38]
         - [13, 38]
+
+#      country_deployment: true
 
       countries:
         coastlund: all

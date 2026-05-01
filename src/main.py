@@ -77,6 +77,7 @@ class GameApp:
             difficulty=player_config.get("difficulty", "normal"),
             combat_details=player_config.get("combat_details", "brief"),
             supply=player_config.get("supply", "standard"),
+            deployment=player_config.get("deployment", "canonical"),
         )
 
         self.view.set_controller(self.controller)

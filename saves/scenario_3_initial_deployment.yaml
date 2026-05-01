@@ -1,0 +1,294 @@
+metadata:
+  scenario_id: scenario_3_kender_strike
+  turn: 1
+  phase: DEPLOYMENT
+  active_player: whitestone
+  initiative_winner: whitestone
+  second_player_has_acted: false
+  activation_bonuses:
+    highlord: 0
+    whitestone: 0
+  combat_bonuses:
+    highlord: 0
+    whitestone: 0
+  save_timestamp: '2026-04-30T19:51:05.307428+00:00'
+world_state:
+  countries:
+    throt:
+      allegiance: highlord
+      conquered: false
+      capital_id: throtl
+      locations:
+        throtl:
+          occupier: highlord
+          is_capital: true
+    dtemple:
+      allegiance: highlord
+      conquered: false
+      capital_id: dark_temple
+      locations:
+        dark_temple:
+          occupier: highlord
+          is_capital: true
+    hylo:
+      allegiance: whitestone
+      conquered: false
+      capital_id: kenderhome
+      locations:
+        kenderhome:
+          occupier: whitestone
+          is_capital: true
+  units:
+  - unit_id: throt_goblin_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 13
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: throt_goblin_inf_2
+    ordinal: 2
+    allegiance: highlord
+    position:
+    - 13
+    - 14
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: throt_goblin_inf_3
+    ordinal: 3
+    allegiance: highlord
+    position:
+    - 12
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: throt_goblin_inf_4
+    ordinal: 4
+    allegiance: highlord
+    position:
+    - 12
+    - 13
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_1
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 12
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: dtemple_draconian_inf_10
+    ordinal: 10
+    allegiance: highlord
+    position:
+    - 12
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: toede
+    ordinal: 1
+    allegiance: highlord
+    position:
+    - 12
+    - 15
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_1
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 16
+    - 19
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_2
+    ordinal: 2
+    allegiance: whitestone
+    position:
+    - 15
+    - 17
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_3
+    ordinal: 3
+    allegiance: whitestone
+    position:
+    - 15
+    - 17
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_4
+    ordinal: 4
+    allegiance: whitestone
+    position:
+    - 15
+    - 18
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_5
+    ordinal: 5
+    allegiance: whitestone
+    position:
+    - 15
+    - 18
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: hylo_kender_inf_6
+    ordinal: 6
+    allegiance: whitestone
+    position:
+    - 16
+    - 19
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  - unit_id: kronin
+    ordinal: 1
+    allegiance: whitestone
+    position:
+    - 15
+    - 17
+    status: ACTIVE
+    escaped: false
+    is_transported: false
+    transport_host: null
+    attacked_this_turn: false
+    moved_this_turn: false
+  unit_runtime:
+    throt_goblin_inf_1|1:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    throt_goblin_inf_2|2:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    throt_goblin_inf_3|3:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    throt_goblin_inf_4|4:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_1|1:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    dtemple_draconian_inf_10|10:
+      movement_points: 6
+      river_hexside: null
+      replacement_ready_turn: null
+    toede|1:
+      movement_points: 10
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_1|1:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_2|2:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_3|3:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_4|4:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_5|5:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    hylo_kender_inf_6|6:
+      movement_points: 3
+      river_hexside: null
+      replacement_ready_turn: null
+    kronin|1:
+      movement_points: 8
+      river_hexside: null
+      replacement_ready_turn: null
+  players:
+    highlord:
+      is_ai: false
+      assets: []
+    whitestone:
+      is_ai: false
+      assets: []
+  completed_event_ids: []
+  strategic_events: {}
+  territory_overrides:
+  - col: 13
+    row: 15
+    value: highlord
+  - col: 14
+    row: 14
+    value: highlord
+  - col: 12
+    row: 12
+    value: highlord
+  - col: 11
+    row: 13
+    value: highlord
+  - col: 13
+    row: 12
+    value: highlord
+  - col: 13
+    row: 13
+    value: highlord

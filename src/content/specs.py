@@ -134,6 +134,13 @@ class ScenarioSpec:
     picture: str = "scenario.jpg"  # Added field with a default fallback
     notes: str = "" # Added a default value to prevent errors if notes are missing
 
+
+@dataclass(frozen=True)
+class CanonicalDeploymentEntry:
+    unit_id: str
+    ordinal: int
+    position: Tuple[int, int]
+
 @dataclass
 class SaveGameSpec:
     metadata: Dict[str, Any]
