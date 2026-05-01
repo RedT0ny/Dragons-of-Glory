@@ -64,7 +64,23 @@ scenario:
         - [12, 14]
         - [12, 15]
         - [13, 14]
-
+      
+      canonical_deployment:
+        - unit_id: "throt_goblin_inf_1"
+          position: [13, 14]
+        - unit_id: "throt_goblin_inf_2"
+          position: [13, 14]
+        - unit_id: "throt_goblin_inf_3"
+          position: [12, 13]
+        - unit_id: "throt_goblin_inf_4"
+          position: [12, 13]
+        - unit_id: "dtemple_draconian_inf_1"
+          position: [12, 15]
+        - unit_id: "dtemple_draconian_inf_10"
+          position: [12, 15]
+        - unit_id: "toede"
+          position: [12, 15]
+      
       countries:
         throt:
           units_by_type:
@@ -73,30 +89,46 @@ scenario:
           units_by_type:
             inf: 2
           ready: 2
-
+      
       explicit_units: ["toede"]
-
+      
       victory_conditions:
         minor:
           type: capture_location
           location: kenderhome
-
+      
     whitestone:
       deployment_area: ["hylo"]
-
+      
+      canonical_deployment:
+        - unit_id: "hylo_kender_inf_1"
+          position: [16, 19]
+        - unit_id: "hylo_kender_inf_2"
+          position: [15, 17]
+        - unit_id: "hylo_kender_inf_3"
+          position: [15, 17]
+        - unit_id: "hylo_kender_inf_4"
+          position: [15, 18]
+        - unit_id: "hylo_kender_inf_5"
+          position: [15, 18]
+        - unit_id: "hylo_kender_inf_6"
+          position: [16, 19]
+        - unit_id: "kronin"
+          position: [15, 17]
+      
       countries:
         hylo:
           units_by_type:
             inf: 6
-
+      
       explicit_units: ["kronin"]
-
+      
       victory_conditions:
         minor:
           type: destroy_unit_score
           unit_types: units
           min_points: 6
-
+  
   notes: >
     No Strategic Event counters or Activations are used in this scenario. 
     No new draconian armies enter during this scenario.

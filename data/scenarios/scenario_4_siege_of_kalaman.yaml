@@ -59,6 +59,68 @@ scenario:
     highlord:
       deployment_area: ["dargaard", "estwilde", "taman", "dtemple"]
 
+      canonical_deployment:
+        - unit_id: "dtemple_draconian_inf_1"
+          position: [36, 12]
+        - unit_id: "dtemple_draconian_inf_10"
+          position: [36, 12]
+        - unit_id: "dtemple_draconian_inf_11"
+          position: [34, 14]
+        - unit_id: "dtemple_draconian_inf_12"
+          position: [34, 14]
+        - unit_id: "dtemple_draconian_inf_13"
+          position: [35, 14]
+        - unit_id: "dtemple_draconian_inf_14"
+          position: [33, 15]
+        - unit_id: "dtemple_draconian_inf_15"
+          position: [33, 15]
+        - unit_id: "dtemple_draconian_inf_16"
+          position: [34, 15]
+        - unit_id: "dtemple_draconian_inf_17"
+          position: [35, 13]
+        - unit_id: "dtemple_draconian_inf_18"
+          position: [31, 13]
+        - unit_id: "guugar"
+          position: [32, 15]
+        - unit_id: "kern_ogre_inf_1"
+          position: [35, 13]
+        - unit_id: "kern_ogre_inf_2"
+          position: [32, 16]
+        - unit_id: "kern_ogre_inf_3"
+          position: [32, 16]
+        - unit_id: "kern_ogre_inf_4"
+          position: [32, 15]
+        - unit_id: "kern_ogre_inf_5"
+          position: [32, 15]
+        - unit_id: "taman_human_inf_1"
+          position: [31, 13]
+        - unit_id: "taman_human_inf_2"
+          position: [31, 13]
+        - unit_id: "taman_human_inf_3"
+          position: [35, 11]
+        - unit_id: "taman_human_inf_4"
+          position: [35, 11]
+        - unit_id: "taman_human_cav_1"
+          position: [35, 14]
+        - unit_id: "red_dragon_wing_1"
+          position: [34, 14]
+        - unit_id: "red_dragon_wing_2"
+          position: [32, 15]
+        - unit_id: "phair_caron"
+          position: [32, 15]
+        - unit_id: "blue_dragon_wing_1"
+          position: [36, 12]
+        - unit_id: "blue_dragon_wing_2"
+          position: [31, 13]
+        - unit_id: "kitiara"
+          position: [36, 12]
+        - unit_id: "topus"
+          position: [31, 13]
+        - unit_id: "ariakas"
+          position: [34, 14]
+        - unit_id: "dracart"
+          position: [31, 13]
+
       countries:
         dtemple:
           units: all
@@ -94,6 +156,74 @@ scenario:
     whitestone:
       deployment_area:
         countries: ["nightlund"]
+
+      canonical_deployment:
+        - unit_id: "eleszar"
+          position: [34, 13]
+        - unit_id: "southlund_solamnic_cav_1"
+          position: [31, 12]
+        - unit_id: "southlund_solamnic_cav_2"
+          position: [31, 12]
+        - unit_id: "southlund_solamnic_inf_1"
+          position: [32, 12]
+        - unit_id: "southlund_solamnic_inf_2"
+          position: [34, 13]
+        - unit_id: "southlund_solamnic_inf_3"
+          position: [34, 13]
+        - unit_id: "calof"
+          position: [34, 13]
+        - unit_id: "nightlund_human_fleet_1"
+          position: [34, 12]
+        - unit_id: "nightlund_human_fleet_2"
+          position: [34, 12]
+        - unit_id: "nightlund_human_inf_1"
+          position: [32, 14]
+        - unit_id: "nightlund_human_inf_2"
+          position: [33, 14]
+        - unit_id: "nightlund_human_inf_3"
+          position: [33, 13]
+        - unit_id: "nightlund_human_inf_4"
+          position: [32, 14]
+        - unit_id: "palanthas_human_inf_1"
+          position: [33, 13]
+        - unit_id: "palanthas_human_fleet_1"
+          position: [34, 12]
+        - unit_id: "gunthar"
+          position: [32, 13]
+        - unit_id: "sancrist_human_inf_1"
+          position: [32, 13]
+        - unit_id: "sancrist_human_inf_2"
+          position: [33, 14]
+        - unit_id: "sancrist_human_inf_3"
+          position: [32, 13]
+        - unit_id: "sancrist_solamnic_cav_1"
+          position: [31, 14]
+        - unit_id: "sancrist_solamnic_cav_2"
+          position: [31, 14]
+        - unit_id: "sancrist_solamnic_fleet_1"
+          position: [35, 12]
+        - unit_id: "sancrist_solamnic_fleet_2"
+          position: [35, 12]
+        - unit_id: "sancrist_solamnic_inf_1"
+          position: [34, 12]
+        - unit_id: "sancrist_solamnic_inf_2"
+          position: [34, 12]
+        - unit_id: "aurik"
+          position: [35, 12]
+        - unit_id: "solanthus_solamnic_cav_1"
+          position: [30, 13]
+        - unit_id: "solanthus_solamnic_cav_2"
+          position: [30, 13]
+        - unit_id: "solanthus_solamnic_inf_1"
+          position: [35, 12]
+        - unit_id: "solanthus_solamnic_inf_2"
+          position: [35, 12]
+        - unit_id: "solanthus_solamnic_inf_3"
+          position: [34, 12]
+        - unit_id: "fizban"
+          position: [34, 12]
+        - unit_id: "laurana"
+          position: [34, 12]
 
       countries:
         southlund:

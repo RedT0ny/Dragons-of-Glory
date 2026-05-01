@@ -62,6 +62,54 @@ scenario:
       deployment_area:
         - "schallsea"
 
+      canonical_deployment:
+        - unit_id: "dtemple_draconian_inf_1"
+          position: [25, 33]
+        - unit_id: "dtemple_draconian_inf_10"
+          position: [25, 33]
+        - unit_id: "dtemple_draconian_inf_11"
+          position: [26, 34]
+        - unit_id: "dtemple_draconian_inf_12"
+          position: [26, 32]
+        - unit_id: "dtemple_draconian_inf_13"
+          position: [26, 32]
+        - unit_id: "dtemple_draconian_inf_14"
+          position: [26, 34]
+        - unit_id: "red_dragon_wing_1"
+          position: [25, 33]
+        - unit_id: "red_dragon_wing_2"
+          position: [26, 33]
+        - unit_id: "saifhum_pirate_fleet_1"
+          position: [26, 34]
+        - unit_id: "saifhum_pirate_fleet_2"
+          position: [25, 33]
+        - unit_id: "saifhum_pirate_fleet_3"
+          position: [26, 32]
+        - unit_id: "saifhum_pirate_fleet_4"
+          position: [26, 32]
+        - unit_id: "saifhum_pirate_fleet_5"
+          position: [25, 33]
+        - unit_id: "saifhum_pirate_fleet_6"
+          position: [26, 34]
+        - unit_id: "barenn"
+          position: [26, 33]
+        - unit_id: "sanction_human_fleet_1"
+          position: [26, 33]
+        - unit_id: "sanction_human_fleet_2"
+          position: [26, 31]
+        - unit_id: "sanction_human_fleet_3"
+          position: [26, 33]
+        - unit_id: "sanction_human_fleet_4"
+          position: [26, 31]
+        - unit_id: "sanction_human_inf_1"
+          position: [26, 33]
+        - unit_id: "sanction_human_inf_2"
+          position: [26, 33]
+        - unit_id: "sanction_human_inf_3"
+          position: [26, 31]
+        - unit_id: "verminaard"
+          position: [25, 33]
+
       countries:
         dtemple:
           units_by_type:
@@ -99,6 +147,28 @@ scenario:
       # Example of specific deployment region (subset of countries)
       deployment_area:
         - "qualinesti"
+
+      canonical_deployment:
+        - unit_id: "qualinesti_elf_inf_1"
+          position: [21, 37]
+        - unit_id: "qualinesti_elf_inf_2"
+          position: [21, 37]
+        - unit_id: "qualinesti_elf_inf_3"
+          position: [22, 37]
+        - unit_id: "qualinesti_elf_inf_4"
+          position: [17, 37]
+        - unit_id: "qualinesti_griffon_wing_1"
+          position: [21, 37]
+        - unit_id: "qualinesti_griffon_wing_2"
+          position: [21, 37]
+        - unit_id: "qualinesti_griffon_wing_3"
+          position: [22, 37]
+        - unit_id: "qualinesti_griffon_wing_4"
+          position: [17, 37]
+        - unit_id: "solostaran"
+          position: [17, 37]
+        - unit_id: "laurana"
+          position: [21, 37]
 
       countries:
         abanasinia: null

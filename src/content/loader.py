@@ -157,7 +157,7 @@ def _normalize_canonical_deployment(value) -> List[CanonicalDeploymentEntry]:
         if not unit_id:
             continue
         try:
-            ordinal = int(item.get("ordinal", 1) or 1)
+            ordinal = int(unit_id.split('_')[-1])
         except (TypeError, ValueError):
             ordinal = 1
 

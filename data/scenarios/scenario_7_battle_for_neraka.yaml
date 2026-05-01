@@ -90,7 +90,7 @@ scenario:
 
     whitestone:
       # Example of specific deployment region (subset of countries)
-      deployment_area: ["estwilde"]
+      deployment_area: ["estwilde", "sanction"]
 
       countries:
         estwilde: null
@@ -100,6 +100,7 @@ scenario:
             wing: 2
             general: 1
         sancrist: all
+        sanction: null
         southlund: all
         solanthus:
           units_by_type:

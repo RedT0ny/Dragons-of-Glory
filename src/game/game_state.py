@@ -3,6 +3,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 
+from game.unit import Unit
 from src.content.tools import TextFormatter
 from src.content.translator import Translator
 from src.game.combat import CombatService
@@ -1076,29 +1077,25 @@ class GameState:
 
     def _hex_has_friendly_counter(self, hex_coord, allegiance):
         for unit in self.map.get_units_in_hex(hex_coord.q, hex_coord.r):
-            if (
-                getattr(unit, "is_leader", False) == False
-                and getattr(unit, "allegiance", None) == allegiance
-                and getattr(unit, "is_on_map", True)
-            ):
+            if not unit.is_leader() and unit.allegiance == allegiance:
                 return True
         return False
 
     @staticmethod
     def _select_supply_attrition_unit(stack_armies):
-        depleted = [u for u in stack_armies if getattr(getattr(u, "status", None), "name", "") == "DEPLETED"]
+        depleted = [u for u in stack_armies if u.status.name == "DEPLETED"]
         if depleted:
-            return min(depleted, key=lambda u: (int(getattr(u, "combat_rating", 0) or 0), str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1) or 1)))
-        active = [u for u in stack_armies if getattr(getattr(u, "status", None), "name", "") == "ACTIVE"]
+            return min(depleted, key=lambda u: (int(u.combat_rating), str(u.id), int(u.ordinal)))
+        active = [u for u in stack_armies if u.status.name == "ACTIVE"]
         if active:
-            return min(active, key=lambda u: (int(getattr(u, "combat_rating", 0) or 0), str(getattr(u, "id", "")), int(getattr(u, "ordinal", 1) or 1)))
+            return min(active, key=lambda u: (int(u.combat_rating), str(u.id), int(u.ordinal)))
         return min(
             stack_armies,
             key=lambda u: (
                 0 if u.is_on_map else 1,
                 int(u.combat_rating),
-                str(getattr(u, "id", "")),
-                int(getattr(u, "ordinal", 1) or 1),
+                str(u.id),
+                int(u.ordinal),
             ),
         ) if stack_armies else None
 

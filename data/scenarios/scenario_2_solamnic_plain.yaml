@@ -96,6 +96,120 @@ scenario:
       assets:
         dragonarmor: 2
 
+      canonical_deployment:
+        - unit_id: "dtemple_draconian_inf_1"
+          position: [38, 22]
+        - unit_id: "dtemple_draconian_inf_10"
+          position: [36, 12]
+        - unit_id: "dtemple_draconian_inf_11"
+          position: [35, 13]
+        - unit_id: "dtemple_draconian_inf_12"
+          position: [29, 19]
+        - unit_id: "dtemple_draconian_inf_13"
+          position: [29, 19]
+        - unit_id: "dtemple_draconian_inf_14"
+          position: [31, 22]
+        - unit_id: "dtemple_draconian_inf_15"
+          position: [34, 14]
+        - unit_id: "dtemple_draconian_inf_16"
+          position: [30, 19]
+        - unit_id: "mithas_minotaur_inf_1"
+          position: [35, 11]
+        - unit_id: "mithas_minotaur_inf_2"
+          position: [36, 10]
+        - unit_id: "mithas_minotaur_inf_3"
+          position: [35, 11]
+        - unit_id: "mithas_minotaur_fleet_1"
+          position: [35, 11]
+        - unit_id: "mithas_minotaur_fleet_2"
+          position: [36, 10]
+        - unit_id: "mithas_minotaur_fleet_3"
+          position: [35, 11]
+        - unit_id: "chot"
+          position: [35, 11]
+        - unit_id: "taman_human_cav_1"
+          position: [29, 20]
+        - unit_id: "taman_human_cav_2"
+          position: [29, 20]
+        - unit_id: "taman_human_inf_1"
+          position: [30, 19]
+        - unit_id: "taman_human_inf_2"
+          position: [35, 13]
+        - unit_id: "taman_human_inf_3"
+          position: [36, 12]
+        - unit_id: "taman_human_inf_4"
+          position: [34, 14]
+        - unit_id: "taman_human_inf_5"
+          position: [35, 14]
+        - unit_id: "taman_human_inf_6"
+          position: [35, 14]
+        - unit_id: "taman_human_inf_7"
+          position: [31, 19]
+        - unit_id: "taman_human_inf_8"
+          position: [28, 28]
+        - unit_id: "blackmaw"
+          position: [32, 18]
+        - unit_id: "throt_goblin_inf_1"
+          position: [32, 18]
+        - unit_id: "throt_goblin_inf_2"
+          position: [31, 19]
+        - unit_id: "throt_goblin_inf_3"
+          position: [32, 18]
+        - unit_id: "throt_goblin_inf_4"
+          position: [32, 18]
+        - unit_id: "throt_goblin_inf_5"
+          position: [30, 20]
+        - unit_id: "throt_goblin_inf_6"
+          position: [30, 20]
+        - unit_id: "throt_goblin_inf_7"
+          position: [30, 21]
+        - unit_id: "throt_goblin_inf_8"
+          position: [30, 21]
+        - unit_id: "barenn"
+          position: [27, 28]
+        - unit_id: "sanction_human_fleet_1"
+          position: [27, 28]
+        - unit_id: "sanction_human_fleet_2"
+          position: [27, 28]
+        - unit_id: "sanction_human_fleet_3"
+          position: [36, 26]
+        - unit_id: "sanction_human_fleet_4"
+          position: [36, 26]
+        - unit_id: "sanction_human_inf_1"
+          position: [27, 28]
+        - unit_id: "sanction_human_inf_2"
+          position: [27, 28]
+        - unit_id: "sanction_human_inf_3"
+          position: [36, 26]
+        - unit_id: "phair_caron"
+          position: [30, 19]
+        - unit_id: "red_dragon_wing_1"
+          position: [28, 28]
+        - unit_id: "red_dragon_wing_2"
+          position: [30, 19]
+        - unit_id: "verminaard"
+          position: [28, 28]
+        - unit_id: "green_dragon_wing_1"
+          position: [35, 14]
+        - unit_id: "green_dragon_wing_2"
+          position: [29, 19]
+        - unit_id: "hullek"
+          position: [29, 19]
+        - unit_id: "salah_khan"
+          position: [35, 14]
+        - unit_id: "blue_dragon_wing_1"
+          position: [36, 12]
+        - unit_id: "blue_dragon_wing_2"
+          position: [35, 13]
+        - unit_id: "kitiara"
+          position: [36, 12]
+        - unit_id: "topus"
+          position: [35, 13]
+        - unit_id: "ariakas"
+          position: [30, 19]
+        - unit_id: "dracart"
+          position: [29, 20]
+
       victory_conditions:
         major:
           all:
@@ -124,6 +238,67 @@ scenario:
         solanthus: all
 
       explicit_units: ["justarius"]
+
+      canonical_deployment:
+        - unit_id: "eleszar"
+          position: [21, 26]
+        - unit_id: "southlund_solamnic_cav_1"
+          position: [21, 26]
+        - unit_id: "southlund_solamnic_cav_2"
+          position: [21, 26]
+        - unit_id: "southlund_solamnic_inf_1"
+          position: [24, 30]
+        - unit_id: "southlund_solamnic_inf_2"
+          position: [19, 29]
+        - unit_id: "southlund_solamnic_inf_3"
+          position: [24, 30]
+        - unit_id: "tower_human_inf_1"
+          position: [23, 16]
+        - unit_id: "tower_human_inf_2"
+          position: [23, 16]
+        - unit_id: "tower_human_inf_3"
+          position: [23, 16]
+        - unit_id: "coastlund_human_inf_1"
+          position: [19, 16]
+        - unit_id: "coastlund_human_inf_2"
+          position: [24, 20]
+        - unit_id: "coastlund_human_inf_3"
+          position: [24, 20]
+        - unit_id: "coastlund_solamnic_cav"
+          position: [23, 21]
+        - unit_id: "lord_hargoth"
+          position: [24, 20]
+        - unit_id: "gunthar"
+          position: [3, 26]
+        - unit_id: "sancrist_human_inf_1"
+          position: [3, 26]
+        - unit_id: "sancrist_human_inf_2"
+          position: [4, 25]
+        - unit_id: "sancrist_human_inf_3"
+          position: [4, 25]
+        - unit_id: "sancrist_solamnic_cav_1"
+          position: [3, 26]
+        - unit_id: "sancrist_solamnic_cav_2"
+          position: [3, 26]
+        - unit_id: "sancrist_solamnic_fleet_1"
+          position: [3, 26]
+        - unit_id: "sancrist_solamnic_fleet_2"
+          position: [3, 26]
+        - unit_id: "aurik"
+          position: [25, 22]
+        - unit_id: "solanthus_solamnic_cav_1"
+          position: [22, 23]
+        - unit_id: "solanthus_solamnic_cav_2"
+          position: [22, 23]
+        - unit_id: "solanthus_solamnic_inf_1"
+          position: [25, 22]
+        - unit_id: "solanthus_solamnic_inf_2"
+          position: [25, 22]
+        - unit_id: "solanthus_solamnic_inf_3"
+          position: [25, 22]
+        - unit_id: "justarius"
+          position: [25, 22]
+  
       assets:
         plate_of_solamnus: 2
 
