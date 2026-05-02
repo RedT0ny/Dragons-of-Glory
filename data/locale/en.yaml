@@ -66,9 +66,6 @@ countries:
   lemish:
     name: "Lemish"
     adjective: "Lemish"
-  maelstrom:
-    name: "Maelstrom"
-    adjective: "Maelstrom"
   mithas:
     name: "Mithas"
     adjective: "Mithas"
@@ -87,6 +84,9 @@ countries:
   qualinesti:
     name: "Qualinesti"
     adjective: "Qualinesti"
+  saifhum:
+    name: "Saifhum"
+    adjective: "Saifhum"
   sanction:
     name: "Sanction"
     adjective: "Sanction"

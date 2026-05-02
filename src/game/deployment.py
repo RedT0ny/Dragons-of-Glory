@@ -71,7 +71,15 @@ class DeploymentService:
             if country_deployment:
                 country = self.game_state.countries.get(unit.land)
                 if country:
-                    candidates = list(country.territories)
+                    area_spec = getattr(getattr(player, "spec", None), "deployment_area", None)
+                    if area_spec is None:
+                        candidates = list(country.territories)
+                    else:
+                        deployment_area_hexes = set(self.get_deployment_hexes(unit.allegiance))
+                        candidates = [
+                            coords for coords in country.territories
+                            if coords in deployment_area_hexes
+                        ]
                 else:
                     candidates = list(self.get_deployment_hexes(unit.allegiance))
             else:

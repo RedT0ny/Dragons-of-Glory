@@ -38,16 +38,57 @@ scenario:
 
     highlord:
       # Deployment area: If null, defaults to the union of all country territories below
-      deployment_area: null
+      country_deployment: true
+
+      canonical_deployment:
+        - unit_id: "kothas_minotaur_fleet_1"
+          position: [60, 16]
+        - unit_id: "kothas_minotaur_fleet_2"
+          position: [60, 16]
+        - unit_id: "kothas_minotaur_fleet_3"
+          position: [60, 16]
+        - unit_id: "kothas_minotaur_fleet_4"
+          position: [60, 16]
+        - unit_id: "kothas_minotaur_inf_1"
+          position: [61, 16]
+        - unit_id: "garik"
+          position: [60, 16]
+        - unit_id: "saifhum_pirate_fleet_1"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_fleet_2"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_fleet_3"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_fleet_4"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_fleet_5"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_fleet_6"
+          position: [52, 11]
+        - unit_id: "saifhum_pirate_inf"
+          position: [53, 11]
+        - unit_id: "felura"
+          position: [52, 11]
+        - unit_id: "blue_dragon_wing_1"
+          position: [49, 26]
+        - unit_id: "topus"
+          position: [49, 26]
+
+      deployment_area:
+        - "kothas"
+        - "saifhum"
+        - [49, 26] # blue
 
       countries:
         kothas:
           units_by_type:
             fleet: all
+            inf: 1
             admiral: 1
         saifhum:
           units_by_type:
             fleet: all
+            inf: 1
             admiral: 1
         blue:
           # Explicit partial setup
@@ -70,13 +111,18 @@ scenario:
           min_points: 4
 
     whitestone:
-      # Example of specific deployment region (subset of countries)
-      deployment_area: country_based
+
+      country_deployment: true
+
+      deployment_area:
+        - "mithas"
+        - [44, 41]
 
       countries:
         mithas:
           units_by_type:
             fleet: all
+            inf: 1
             admiral: 1
         silvanesti:
           units_by_type:
@@ -85,6 +131,32 @@ scenario:
             wing: 1 # griffon
 
       explicit_units: ["fizban"]
+
+      canonical_deployment:
+        - unit_id: "mithas_minotaur_fleet_1"
+          position: [60, 12]
+        - unit_id: "mithas_minotaur_fleet_2"
+          position: [60, 12]
+        - unit_id: "mithas_minotaur_fleet_3"
+          position: [60, 12]
+        - unit_id: "mithas_minotaur_fleet_4"
+          position: [60, 12]
+        - unit_id: "mithas_minotaur_inf_1"
+          position: [60, 11]
+        - unit_id: "chot"
+          position: [60, 12]
+        - unit_id: "silvanesti_elf_fleet_1"
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_2"
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_3"
+          position: [44, 41]
+        - unit_id: "silvanesti_elf_fleet_4"
+          position: [44, 41]
+        - unit_id: "silvanesti_pegasus_wing_1"
+          position: [44, 41]
+        - unit_id: "fizban"
+          position: [44, 41]
 
       victory_conditions:
         major:

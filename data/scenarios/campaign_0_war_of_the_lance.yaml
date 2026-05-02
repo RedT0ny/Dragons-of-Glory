@@ -92,6 +92,66 @@ scenario:
     highlord:
       # Deployment in Taman Busuk and Dark Temple
 
+      canonical_deployment:
+        - unit_id: "taman_human_cav_1"
+          position: [38, 25]
+        - unit_id: "taman_human_cav_2"
+          position: [38, 25]
+        - unit_id: "taman_human_inf_1"
+          position: [38, 23]
+        - unit_id: "taman_human_inf_2"
+          position: [35, 25]
+        - unit_id: "taman_human_inf_3"
+          position: [37, 26]
+        - unit_id: "taman_human_inf_4"
+          position: [34, 23]
+        - unit_id: "taman_human_inf_5"
+          position: [35, 22]
+        - unit_id: "taman_human_inf_6"
+          position: [35, 19]
+        - unit_id: "taman_human_inf_7"
+          position: [35, 19]
+        - unit_id: "taman_human_inf_8"
+          position: [38, 22]
+        - unit_id: "black_dragon_wing"
+          position: [38, 21]
+        - unit_id: "lucien"
+          position: [38, 21]
+        - unit_id: "marcus"
+          position: [38, 21]
+        - unit_id: "blue_dragon_wing_1"
+          position: [38, 23]
+        - unit_id: "blue_dragon_wing_2"
+          position: [35, 25]
+        - unit_id: "kitiara"
+          position: [38, 23]
+        - unit_id: "topus"
+          position: [35, 25]
+        - unit_id: "green_dragon_wing_1"
+          position: [38, 25]
+        - unit_id: "green_dragon_wing_2"
+          position: [36, 23]
+        - unit_id: "hullek"
+          position: [36, 23]
+        - unit_id: "salah_khan"
+          position: [38, 25]
+        - unit_id: "phair_caron"
+          position: [37, 26]
+        - unit_id: "red_dragon_wing_1"
+          position: [34, 23]
+        - unit_id: "red_dragon_wing_2"
+          position: [37, 26]
+        - unit_id: "verminaard"
+          position: [34, 23]
+        - unit_id: "feal_thas"
+          position: [38, 24]
+        - unit_id: "toede"
+          position: [35, 22]
+        - unit_id: "white_dragon_wing"
+          position: [38, 24]
+        - unit_id: "ariakas"
+          position: [38, 23]
+
       countries:
         dtemple:
           units: all

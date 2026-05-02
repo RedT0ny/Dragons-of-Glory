@@ -54,6 +54,88 @@ scenario:
       # Deployment area: If null, defaults to the union of all country territories below
       deployment_area: ["dtemple", "taman"]
 
+      canonical_deployment:
+        - unit_id: "dtemple_draconian_inf_1"
+          position: [35, 21]
+        - unit_id: "dtemple_draconian_inf_10"
+          position: [38, 22]
+        - unit_id: "dtemple_draconian_inf_11"
+          position: [37, 20]
+        - unit_id: "dtemple_draconian_inf_12"
+          position: [37, 21]
+        - unit_id: "dtemple_draconian_inf_13"
+          position: [37, 22]
+        - unit_id: "dtemple_draconian_inf_14"
+          position: [38, 24]
+        - unit_id: "dtemple_draconian_inf_15"
+          position: [38, 23]
+        - unit_id: "dtemple_draconian_inf_16"
+          position: [37, 22]
+        - unit_id: "dtemple_draconian_inf_17"
+          position: [38, 22]
+        - unit_id: "dtemple_draconian_inf_18"
+          position: [38, 21]
+        - unit_id: "guugar"
+          position: [38, 21]
+        - unit_id: "kern_ogre_inf_1"
+          position: [36, 21]
+        - unit_id: "kern_ogre_inf_2"
+          position: [36, 21]
+        - unit_id: "kern_ogre_inf_3"
+          position: [37, 26]
+        - unit_id: "kern_ogre_inf_4"
+          position: [37, 26]
+        - unit_id: "kern_ogre_inf_5"
+          position: [38, 21]
+        - unit_id: "khur_human_inf_1"
+          position: [38, 25]
+        - unit_id: "khur_human_inf_2"
+          position: [38, 25]
+        - unit_id: "khur_human_cav"
+          position: [36, 23]
+        - unit_id: "taman_human_inf_1"
+          position: [35, 21]
+        - unit_id: "taman_human_inf_2"
+          position: [37, 20]
+        - unit_id: "taman_human_inf_3"
+          position: [38, 23]
+        - unit_id: "taman_human_inf_4"
+          position: [37, 21]
+        - unit_id: "taman_human_cav_1"
+          position: [36, 23]
+        - unit_id: "blue_dragon_wing_1"
+          position: [37, 20]
+        - unit_id: "blue_dragon_wing_2"
+          position: [35, 21]
+        - unit_id: "kitiara"
+          position: [37, 20]
+        - unit_id: "topus"
+          position: [35, 21]
+        - unit_id: "black_dragon_wing"
+          position: [38, 24]
+        - unit_id: "lucien"
+          position: [38, 24]
+        - unit_id: "marcus"
+          position: [38, 25]
+        - unit_id: "red_dragon_wing_1"
+          position: [38, 23]
+        - unit_id: "red_dragon_wing_2"
+          position: [38, 22]
+        - unit_id: "green_dragon_wing_1"
+          position: [37, 26]
+        - unit_id: "green_dragon_wing_2"
+          position: [38, 21]
+        - unit_id: "hullek"
+          position: [38, 21]
+        - unit_id: "salah_khan"
+          position: [37, 26]
+        - unit_id: "ariakas"
+          position: [38, 23]
+        - unit_id: "verminaard"
+          position: [38, 22]
+        - unit_id: "iolanthe"
+          position: [38, 25]
+
       countries:
         dtemple:
           units_by_type:
@@ -91,6 +173,76 @@ scenario:
     whitestone:
       # Example of specific deployment region (subset of countries)
       deployment_area: ["estwilde", "sanction"]
+
+      canonical_deployment:
+        - unit_id: "qualinesti_elf_inf_1"
+          position: [33, 21]
+        - unit_id: "qualinesti_elf_inf_2"
+          position: [34, 18]
+        - unit_id: "qualinesti_griffon_wing_1"
+          position: [33, 21]
+        - unit_id: "qualinesti_griffon_wing_2"
+          position: [34, 18]
+        - unit_id: "solostaran"
+          position: [34, 22]
+        - unit_id: "gunthar"
+          position: [34, 19]
+        - unit_id: "sancrist_human_inf_1"
+          position: [36, 26]
+        - unit_id: "sancrist_human_inf_2"
+          position: [36, 26]
+        - unit_id: "sancrist_human_inf_3"
+          position: [36, 26]
+        - unit_id: "sancrist_solamnic_cav_1"
+          position: [34, 19]
+        - unit_id: "sancrist_solamnic_cav_2"
+          position: [34, 19]
+        - unit_id: "sancrist_solamnic_fleet_1"
+          position: [36, 26]
+        - unit_id: "sancrist_solamnic_fleet_2"
+          position: [36, 26]
+        - unit_id: "sancrist_solamnic_inf_1"
+          position: [34, 22]
+        - unit_id: "sancrist_solamnic_inf_2"
+          position: [34, 22]
+        - unit_id: "eleszar"
+          position: [35, 18]
+        - unit_id: "southlund_solamnic_cav_1"
+          position: [36, 15]
+        - unit_id: "southlund_solamnic_cav_2"
+          position: [36, 15]
+        - unit_id: "southlund_solamnic_inf_1"
+          position: [34, 21]
+        - unit_id: "southlund_solamnic_inf_2"
+          position: [34, 21]
+        - unit_id: "southlund_solamnic_inf_3"
+          position: [35, 18]
+        - unit_id: "solanthus_solamnic_inf_1"
+          position: [35, 17]
+        - unit_id: "solanthus_solamnic_inf_2"
+          position: [35, 17]
+        - unit_id: "solanthus_solamnic_cav_1"
+          position: [35, 18]
+        - unit_id: "aurik"
+          position: [35, 17]
+        - unit_id: "gold_dragon_wing"
+          position: [34, 19]
+        - unit_id: "silver_dragon_wing"
+          position: [34, 21]
+        - unit_id: "bronze_dragon_wing"
+          position: [34, 22]
+        - unit_id: "copper_dragon_wing_1"
+          position: [35, 18]
+        - unit_id: "copper_dragon_wing_2"
+          position: [35, 17]
+        - unit_id: "brass_dragon_wing_1"
+          position: [34, 20]
+        - unit_id: "brass_dragon_wing_2"
+          position: [36, 26]
+        - unit_id: "fizban"
+          position: [34, 20]
+        - unit_id: "laurana"
+          position: [34, 21]
 
       countries:
         estwilde: null

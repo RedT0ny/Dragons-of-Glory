@@ -481,6 +481,7 @@ class MainWindow(QMainWindow):
     def on_new_game_clicked(self):
         """
         Handles the action of starting a new game.
+        Shows scenario selection dialog, then config dialog for runtime parameters.
         """
         if not self.controller:
             return
@@ -494,18 +495,34 @@ class MainWindow(QMainWindow):
             if confirm != QMessageBox.Yes:
                 return
         dialog = NewGameDialog(self)
-        if dialog.exec():
-            spec = dialog.get_selected_scenario_spec()
-            if not spec:
-                return
+        if not dialog.exec():
+            return
+        spec = dialog.get_selected_scenario_spec()
+        if not spec:
+            return
 
-            try:
-                # Prevent Enter from leaking from the file dialog into an immediate phase change.
-                self._suppress_end_phase_hotkey_until = monotonic() + 0.6
-                self.controller.start_new_game(spec)
-                self.append_log(f"New Game {spec.id}\n")
-            except Exception as exc:
-                QMessageBox.critical(self, "New Game Failed", str(exc))
+        # Show config dialog for runtime configuration parameters
+        config_dialog = ConfigDialog(self)
+        config_dialog.set_from_config({
+            "difficulty": "normal",
+            "combat_details": "brief",
+            "supply": "standard",
+            "deployment": "canonical",
+            "highlord_ai": False,
+            "whitestone_ai": False,
+        })
+        if not config_dialog.exec():
+            return
+        config = config_dialog.get_config()
+
+        try:
+            # Prevent Enter from leaking from the dialog into an immediate phase change.
+            self._suppress_end_phase_hotkey_until = monotonic() + 0.6
+            self.controller.start_new_game(spec)
+            self.controller.apply_runtime_config(config)
+            self.append_log(f"New Game {spec.id}\n")
+        except Exception as exc:
+            QMessageBox.critical(self, "New Game Failed", str(exc))
 
     def on_save_clicked(self):
         """
