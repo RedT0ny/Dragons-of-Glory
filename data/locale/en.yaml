@@ -24,9 +24,18 @@ countries:
   blue:
     name: "Blue Dragonarmy"
     adjective: "Blue"
+  brass:
+    name: "Brass Dragon Wing"
+    adjective: "Brass"
+  bronze:
+    name: "Bronze Dragon Wing"
+    adjective: "Bronze"
   coastlund:
     name: "Coastlund"
     adjective: "Coastlund"
+  copper:
+    name: "Copper Dragon Wing"
+    adjective: "Copper"
   daltigoth:
     name: "Daltigoth"
     adjective: "Daltigothian"
@@ -39,6 +48,9 @@ countries:
   estwilde:
     name: "Estwilde"
     adjective: "Estwilde"
+  gold:
+    name: "Gold Dragon Wing"
+    adjective: "Golden"
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
@@ -114,6 +126,9 @@ countries:
   silvanesti:
     name: "Silvanesti"
     adjective: "Silvanesti"
+  silver:
+    name: "Silver Dragon Wing"
+    adjective: "Silver"
   solanthus:
     name: "Solanthus"
     adjective: "Solanthus"

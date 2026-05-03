@@ -24,9 +24,18 @@ countries:
   blue:
     name: "Ala Azul"
     adjective: "Azul"
+  brass:
+    name: "Ala de Latón"
+    adjective: "de Latón"
+  bronze:
+    name: "Ala de Bronce"
+    adjective: "Broncíneo"
   coastlund:
     name: "Coastlund"
     adjective: "Coastlund"
+  copper:
+    name: "Ala de Cobre"
+    adjective: "Cobrizo"
   daltigoth:
     name: "Daltigoth"
     adjective: "Daltigothiano"
@@ -39,6 +48,9 @@ countries:
   estwilde:
     name: "Estwilde"
     adjective: "Estwilde"
+  gold:
+    name: "Ala Dorada"
+    adjective: "Dorado"
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
@@ -114,6 +126,9 @@ countries:
   silvanesti:
     name: "Silvanesti"
     adjective: "Silvanesti"
+  silver:
+    name: "Ala de Plata"
+    adjective: "Plateado"
   solanthus:
     name: "Solanthus"
     adjective: "Solanthus"
