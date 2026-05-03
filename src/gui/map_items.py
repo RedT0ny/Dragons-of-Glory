@@ -1,14 +1,14 @@
 import math, os
 
+from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
+from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QGraphicsItem
-from PySide6.QtGui import QPainter, QPainterPath, QColor, QBrush, QPen
-from PySide6.QtCore import Qt, QPointF, QRectF, QByteArray
 
+from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, NEUTRAL
 from src.content.specs import UnitType, UnitRace, UnitState
 from src.content.tools import caption_id
-from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
 
 
 class HexagonItem(QGraphicsItem):
@@ -63,12 +63,10 @@ class HexagonItem(QGraphicsItem):
 
     def paint(self, painter, option, widget):
         painter.setRenderHint(QPainter.Antialiasing)
-    
-        # Draw terrain base and pattern
-        visual = TERRAIN_VISUALS.get(self.terrain_type, TERRAIN_VISUALS["grassland"])
-    
+
         # Layer 1: Terrain Color + Pattern
         # if DEBUG:
+        #     visual = TERRAIN_VISUALS.get(self.terrain_type, TERRAIN_VISUALS["grassland"])
         #     base_brush = QBrush(visual["color"], visual["pattern"])
         #     painter.setBrush(base_brush)
         #     painter.setPen(QPen(QColor(100, 100, 100, 40), 0.5))
@@ -296,9 +294,9 @@ class UnitCounter(QGraphicsItem):
 
     def _get_element_id(self):
         # Be defensive: unit_type and race may be None during some flows (tests/mocks)
-        utype = getattr(self.unit, 'unit_type', None)
-        urace = getattr(self.unit, 'race', None)
-        uid = getattr(self.unit, 'id', None)
+        utype = self.unit.unit_type
+        urace = self.unit.race
+        uid = self.unit.id
 
         if utype in [UnitType.WIZARD, UnitType.HIGHLORD,
                      UnitType.EMPEROR, UnitType.CITADEL,
@@ -311,6 +309,8 @@ class UnitCounter(QGraphicsItem):
                 return uid
             if urace == UnitRace.ELF:
                 return "elflord"
+            if urace == UnitRace.DWARF:
+                return "dwarflord"
             return "leader"
         if urace == UnitRace.DRAGON:
             land = getattr(self.unit, 'land', None)
@@ -332,8 +332,7 @@ class UnitCounter(QGraphicsItem):
         element_id = self._element_id or "noicon"
         if self._is_precolored_group(element_id):
             return self.renderer
-        allegiance = getattr(self.unit, "allegiance", WS)
-        if allegiance == WS:
+        if self.unit.allegiance == WS:
             return self.get_light_renderer()
         return self.renderer
 
@@ -369,26 +368,32 @@ class UnitCounter(QGraphicsItem):
         # Background
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(QBrush(self.color))
-        painter.setPen(QPen(QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0), 2))
+        painter.setPen(QPen(QColor(255, 255, 255) if self.unit.allegiance == WS else QColor(0, 0, 0), 2))
         painter.drawRoundedRect(self.unit_rect, 5, 5)
         self._draw_icon(painter)
 
         # ID
         id_color, rating_color, move_color, movement_display = self._get_text_colors_and_movement()
-
+        
         painter.setPen(QPen(id_color))
         f = painter.font()
         f.setPointSize(7)
         f.setBold(True)
         painter.setFont(f)
         painter.drawText(self.unit_rect, Qt.AlignHCenter | Qt.AlignTop, caption_id(self.unit.id))
-
+        
+        # Stats (bigger font)
+        stats_font = painter.font()
+        stats_font.setPointSize(9)
+        stats_font.setBold(True)
+        painter.setFont(stats_font)
+        
         # Stats
-        rating = self.unit.combat_rating if getattr(self.unit, 'combat_rating', 0) != 0 else getattr(self.unit, 'tactical_rating', 0)
+        rating = self.unit.combat_rating if self.unit.combat_rating != 0 else self.unit.tactical_rating
         stats_rect = self.unit_rect.adjusted(4, 0, -4, -2)
         left_rect = QRectF(stats_rect.left(), stats_rect.top(), stats_rect.width() / 2, stats_rect.height())
         right_rect = QRectF(stats_rect.center().x(), stats_rect.top(), stats_rect.width() / 2, stats_rect.height())
-
+        
         painter.setPen(QPen(rating_color))
         painter.drawText(left_rect, Qt.AlignHCenter | Qt.AlignBottom, str(rating))
         painter.setPen(QPen(move_color))
@@ -396,15 +401,15 @@ class UnitCounter(QGraphicsItem):
         self._draw_badges(painter)
 
     def _get_text_colors_and_movement(self):
-        base_text_color = QColor(255, 255, 255) if getattr(self.unit, 'allegiance', None) == WS else QColor(0, 0, 0)
+        base_text_color = QColor(255, 255, 255) if self.unit.allegiance == WS else QColor(0, 0, 0)
         gray_text_color = QColor(160, 160, 160)
 
-        max_movement = getattr(self.unit, "movement", 0)
-        remaining_movement = getattr(self.unit, "movement_points", max_movement)
+        max_movement = self.unit.movement
+        remaining_movement = self.unit.movement_points
         remaining_movement = max(0, remaining_movement)
 
-        attacked = bool(getattr(self.unit, "attacked_this_turn", False))
-        depleted = bool(getattr(self.unit, "status", None) == UnitState.DEPLETED)
+        attacked = bool(self.unit.attacked_this_turn)
+        depleted = bool(self.unit.status == UnitState.DEPLETED)
 
         if attacked:
             id_color = gray_text_color
@@ -471,26 +476,19 @@ class UnitCounter(QGraphicsItem):
             is_transported = bool(getattr(self.unit, 'is_transported', False))
             host = getattr(self.unit, 'transport_host', None)
             if is_transported and host is not None:
-                host_num = getattr(host, 'ordinal', None)
-                if host_num is None:
-                    host_num = getattr(host, 'ordinal_index', None)
-                if host_num is None:
-                    host_num = getattr(host, 'id', None)
-
-                if host_num is not None:
-                    host_text = str(host_num)
-                    tw, th = 18, 14
-                    tx = self.unit_rect.right() - tw - 2
-                    ty = self.unit_rect.top() + 2
-                    trect = QRectF(tx, ty, tw, th)
-                    painter.setBrush(QBrush(QColor(200, 200, 200)))
-                    painter.setPen(QPen(QColor(0, 0, 0), 1))
-                    painter.drawRoundedRect(trect, 3, 3)
-                    pf2 = painter.font()
-                    pf2.setPointSize(8)
-                    pf2.setBold(True)
-                    painter.setFont(pf2)
-                    painter.setPen(QPen(QColor(0, 0, 0)))
-                    painter.drawText(trect, Qt.AlignCenter, host_text)
+                host_text = str(host.ordinal)
+                tw, th = 18, 14
+                tx = self.unit_rect.right() - tw - 2
+                ty = self.unit_rect.top() + 2
+                trect = QRectF(tx, ty, tw, th)
+                painter.setBrush(QBrush(QColor(200, 200, 200)))
+                painter.setPen(QPen(QColor(0, 0, 0), 1))
+                painter.drawRoundedRect(trect, 3, 3)
+                pf2 = painter.font()
+                pf2.setPointSize(9)
+                pf2.setBold(True)
+                painter.setFont(pf2)
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                painter.drawText(trect, Qt.AlignCenter, host_text)
         except Exception:
             pass
