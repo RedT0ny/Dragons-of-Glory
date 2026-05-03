@@ -170,7 +170,7 @@ plate_of_solamnus:
     Orders were first formed and no one knows how many of these suits of armor were forged. No such armor has been 
     forged since that time, at least according to the records of the Knights of Solamnia, who have tried to keep 
     track of every suit they have discovered.
-  picture: "solamnus_plate.svg"
+  picture: "solamnus_plate.jpg"
   effect: "+1 Tactical Rating. Armor bonus."
   requirements:
     - { type: "unit_type", value: "leader" }
