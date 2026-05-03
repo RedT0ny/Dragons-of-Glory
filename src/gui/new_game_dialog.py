@@ -8,22 +8,19 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
-from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-                            QMetaObject, QObject, QPoint, QRect,
-                            QSize, QTime, QUrl, Qt, QDir)
-from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QDialog, QFormLayout, QFrame,
+import os
+
+from PySide6.QtCore import (QCoreApplication, QMetaObject, QSize, Qt)
+from PySide6.QtGui import (QFont, QPixmap)
+from PySide6.QtWidgets import (QComboBox, QDialog, QFormLayout, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout, QLabel,
-                               QLineEdit, QListView, QPushButton, QSizePolicy,
-                               QSpacerItem, QTextEdit, QVBoxLayout, QWidget, QFileSystemModel)
+                               QLineEdit, QPushButton, QSizePolicy,
+                               QSpacerItem, QTextEdit, QVBoxLayout, QListWidget, QListWidgetItem)
+
 from src.content.config import SCENARIOS_DIR, IMAGES_DIR
 from src.content.loader import load_scenario_yaml
 from src.content.tools import TextFormatter
 from src.gui.notes_dialog import NotesDialog
-import os
 
 
 class Ui_newGameDialog(object):
@@ -47,19 +44,10 @@ class Ui_newGameDialog(object):
         self.scGroupBox.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.formLayout = QFormLayout(self.scGroupBox)
         self.formLayout.setObjectName(u"formLayout")
-        self.scListView = QListView(self.scGroupBox)
-        self.scListView.setObjectName(u"scListView")
+        self.scList = QListWidget(self.scGroupBox)
+        self.scList.setObjectName(u"scList")
 
-        # Set up the file system model to list scenario files
-        file_list_model = QFileSystemModel(self.scListView)
-        file_list_model.setRootPath(SCENARIOS_DIR)
-        file_list_model.setNameFilters([u"*.yaml"])
-        file_list_model.setNameFilterDisables(False)  # Hide non-matching files
-        self.scListView.setModel(file_list_model)
-        self.scListView.setRootIndex(file_list_model.index(SCENARIOS_DIR))
-
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.SpanningRole, self.scListView)
-
+        self.formLayout.setWidget(0, QFormLayout.ItemRole.SpanningRole, self.scList)
 
         self.horizontalLayout.addWidget(self.scGroupBox)
 
@@ -156,10 +144,10 @@ class Ui_newGameDialog(object):
 
         self.gridLayout.addWidget(self.hlVictory, 4, 0, 1, 3)
 
-        self.hlCountries = QLineEdit(self.detailsFrame)
+        self.hlCountries = QComboBox(self.detailsFrame)
         self.hlCountries.setObjectName(u"hlCountries")
-        self.hlCountries.setReadOnly(True)
-
+        self.hlCountries.setMaximumSize(QSize(400, 16777215))
+        
         self.gridLayout.addWidget(self.hlCountries, 3, 1, 1, 2)
 
         self.labelStart = QLabel(self.detailsFrame)
@@ -172,10 +160,10 @@ class Ui_newGameDialog(object):
 
         self.gridLayout.addWidget(self.labelWS, 3, 3, 1, 1)
 
-        self.wsCountries = QLineEdit(self.detailsFrame)
+        self.wsCountries = QComboBox(self.detailsFrame)
         self.wsCountries.setObjectName(u"wsCountries")
-        self.wsCountries.setReadOnly(True)
-
+        self.wsCountries.setMaximumSize(QSize(400, 16777215))
+        
         self.gridLayout.addWidget(self.wsCountries, 3, 4, 1, 1)
 
         self.wsVictory = QTextEdit(self.detailsFrame)
@@ -255,10 +243,42 @@ class NewGameDialog(QDialog):
         self.translator = translator or getattr(parent, "translator", None)
         self.text_formatter = TextFormatter(self.translator) if self.translator else None
         
+        # Populate the list widget with scenario names
+        self._populate_scenario_list()
+        
         # Connect signals
-        self.ui.scListView.selectionModel().selectionChanged.connect(self._on_scenario_selected)
+        self.ui.scList.itemSelectionChanged.connect(self._on_scenario_selected)
         self.ui.startButton.clicked.connect(self.accept)
         self.ui.notesButton.clicked.connect(self._on_notes_clicked)
+    
+    def _populate_scenario_list(self):
+        """Populate the list widget with scenario names from YAML files."""
+        import glob
+        
+        # Find all YAML scenario files
+        yaml_files = glob.glob(os.path.join(SCENARIOS_DIR, "*.yaml"))
+        yaml_files.sort()
+        
+        for file_path in yaml_files:
+            try:
+                spec = load_scenario_yaml(file_path)
+                # Use translated name if available, otherwise use the id
+                if self.translator:
+                    display_name = self.translator.get_text("scenarios", spec.id)
+                else:
+                    display_name = spec.id.replace("_", " ").title()
+                
+                item = QListWidgetItem(display_name)
+                item.setData(Qt.UserRole, file_path)  # Store file path
+                self.ui.scList.addItem(item)
+            except Exception as e:
+                print(f"Error loading {file_path}: {e}")
+                # Fallback: use filename without extension
+                filename = os.path.basename(file_path)
+                name = os.path.splitext(filename)[0].replace("_", " ").title()
+                item = QListWidgetItem(name)
+                item.setData(Qt.UserRole, file_path)
+                self.ui.scList.addItem(item)
 
     def _on_notes_clicked(self):
         """Open the notes dialog for the current scenario."""
@@ -269,16 +289,15 @@ class NewGameDialog(QDialog):
         dialog = NotesDialog(notes, self)
         dialog.exec()
 
-    def _on_scenario_selected(self, selected, deselected):
-        """Handle scenario selection from the list view."""
-        indexes = selected.indexes()
-        if not indexes:
+    def _on_scenario_selected(self):
+        """Handle scenario selection from the list widget."""
+        item = self.ui.scList.currentItem()
+        if not item:
             self._clear_details()
             return
             
-        # Get the selected file path
-        model = self.ui.scListView.model()
-        file_path = model.filePath(indexes[0])
+        # Get the selected item's file path from the custom role
+        file_path = item.data(Qt.UserRole)
         
         # Load the scenario spec
         try:
@@ -323,12 +342,24 @@ class NewGameDialog(QDialog):
         # Highlord countries
         hl_setup = spec.setup.get("highlord", {})
         hl_countries = list(hl_setup.get("countries", {}).keys())
-        self.ui.hlCountries.setText(", ".join(c.title() for c in hl_countries) if hl_countries else "None")
+        self.ui.hlCountries.clear()
+        if hl_countries:
+            for key in hl_countries:
+                name = self.translator.get_country_name(key) if self.translator else key.title()
+                self.ui.hlCountries.addItem(name)
+        else:
+            self.ui.hlCountries.addItem("None")
         
         # Whitestone countries
         ws_setup = spec.setup.get("whitestone", {})
         ws_countries = list(ws_setup.get("countries", {}).keys())
-        self.ui.wsCountries.setText(", ".join(c.title() for c in ws_countries) if ws_countries else "None")
+        self.ui.wsCountries.clear()
+        if ws_countries:
+            for key in ws_countries:
+                name = self.translator.get_country_name(key) if self.translator else key.title()
+                self.ui.wsCountries.addItem(name)
+        else:
+            self.ui.wsCountries.addItem("None")
         
         # Victory conditions
         vc = spec.victory_conditions

@@ -12,12 +12,21 @@ countries:
   balifor:
     name: "Balifor"
     adjective: "Balifor"
+  black:
+    name: "Black Dragonarmy"
+    adjective: "Black"
   blode:
     name: "Blode"
     adjective: "Blode"
   blodehelm:
     name: "Blodehelm"
     adjective: "Blodehelm"
+  blue:
+    name: "Blue Dragonarmy"
+    adjective: "Blue"
+  coastlund:
+    name: "Coastlund"
+    adjective: "Coastlund"
   daltigoth:
     name: "Daltigoth"
     adjective: "Daltigothian"
@@ -27,18 +36,18 @@ countries:
   dtemple:
     name: "Dark Temple"
     adjective: "Dark Temple"
+  estwilde:
+    name: "Estwilde"
+    adjective: "Estwilde"
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
-  sancrist:
-    name: "Sancrist"
-    adjective: "Sancrist"
+  green:
+    name: "Green Dragonarmy"
+    adjective: "Green"
   haltigoth:
     name: "Haltigoth"
     adjective: "Haltigothian"
-  coastlund:
-    name: "Coastlund"
-    adjective: "Coastlund"
   hinterlund:
     name: "Hinterlund"
     adjective: "Hinterlund"
@@ -70,8 +79,8 @@ countries:
     name: "Mithas"
     adjective: "Mithas"
   nergoth:
-    name: "N. Ergoth"
-    adjective: "N. Ergothian"
+    name: "Northern Ergoth"
+    adjective: "Northern Ergothian"
   nightlund:
     name: "Nightlund"
     adjective: "Nightlund"
@@ -84,12 +93,21 @@ countries:
   qualinesti:
     name: "Qualinesti"
     adjective: "Qualinesti"
+  red:
+    name: "Red Dragonarmy"
+    adjective: "Red"
   saifhum:
     name: "Saifhum"
     adjective: "Saifhum"
+  sancrist:
+    name: "Sancrist"
+    adjective: "Sancrist"
   sanction:
     name: "Sanction"
     adjective: "Sanction"
+  schallsea:
+    name: "Schallsea"
+    adjective: "Schallsea"
   sikket:
     name: "Sikk'et Hul"
     adjective: "Sikk'et Hul"
@@ -123,6 +141,9 @@ countries:
   vingaard:
     name: "Vingaard"
     adjective: "Vingaard"
+  white:
+    name: "White Dragonarmy"
+    adjective: "White"
   zhakar:
     name: "Zhakar"
     adjective: "Zhakar"
@@ -257,6 +278,11 @@ locations:
   throtl: "Throtl"
   vingaard_keep: "Vingaard Keep"
   zhakar_city: "Zhakar"
+  lost_names: "City of Lost Names"
+  pax_tharkas: "Pax Tharkas"
+  winston_tower: "Winston's Tower"
+  wayreth: "Tower of High Sorcery"
+  zhea_harbor: "Zhea Harbor"
 scenarios:
   campaign_0_war_of_the_lance: "The War of the Lance"
   campaign_1_dragonlance_chronicles: "Dragonlance Chronicles"
@@ -385,7 +411,7 @@ unit_names:
   felura: "Grand Mariner Felura Kar-Erian"
   gunthar: "Gunthar uth Wistan"
   harald: "Harald Haakan"
-  hornfel: "Hornfel"
+  hornfel: "Thane Hornfel"
   hullek: "Hullek Skullsmasher"
   guugar: "Khan Guugar"
   sharuk: "Khan Sharuk"
