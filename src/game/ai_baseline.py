@@ -11,7 +11,7 @@ from src.content.tools import TextFormatter
 from src.content import loader
 from src.content.config import AI_STANCE_DATA
 from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import UnitType, UnitState, LocType, UnitRace, HexsideType
+from src.content.specs import UnitType, UnitState, LocType, UnitRace, HexsideType, GamePhase
 from src.content.tools import debug_print
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
@@ -67,6 +67,38 @@ def _needs_capital_defense(side: str, hl_category: Optional[str], ws_category: O
         return True
     if enemy_cat and enemy_cat.lower() in _PROTECTIVE_ENEMY_CATEGORIES:
         return True
+    return False
+
+
+def _min_capital_ground_defenders(threat_value: float) -> int:
+    return 2 if threat_value < 2.0 else 3
+
+
+def _friendly_ground_combat_defenders_in_hex(ctx: "AIContext", hex_obj: Hex, side: str) -> List[object]:
+    return [
+        u for u in ctx.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r)
+        if u.allegiance == side
+        and u.is_on_map
+        and u.is_army()
+        and u.is_combat_unit()
+    ]
+
+
+def _can_immediately_deploy_ground_defender(ctx: "AIContext", side: str, capital_hex: Hex) -> bool:
+    capital_offset = capital_hex.axial_to_offset()
+    for unit in ctx.game_state.units:
+        if unit.allegiance != side:
+            continue
+        if unit.status != UnitState.READY or unit.is_on_map:
+            continue
+        if not unit.is_army() or not unit.is_combat_unit():
+            continue
+        valid = ctx.game_state.deployment_service.get_valid_deployment_hexes(
+            unit,
+            allow_territory_wide=False,
+        ) or []
+        if capital_offset in {tuple(v) for v in valid}:
+            return True
     return False
 
 
@@ -1063,6 +1095,27 @@ class OperationalPlanner:
         return any(p.is_army() for p in passengers)
 
     @staticmethod
+    def _group_ground_combat_count(group: TaskGroup) -> int:
+        return sum(1 for u in group.units if u.is_army() and u.is_combat_unit())
+
+    @staticmethod
+    def _group_is_pinned_capital_garrison(ctx: AIContext, group: TaskGroup, threat: Any) -> bool:
+        if not group.has_army or group.has_fleet:
+            return False
+        loc = ctx.game_state.map.get_location(group.hex)
+        if not loc or not getattr(loc, "is_capital", False) or getattr(loc, "occupier", None) != ctx.side:
+            return False
+
+        local_threat = _overlay_value(threat, *group.hex.axial_to_offset(), 0.0)
+        defenders = _friendly_ground_combat_defenders_in_hex(ctx, group.hex, ctx.side)
+        remaining = len(defenders) - OperationalPlanner._group_ground_combat_count(group)
+        min_required = _min_capital_ground_defenders(local_threat)
+
+        if remaining < 1 and not _can_immediately_deploy_ground_defender(ctx, ctx.side, group.hex):
+            return True
+        return remaining < min_required
+
+    @staticmethod
     def _neutral_border_staging_hexes(ctx: AIContext, country_id: str) -> List[Hex]:
         """Friendly-side hexes adjacent to a legal neutral-entry hex for the chosen country."""
         cache = ctx.neutral_front_cache if isinstance(ctx.neutral_front_cache, dict) else None
@@ -1266,6 +1319,11 @@ class OperationalPlanner:
         support_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         loaded_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         empty_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        is_hl_control_campaign = (
+            offensive
+            and ctx.side == HL
+            and str(plan.victory_category or "").lower() == "control"
+        )
         if offensive and plan.transport_campaign and plan.beachhead_slots:
             loaded_fleet_groups: List[TaskGroup] = []
             for g in [x for x in groups if x.has_fleet]:
@@ -1328,6 +1386,8 @@ class OperationalPlanner:
                     support_count = max(1, (len(candidates) * 15) // 100)
 
                 # Clamp to available candidates
+                if is_hl_control_campaign:
+                    support_count = max(support_count, max(1, len(candidates) // 4))
                 total_commit = min(len(candidates), main_count + support_count)
                 main_count = min(main_count, total_commit)
                 support_count = min(support_count, total_commit - main_count)
@@ -1342,32 +1402,37 @@ class OperationalPlanner:
             group_key = _task_group_key(group)
 
             if (
-                offensive
-                and loc
+                loc
                 and getattr(loc, "is_capital", False)
                 and getattr(loc, "occupier", None) == ctx.side
                 and group.has_army
                 and not group.has_fleet
             ):
-                stack = ctx.game_state.map.get_units_in_hex(group.hex.q, group.hex.r)
-                defenders = [
-                    u for u in stack
-                    if u.allegiance == ctx.side
-                    and u.is_on_map
-                    and u.is_combat_unit()
-                ]
-                is_failsafe_garrison = (
-                    len(defenders) == 1
-                    and len([u for u in group.units if u.is_army()]) == 1
-                    and all(not u.is_leader() for u in group.units)
+                defenders = _friendly_ground_combat_defenders_in_hex(ctx, group.hex, ctx.side)
+                group_ground = self._group_ground_combat_count(group)
+                remaining_ground = len(defenders) - group_ground
+                min_required = _min_capital_ground_defenders(local_threat)
+                incoming_relief = any(
+                    capital_hex == group.hex and _task_group_key(assigned_group) != group_key
+                    for capital_hex, assigned_group in capital_defense_groups.items()
                 )
-                if is_failsafe_garrison:
+                can_deploy_relief = _can_immediately_deploy_ground_defender(ctx, ctx.side, group.hex)
+                if remaining_ground < 1 and not (incoming_relief or can_deploy_relief):
                     append_mission(Mission(
                         group=group,
                         mission_type="defend_allied_capital",
                         target_hex=group.hex,
                         objective=None,
-                        priority=160 + local_threat * 10,
+                        priority=185 + local_threat * 12,
+                    ))
+                    continue
+                if len(defenders) < min_required:
+                    append_mission(Mission(
+                        group=group,
+                        mission_type="defend_allied_capital",
+                        target_hex=group.hex,
+                        objective=None,
+                        priority=165 + local_threat * 10,
                     ))
                     continue
 
@@ -1618,6 +1683,24 @@ class OperationalPlanner:
                     ))
             else:
                 if objective:
+                    if (
+                        offensive
+                        and main_hex is not None
+                        and group.has_army
+                        and not group.has_fleet
+                        and group_key not in main_effort_group_keys
+                        and group_key not in support_group_keys
+                        and objective.owner == ctx.side
+                        and local_threat < 2.0
+                    ):
+                        append_mission(Mission(
+                            group=group,
+                            mission_type="support_main_effort",
+                            target_hex=main_hex,
+                            objective=main_objective,
+                            priority=96 + plan.urgency_score * 24 + group.power * 0.55,
+                        ))
+                        continue
                     if group.has_wing and not group.has_army and objective.owner == ctx.side:
                         if offensive and main_hex is not None:
                             append_mission(Mission(
@@ -1819,6 +1902,8 @@ class OperationalPlanner:
         must_force = bool(plan.must_act or (plan.objective_deadline_turn is not None and plan.objective_deadline_turn - ctx.turn <= 2))
         if must_force:
             return False
+        if ctx.side == HL and str(plan.victory_category or "").lower() == "control":
+            return group.power < defender_power * 0.95
         return group.power < defender_power * 1.15
 
     @staticmethod
@@ -1848,17 +1933,14 @@ class OperationalPlanner:
                     continue
                 capital_hex = Hex.offset_to_axial(loc.coords[0], loc.coords[1])
                 col, row = loc.coords[0], loc.coords[1]
-                stack = ctx.game_state.map.get_units_in_hex(capital_hex.q, capital_hex.r)
-                defenders = [
-                    u for u in stack
-                    if u.allegiance == ctx.side
-                    and u.is_on_map
-                    and u.is_combat_unit()
-                ]
+                local_threat = _overlay_value(threat, col, row, 0.0)
+                defenders = _friendly_ground_combat_defenders_in_hex(ctx, capital_hex, ctx.side)
                 garrison_count = len(defenders)
-                if garrison_count < 1:
-                    capitals_needing_defense.append((capital_hex, float(garrison_count)))
-        capitals_needing_defense.sort(key=lambda x: x[1])
+                min_required = _min_capital_ground_defenders(local_threat)
+                if garrison_count < min_required:
+                    deficit = float(min_required - garrison_count) + local_threat * 0.25
+                    capitals_needing_defense.append((capital_hex, deficit))
+        capitals_needing_defense.sort(key=lambda x: x[1], reverse=True)
         return capitals_needing_defense
 
     @staticmethod
@@ -1878,9 +1960,10 @@ class OperationalPlanner:
             g for g in groups
             if g.has_army
             and not g.has_fleet
+            and not OperationalPlanner._group_is_pinned_capital_garrison(ctx, g, threat)
         ]
         candidate_groups.sort(key=lambda g: g.power)
-        for capital_hex, current_power in capitals:
+        for capital_hex, _deficit in capitals:
             if not candidate_groups:
                 break
             best_group = None
@@ -1942,6 +2025,23 @@ class TacticalPlanner:
     def __init__(self):
         self._reachable_cache_phase_key: Optional[Tuple[int, str, Any]] = None
         self._reachable_cache: Dict[Tuple[Any, ...], Any] = {}
+
+    @staticmethod
+    def _deploy_unit(
+        ctx: AIContext,
+        unit,
+        target_hex: Hex,
+        invasion_deployment_active: bool = False,
+        invasion_deployment_allegiance: Optional[str] = None,
+        invasion_deployment_country_id: Optional[str] = None,
+    ):
+        return ctx.game_state.deployment_service.deploy_unit(
+            unit,
+            target_hex,
+            invasion_deployment_active=invasion_deployment_active,
+            invasion_deployment_allegiance=invasion_deployment_allegiance,
+            invasion_deployment_country_id=invasion_deployment_country_id,
+        )
     
     @staticmethod
     def _can_army_exit_landing_hex(ctx: AIContext, army, landing_hex: Hex) -> bool:
@@ -2065,7 +2165,8 @@ class TacticalPlanner:
                 preferred_valid,
                 key=lambda coords: self._score_deployment_hex(ctx, plan, unit, coords),
             )
-            result = ctx.game_state.deployment_service.deploy_unit(
+            result = self._deploy_unit(
+                ctx,
                 unit,
                 Hex.offset_to_axial(best_hex[0], best_hex[1]),
                 invasion_deployment_active=invasion_deployment_active,
@@ -2121,7 +2222,8 @@ class TacticalPlanner:
             ) or []
             if valid_capital not in {tuple(v) for v in valid}:
                 continue
-            result = ctx.game_state.deployment_service.deploy_unit(
+            result = self._deploy_unit(
+                ctx,
                 army,
                 capital_hex,
                 invasion_deployment_active=invasion_deployment_active,
@@ -2166,7 +2268,8 @@ class TacticalPlanner:
                 continue
             best_hex = max(joint, key=lambda coords: self._score_deployment_hex(ctx, plan, dragon, coords))
             target_hex = Hex.offset_to_axial(best_hex[0], best_hex[1])
-            wing_res = ctx.game_state.deployment_service.deploy_unit(
+            wing_res = self._deploy_unit(
+                ctx,
                 dragon,
                 target_hex,
                 invasion_deployment_active=invasion_deployment_active,
@@ -2175,7 +2278,8 @@ class TacticalPlanner:
             )
             if not wing_res.success:
                 continue
-            cmd_res = ctx.game_state.deployment_service.deploy_unit(
+            cmd_res = self._deploy_unit(
+                ctx,
                 highlord,
                 target_hex,
                 invasion_deployment_active=invasion_deployment_active,
@@ -2275,7 +2379,8 @@ class TacticalPlanner:
             chosen = candidates[0][0]
             chosen_hex = Hex.offset_to_axial(chosen[0], chosen[1])
 
-            result = ctx.game_state.deployment_service.deploy_unit(
+            result = self._deploy_unit(
+                ctx,
                 fleet,
                 chosen_hex,
                 invasion_deployment_active=invasion_deployment_active,
@@ -2369,8 +2474,10 @@ class TacticalPlanner:
             chosen = candidates[0][0]
             chosen_hex = Hex.offset_to_axial(chosen[0], chosen[1])
 
-            result = ctx.game_state.deployment_service.deploy_unit(
-                army, chosen_hex,
+            result = self._deploy_unit(
+                ctx,
+                army,
+                chosen_hex,
                 invasion_deployment_active=invasion_deployment_active,
                 invasion_deployment_allegiance=invasion_deployment_allegiance,
                 invasion_deployment_country_id=invasion_deployment_country_id,
@@ -2469,6 +2576,26 @@ class TacticalPlanner:
                 score += 20.0
             if territory_val == ctx.enemy and dist_to_objective <= 10:
                 score += 30.0
+            if unit.is_army():
+                adjacent_enemy_territory = False
+                adjacent_target_country = False
+                target_country_id = getattr(plan.main_objective, "country_id", None)
+                for neighbor in deploy_hex.neighbors():
+                    ncol, nrow = neighbor.axial_to_offset()
+                    if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
+                        continue
+                    if territory and territory.values.get((ncol, nrow)) == ctx.enemy:
+                        adjacent_enemy_territory = True
+                    if target_country_id and (ctx.country_id_by_offset or {}).get((ncol, nrow)) == target_country_id:
+                        adjacent_target_country = True
+                if target_country_id and (ctx.country_id_by_offset or {}).get((col, row)) == target_country_id:
+                    score += 22.0
+                elif adjacent_target_country:
+                    score += 14.0
+                if adjacent_enemy_territory:
+                    score += 12.0
+                elif threat < 1.0 and dist_to_objective > 8:
+                    score -= 18.0
 
         # Location and capital scoring
         loc = ctx.game_state.map.get_location(deploy_hex)
@@ -2631,6 +2758,44 @@ class TacticalPlanner:
         self._reachable_cache[cache_key] = computed
         return computed, False
 
+    @staticmethod
+    def _is_follow_up_worthy(plan: StrategicPlan, action: TacticalAction) -> bool:
+        if action.target_hex is None:
+            return False
+        if action.target_hex == action.group.hex:
+            return False
+        offensive_types = {
+            "push_objective",
+            "main_effort_attack",
+            "support_main_effort",
+            "prepare_assault",
+            "post_landing_push",
+            "secure_beachhead",
+            "stage_neutral_invasion",
+            "embark_main_effort",
+            "transport_main_effort",
+        }
+        if action.details not in offensive_types:
+            return False
+        if action.score >= 5:
+            return True
+        if getattr(plan, "must_act", False) and action.score >= 0:
+            return True
+        return False
+
+    def _should_lock_group_after_action(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        mission: Mission,
+        action: TacticalAction,
+    ) -> bool:
+        if action.target_hex is None or action.target_hex == mission.group.hex:
+            return True
+        if not any(float(getattr(u, "movement_points", 0) or 0) > 0 for u in mission.group.mobile_units):
+            return True
+        return not self._is_follow_up_worthy(plan, action)
+
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
         transport_t0 = perf_counter()
         transport_executed = self._maybe_execute_transport_action(ctx, plan)
@@ -2677,7 +2842,7 @@ class TacticalPlanner:
 
         actions.sort(key=lambda a: (a.score, a.group.power), reverse=True)
         best = actions[0]
-        if best.score < 5:
+        if best.score < 5 and not self._is_follow_up_worthy(plan, best):
             return False
 
         target_hex = best.target_hex
@@ -2694,7 +2859,8 @@ class TacticalPlanner:
                 pos = tuple(unit.position) if unit.position else (None, None)
                 unit_name = TextFormatter.format_unit_log_string(unit)
                 ctx.movement_logs.append(f"movement unit={unit_name} from={pos} to={pos}")
-            if ctx.moved_task_groups is not None:
+            mission = next((m for m in missions if _task_group_key(m.group) == _task_group_key(best.group)), None)
+            if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
                 ctx.moved_task_groups.add(_task_group_key(best.group))
             return True
 
@@ -2724,7 +2890,8 @@ class TacticalPlanner:
             now = tuple(unit.position) if unit.position else (None, None)
             unit_name = TextFormatter.format_unit_log_string(unit)
             ctx.movement_logs.append(f"movement unit={unit_name} from={prev} to={now}")
-        if ctx.moved_task_groups is not None:
+        mission = next((m for m in missions if _task_group_key(m.group) == _task_group_key(best.group)), None)
+        if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
             ctx.moved_task_groups.add(_task_group_key(best.group))
         return True
 
@@ -2848,7 +3015,7 @@ class TacticalPlanner:
         if (
             mission.target_hex is not None
             and mission.group.has_army
-            and mission.mission_type in {"defend", "defend_capital", "defend_key_location", "reinforce", "hold"}
+            and mission.mission_type in {"defend", "defend_capital", "defend_allied_capital", "defend_key_location", "reinforce", "hold"}
             and current_hex == mission.target_hex
             and target_hex != current_hex
         ):
@@ -2873,7 +3040,7 @@ class TacticalPlanner:
         # alone and unprotected on the hex.
         if (
             target_hex != current_hex
-            and mission.mission_type in {"defend", "defend_capital", "defend_key_location", "reinforce", "hold"}
+            and mission.mission_type in {"defend", "defend_capital", "defend_allied_capital", "defend_key_location", "reinforce", "hold"}
         ):
             current_loc = ctx.game_state.map.get_location(current_hex)
             if current_loc and getattr(current_loc, "occupier", None) == ctx.side:
@@ -2891,6 +3058,13 @@ class TacticalPlanner:
                         score -= 40.0
                     if getattr(current_loc, "loc_type", None) in {LocType.FORTRESS.value, LocType.PORT.value, LocType.TEMPLE.value}:
                         score -= 25.0
+                if getattr(current_loc, "is_capital", False):
+                    remaining_ground = len(_friendly_ground_combat_defenders_in_hex(ctx, current_hex, ctx.side)) - sum(
+                        1 for u in mission.group.units if u.is_army() and u.is_combat_unit()
+                    )
+                    can_redeploy = _can_immediately_deploy_ground_defender(ctx, ctx.side, current_hex)
+                    if remaining_ground < 1 and not can_redeploy:
+                        score -= 400.0
 
         amphibious_types = {"embark_main_effort", "transport_main_effort", "move_to_landing_area"}
         if mission.mission_type in amphibious_types and plan.main_objective:
@@ -3705,6 +3879,8 @@ class TacticalPlanner:
 
         offensive = plan.offensive_side == ctx.side
         min_odds = 1.05 if offensive else 1.2
+        if offensive and ctx.side == HL and str(plan.victory_category or "").lower() == "control":
+            min_odds -= 0.1
         if plan.posture == "desperate_offensive":
             min_odds -= 0.08
 
@@ -3939,6 +4115,17 @@ class BaselineAIPlayer:
         invasion_deployment_allegiance: str | None = None,
         invasion_deployment_country_id: str | None = None,
     ) -> int:
+        if (
+            getattr(self.game_state, "phase", None) == GamePhase.DEPLOYMENT
+            and not allow_territory_wide
+            and country_filter is None
+            and not invasion_deployment_active
+        ):
+            deployed = self.game_state.apply_canonical_deployment(side)
+            if deployed is not None:
+                self._log(f"deploy: {deployed} units (canonical)")
+                return deployed
+
         ctx = self._build_context(side)
         plan = self._strategic.build_plan(ctx)
         deployed = self._tactical.deploy_ready_units(

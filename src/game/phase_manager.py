@@ -209,9 +209,7 @@ class TurnEngine:
         if current_phase == GamePhase.DEPLOYMENT:
             self._log_phase_header_once(f"Step 0: Deployment Phase - {active_player.capitalize()}")
             if is_ai:
-                deployed = self.game_state.apply_canonical_deployment(active_player)
-                if deployed is None:
-                    deployed = self.ai_baseline.deploy_all_ready_units(active_player)
+                deployed = self.ai_baseline.deploy_all_ready_units(active_player)
                 print(f"AI deployment complete. Deployed: {deployed}")
                 self.game_state.advance_phase()
                 return TurnOutcome(advanced=True)
