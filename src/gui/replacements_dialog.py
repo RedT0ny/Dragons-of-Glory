@@ -1,15 +1,17 @@
+import weakref
+
+import shiboken6
+from PySide6.QtCore import Qt, Signal, QTimer, QRectF
+from PySide6.QtGui import QPixmap, QPainter, QColor
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableWidget,
                                QTableWidgetItem, QHeaderView, QLabel, QWidget,
-                               QPushButton, QScrollArea, QFrame, QGraphicsView, QGraphicsScene, QGridLayout,
+                               QPushButton, QGraphicsScene, QGridLayout,
                                QAbstractItemView)
-from PySide6.QtCore import Qt, QSize, Signal, QTimer, QRectF
-import shiboken6
-import weakref
-from PySide6.QtGui import QPixmap, QPainter, QColor
 
+from src.content.constants import WS, HL
 from src.content.specs import UnitState
-from src.content.constants import WS, HL, NEUTRAL, UI_COLORS
 from src.gui.map_items import UnitCounter
+
 
 class UnitLabel(QLabel):
     """A clickable preview representing a unit. Uses a static Pixmap instead of a heavy QGraphicsView."""
@@ -137,6 +139,7 @@ class ReplacementsDialog(QDialog):
 
     def __init__(self, game_state, view, parent=None, filter_country_id=None, allow_territory_deploy=False, invasion_mode=False):
         super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
         self.game_state = game_state
         self.view = view
         self.filter_country_id = filter_country_id
@@ -154,6 +157,12 @@ class ReplacementsDialog(QDialog):
 
         self.setup_ui()
         self.populate_table()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            event.ignore()
+        else:
+            super().keyPressEvent(event)
 
     def setup_ui(self):
         layout = QVBoxLayout(self)

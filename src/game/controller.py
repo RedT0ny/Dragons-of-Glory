@@ -154,7 +154,7 @@ class GameController(QObject):
         current_player = self.game_state.current_player
         if not current_player or current_player.is_ai:
             return False
-        return self.game_state.phase in {GamePhase.DEPLOYMENT, GamePhase.REPLACEMENTS, GamePhase.MOVEMENT, GamePhase.COMBAT}
+        return self.game_state.phase in {GamePhase.DEPLOYMENT, GamePhase.REPLACEMENTS, GamePhase.MOVEMENT, GamePhase.COMBAT, GamePhase.STRATEGIC_EVENTS}
 
     def _run_deferred_if_current(self, epoch, callback, callback_name="callback"):
         """Execute a deferred callback only if the epoch matches current state.

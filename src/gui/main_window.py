@@ -183,7 +183,10 @@ class MainWindow(QMainWindow):
             if isinstance(focus_widget, QAbstractButton):
                 super().keyPressEvent(event)
                 return
-            if hasattr(self, 'info_panel'):
+            if hasattr(self, 'info_panel') and hasattr(self.info_panel, 'btn_end_phase'):
+                if not self.info_panel.btn_end_phase.isEnabled():
+                    super().keyPressEvent(event)
+                    return
                 self.info_panel.end_phase_clicked.emit()
             event.accept()
             return
