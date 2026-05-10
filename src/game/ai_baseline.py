@@ -2798,7 +2798,7 @@ class TacticalPlanner:
 
     def execute_best_movement(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission], attempt_invasion=None) -> bool:
         transport_t0 = perf_counter()
-        transport_executed = self._maybe_execute_transport_action(ctx, plan)
+        transport_executed, commander_boarded = self._maybe_execute_transport_action(ctx, plan, allow_commander_boarding=True)
         transport_ms = (perf_counter() - transport_t0) * 1000.0
         if transport_executed:
             ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
@@ -2838,11 +2838,17 @@ class TacticalPlanner:
             f"cache_hits={cache_hits} cache_misses={cache_misses}"
         )
         if not actions:
+            if commander_boarded:
+                ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
+                return True
             return False
 
         actions.sort(key=lambda a: (a.score, a.group.power), reverse=True)
         best = actions[0]
         if best.score < 5 and not self._is_follow_up_worthy(plan, best):
+            if commander_boarded:
+                ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
+                return True
             return False
 
         target_hex = best.target_hex
@@ -2921,6 +2927,7 @@ class TacticalPlanner:
         assigned_preserved = True
 
         if len(candidates) > 80:
+            candidates = self._prefilter_move_candidates(ctx, plan, mission, candidates, current, target_offset, limit=80)
             truncated = list(candidates[:80])
             if target_offset and assigned_reachable and target_offset not in truncated:
                 truncated[-1] = target_offset
@@ -2976,6 +2983,47 @@ class TacticalPlanner:
             "candidates": len(candidates),
             "cache_hit": cache_hit,
         }
+
+    def _prefilter_move_candidates(
+        self,
+        ctx: AIContext,
+        plan: StrategicPlan,
+        mission: Mission,
+        candidates: List[Tuple[int, int]],
+        current: Tuple[int, int],
+        target_offset: Optional[Tuple[int, int]],
+        limit: int = 80,
+    ) -> List[Tuple[int, int]]:
+        if len(candidates) <= limit:
+            return candidates
+        if mission.target_hex is None:
+            return candidates
+
+        current_hex = mission.group.hex
+        objective_hex = mission.target_hex
+        main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1]) if plan.main_objective else None
+        offensive_types = {"push_objective", "main_effort_attack", "support_main_effort"}
+        threat_overlay = ctx.overlays.get("threat")
+
+        def rank(candidate: Tuple[int, int]) -> Tuple[float, float, float]:
+            hex_obj = Hex.offset_to_axial(candidate[0], candidate[1])
+            target_progress = current_hex.distance_to(objective_hex) - hex_obj.distance_to(objective_hex)
+            main_progress = 0.0
+            if mission.mission_type in offensive_types and main_hex is not None:
+                main_progress = current_hex.distance_to(main_hex) - hex_obj.distance_to(main_hex)
+            threat = _overlay_value(threat_overlay, candidate[0], candidate[1], 0.0)
+            return (main_progress, target_progress, -threat)
+
+        prioritized = sorted(candidates, key=rank, reverse=True)
+        preserved: List[Tuple[int, int]] = []
+        for item in (current, target_offset):
+            if item and item in prioritized and item not in preserved:
+                preserved.append(item)
+        selected = list(prioritized[:limit])
+        for item in preserved:
+            if item not in selected:
+                selected[-1] = item
+        return selected
 
     @staticmethod
     def _fleet_has_embarked_ground(fleet) -> bool:
@@ -3205,43 +3253,56 @@ class TacticalPlanner:
             next_dist = target_hex.distance_to(main_hex)
             support_now = _overlay_value(friendly_power_overlay, current_col, current_row, 0.0)
             support_gain = support - support_now
+            advance_gain = current_dist - next_dist
 
             # REWARD: Advancing toward the objective
-            if next_dist < current_dist:
-                advance_gain = current_dist - next_dist
+            if advance_gain > 0:
                 # Base reward for any forward progress
-                score += advance_gain * 12
+                score += advance_gain * 16
                 # Bonus for meaningful advances (2+ hexes)
                 if advance_gain >= 2:
-                    score += 20
+                    score += 24
                 # High urgency bonus: reward decisive movement
                 if plan.must_act or plan.urgency_score >= 0.7:
-                    score += 15
+                    score += 18
             # PENALTY: Lateral or backward moves
             else:
-                if support_gain <= 0:
-                    # No progress AND no support gain = useless move
-                    score -= 35
+                pressure = 0.0
+                if plan.must_act:
+                    pressure += 18.0
+                if plan.urgency_score >= 0.7:
+                    pressure += 12.0
+                if advance_gain == 0:
+                    if support_gain <= 0:
+                        # No progress AND no support gain = useless move
+                        score -= 45 + pressure
+                    else:
+                        # Support gain alone doesn't justify no advance on offensive missions
+                        score -= 10 + pressure * 0.5
+                        score += min(2.0, support_gain)
                 else:
-                    # Support gain alone doesn't justify no advance on offensive missions
-                    score += min(3.0, support_gain)
+                    retreat_penalty = 55 + abs(advance_gain) * 14 + pressure
+                    if support_gain <= 0:
+                        retreat_penalty += 12
+                    score -= retreat_penalty
+                    score += min(1.5, max(0.0, support_gain))
 
             # CRITICAL: Hard penalties under pressure
             if plan.must_act:
                 if next_dist >= current_dist and support_gain <= 0:
-                    score -= 40  # Must act + passive = unacceptable
+                    score -= 50  # Must act + passive = unacceptable
             if plan.urgency_score >= 0.7:
                 if next_dist >= current_dist:
-                    score -= 25  # High urgency + no progress = bad
+                    score -= 35  # High urgency + no progress = bad
             # Deadline pressure: turns running out
             if plan.objective_deadline_turn is not None:
                 turns_left = plan.objective_deadline_turn - ctx.turn
                 if turns_left <= 3:
                     if next_dist >= current_dist:
-                        score -= 45  # Critical deadline + passive = reject
+                        score -= 55  # Critical deadline + passive = reject
                 elif turns_left <= 5:
                     if next_dist >= current_dist and support_gain <= 0:
-                        score -= 25
+                        score -= 32
         return score
 
     @staticmethod
@@ -3279,12 +3340,13 @@ class TacticalPlanner:
             return 6.0
         return 0.0
 
-    def _maybe_execute_transport_action(self, ctx: AIContext, plan: StrategicPlan) -> bool:
+    def _maybe_execute_transport_action(self, ctx: AIContext, plan: StrategicPlan, allow_commander_boarding: bool = True) -> Tuple[bool, bool]:
         """Execute transport actions in priority order: unboard, board commanders, board same-hex fleets."""
         transport_actions = ctx.transport_actions_in_phase
         beachhead_slots = list(plan.beachhead_slots or ([] if plan.beachhead_hex is None else [plan.beachhead_hex]))
         beachhead_slot_offsets = {h.axial_to_offset() for h in beachhead_slots}
         landed_state = set((ctx.invasion_state or {}).get("landed_armies", set()) or set())
+        landed_leader_state = set((ctx.invasion_state or {}).get("landed_leaders", set()) or set())
         ashore_state = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
         
         # Stage 1: Batch fleet unloading wave.
@@ -3302,11 +3364,10 @@ class TacticalPlanner:
                     debug_print(f"[TRANSPORT] unload_batch count={len(unload_actions)}")
                     unloaded_any = self._execute_fleet_unload_actions(ctx, plan, unload_actions, max_actions=4)
                     if unloaded_any:
-                        return True
+                        return True, False
 
         # Stage 2: Board dragon commanders onto wings lacking them (CRITICAL for HL)
-        if self._board_dragon_commanders(ctx):
-            return True
+        commander_boarded = bool(allow_commander_boarding and self._board_dragon_commanders(ctx))
 
         # Stage 3: Same-hex fleet boarding for transport campaigns
         if plan.transport_campaign:
@@ -3370,6 +3431,16 @@ class TacticalPlanner:
 
                     # Second priority: leaders (if fleet can carry)
                     elif unit.is_leader():
+                        ukey = _unit_key(unit)
+                        if transport_actions and ("landed_leader", ukey) in transport_actions:
+                            debug_print(f"[TRANSPORT] skip_reboard landed_leader={getattr(unit, 'id', '?')}")
+                            continue
+                        if ukey in landed_leader_state:
+                            debug_print(f"[TRANSPORT] skip_reboard landed_leader={getattr(unit, 'id', '?')}")
+                            continue
+                        if unit.position and tuple(unit.position) in beachhead_slot_offsets:
+                            debug_print(f"[TRANSPORT] skip_reboard beachhead_leader={getattr(unit, 'id', '?')}")
+                            continue
                         if fleet.can_carry(unit):
                             candidates.append((unit, 1, 0, pair_key))
 
@@ -3380,9 +3451,9 @@ class TacticalPlanner:
                     if ctx.movement_service.board_unit(fleet, passenger):
                         if transport_actions is not None:
                             transport_actions.add(pair_key)
-                        return True
+                        return True, commander_boarded
 
-        return False
+        return False, commander_boarded
 
     @staticmethod
     def _collect_fleet_unload_actions(ctx: AIContext, plan: StrategicPlan) -> List[Tuple[object, List[object], float]]:
@@ -3494,6 +3565,7 @@ class TacticalPlanner:
             return False
         transport_actions = ctx.transport_actions_in_phase
         landed_state = set((ctx.invasion_state or {}).get("landed_armies", set()) or set())
+        landed_leader_state = set((ctx.invasion_state or {}).get("landed_leaders", set()) or set())
         ashore_state = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
         unloaded = 0
         for fleet, selected, _score in actions:
@@ -3512,12 +3584,17 @@ class TacticalPlanner:
                 transport_actions.add(("landing_reserve", (col, row)))
                 for p in selected:
                     transport_actions.add(("landing_unload", _unit_key(fleet), (col, row)))
-                    transport_actions.add(("landed_army", _unit_key(p)))
-                    landed_state.add(_unit_key(p))
-                    ashore_state.add(_unit_key(p))
-                    debug_print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
+                    if p.is_army():
+                        transport_actions.add(("landed_army", _unit_key(p)))
+                        landed_state.add(_unit_key(p))
+                        ashore_state.add(_unit_key(p))
+                        debug_print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
+                    elif p.is_leader():
+                        transport_actions.add(("landed_leader", _unit_key(p)))
+                        landed_leader_state.add(_unit_key(p))
             if ctx.invasion_state is not None:
                 ctx.invasion_state["landed_armies"] = set(landed_state)
+                ctx.invasion_state["landed_leaders"] = set(landed_leader_state)
                 ctx.invasion_state["ashore_committed_armies"] = set(ashore_state)
         return unloaded > 0
 
@@ -4692,6 +4769,8 @@ class BaselineAIPlayer:
             for side, state in self._invasion_state_by_side.items():
                 for uk in state.get("landed_armies", set()) or set():
                     self._transport_actions_in_phase.add(("landed_army", uk))
+                for uk in state.get("landed_leaders", set()) or set():
+                    self._transport_actions_in_phase.add(("landed_leader", uk))
         return self._transport_actions_in_phase
 
     def _compute_transport_signature(self, ctx: AIContext) -> Tuple[Tuple[Any, ...], ...]:
@@ -4795,6 +4874,7 @@ class BaselineAIPlayer:
                 "landing_slots": [],
                 "fleet_assignments": {},
                 "landed_armies": set(),
+                "landed_leaders": set(),
                 "ashore_committed_armies": set(),
                 "committed_fleets": set(),
                 "version": 1,
@@ -4846,18 +4926,19 @@ class BaselineAIPlayer:
         state["ashore_committed_armies"] = committed.intersection(valid)
 
     def _clear_landed_flag_if_inland(self, side: str, unit):
-        if not unit.is_army():
+        if not (unit.is_army() or unit.is_leader()):
             return
         if not unit.position or None in unit.position:
             return
         state = self._get_invasion_state(side)
         key = _unit_key(unit)
-        if key not in state.get("landed_armies", set()):
+        landed_key = "landed_armies" if unit.is_army() else "landed_leaders"
+        if key not in state.get(landed_key, set()):
             return
         unit_hex = Hex.offset_to_axial(*unit.position)
         landing_slots = [Hex.offset_to_axial(int(c), int(r)) for (c, r) in state.get("landing_slots", []) or []]
         if (not self.game_state.map.is_coastal(unit_hex)) or all(unit_hex.distance_to(h) > 1 for h in landing_slots):
-            state["landed_armies"].discard(key)
+            state[landed_key].discard(key)
 
     def _log(self, msg: str):
         debug_print(f"AI[{self.game_state.active_player}] {msg}")

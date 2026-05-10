@@ -954,9 +954,11 @@ class MovementService:
             ok, reason = self._can_stack_reach_target(units, target_hex)
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
-
-            ordered_units = sorted(units, key=lambda u: 0 if u.is_army() else 1)
-            return self._execute_unit_move_batch(ordered_units, target_hex)
+            return self._move_stack_along_path(
+                units,
+                target_hex,
+                apply_interception=self.interception_service.should_check_interception(units),
+            )
 
         if self.interception_service.should_check_interception(units):
             return self._move_units_with_interception(units, target_hex)
@@ -988,6 +990,9 @@ class MovementService:
         return MoveUnitsResult(moved=moved, errors=[])
 
     def _move_units_with_interception(self, units, target_hex):
+        return self._move_stack_along_path(units, target_hex, apply_interception=True)
+
+    def _move_stack_along_path(self, units, target_hex, apply_interception: bool):
         lead = units[0]
         evaluations = {}
         lead_evaluation = None
@@ -1051,13 +1056,14 @@ class MovementService:
             if not movers_alive:
                 return MoveUnitsResult(moved=[], errors=[])
 
-            intercepted = self.interception_service.maybe_apply_interception(movers_alive, step_hex)
-            movers_alive = [u for u in units if u.is_on_map]
-            if not movers_alive:
-                return MoveUnitsResult(moved=[], errors=[])
+            if apply_interception:
+                intercepted = self.interception_service.maybe_apply_interception(movers_alive, step_hex)
+                movers_alive = [u for u in units if u.is_on_map]
+                if not movers_alive:
+                    return MoveUnitsResult(moved=[], errors=[])
 
-            if intercepted:
-                print(f"Interception resolved at {step_hex.axial_to_offset()}.")
+                if intercepted:
+                    print(f"Interception resolved at {step_hex.axial_to_offset()}.")
 
         self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=[u for u in units if u.is_on_map], errors=[])
