@@ -4265,6 +4265,7 @@ class BaselineAIPlayer:
         self._movement_history_by_side: Dict[str, Dict[Tuple[Tuple[str, int], ...], Dict[str, Any]]] = defaultdict(dict)
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
+        self._front_diag_logged_phase: Set[Tuple[Any, ...]] = set()
         # NOTE: No planning cache - board state changes after each action, so caching
         # TaskGroups/Missions across moves causes stale decisions. Rebuild fresh each time.
         self._strategic = StrategicPlanner()
@@ -4581,6 +4582,7 @@ class BaselineAIPlayer:
         t3 = perf_counter()
         missions = self._operational.build_missions(ctx, plan, groups)
         t4 = perf_counter()
+        self._log_front_diagnostics(ctx, plan)
         
         # Debug print for transport: show objective vs beachhead separation
         if plan.transport_campaign:
@@ -4764,6 +4766,108 @@ class BaselineAIPlayer:
         friendly_hexes = combat_hexes(friendly_units)
         return adjacent_counts(enemy_hexes), adjacent_counts(friendly_hexes)
 
+    def _log_front_diagnostics(self, ctx: AIContext, plan: StrategicPlan):
+        key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+            ctx.side,
+        )
+        if key in self._front_diag_logged_phase:
+            return
+        self._front_diag_logged_phase.add(key)
+
+        facts = ctx.control_facts
+        occupied = getattr(facts, "occupied", {}) or {}
+        zoc_by_side = getattr(facts, "zoc_by_side", {}) or {}
+        friendly_occ = {coord for coord, side in occupied.items() if side == ctx.side}
+        enemy_occ = {coord for coord, side in occupied.items() if side == ctx.enemy}
+        enemy_pressure = set(enemy_occ)
+        enemy_pressure.update(zoc_by_side.get(ctx.enemy, set()) or set())
+        enemy_pressure.update(set(ctx.enemy_adjacent_combat_count.keys()))
+
+        hot_front = set()
+        for q, r in friendly_occ:
+            here = Hex(q, r)
+            if (q, r) in enemy_pressure:
+                hot_front.add((q, r))
+                continue
+            if any((n.q, n.r) in enemy_pressure for n in here.neighbors()):
+                hot_front.add((q, r))
+
+        territory = ctx.overlays.get("territory")
+        target_country_ids = set((ctx.objective_graph or {}).get("offensive_target_countries", set()) or set())
+        if getattr(plan.main_objective, "country_id", None):
+            target_country_ids.add(str(plan.main_objective.country_id))
+        friendly_mobile_hexes = [
+            Hex.offset_to_axial(*unit.position)
+            for unit in ctx.friendly_units
+            if unit.is_on_map
+            and unit.position
+            and unit.position[0] is not None
+            and (unit.is_army() or unit.is_wing())
+        ]
+
+        expansion_rows: List[Tuple[float, str, int, int]] = []
+        cold_rows: List[Tuple[float, str, int, int]] = []
+        for country in ctx.game_state.countries.values():
+            cid = str(getattr(country, "id", "") or "")
+            if not cid:
+                continue
+            allegiance = getattr(country, "allegiance", None)
+            if allegiance == ctx.side:
+                continue
+            hexes = list((ctx.country_hexes_by_id or {}).get(cid, []) or [])
+            if not hexes:
+                continue
+
+            frontier_count = 0
+            seen_frontier: Set[Tuple[int, int]] = set()
+            min_dist = 999
+            for h in hexes:
+                for n in h.neighbors():
+                    ncol, nrow = n.axial_to_offset()
+                    if not ctx.game_state.is_hex_in_bounds(ncol, nrow):
+                        continue
+                    if (n.q, n.r) in friendly_occ:
+                        seen_frontier.add((n.q, n.r))
+                    elif territory and territory.values.get((ncol, nrow)) == ctx.side:
+                        seen_frontier.add((n.q, n.r))
+                for unit_hex in friendly_mobile_hexes:
+                    min_dist = min(min_dist, unit_hex.distance_to(h))
+            frontier_count = len(seen_frontier)
+
+            objective_bonus = 40 if cid in target_country_ids else 0
+            alignment = _country_alignment_for_side(country, ctx.side)
+            strength = float(getattr(country, "strength", 0) or 0)
+            distance_bonus = max(0, 12 - min_dist) * 4
+            score = frontier_count * 25 + objective_bonus + alignment * 2 + distance_bonus - strength * 0.8
+            row = (score, cid, frontier_count, min_dist)
+            if allegiance == NEUTRAL and frontier_count > 0:
+                expansion_rows.append(row)
+            elif allegiance != ctx.side:
+                cold_rows.append(row)
+
+        expansion_rows.sort(reverse=True)
+        cold_rows.sort(reverse=True)
+
+        def fmt(rows: List[Tuple[float, str, int, int]]) -> str:
+            if not rows:
+                return "-"
+            return ",".join(f"{cid}:f{frontier}:d{dist}:s{score:.0f}" for score, cid, frontier, dist in rows[:3])
+
+        amphib = "-"
+        if plan.transport_campaign or plan.beachhead_slots:
+            slots = [h.axial_to_offset() for h in (plan.beachhead_slots or [])]
+            amphib = f"slots={slots[:4]} embarked={len(ctx.embarked_ground)}"
+
+        main_id = getattr(plan.main_objective, "id", None) if plan.main_objective else None
+        debug_print(
+            f"[FRONT] side={ctx.side} posture={plan.posture} main={main_id} "
+            f"hot={len(hot_front)} enemy_pressure={len(enemy_pressure)} "
+            f"expansion={fmt(expansion_rows)} cold={fmt(cold_rows)} amphibious={amphib}"
+        )
+
     def _current_scenario_id(self) -> str:
         return str(getattr(getattr(self.game_state, "scenario_spec", None), "id", "") or "")
 
@@ -4845,6 +4949,7 @@ class BaselineAIPlayer:
             self._moved_task_groups_in_phase = set()
             self._movement_phase_plan_cache_by_side = {}
             self._neutral_front_cache_by_side = {}
+            self._front_diag_logged_phase = set()
         return self._moved_task_groups_in_phase
 
     def _ensure_transport_phase_memory(self) -> set:
