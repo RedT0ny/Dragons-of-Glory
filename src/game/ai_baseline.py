@@ -213,6 +213,7 @@ class AIContext:
     movement_logs: List[str] = field(default_factory=list)
     enemy_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
     friendly_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
+    movement_history: Optional[Dict[Tuple[Tuple[str, int], ...], Dict[str, Any]]] = None
 
 
 @dataclass
@@ -2783,6 +2784,85 @@ class TacticalPlanner:
             return True
         return False
 
+    @staticmethod
+    def _movement_history_penalty(
+        ctx: AIContext,
+        plan: StrategicPlan,
+        mission: Mission,
+        target_hex: Hex,
+    ) -> float:
+        history = ctx.movement_history or {}
+        entry = history.get(_task_group_key(mission.group))
+        if not entry:
+            return 0.0
+        if ctx.turn - int(entry.get("turn", ctx.turn) or ctx.turn) > 2:
+            return 0.0
+
+        current = mission.group.hex.axial_to_offset()
+        target = target_hex.axial_to_offset()
+        if target == current:
+            return 0.0
+
+        last_from = entry.get("from")
+        last_to = entry.get("to")
+        last_mission = entry.get("mission")
+        mission_changed = last_mission is not None and last_mission != mission.mission_type
+
+        current_threat = _overlay_value(ctx.overlays.get("threat"), current[0], current[1], 0.0)
+        target_threat = _overlay_value(ctx.overlays.get("threat"), target[0], target[1], 0.0)
+        threat_relief = max(0.0, current_threat - target_threat)
+
+        objective_gain = 0
+        if mission.target_hex is not None:
+            objective_gain = mission.group.hex.distance_to(mission.target_hex) - target_hex.distance_to(mission.target_hex)
+        main_gain = 0
+        if plan.main_objective is not None:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            main_gain = mission.group.hex.distance_to(main_hex) - target_hex.distance_to(main_hex)
+
+        justified = (
+            mission_changed
+            or threat_relief >= 1.5
+            or objective_gain > 0
+            or main_gain > 0
+            or (plan.must_act and max(objective_gain, main_gain) >= 0)
+        )
+
+        penalty = 0.0
+        if last_from == target and last_to == current and not justified:
+            penalty -= 55.0
+        elif last_from == target and last_to == current:
+            penalty -= 18.0
+
+        repeat_count = int(entry.get("repeat_count", 0) or 0)
+        if repeat_count >= 2 and {last_from, last_to} == {current, target} and not justified:
+            penalty -= 20.0 * min(3, repeat_count - 1)
+
+        return penalty
+
+    @staticmethod
+    def _record_movement_history(
+        ctx: AIContext,
+        mission: Optional[Mission],
+        action: TacticalAction,
+        from_offset: Tuple[int, int],
+        to_offset: Tuple[int, int],
+    ):
+        if ctx.movement_history is None or mission is None or from_offset == to_offset:
+            return
+        group_key = _task_group_key(action.group)
+        previous = ctx.movement_history.get(group_key, {})
+        repeat_count = 1
+        if previous.get("from") == to_offset and previous.get("to") == from_offset:
+            repeat_count = int(previous.get("repeat_count", 1) or 1) + 1
+        ctx.movement_history[group_key] = {
+            "from": from_offset,
+            "to": to_offset,
+            "mission": mission.mission_type,
+            "turn": ctx.turn,
+            "repeat_count": repeat_count,
+        }
+
     def _should_lock_group_after_action(
         self,
         ctx: AIContext,
@@ -2897,6 +2977,13 @@ class TacticalPlanner:
             unit_name = TextFormatter.format_unit_log_string(unit)
             ctx.movement_logs.append(f"movement unit={unit_name} from={prev} to={now}")
         mission = next((m for m in missions if _task_group_key(m.group) == _task_group_key(best.group)), None)
+        self._record_movement_history(
+            ctx,
+            mission,
+            best,
+            best.group.hex.axial_to_offset(),
+            target_hex.axial_to_offset(),
+        )
         if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
             ctx.moved_task_groups.add(_task_group_key(best.group))
         return True
@@ -3048,6 +3135,7 @@ class TacticalPlanner:
             score += weights["objective"] * (max(0.0, 12.0 - distance))
         score += weights["threat"] * threat
         score += weights["support"] * support
+        score += self._movement_history_penalty(ctx, plan, mission, target_hex)
         if territory_val == ctx.enemy:
             score += weights["capture"] * 6
         elif territory_val == ctx.side:
@@ -4174,6 +4262,7 @@ class BaselineAIPlayer:
         self._coastal_hexes_cache: Optional[List[Hex]] = None
         self._country_id_by_offset_cache: Optional[Dict[Tuple[int, int], str]] = None
         self._unit_last_position: Dict[Tuple[str, int], Tuple[int, int]] = {}
+        self._movement_history_by_side: Dict[str, Dict[Tuple[Tuple[str, int], ...], Dict[str, Any]]] = defaultdict(dict)
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
         # NOTE: No planning cache - board state changes after each action, so caching
@@ -4648,6 +4737,7 @@ class BaselineAIPlayer:
             embarked_ground=embarked_ground,
             enemy_adjacent_combat_count=enemy_adjacent_combat_count,
             friendly_adjacent_combat_count=friendly_adjacent_combat_count,
+            movement_history=self._movement_history_by_side[side],
         )
 
     @staticmethod
