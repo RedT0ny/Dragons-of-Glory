@@ -276,6 +276,10 @@ scenario:
           position: [4, 25]
         - unit_id: "sancrist_human_inf_3"
           position: [4, 25]
+        - unit_id: "sancrist_solamnic_inf_1"
+          position: [3, 27]
+        - unit_id: "sancrist_solamnic_inf_2"
+          position: [3, 27]
         - unit_id: "sancrist_solamnic_cav_1"
           position: [3, 26]
         - unit_id: "sancrist_solamnic_cav_2"
