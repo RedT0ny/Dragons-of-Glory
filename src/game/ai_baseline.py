@@ -214,6 +214,7 @@ class AIContext:
     enemy_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
     friendly_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
     movement_history: Optional[Dict[Tuple[Tuple[str, int], ...], Dict[str, Any]]] = None
+    front_analysis: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -1320,6 +1321,8 @@ class OperationalPlanner:
         support_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         loaded_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         empty_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
+        front_analysis = ctx.front_analysis or {}
+        primary_front_country = front_analysis.get("primary_country_id")
         is_hl_control_campaign = (
             offensive
             and ctx.side == HL
@@ -1612,6 +1615,13 @@ class OperationalPlanner:
                 [o for o in plan.objectives if getattr(o, "owner", None) != ctx.side]
                 if offensive else list(plan.objectives)
             )
+            if offensive and primary_front_country:
+                front_objectives = [
+                    o for o in objective_pool
+                    if getattr(o, "country_id", None) == primary_front_country
+                ]
+                if front_objectives:
+                    objective_pool = front_objectives
             if not objective_pool:
                 objective_pool = list(plan.objectives)
             objective, distance = self._nearest_objective(group.hex, objective_pool)
@@ -4578,6 +4588,7 @@ class BaselineAIPlayer:
             }
             debug_print(f"[TRANSPORT] phase_plan_recomputed reason={recompute_reason}")
         t2 = perf_counter()
+        ctx.front_analysis = self._build_front_analysis(ctx, plan)
         groups = self._operational.build_task_groups(ctx)
         t3 = perf_counter()
         missions = self._operational.build_missions(ctx, plan, groups)
@@ -4766,17 +4777,7 @@ class BaselineAIPlayer:
         friendly_hexes = combat_hexes(friendly_units)
         return adjacent_counts(enemy_hexes), adjacent_counts(friendly_hexes)
 
-    def _log_front_diagnostics(self, ctx: AIContext, plan: StrategicPlan):
-        key = (
-            int(getattr(self.game_state, "turn", 0) or 0),
-            getattr(self.game_state, "active_player", None),
-            getattr(self.game_state, "phase", None),
-            ctx.side,
-        )
-        if key in self._front_diag_logged_phase:
-            return
-        self._front_diag_logged_phase.add(key)
-
+    def _build_front_analysis(self, ctx: AIContext, plan: StrategicPlan) -> Dict[str, Any]:
         facts = ctx.control_facts
         occupied = getattr(facts, "occupied", {}) or {}
         zoc_by_side = getattr(facts, "zoc_by_side", {}) or {}
@@ -4808,8 +4809,8 @@ class BaselineAIPlayer:
             and (unit.is_army() or unit.is_wing())
         ]
 
-        expansion_rows: List[Tuple[float, str, int, int]] = []
-        cold_rows: List[Tuple[float, str, int, int]] = []
+        expansion_rows: List[Dict[str, Any]] = []
+        cold_rows: List[Dict[str, Any]] = []
         for country in ctx.game_state.countries.values():
             cid = str(getattr(country, "id", "") or "")
             if not cid:
@@ -4842,19 +4843,54 @@ class BaselineAIPlayer:
             strength = float(getattr(country, "strength", 0) or 0)
             distance_bonus = max(0, 12 - min_dist) * 4
             score = frontier_count * 25 + objective_bonus + alignment * 2 + distance_bonus - strength * 0.8
-            row = (score, cid, frontier_count, min_dist)
+            row = {
+                "score": score,
+                "country_id": cid,
+                "frontier_count": frontier_count,
+                "min_dist": min_dist,
+                "allegiance": allegiance,
+            }
             if allegiance == NEUTRAL and frontier_count > 0:
                 expansion_rows.append(row)
             elif allegiance != ctx.side:
                 cold_rows.append(row)
 
-        expansion_rows.sort(reverse=True)
-        cold_rows.sort(reverse=True)
+        expansion_rows.sort(key=lambda r: float(r.get("score", 0.0)), reverse=True)
+        cold_rows.sort(key=lambda r: float(r.get("score", 0.0)), reverse=True)
+        cold_front_rows = [r for r in cold_rows if int(r.get("frontier_count", 0) or 0) > 0]
+        primary = expansion_rows[0] if expansion_rows else (cold_front_rows[0] if cold_front_rows else None)
+        return {
+            "hot_count": len(hot_front),
+            "enemy_pressure_count": len(enemy_pressure),
+            "expansion": expansion_rows,
+            "cold": cold_rows,
+            "primary_country_id": primary.get("country_id") if primary else None,
+            "primary_mode": "expansion" if expansion_rows else ("cold" if cold_front_rows else None),
+        }
 
-        def fmt(rows: List[Tuple[float, str, int, int]]) -> str:
+    def _log_front_diagnostics(self, ctx: AIContext, plan: StrategicPlan):
+        key = (
+            int(getattr(self.game_state, "turn", 0) or 0),
+            getattr(self.game_state, "active_player", None),
+            getattr(self.game_state, "phase", None),
+            ctx.side,
+        )
+        if key in self._front_diag_logged_phase:
+            return
+        self._front_diag_logged_phase.add(key)
+
+        front_analysis = ctx.front_analysis or self._build_front_analysis(ctx, plan)
+        expansion_rows = list(front_analysis.get("expansion", []) or [])
+        cold_rows = list(front_analysis.get("cold", []) or [])
+
+        def fmt(rows: List[Dict[str, Any]]) -> str:
             if not rows:
                 return "-"
-            return ",".join(f"{cid}:f{frontier}:d{dist}:s{score:.0f}" for score, cid, frontier, dist in rows[:3])
+            return ",".join(
+                f"{r.get('country_id')}:f{int(r.get('frontier_count', 0) or 0)}:"
+                f"d{int(r.get('min_dist', 999) or 999)}:s{float(r.get('score', 0.0) or 0.0):.0f}"
+                for r in rows[:3]
+            )
 
         amphib = "-"
         if plan.transport_campaign or plan.beachhead_slots:
@@ -4864,7 +4900,9 @@ class BaselineAIPlayer:
         main_id = getattr(plan.main_objective, "id", None) if plan.main_objective else None
         debug_print(
             f"[FRONT] side={ctx.side} posture={plan.posture} main={main_id} "
-            f"hot={len(hot_front)} enemy_pressure={len(enemy_pressure)} "
+            f"hot={int(front_analysis.get('hot_count', 0) or 0)} "
+            f"enemy_pressure={int(front_analysis.get('enemy_pressure_count', 0) or 0)} "
+            f"primary={front_analysis.get('primary_mode')}:{front_analysis.get('primary_country_id')} "
             f"expansion={fmt(expansion_rows)} cold={fmt(cold_rows)} amphibious={amphib}"
         )
 
