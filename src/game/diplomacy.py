@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional
 
+from game.unit import Fleet, Unit
 from src.content.translator import Translator
 from src.content.constants import HL, WS
 from src.content.specs import LocType, UnitState, UnitType
@@ -245,17 +246,40 @@ class ConquestService:
         return all(loc.occupier == enemy for loc in country.locations.values())
 
     def _destroy_country_upon_conquest(self, country, conqueror: str):
+        """ Destroys all country units upon conquest, with special handling for fleets.
+        Fleets that are not on the map or in reserve are destroyed, but fleets on the map remain if they are in a
+        location that can support them. This allows for scenarios where a country is conquered but its fleets survive
+        if they are in coastal locations, while armies are always destroyed. """
         gs = self.game_state
         destroyed_count = 0
-        for unit in gs.units:
-            if unit.land != country.id:
-                continue
+        country_units = {unit for unit in gs.units if unit.land == country.id}
+        country_fleets = {fleet for fleet in country_units if fleet.is_fleet()}
 
+        # First detach conquered-country units from every carrier, including
+        # carriers that belong to other countries.
+        for carrier in gs.units:
+            passengers = getattr(carrier, "passengers", None)
+            if not passengers:
+                continue
+            for passenger in list(passengers):
+                if passenger in country_units:
+                    passenger.transport_host = None
+                    passenger.is_transported = False
+                    passengers.remove(passenger)
+
+        for fleet in country_fleets:
+            if fleet.status not in UnitState.on_map_states() and fleet.status != UnitState.DESTROYED:
+                fleet.eliminate_carrier()
+                pending_escapes = getattr(fleet, "_pending_leader_escapes", None)
+                if pending_escapes:
+                    gs._get_leader_escape_handler().handle_leader_escapes(pending_escapes, auto_resolve_ai=True)
+                    fleet._pending_leader_escapes = None
+                fleet.destroy()
+                gs.map.remove_unit_from_spatial_map(fleet)
+                destroyed_count += 1
+
+        for unit in country_units:
             if unit.is_fleet():
-                if unit.status not in UnitState.on_map_states() and unit.status != UnitState.DESTROYED:
-                    unit.destroy()
-                    gs.map.remove_unit_from_spatial_map(unit)
-                    destroyed_count += 1
                 continue
 
             if unit.status == UnitState.DESTROYED:

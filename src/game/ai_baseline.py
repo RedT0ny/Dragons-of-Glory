@@ -2975,6 +2975,100 @@ class TacticalPlanner:
             return -penalty
         return 0.0
 
+    @staticmethod
+    def _army_stack_limit_for_hex(ctx: AIContext, hex_obj: Hex) -> int:
+        loc = ctx.game_state.map.get_location(hex_obj)
+        if loc and (
+            getattr(loc, "is_capital", False)
+            or getattr(loc, "loc_type", None) in {LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value}
+        ):
+            return 3
+        return 2
+
+    @staticmethod
+    def _front_progress_gain(ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
+        current_hex = mission.group.hex
+        gains: List[float] = []
+        if mission.target_hex is not None:
+            gains.append(float(current_hex.distance_to(mission.target_hex) - target_hex.distance_to(mission.target_hex)))
+        if plan.main_objective is not None:
+            main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+            gains.append(float(current_hex.distance_to(main_hex) - target_hex.distance_to(main_hex)))
+
+        front = ctx.front_analysis or {}
+        country_id = front.get("primary_country_id")
+        country_hexes = list((ctx.country_hexes_by_id or {}).get(str(country_id), []) or []) if country_id else []
+        if country_hexes:
+            current_dist = min(current_hex.distance_to(h) for h in country_hexes)
+            target_dist = min(target_hex.distance_to(h) for h in country_hexes)
+            gains.append(float(current_dist - target_dist))
+        return max(gains, default=0.0)
+
+    @staticmethod
+    def _front_congestion_score(ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
+        if plan.offensive_side != ctx.side:
+            return 0.0
+        if mission.group.has_fleet or not mission.group.has_army:
+            return 0.0
+        if target_hex == mission.group.hex:
+            return 0.0
+        if mission.mission_type not in {
+            "main_effort_attack",
+            "support_main_effort",
+            "push_objective",
+            "stage_neutral_invasion",
+            "post_landing_push",
+            "prepare_assault",
+        }:
+            return 0.0
+
+        moving_ids = {id(u) for u in mission.group.units}
+        moving_armies = sum(1 for u in mission.group.units if u.is_army())
+        if moving_armies <= 0:
+            return 0.0
+
+        def friendly_armies_at(hex_obj: Hex, exclude_moving: bool) -> int:
+            return sum(
+                1
+                for u in ctx.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r)
+                if u.allegiance == ctx.side
+                and u.is_on_map
+                and u.is_army()
+                and (not exclude_moving or id(u) not in moving_ids)
+            )
+
+        current_hex = mission.group.hex
+        progress_gain = TacticalPlanner._front_progress_gain(ctx, plan, mission, target_hex)
+        target_existing = friendly_armies_at(target_hex, exclude_moving=True)
+        target_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, target_hex)
+        projected_target = target_existing + moving_armies
+        target_is_objective = bool(mission.target_hex is not None and target_hex == mission.target_hex)
+
+        score = 0.0
+        if projected_target > target_limit:
+            score -= 140.0 + (projected_target - target_limit) * 40.0
+        elif target_existing >= target_limit:
+            score -= 70.0
+        elif target_existing > 0 and projected_target >= target_limit and not target_is_objective:
+            score -= 22.0
+        elif target_existing > 0 and projected_target == target_limit - 1 and progress_gain <= 0:
+            score -= 10.0
+
+        current_armies = friendly_armies_at(current_hex, exclude_moving=False)
+        current_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, current_hex)
+        if current_armies >= current_limit and progress_gain > 0:
+            score += 14.0 + min(16.0, max(0, current_armies - current_limit + 1) * 6.0)
+        elif current_armies > current_limit and progress_gain >= 0:
+            score += 8.0
+
+        current_loc = ctx.game_state.map.get_location(current_hex)
+        if current_loc and getattr(current_loc, "occupier", None) == ctx.side and progress_gain > 0:
+            current_col, current_row = current_hex.axial_to_offset()
+            current_threat = _overlay_value(ctx.overlays.get("threat"), current_col, current_row, 0.0)
+            if current_threat < 1.0 and current_armies >= 2:
+                score += 10.0
+        return score
+
     def _should_lock_group_after_action(
         self,
         ctx: AIContext,
@@ -3249,6 +3343,7 @@ class TacticalPlanner:
         score += weights["support"] * support
         score += self._movement_history_penalty(ctx, plan, mission, target_hex)
         score += self._front_direction_score(ctx, plan, mission, target_hex)
+        score += self._front_congestion_score(ctx, plan, mission, target_hex)
         if territory_val == ctx.enemy:
             score += weights["capture"] * 6
         elif territory_val == ctx.side:
@@ -4615,9 +4710,15 @@ class BaselineAIPlayer:
         alignment = getattr(target_country, "alignment", (0, 0)) or (0, 0)
         ws_base = int(alignment[0] if len(alignment) > 0 else 0) + 2
         hl_base = int(alignment[1] if len(alignment) > 1 else 0) + modifier
+        force_ratio = invader_sp / max(defender_sp, 1)
+
         required_edge = 2
-        if invader_sp >= defender_sp * 2 and defender_sp > 0:
+        if force_ratio >= 2:
             required_edge = 1
+        if force_ratio >= 2.5:
+            required_edge = -10
+        # if invader_sp >= defender_sp * 2 and defender_sp > 0:
+        #     required_edge = 1
         # Require a clear Highlord edge; neutral odds are too wasteful for AI expansion.
         if hl_base < ws_base + required_edge:
             debug_print(

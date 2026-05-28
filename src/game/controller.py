@@ -1038,7 +1038,7 @@ class GameController(QObject):
             deployment_plan.message_title,
             deployment_plan.message_text
             + "\nClick 'Minimize' to interact with map.\n"
-            "Click 'End Turn' (End Phase) when finished.",
+            "Click 'Finish Deployment' when finished.",
         )
 
     def _connect_replacements_dialog_signals(self):

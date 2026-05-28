@@ -64,7 +64,7 @@
 ;4;inf;human;blodehelm;neutral;;4;0;4;steppe_inf.jpg
 ;2;cav;human;blodehelm;neutral;;4;0;8;steppe_cav.jpg
 ;4;inf;ogre;daltigoth;neutral;mountain;6;0;4;ogre_inf.jpg
-;1;fleet;human;daltigoth;neutral;;4;0;40;ogre_fleet.jpg
+;1;fleet;ogre;daltigoth;neutral;;4;0;40;ogre_fleet.jpg
 ;1;inf;pirate;saifhum;neutral;;12;0;0;pirate_inf.jpg
 ;6;fleet;pirate;saifhum;neutral;;4;0;45;pirate_fleet.jpg
 ;2;inf;undead;dargaard;neutral;;10;0;8;undead_inf.jpg
