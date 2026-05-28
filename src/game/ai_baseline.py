@@ -436,6 +436,8 @@ class StrategicPlanner:
         # Slight preference for countries that can be attacked/expanded from current position.
         if frontier_count > 0:
             score += 40.0
+            controlled_neighbors = self._friendly_controlled_neighbor_countries(ctx, country.id)
+            score += min(3, len(controlled_neighbors)) * 18.0
 
         country_strength = float(getattr(country, "strength", 0) or 0)
 
@@ -466,6 +468,23 @@ class StrategicPlanner:
         score += port_count * 4.0 + capital_count * 6.0
 
         return score
+
+    @staticmethod
+    def _friendly_controlled_neighbor_countries(ctx: AIContext, country_id: str) -> Set[str]:
+        country_hexes = list((ctx.country_hexes_by_id or {}).get(country_id, []) or [])
+        if not country_hexes:
+            return set()
+        out: Set[str] = set()
+        for h in country_hexes:
+            for n in h.neighbors():
+                col, row = n.axial_to_offset()
+                other_id = (ctx.country_id_by_offset or {}).get((col, row))
+                if not other_id or other_id == country_id:
+                    continue
+                other = ctx.game_state.countries.get(other_id)
+                if other and getattr(other, "allegiance", None) == ctx.side:
+                    out.add(str(other_id))
+        return out
 
     @staticmethod
     def _best_objective_in_country(
@@ -1291,6 +1310,7 @@ class OperationalPlanner:
         invasion_stage_hexes: List[Hex] = []
         invasion_adjacent_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         invasion_force_ready = False
+        primary_front_stage_hexes: List[Hex] = []
 
         capital_defense_groups: Dict[Hex, TaskGroup] = {}
         if _needs_capital_defense(ctx.side, plan.victory_category, plan.enemy_victory_category):
@@ -1323,6 +1343,8 @@ class OperationalPlanner:
         empty_fleet_group_keys: Set[Tuple[Tuple[str, int], ...]] = set()
         front_analysis = ctx.front_analysis or {}
         primary_front_country = front_analysis.get("primary_country_id")
+        if offensive and primary_front_country:
+            primary_front_stage_hexes = self._neutral_border_staging_hexes(ctx, str(primary_front_country))
         is_hl_control_campaign = (
             offensive
             and ctx.side == HL
@@ -1694,6 +1716,29 @@ class OperationalPlanner:
                     ))
             else:
                 if objective:
+                    if (
+                        offensive
+                        and primary_front_stage_hexes
+                        and group.has_army
+                        and not group.has_fleet
+                        and objective.owner == ctx.side
+                        and local_threat < 2.0
+                    ):
+                        target = min(
+                            primary_front_stage_hexes,
+                            key=lambda h: (
+                                group.hex.distance_to(h),
+                                h.distance_to(main_hex) if main_hex is not None else 0,
+                            ),
+                        )
+                        append_mission(Mission(
+                            group=group,
+                            mission_type="stage_neutral_invasion",
+                            target_hex=target,
+                            objective=None,
+                            priority=104 + plan.urgency_score * 20 + group.power * 0.45 - group.hex.distance_to(target),
+                        ))
+                        continue
                     if (
                         offensive
                         and main_hex is not None
@@ -2619,6 +2664,16 @@ class TacticalPlanner:
             # Always give base capital bonus if is_capital
             if getattr(loc, "is_capital", False):
                 score += 5
+            if offensive and unit.is_army() and threat < 1.0 and getattr(loc, "occupier", None) == ctx.side:
+                stack = ctx.game_state.map.get_units_in_hex(deploy_hex.q, deploy_hex.r)
+                friendly_ground_here = sum(
+                    1 for u in stack
+                    if u.allegiance == ctx.side
+                    and u.is_on_map
+                    and u.is_army()
+                )
+                if friendly_ground_here >= 2:
+                    score -= 90.0 + (friendly_ground_here - 1) * 35.0
 
         # Defensive posture: strongly reward own capital if undergarrisoned
         is_defensive = (plan.posture == "defensive" or plan.offensive_side != ctx.side)
@@ -2872,6 +2927,53 @@ class TacticalPlanner:
             "turn": ctx.turn,
             "repeat_count": repeat_count,
         }
+
+    @staticmethod
+    def _front_direction_score(ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
+        if plan.offensive_side != ctx.side:
+            return 0.0
+        if mission.group.has_fleet:
+            return 0.0
+        if not (mission.group.has_army or mission.group.has_wing):
+            return 0.0
+        if mission.mission_type in {
+            "defend",
+            "defend_capital",
+            "defend_allied_capital",
+            "defend_key_location",
+            "hold",
+            "secure_beachhead",
+            "transport_main_effort",
+            "embark_main_effort",
+            "move_to_landing_area",
+        }:
+            return 0.0
+
+        front = ctx.front_analysis or {}
+        country_id = front.get("primary_country_id")
+        if not country_id:
+            return 0.0
+        active_country = getattr(mission.objective, "country_id", None) if mission.objective is not None else None
+        if active_country is None and mission.mission_type in {"main_effort_attack", "support_main_effort"}:
+            active_country = getattr(plan.main_objective, "country_id", None) if plan.main_objective else None
+        if active_country is not None and str(active_country) != str(country_id):
+            return 0.0
+        country_hexes = list((ctx.country_hexes_by_id or {}).get(str(country_id), []) or [])
+        if not country_hexes:
+            return 0.0
+
+        current_hex = mission.group.hex
+        current_dist = min(current_hex.distance_to(h) for h in country_hexes)
+        next_dist = min(target_hex.distance_to(h) for h in country_hexes)
+        progress = current_dist - next_dist
+        if progress > 0:
+            return min(18.0, progress * 8.0)
+        if progress < 0:
+            penalty = min(20.0, abs(progress) * 7.0)
+            if mission.mission_type in {"main_effort_attack", "support_main_effort", "push_objective", "stage_neutral_invasion"}:
+                penalty += 6.0
+            return -penalty
+        return 0.0
 
     def _should_lock_group_after_action(
         self,
@@ -3146,6 +3248,7 @@ class TacticalPlanner:
         score += weights["threat"] * threat
         score += weights["support"] * support
         score += self._movement_history_penalty(ctx, plan, mission, target_hex)
+        score += self._front_direction_score(ctx, plan, mission, target_hex)
         if territory_val == ctx.enemy:
             score += weights["capture"] * 6
         elif territory_val == ctx.side:
@@ -4512,17 +4615,22 @@ class BaselineAIPlayer:
         alignment = getattr(target_country, "alignment", (0, 0)) or (0, 0)
         ws_base = int(alignment[0] if len(alignment) > 0 else 0) + 2
         hl_base = int(alignment[1] if len(alignment) > 1 else 0) + modifier
-        # If HL has higher chances to turn a country in their favor than WS as a result of an invasion, it invades
-        if hl_base <= ws_base:
+        required_edge = 2
+        if invader_sp >= defender_sp * 2 and defender_sp > 0:
+            required_edge = 1
+        # Require a clear Highlord edge; neutral odds are too wasteful for AI expansion.
+        if hl_base < ws_base + required_edge:
             debug_print(
                 f"[INVASION] Delaying invasion of {target_country_id}: "
-                f"hl_base={hl_base} ws_base={ws_base} invader_sp={invader_sp} defender_sp={defender_sp}"
+                f"hl_base={hl_base} ws_base={ws_base} required_edge={required_edge} "
+                f"invader_sp={invader_sp} defender_sp={defender_sp}"
             )
             return False
 
         debug_print(
             f"[INVASION] Triggering invasion of {target_country_id}: "
-            f"hl_base={hl_base} ws_base={ws_base} invader_sp={invader_sp} defender_sp={defender_sp}"
+            f"hl_base={hl_base} ws_base={ws_base} required_edge={required_edge} "
+            f"invader_sp={invader_sp} defender_sp={defender_sp}"
         )
         attempt_invasion(target_country_id)
         post_country = ctx.game_state.countries.get(target_country_id)
