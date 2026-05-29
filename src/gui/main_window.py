@@ -577,10 +577,16 @@ class MainWindow(QMainWindow):
         if not files:
             return
         path = files[0]
+        config_dialog = ConfigDialog(self)
+        config_dialog.set_from_config(self.controller.get_runtime_config())
+        if not config_dialog.exec():
+            return
+        config = config_dialog.get_config()
         try:
             # Prevent Enter from leaking from the file dialog into an immediate phase change.
             self._suppress_end_phase_hotkey_until = monotonic() + 0.6
             self.controller.load_game(path)
+            self.controller.apply_runtime_config(config)
             self.append_log(f"Game loaded from {path}\n")
         except Exception as exc:
             QMessageBox.critical(self, "Load Failed", str(exc))

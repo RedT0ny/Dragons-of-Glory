@@ -17,8 +17,8 @@ class IntroWindow(QMainWindow):
     """
     # Signal emitted when the user successfully starts a new game configuration
     ready_to_start = Signal(object, dict) # (ScenarioSpec, player_config)
-    # Signal emitted when a save file is selected
-    ready_to_load = Signal(str) # (file_path)
+    # Signal emitted when a save file and runtime configuration are selected
+    ready_to_load = Signal(str, dict) # (file_path, player_config)
 
     def __init__(self, translator):
         super().__init__()
@@ -142,9 +142,23 @@ class IntroWindow(QMainWindow):
         files = dialog.selectedFiles()
         if files:
             file_path = files[0]
+            config_dialog = ConfigDialog(self)
+            config_dialog.set_from_config(
+                {
+                    "highlord_ai": False,
+                    "whitestone_ai": False,
+                    "difficulty": "normal",
+                    "combat_details": "brief",
+                    "supply": "standard",
+                    "deployment": "canonical",
+                }
+            )
+            if not config_dialog.exec():
+                return
+            player_config = config_dialog.get_config()
             print(f"Loading game from: {file_path}")
-            # Emit a signal or call the controller to load the state
-            self.ready_to_load.emit(file_path)
+            print(f"Config: {player_config}")
+            self.ready_to_load.emit(file_path, player_config)
 
     def on_new_game(self):
         """Opens the Scenario Selection dialog."""
@@ -164,6 +178,7 @@ class IntroWindow(QMainWindow):
                     "difficulty": "normal",
                     "combat_details": "brief",
                     "supply": "standard",
+                    "deployment": "canonical",
                 }
             )
             if side_dialog.exec():

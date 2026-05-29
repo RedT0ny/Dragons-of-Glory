@@ -56,13 +56,10 @@ class GameApp:
         self.model.load_scenario(scenario_spec)
         self.launch_game_engine(player_config)
 
-    def load_existing_game(self, file_path):
+    def load_existing_game(self, file_path, player_config):
         """Initializes a game from a save file."""
         self.model = GameState()
         self.model.load_state(file_path)
-        # For loaded games, we'll need a way to determine AI config,
-        # for now defaulting to human vs human or reading from save
-        player_config = {"highlord_ai": False, "whitestone_ai": False}
         self.launch_game_engine(player_config)
 
     def launch_game_engine(self, player_config):
