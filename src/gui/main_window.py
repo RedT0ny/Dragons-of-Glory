@@ -14,6 +14,7 @@ from src.content.tools import debug_print
 from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
 from src.gui.new_game_dialog import NewGameDialog
+from src.gui.loading_dialog import LoadingDialog
 from src.gui.status_tab import StatusTab
 from src.gui.assets_tab import AssetsTab
 from src.gui.info_panel import InfoPanel
@@ -518,13 +519,20 @@ class MainWindow(QMainWindow):
             return
         config = config_dialog.get_config()
 
+        loading = LoadingDialog(self, "Starting New Game")
         try:
             # Prevent Enter from leaking from the dialog into an immediate phase change.
             self._suppress_end_phase_hotkey_until = monotonic() + 0.6
+            loading.step("Reading scenario data...", 20)
             self.controller.start_new_game(spec)
             self.controller.apply_runtime_config(config)
+            loading.step("Setting up turn flow...", 65)
+            loading.set_status("Setting up GUI...", 85)
             self.append_log(f"New Game {spec.id}\n")
+            self.controller.set_startup_loading_dialog(loading)
+            self.controller.resume_after_startup_loading()
         except Exception as exc:
+            loading.close()
             QMessageBox.critical(self, "New Game Failed", str(exc))
 
     def on_save_clicked(self):
@@ -582,11 +590,18 @@ class MainWindow(QMainWindow):
         if not config_dialog.exec():
             return
         config = config_dialog.get_config()
+        loading = LoadingDialog(self, "Loading Game")
         try:
             # Prevent Enter from leaking from the file dialog into an immediate phase change.
             self._suppress_end_phase_hotkey_until = monotonic() + 0.6
+            loading.step("Reading saved game...", 20)
             self.controller.load_game(path)
             self.controller.apply_runtime_config(config)
+            loading.step("Setting up turn flow...", 65)
+            loading.set_status("Setting up GUI...", 85)
             self.append_log(f"Game loaded from {path}\n")
+            self.controller.set_startup_loading_dialog(loading)
+            self.controller.resume_after_startup_loading()
         except Exception as exc:
+            loading.close()
             QMessageBox.critical(self, "Load Failed", str(exc))

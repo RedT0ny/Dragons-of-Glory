@@ -89,6 +89,7 @@ class GameController(QObject):
         self._processing_turn_tick = False
         self._replacements_refresh_queued = False
         self._pending_phase_advance_after_deployment = False
+        self._startup_loading_dialog = None
 
     def get_runtime_config(self):
         """Return current runtime configuration for saving/restoring.
@@ -329,6 +330,14 @@ class GameController(QObject):
         """Initializes the loop and immediately processes the first phase."""
         self.process_game_turn()
 
+    def set_startup_loading_dialog(self, loading_dialog):
+        """Keep startup progress visible through the first automatic turn tick."""
+        self._startup_loading_dialog = loading_dialog
+
+    def resume_after_startup_loading(self):
+        """Resume turn processing after a startup/load dialog has been handed off."""
+        self._schedule_deferred(self.process_game_turn)
+
     def start_new_game(self, scenario_spec):
         """
         Start a new scenario using the existing runtime objects.
@@ -413,6 +422,8 @@ class GameController(QObject):
                     self.movement_service.clear_movement_undo()
                     self._movement_undo_context = context
 
+            if self._startup_loading_dialog:
+                self._startup_loading_dialog.step("Processing opening phase...", 96)
             outcome = self.turn_engine.step()
             if self._handle_turn_action(outcome.action, outcome.payload):
                 # Keep turn header in sync even when step() requests human interaction
@@ -436,6 +447,14 @@ class GameController(QObject):
                 self._schedule_deferred(self.process_game_turn)
         finally:
             self._processing_turn_tick = False
+            if self._startup_loading_dialog:
+                keep_loading_for_opening_deployment = (
+                    self.game_state.phase == GamePhase.DEPLOYMENT
+                    and str(getattr(self.game_state, "deployment_mode", self.deployment)).strip().lower() == "canonical"
+                )
+                if not keep_loading_for_opening_deployment:
+                    self._startup_loading_dialog.close()
+                    self._startup_loading_dialog = None
 
     def _handle_turn_action(self, action: TurnAction, payload: dict | None) -> bool:
         """Process turn actions returned by the turn engine.
@@ -460,6 +479,8 @@ class GameController(QObject):
                 action == TurnAction.REQUEST_HUMAN_DEPLOYMENT
                 and str(getattr(self.game_state, "deployment_mode", self.deployment)).strip().lower() == "canonical"
             ):
+                if self._startup_loading_dialog:
+                    self._startup_loading_dialog.step("Applying canonical unit deployment...", 98)
                 deployed = self.game_state.apply_canonical_deployment(
                     payload.get("active_player", self.game_state.active_player)
                 )

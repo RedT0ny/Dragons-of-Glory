@@ -80,15 +80,11 @@ Design overview:
 TODO:
 
 - Add Dragon #170's Advanced Rules in "settings" - Intercept and supply done, winter turns missing.
-- Review country colors and unit icons to make them more distinguishable (Partially done).
 - I18n (Partially)
-- Simplify GameState.resolve_combat()
-- Rethink Leader drm bonus. Now it's the max, but maybe it should be the sum of all leaders in the combat?
 
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
-- Interceptions still involving ground armies. Should ignore location bonuses as well.
 - Avoid garrisons (units that cannot move) being boarded onto ships.
 - AI not deploying units created by events until next replacements phase.
 

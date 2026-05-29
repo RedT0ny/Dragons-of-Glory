@@ -5,6 +5,7 @@ from PySide6.QtCore import QTimer
 
 from src.gui.main_window import MainWindow
 from src.gui.intro_window import IntroWindow
+from src.gui.loading_dialog import LoadingDialog
 from src.game.game_state import GameState
 from src.content.audio_manager import AudioManager
 from src.content.translator import Translator
@@ -52,20 +53,38 @@ class GameApp:
 
     def start_new_game(self, scenario_spec, player_config):
         """Initializes a fresh game from a scenario spec."""
-        self.model = GameState()
-        self.model.load_scenario(scenario_spec)
-        self.launch_game_engine(player_config)
+        loading = LoadingDialog(None, "Starting New Game")
+        try:
+            loading.step("Creating game state...", 5)
+            self.model = GameState()
+            loading.step("Reading scenario data...", 25)
+            self.model.load_scenario(scenario_spec)
+            self.launch_game_engine(player_config, loading)
+        except Exception:
+            loading.close()
+            raise
 
     def load_existing_game(self, file_path, player_config):
         """Initializes a game from a save file."""
-        self.model = GameState()
-        self.model.load_state(file_path)
-        self.launch_game_engine(player_config)
+        loading = LoadingDialog(None, "Loading Game")
+        try:
+            loading.step("Creating game state...", 5)
+            self.model = GameState()
+            loading.step("Reading saved game...", 25)
+            self.model.load_state(file_path)
+            self.launch_game_engine(player_config, loading)
+        except Exception:
+            loading.close()
+            raise
 
-    def launch_game_engine(self, player_config):
+    def launch_game_engine(self, player_config, loading=None):
         """Common logic to show the main window and start the controller."""
+        if loading:
+            loading.step("Setting up game window...", 50)
         self.view = MainWindow(self.model)
 
+        if loading:
+            loading.step("Creating controller...", 70)
         self.controller = GameController(
             game_state=self.model,
             view=self.view.map_view,
@@ -77,8 +96,12 @@ class GameApp:
             deployment=player_config.get("deployment", "canonical"),
         )
 
+        if loading:
+            loading.step("Setting up GUI...", 85)
         self.view.set_controller(self.controller)
 
+        if loading:
+            loading.step("Preparing turn engine...", 95)
         self.audio_manager.play_game_playlist()
         # Quiesce intro resources before processing gameplay phases.
         # This avoids UI lifecycle races when loading directly from intro.
@@ -95,6 +118,8 @@ class GameApp:
 
         self.view.showMaximized()
         # Defer start one event-loop tick so window/layout/dialog parents are stable.
+        if loading:
+            self.controller.set_startup_loading_dialog(loading)
         QTimer.singleShot(0, self.controller.start_game)
 
     def run(self):
