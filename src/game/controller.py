@@ -484,10 +484,11 @@ class GameController(QObject):
                 deployed = self.game_state.apply_canonical_deployment(
                     payload.get("active_player", self.game_state.active_player)
                 )
-                if deployed is not None:
-                    print(f"Canonical deployment complete. Deployed: {deployed}")
-                    self.game_state.advance_phase()
-                    return False
+                if deployed is None:
+                    deployed = 0
+                print(f"Canonical deployment complete. Deployed: {deployed}")
+                self.game_state.advance_phase()
+                return False
             if not self._is_replacements_dialog_visible():
                 from src.gui.replacements_dialog import ReplacementsDialog
                 self.replacements_dialog = ReplacementsDialog(
