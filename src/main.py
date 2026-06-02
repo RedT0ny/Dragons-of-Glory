@@ -1,8 +1,10 @@
 import sys, locale
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer
 
+from src.content.config import GAME_ICON
 from src.gui.main_window import MainWindow
 from src.gui.intro_window import IntroWindow
 from src.gui.loading_dialog import LoadingDialog
@@ -49,6 +51,7 @@ class GameApp:
 
         # Create the application instance
         app = QApplication(sys.argv)
+        app.setWindowIcon(QIcon(GAME_ICON))
         return app
 
     def start_new_game(self, scenario_spec, player_config):

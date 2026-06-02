@@ -1,9 +1,12 @@
 from collections import deque
+import os
 from typing import Optional, Tuple
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
+from src.content.config import ICONS_DIR
 from src.content.tools import TextFormatter
 
 _PENDING_COMBAT_DIALOGS = deque()
@@ -76,11 +79,18 @@ def show_combat_result_popup(
     message = "\n".join(lines)
 
     highlight_coords = _to_offset_coords(target_hex)
-    _enqueue_combat_popup(title, message, highlight_coords)
+    icon_name = "intercept.svg" if context == "interception" else "battle.svg"
+    icon_path = os.path.join(ICONS_DIR, icon_name)
+    _enqueue_combat_popup(title, message, highlight_coords, icon_path)
 
-def _enqueue_combat_popup(title: str, message: str, highlight_coords: Optional[Tuple[int, int]] = None):
+def _enqueue_combat_popup(
+    title: str,
+    message: str,
+    highlight_coords: Optional[Tuple[int, int]] = None,
+    icon_path: Optional[str] = None,
+):
     # Store coords in the queue so highlight + centering can be applied at display time.
-    _PENDING_COMBAT_DIALOGS.append((title, message, highlight_coords))
+    _PENDING_COMBAT_DIALOGS.append((title, message, highlight_coords, icon_path))
     QTimer.singleShot(0, _drain_combat_popup_queue)
 
 def _drain_combat_popup_queue():
@@ -96,7 +106,7 @@ def _drain_combat_popup_queue():
     map_view = getattr(parent, "map_view", None) if parent else None
     had_map_view = bool(map_view and hasattr(map_view, "highlight_movement_range"))
 
-    title, message, highlight_coords = _PENDING_COMBAT_DIALOGS.popleft()
+    title, message, highlight_coords, icon_path = _PENDING_COMBAT_DIALOGS.popleft()
 
     try:
         # Apply highlight (red warning channel) and center the view while the dialog is visible.
@@ -125,7 +135,14 @@ def _drain_combat_popup_queue():
 
             QApplication.processEvents()
 
-        QMessageBox.information(parent, title, message)
+        dialog = QMessageBox(parent)
+        dialog.setIcon(QMessageBox.Icon.Information)
+        dialog.setWindowTitle(title)
+        dialog.setText(message)
+        dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+        if icon_path:
+            dialog.setWindowIcon(QIcon(icon_path))
+        dialog.exec()
 
     finally:
         # Always clear highlight after dialog closes.

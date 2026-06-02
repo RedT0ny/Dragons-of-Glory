@@ -6,7 +6,7 @@ import os
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "Beta 0.42.0"
+APP_VERSION = "Beta 0.42.1"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,6 +50,7 @@ X_OFFSET = 244
 Y_OFFSET = 198
 UNIT_SIZE = HEX_RADIUS * 0.45
 UNIT_ICON_SIZE = 60
+GAME_ICON = os.path.join(ICONS_DIR, "DOG_icon.ico")
 COVER_PICTURE = os.path.join(IMAGES_DIR, "scenario.jpg")
 INTRO_VIDEO = os.path.join(VIDEOS_DIR, "intro.mp4")
 MAP_IMAGE_PATH = os.path.join(IMAGES_DIR, "map.jpg")
