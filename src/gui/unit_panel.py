@@ -1,7 +1,7 @@
 from collections import defaultdict
 from types import SimpleNamespace
 from time import perf_counter
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTableWidget,
                                QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle, QGraphicsScene)
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
@@ -443,7 +443,7 @@ class AllegiancePanel(QWidget):
     unit_selected = Signal(object) # Emits the selected unit (or None)
     unit_double_clicked = Signal(object) # Emits the double-clicked unit
 
-    def __init__(self, game_state, allegiance, columns, parent=None, title=None):
+    def __init__(self, game_state, allegiance, columns, parent=None, title=None, unit_filter: Optional[Callable] = None):
         """Initialize the allegiance panel with game state, allegiance, and columns.
         
         Args:
@@ -452,11 +452,13 @@ class AllegiancePanel(QWidget):
             columns: List of UnitColumn enums for the unit tables.
             parent: Optional parent widget.
             title: Optional title for the panel; defaults to allegiance.
+            unit_filter: Optional predicate used to exclude units from this panel.
         """
         super().__init__(parent)
         self.game_state = game_state
         self.allegiance = allegiance
         self.columns = columns
+        self.unit_filter = unit_filter
         self.base_title = title or str(allegiance)
         self.title_label = None
         self.tables = [] # Keep track of created tables
@@ -550,10 +552,20 @@ class AllegiancePanel(QWidget):
         if units_by_land is None:
             units_by_land = defaultdict(list)
             for u in self.game_state.units:
+                if self.unit_filter and not self.unit_filter(u):
+                    continue
                 units_by_land[getattr(u, "land", None)].append(u)
+        elif self.unit_filter:
+            filtered_units_by_land = defaultdict(list)
+            for land, units in units_by_land.items():
+                filtered_units_by_land[land].extend(u for u in units if self.unit_filter(u))
+            units_by_land = filtered_units_by_land
+
         allegiance_units = (preindexed or {}).get("units_by_allegiance", {}).get(self.allegiance) if preindexed else None
         if allegiance_units is None:
             allegiance_units = [u for u in self.game_state.units if u.allegiance == self.allegiance]
+        if self.unit_filter:
+            allegiance_units = [u for u in allegiance_units if self.unit_filter(u)]
 
         for country in countries:
             units = list(units_by_land.get(country.id, []))

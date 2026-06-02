@@ -9,7 +9,7 @@ from PySide6.QtGui import QFontDatabase, QFont, QPixmap
 
 from src.content.tools import TextFormatter, debug_print
 from src.content.translator import Translator
-from src.content.specs import AssetType, UnitColumn
+from src.content.specs import AssetType, UnitColumn, UnitState
 from src.gui.unit_panel import AllegiancePanel
 from src.content.config import FONTS_DIR, LIBRA_FONT, IMAGES_DIR
 
@@ -296,7 +296,13 @@ class AssetsTab(QWidget):
                 UnitColumn.POS,
                 UnitColumn.EQUIPMENT
             ]
-            self.unit_panel = AllegiancePanel(self.game_state, player.allegiance, columns, title="Player Units")
+            self.unit_panel = AllegiancePanel(
+                self.game_state,
+                player.allegiance,
+                columns,
+                title="Player Units",
+                unit_filter=lambda unit: getattr(unit, "status", None) != UnitState.DESTROYED,
+            )
             self.unit_panel.unit_selected.connect(self.on_unit_selected)
             self.unit_panel.unit_double_clicked.connect(self.unit_double_clicked.emit)
             self.panel_layout.addWidget(self.unit_panel)
