@@ -3995,6 +3995,7 @@ class TacticalPlanner:
         For HL: same-flight Highlord preferred, Emperor fallback.
         For WS: equivalent valid commander logic.
         """
+        boarded_any = False
         wings = sorted(
             [
                 u for u in ctx.friendly_units
@@ -4021,8 +4022,8 @@ class TacticalPlanner:
                 continue
             commander = self._select_dragon_commander_for_wing(ctx, wing, leaders)
             if commander and ctx.movement_service.board_unit(wing, commander):
-                return True
-        return False
+                boarded_any = True
+        return boarded_any
 
     @staticmethod
     def _wing_has_valid_dragon_commander(ctx: AIContext, wing) -> bool:

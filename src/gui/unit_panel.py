@@ -11,7 +11,7 @@ from src.content.tools import debug_print
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
-from src.content.tools import caption_id, TextFormatter
+from src.content.tools import TextFormatter
 from src.gui.map_items import UnitCounter
 
 class CheckBoxHeader(QHeaderView):
