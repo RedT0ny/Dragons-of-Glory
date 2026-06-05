@@ -3,7 +3,7 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 
-from game.unit import Unit
+from src.game.unit import Unit
 from src.content.tools import TextFormatter
 from src.content.translator import Translator
 from src.game.combat import CombatService
