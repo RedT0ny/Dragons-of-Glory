@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional
 
-from game.unit import Fleet, Unit
+from src.game.unit import Fleet, Unit
 from src.content.translator import Translator
 from src.content.constants import HL, WS
 from src.content.specs import LocType, UnitState, UnitType
