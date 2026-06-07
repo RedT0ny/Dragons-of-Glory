@@ -960,6 +960,9 @@ class MovementService:
                 apply_interception=self.interception_service.should_check_interception(units),
             )
 
+        if not self.game_state.map.can_stack_move_to(units, target_hex):
+            return MoveUnitsResult(moved=[], errors=["Stacking limit or enemy presence at target hex."])
+
         if self.interception_service.should_check_interception(units):
             return self._move_units_with_interception(units, target_hex)
 

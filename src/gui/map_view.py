@@ -277,7 +277,7 @@ class AnsalonMapView(QGraphicsView):
             # Note: Let controller handle unit state updates and model sync
 
     def handle_depleted_stack_click(self, scene_pos):
-        # View emits clicked stack; controller decides merge legality/rules.
+        """ View emits clicked stack; controller decides merge legality/rules. """
         items = self.scene.items(scene_pos)
         clicked_units = []
         for item in items:

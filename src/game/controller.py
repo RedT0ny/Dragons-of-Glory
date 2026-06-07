@@ -1116,6 +1116,8 @@ class GameController(QObject):
 
             self.view.sync_with_model()
             self._refresh_info_panel()
+            if self._is_replacements_dialog_visible():
+                self.replacements_dialog.refresh()
 
     def on_asset_assign_requested(self, asset, unit):
         """Handle request to assign an asset to a unit (human player only).

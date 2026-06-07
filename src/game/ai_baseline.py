@@ -1254,7 +1254,9 @@ class OperationalPlanner:
                 for army_chunk in army_chunks:
                     role_groups.append((army_chunk, True, False, False))
             if air_units:
-                role_groups.append((air_units, False, True, False))
+                air_chunks = [air_units[i:i + 2] for i in range(0, len(air_units), 2)]
+                for air_chunk in air_chunks:
+                    role_groups.append((air_chunk, False, True, False))
             for fleet in fleets:
                 role_groups.append(([fleet], False, False, True))
 
@@ -3008,7 +3010,7 @@ class TacticalPlanner:
     def _front_congestion_score(ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
         if plan.offensive_side != ctx.side:
             return 0.0
-        if mission.group.has_fleet or not mission.group.has_army:
+        if mission.group.has_fleet or (not mission.group.has_army and not mission.group.has_wing):
             return 0.0
         if target_hex == mission.group.hex:
             return 0.0
@@ -3024,49 +3026,72 @@ class TacticalPlanner:
 
         moving_ids = {id(u) for u in mission.group.units}
         moving_armies = sum(1 for u in mission.group.units if u.is_army())
-        if moving_armies <= 0:
+        moving_wings = sum(1 for u in mission.group.units if u.is_wing())
+        if moving_armies <= 0 and moving_wings <= 0:
             return 0.0
 
-        def friendly_armies_at(hex_obj: Hex, exclude_moving: bool) -> int:
+        def friendly_at(hex_obj: Hex, unit_filter, exclude_moving: bool) -> int:
             return sum(
                 1
                 for u in ctx.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r)
                 if u.allegiance == ctx.side
                 and u.is_on_map
-                and u.is_army()
+                and unit_filter(u)
                 and (not exclude_moving or id(u) not in moving_ids)
             )
 
         current_hex = mission.group.hex
         progress_gain = TacticalPlanner._front_progress_gain(ctx, plan, mission, target_hex)
-        target_existing = friendly_armies_at(target_hex, exclude_moving=True)
-        target_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, target_hex)
-        projected_target = target_existing + moving_armies
-        target_is_objective = bool(mission.target_hex is not None and target_hex == mission.target_hex)
 
         score = 0.0
-        if projected_target > target_limit:
-            score -= 140.0 + (projected_target - target_limit) * 40.0
-        elif target_existing >= target_limit:
-            score -= 70.0
-        elif target_existing > 0 and projected_target >= target_limit and not target_is_objective:
-            score -= 22.0
-        elif target_existing > 0 and projected_target == target_limit - 1 and progress_gain <= 0:
-            score -= 10.0
 
-        current_armies = friendly_armies_at(current_hex, exclude_moving=False)
-        current_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, current_hex)
-        if current_armies >= current_limit and progress_gain > 0:
-            score += 14.0 + min(16.0, max(0, current_armies - current_limit + 1) * 6.0)
-        elif current_armies > current_limit and progress_gain >= 0:
-            score += 8.0
+        # Army congestion
+        if moving_armies > 0:
+            target_existing = friendly_at(target_hex, lambda u: u.is_army(), exclude_moving=True)
+            target_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, target_hex)
+            projected_target = target_existing + moving_armies
+            target_is_objective = bool(mission.target_hex is not None and target_hex == mission.target_hex)
 
-        current_loc = ctx.game_state.map.get_location(current_hex)
-        if current_loc and getattr(current_loc, "occupier", None) == ctx.side and progress_gain > 0:
-            current_col, current_row = current_hex.axial_to_offset()
-            current_threat = _overlay_value(ctx.overlays.get("threat"), current_col, current_row, 0.0)
-            if current_threat < 1.0 and current_armies >= 2:
-                score += 10.0
+            if projected_target > target_limit:
+                score -= 140.0 + (projected_target - target_limit) * 40.0
+            elif target_existing >= target_limit:
+                score -= 70.0
+            elif target_existing > 0 and projected_target >= target_limit and not target_is_objective:
+                score -= 22.0
+            elif target_existing > 0 and projected_target == target_limit - 1 and progress_gain <= 0:
+                score -= 10.0
+
+            current_armies = friendly_at(current_hex, lambda u: u.is_army(), exclude_moving=False)
+            current_limit = TacticalPlanner._army_stack_limit_for_hex(ctx, current_hex)
+            if current_armies >= current_limit and progress_gain > 0:
+                score += 14.0 + min(16.0, max(0, current_armies - current_limit + 1) * 6.0)
+            elif current_armies > current_limit and progress_gain >= 0:
+                score += 8.0
+
+            current_loc = ctx.game_state.map.get_location(current_hex)
+            if current_loc and getattr(current_loc, "occupier", None) == ctx.side and progress_gain > 0:
+                current_col, current_row = current_hex.axial_to_offset()
+                current_threat = _overlay_value(ctx.overlays.get("threat"), current_col, current_row, 0.0)
+                if current_threat < 1.0 and current_armies >= 2:
+                    score += 10.0
+
+        # Wing congestion (dragons)
+        if moving_wings > 0:
+            wing_limit = 2
+            target_existing = friendly_at(target_hex, lambda u: u.is_wing(), exclude_moving=True)
+            projected_target = target_existing + moving_wings
+
+            if projected_target > wing_limit:
+                score -= 100.0 + (projected_target - wing_limit) * 30.0
+            elif target_existing >= wing_limit:
+                score -= 50.0
+
+            current_wings = friendly_at(current_hex, lambda u: u.is_wing(), exclude_moving=False)
+            if current_wings >= wing_limit and progress_gain > 0:
+                score += 10.0 + max(0, current_wings - wing_limit) * 5.0
+            elif current_wings > wing_limit:
+                score += 5.0
+
         return score
 
     def _should_lock_group_after_action(
@@ -3088,6 +3113,7 @@ class TacticalPlanner:
         transport_ms = (perf_counter() - transport_t0) * 1000.0
         if transport_executed:
             ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
+            self._reachable_cache.clear()
             return True
 
         eval_start = perf_counter()
@@ -3192,6 +3218,7 @@ class TacticalPlanner:
         )
         if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
             ctx.moved_task_groups.add(_task_group_key(best.group))
+        self._reachable_cache.clear()
         return True
 
     def _best_move_for_mission(

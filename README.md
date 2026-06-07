@@ -81,6 +81,7 @@ TODO:
 
 - Add Dragon #170's Advanced Rules in "settings" - Intercept and supply done, winter turns missing.
 - I18n (Partially)
+- YAML viewer to show lists of events and artifacts (for the help menu/encyclopedia).
 
 TODO BUGFIX:
 
