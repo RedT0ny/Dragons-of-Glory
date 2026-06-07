@@ -803,7 +803,7 @@ nergoth:
   capital_id: gwynned
   color: "#C0C0C0"
   allegiance: neutral
-  alignment: [3, -2]
+  alignment: [5, -2]
   strength: 30
   locations:
     gwynned: {loc_type: port, coords: [11, 21]}
