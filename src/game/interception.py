@@ -108,7 +108,7 @@ class InterceptionService:
         previous_active_player = self.game_state.active_player
         self.game_state.active_player = interceptors[0].allegiance
         try:
-            live_interceptors = [u for u in interceptors if u.is_on_map]
+            live_interceptors = [u for u in interceptors if u.is_on_map and (u.is_wing() or u.is_fleet())]
             if live_interceptors:
                 air_defenders = [u for u in moving_units if u.is_on_map and (u.is_wing() or u.is_fleet())]
                 if not air_defenders:
@@ -126,9 +126,11 @@ class InterceptionService:
                     )
                     return
 
+                moved_interceptors = []
                 for interceptor in interceptors:
-                    if interceptor.is_on_map:
+                    if interceptor.is_on_map and (interceptor.is_wing() or interceptor.is_fleet()):
                         self.movement_service.relocate_unit_on_board(interceptor, adjacent_hex)
+                        moved_interceptors.append(interceptor)
 
                 resolution = self.game_state.combat_service.resolve_combat(
                     live_interceptors,
@@ -147,7 +149,7 @@ class InterceptionService:
         finally:
             self.game_state.active_player = previous_active_player
 
-        for interceptor in interceptors:
+        for interceptor in moved_interceptors:
             if not interceptor.is_on_map:
                 continue
             self.movement_service.relocate_unit_on_board(interceptor, origin_hex)
@@ -172,8 +174,15 @@ class InterceptionService:
 
             feasible = True
             max_cost = 0
-            for interceptor in interceptors:
-                if not self.game_state.map.can_unit_land_on_hex(interceptor, neighbor):
+            combat_interceptors = [u for u in interceptors if u.is_wing() or u.is_fleet()]
+            if not combat_interceptors:
+                continue
+            for interceptor in combat_interceptors:
+                if interceptor.is_fleet():
+                    if not self.game_state.map._fleet_can_enter_hex(interceptor, neighbor):
+                        feasible = False
+                        break
+                elif not self.game_state.map.can_unit_land_on_hex(interceptor, neighbor):
                     feasible = False
                     break
                 if interceptor.is_fleet():

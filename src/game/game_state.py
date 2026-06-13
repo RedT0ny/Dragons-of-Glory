@@ -185,9 +185,11 @@ class GameState:
 
     def can_units_attack_target_hex(self, attackers, target_hex) -> bool:
         """
-        Shared land-combat hexside legality check.
+        Shared land/naval combat hexside legality check.
         Returns False when any relevant attacking combat unit cannot legally
         project/attack across its own attacker->target hexside.
+        - Control units (armies/wings/citadels) must be able to project across the hexside.
+        - Fleets are always legal if adjacent (they rely on river-hexside routing instead).
         """
         if not target_hex:
             return False
@@ -195,7 +197,7 @@ class GameState:
         relevant = [
             u for u in (attackers or [])
             if u.is_on_map
-            and u.is_control_unit()
+            and (u.is_control_unit() or u.is_fleet())
             and getattr(u, "transport_host", None) is None
         ]
         if not relevant:
@@ -207,7 +209,7 @@ class GameState:
             from_hex = Hex.offset_to_axial(*unit.position)
             if target_hex not in from_hex.neighbors():
                 return False
-            if not self.can_unit_project_across_hexside(unit, from_hex, target_hex):
+            if not unit.is_fleet() and not self.can_unit_project_across_hexside(unit, from_hex, target_hex):
                 return False
         return True
 
