@@ -93,6 +93,9 @@ countries:
   nergoth:
     name: "Northern Ergoth"
     adjective: "Northern Ergothian"
+  nevermind:
+    name: "Mount Nevermind"
+    adjective: "Nevermind"
   nightlund:
     name: "Nightlund"
     adjective: "Nightlund"

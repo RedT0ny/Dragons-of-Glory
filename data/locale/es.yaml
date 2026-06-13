@@ -93,6 +93,9 @@ countries:
   nergoth:
     name: "Ergoth del Norte"
     adjective: "Norergothiano"
+  nevermind:
+    name: "Monte Noimporta"
+    adjective: "Noimporta"
   nightlund:
     name: "Nightlund"
     adjective: "Nightlund"

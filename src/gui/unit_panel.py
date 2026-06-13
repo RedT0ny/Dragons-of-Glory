@@ -7,12 +7,15 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTable
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
+from src.content.translator import Translator
 from src.content.tools import debug_print
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
 from src.content.specs import UnitColumn
 from src.content.tools import TextFormatter
 from src.gui.map_items import UnitCounter
+
+translator = Translator()
 
 class CheckBoxHeader(QHeaderView):
     """A custom header with a checkbox in the first column."""
@@ -571,18 +574,18 @@ class AllegiancePanel(QWidget):
             units = list(units_by_land.get(country.id, []))
             processed_units.update(units)
             groups_data.append((
-                country.id.title(),
+                translator.get_country_name(country.id),
                 units,
-                "font-weight: bold; background-color: #EEE; border: 1px solid #CCC;",
+                "font-weight: bold; background-color: rgba(128, 128, 128, 0.15); border: 1px solid #888;",
             ))
 
         remaining_units = [u for u in allegiance_units if u not in processed_units]
         if remaining_units:
             grouped = {}
             for unit in remaining_units:
-                land_val = str(unit.land).lower() if unit.land else ""
-                if land_val in DRAGONFLIGHTS:
-                    group_name = f"{land_val.title()} Dragonflight"
+                df = getattr(getattr(unit, "spec", None), "dragonflight", None)
+                if df and df.lower() in DRAGONFLIGHTS:
+                    group_name = translator.get_country_name(df.lower())
                 else:
                     group_name = "Others / Independent"
                 grouped.setdefault(group_name, []).append(unit)
@@ -591,7 +594,7 @@ class AllegiancePanel(QWidget):
                 groups_data.append((
                     name,
                     grouped[name],
-                    "font-weight: bold; background-color: #E0E0E0; border: 1px dashed #999;",
+                    "font-weight: bold; background-color: rgba(128, 128, 128, 0.10); border: 1px dashed #888;",
                 ))
         return groups_data
 

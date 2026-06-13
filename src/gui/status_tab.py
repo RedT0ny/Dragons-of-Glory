@@ -40,6 +40,9 @@ class StatusTab(QWidget):
         self.refresh()
 
     def _country_counts_by_allegiance(self):
+        """
+        Returns a dictionary with counts of countries for each allegiance.
+        """
         counts = {WS: 0, HL: 0, NEUTRAL: 0}
         for country in self.game_state.countries.values():
             allegiance = country.allegiance
@@ -48,6 +51,9 @@ class StatusTab(QWidget):
         return counts
 
     def _build_preindex(self):
+        """
+        Builds pre-indexed data structures for efficient lookups in panels (reduces loading time).
+        """
         units_by_land = defaultdict(list)
         units_by_allegiance = {WS: [], HL: [], NEUTRAL: []}
         for u in self.game_state.units:
