@@ -1347,6 +1347,10 @@ class CombatService:
         if target_hex and not self.game_state.can_units_attack_target_hex(attackers, target_hex):
             return False
 
+        # Fleets can only attack stacks that contain at least one fleet.
+        if all(u.is_fleet() for u in attackers) and not any(u.is_fleet() for u in defenders):
+            return False
+
         defenders_have_dragons = any(u.is_on_map and u.is_dragon() for u in defenders)
         for unit in attackers:
             if not unit.is_combat_unit():
