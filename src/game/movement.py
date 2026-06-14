@@ -719,8 +719,9 @@ class MovementService:
 
     # --- Transport State ---
     def board_unit(self, carrier, unit):
-        if getattr(carrier, "moved_this_turn", False) or getattr(unit, "moved_this_turn", False):
-            return False
+        if ((getattr(carrier, "moved_this_turn", False) or getattr(unit, "moved_this_turn", False))
+                and not carrier.is_fleet()):
+                return False
 
         if not carrier.can_carry(unit):
             return False
