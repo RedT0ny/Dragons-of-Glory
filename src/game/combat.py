@@ -310,13 +310,14 @@ class CombatResolver:
         defender_location = self._get_defender_location()
         defender_loc_type = self._normalize_loc_type(defender_location)
 
-        # LEADERS
+        # LEADERS: + Tactical rating of attacking leaders - Tactical rating of defending leaders.
         atk_leader = sum( u.tactical_rating for u in self.attackers if u.is_leader() )
         def_leader = sum( u.tactical_rating for u in self.defenders if u.is_leader() )
         add_part("attacker_leader", atk_leader)
         add_part("defender_leader", -def_leader)
 
-        # DRAGONS (Dragon wings only)
+        # DRAGONS: + Total combat rating of attacking dragons - total combat rating of defending dragons.
+        # Dragon Slayer artifacts in the defender side negate this bonus
         attacker_dragon_bonus = sum(
             u.combat_rating
             for u in self.attackers
@@ -363,12 +364,12 @@ class CombatResolver:
         elif defender_loc_type == LocType.UNDERCITY.value:
             add_part("location_undercity", -10)
 
-        # CROSSINGS: apply exactly one crossing DRM (the single worst among participating ground attackers)
+        # CROSSINGS: Apply exactly one crossing DRM (the single worst among participating ground attackers)
         crossing_label, crossing_drm = self._resolve_worst_attacker_crossing(defender_hex)
         if crossing_label and crossing_drm:
             add_part(crossing_label, crossing_drm)
 
-        # TERRAIN AFFINITY
+        # TERRAIN AFFINITY: +/- 1 if all attacking/defending units have terrain affinity
         add_part("attacker_terrain_affinity", self._count_attacker_terrain_affinity_bonus())
         add_part("defender_terrain_affinity", -self._count_defender_terrain_affinity_bonus(defender_hex))
 
@@ -632,9 +633,26 @@ class CombatResolver:
 
 class NavalCombatResolver:
     """
-    Resolves Rule 8 fleet-to-fleet combat.
+    Resolves Rule 8 fleet-to-fleet naval combat.
+
+    Multi-round simultaneous-fire engagement between opposing fleets. Each round,
+    every operational fleet rolls to hit (d10 <= fleet attack rating). Hits are
+    applied one by one: ACTIVE -> DEPLETED -> RESERVE. Sides may withdraw
+    between rounds via an optional callback.
+
+    Output format (result_code): "N/NS" = attacker survives / defender eliminated,
+    "NS/N" = attacker eliminated / defender survives, "NS/NS" = mutual destruction,
+    "-/-" = both still present but combat ended (e.g. withdrawal).
     """
     def __init__(self, game_state, attackers, defenders, roll_d10_fn=None, roll_d6_fn=None):
+        """
+        Args:
+            game_state: GameState instance for damage/movement queries.
+            attackers: All units participating on the attacking side (filtered to fleets).
+            defenders: All units participating on the defending side (filtered to fleets).
+            roll_d10_fn: Optional d10 source (default random.randint(1,10)).
+            roll_d6_fn: Optional d6 source (default random.randint(1,6)), forwarded to LeaderEscapeHandler.
+        """
         self.game_state = game_state
         self.attackers = [u for u in attackers if u.is_fleet() and u.is_on_map]
         self.defenders = [u for u in defenders if u.is_fleet() and u.is_on_map]
@@ -643,6 +661,23 @@ class NavalCombatResolver:
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
 
     def resolve(self, withdraw_decider=None):
+        """
+        Run naval combat rounds until one side is eliminated or a withdrawal occurs.
+
+        Each round:
+          1. Both sides simultaneously roll to hit (d10 <= fleet_attack_rating).
+          2. Hits are applied: ACTIVE -> DEPLETED, DEPLETED -> RESERVE.
+          3. Dead ships are pruned from combat lists.
+          4. Optional withdraw_decider callbacks allow a side to break off.
+
+        Args:
+            withdraw_decider: Optional callable(side_allegiance, rounds) -> bool.
+                Return True to withdraw that side from combat.
+
+        Returns:
+            dict with keys: result (str), rounds (int),
+            attacker_survivors (int), defender_survivors (int).
+        """
         rounds = 0
         while self.attackers and self.defenders:
             rounds += 1
@@ -651,6 +686,7 @@ class NavalCombatResolver:
             if not atk_round or not def_round:
                 break
 
+            # Simultaneous fire: collect all hits first, then apply
             hits = {}
             for ship in atk_round:
                 target = self._select_target(ship, def_round)
@@ -696,11 +732,16 @@ class NavalCombatResolver:
         }
 
     def _roll_hits(self, fleet):
+        """Roll 1d10; hit if <= fleet_attack_rating. True = hit scored."""
         threshold = self._fleet_attack_rating(fleet)
         roll = self._roll_d10()
         return roll <= threshold
 
     def _fleet_attack_rating(self, fleet):
+        """
+        Effective attack rating = fleet's base combat_rating + highest tactical_rating
+        among embarked leaders (if any).
+        """
         base = fleet.combat_rating
         passengers = list(getattr(fleet, "passengers", []) or [])
         leader_bonus = 0
@@ -711,6 +752,15 @@ class NavalCombatResolver:
         return base + leader_bonus
 
     def _select_target(self, attacker, candidates):
+        """
+        Pick the next target from candidate fleets.
+
+        Priority:
+          1. DEPLETED ships (finish them off first).
+          2. Lowest combat_rating (weakest first).
+
+        Returns a single Unit or None if no live candidates remain.
+        """
         live = [u for u in candidates if u.is_on_map]
         if not live:
             return None
@@ -718,6 +768,12 @@ class NavalCombatResolver:
         return live[0]
 
     def _withdraw_all(self, side_fleets):
+        """
+        Move every fleet in the given side to the first valid neighbor hex
+        (only one step, following river navigation rules).
+
+        Used when a player decides to break off naval combat.
+        """
         for fleet in list(side_fleets):
             if not fleet.is_on_map or not fleet.position or None in fleet.position:
                 continue
@@ -732,10 +788,20 @@ class NavalCombatResolver:
             fleet.river_hexside = next_side
 
     def _sync_combat_lists(self):
+        """Remove destroyed/off-map fleets from the attacker and defender lists."""
         self.attackers = [u for u in self.attackers if u.is_on_map]
         self.defenders = [u for u in self.defenders if u.is_on_map]
 
     def _result_code(self):
+        """
+        Determine the combat result code.
+
+        Returns:
+            "N/NS"  - attacker survives, defender destroyed
+            "NS/N"  - attacker destroyed, defender survives
+            "NS/NS" - mutual destruction
+            "-/-"   - both sides still present (e.g. both withdrew)
+        """
         if self.attackers and not self.defenders:
             return "N/NS"
         if self.defenders and not self.attackers:
@@ -745,11 +811,13 @@ class NavalCombatResolver:
         return "-/-"
 
     def _attacker_side(self):
+        """Return the allegiance string of the first attacker fleet, or None."""
         if self.attackers:
             return self.attackers[0].allegiance
         return None
 
     def _defender_side(self):
+        """Return the allegiance string of the first defender fleet, or None."""
         if self.defenders:
             return self.defenders[0].allegiance
         return None
