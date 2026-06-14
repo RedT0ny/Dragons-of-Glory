@@ -3,6 +3,7 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
+from src.gui.message_dialog import show_info_dialog
 from src.content.tools import TextFormatter
 from src.content.translator import Translator
 from src.content.constants import HL, WS
@@ -563,12 +564,12 @@ class GameController(QObject):
         winner = (self.game_state.winner or "draw").title()
         reason = self.game_state.victory_reason or "victory_conditions"
         points = getattr(self.game_state, "victory_points", {})
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(
-            self.view.window(),
+        from src.gui.message_dialog import show_info_dialog
+        show_info_dialog(
             "Game Over",
             f"Winner: {winner}\nReason: {reason}\n"
             f"Highlord points: {points.get(HL, 0)}\nWhitestone points: {points.get(WS, 0)}",
+            parent=self.view.window(),
         )
 
     def connect_map_view_signals(self):
@@ -664,11 +665,12 @@ class GameController(QObject):
                 main_window.assets_tab.select_asset_by_id(asset_id)
 
         # 2. Show Popup
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(main_window, "New Artifact",
-                                "You have received an artifact!\n\n"
-                                "Assign it to an unequipped unit using the panel.\n"
-                                "Click 'End Turn' (End Phase) when ready.")
+        from src.gui.message_dialog import show_info_dialog
+        show_info_dialog("New Artifact",
+                         "You have received an artifact!\n\n"
+                         "Assign it to an unequipped unit using the panel.\n"
+                         "Click 'End Turn' (End Phase) when ready.",
+                         parent=main_window)
 
         # 3. Stop Timer (if it was running)
         self.ai_timer.stop()
@@ -796,25 +798,15 @@ class GameController(QObject):
                 pass
             col, row = hex_obj.axial_to_offset()
             if (col, row) in self.neutral_warning_hexes:
-                from PySide6.QtWidgets import QMessageBox
+                from src.gui.message_dialog import show_info_dialog, show_question_dialog
                 decision = self.movement_service.invasion_handler.evaluate_neutral_entry(hex_obj)
                 if not decision.is_neutral_entry:
                     pass
                 elif decision.blocked_message:
-                    QMessageBox.information(
-                        self.view.window(),
-                        "Neutral Territory",
-                        decision.blocked_message
-                    )
+                    show_info_dialog("Neutral Territory", decision.blocked_message, parent=self.view.window())
                     return
                 elif decision.confirmation_prompt:
-                    reply = QMessageBox.question(
-                        self.view.window(),
-                        "Neutral Territory",
-                        decision.confirmation_prompt,
-                        QMessageBox.Ok | QMessageBox.Cancel
-                    )
-                    if reply == QMessageBox.Ok:
+                    if show_question_dialog("Neutral Territory", decision.confirmation_prompt, parent=self.view.window()):
                         self._attempt_invasion(decision.country_id or "unknown")
                     return
 
@@ -826,12 +818,8 @@ class GameController(QObject):
                     f"Movement blocked: target={hex_obj.axial_to_offset()} errors={move_result.errors}"
                 )
                 self.movement_service.discard_last_movement_snapshot()
-                from PySide6.QtWidgets import QMessageBox
-                QMessageBox.information(
-                    self.view.window(),
-                    "Move Blocked",
-                    move_result.errors[0]
-                )
+                from src.gui.message_dialog import show_info_dialog
+                show_info_dialog("Move Blocked", move_result.errors[0], parent=self.view.window())
                 return
             RuntimeDiagnostics.record_event(
                 f"Movement applied: target={hex_obj.axial_to_offset()} "
@@ -976,24 +964,14 @@ class GameController(QObject):
         selected = self.selected_units_for_movement
         if not selected:
             return
-        from PySide6.QtWidgets import QMessageBox
+        from src.gui.message_dialog import show_info_dialog, show_question_dialog
         decision = self.movement_service.invasion_handler.evaluate_unboard_neutral_entry(selected)
         if decision.is_neutral_entry:
             if decision.blocked_message:
-                QMessageBox.information(
-                    self.view.window(),
-                    "Neutral Territory",
-                    decision.blocked_message,
-                )
+                show_info_dialog("Neutral Territory", decision.blocked_message, parent=self.view.window())
                 return
             if decision.confirmation_prompt:
-                reply = QMessageBox.question(
-                    self.view.window(),
-                    "Neutral Territory",
-                    decision.confirmation_prompt,
-                    QMessageBox.Ok | QMessageBox.Cancel
-                )
-                if reply != QMessageBox.Ok:
+                if not show_question_dialog("Neutral Territory", decision.confirmation_prompt, parent=self.view.window()):
                     return
                 outcome = self._attempt_invasion(
                     decision.country_id or "unknown",
@@ -1037,7 +1015,7 @@ class GameController(QObject):
             active_player: The player who triggered this deployment
         """
         from src.gui.replacements_dialog import ReplacementsDialog
-        from PySide6.QtWidgets import QMessageBox
+        from src.gui.message_dialog import show_info_dialog
 
         deployment_plan = self.diplomacy_service.build_deployment_plan(effects, active_player)
         self._refresh_minimap_allegiance()
@@ -1055,12 +1033,12 @@ class GameController(QObject):
         self.replacements_dialog.show()
         self._begin_deployment_session()
 
-        QMessageBox.information(
-            self.replacements_dialog,
+        show_info_dialog(
             deployment_plan.message_title,
             deployment_plan.message_text
             + "\nClick 'Minimize' to interact with map.\n"
             "Click 'Finish Deployment' when finished.",
+            parent=self.replacements_dialog,
         )
 
     def _connect_replacements_dialog_signals(self):
@@ -1227,11 +1205,11 @@ class GameController(QObject):
         Returns:
             Invasion outcome object with success status, winner, and messages.
         """
-        from PySide6.QtWidgets import QMessageBox
+        from src.gui.message_dialog import show_info_dialog
 
         invasion_data = self.movement_service.get_invasion_force(country_id, extra_units=invasion_units)
         outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
-        QMessageBox.information(self.view.window(), outcome.title, outcome.message)
+        show_info_dialog(outcome.title, outcome.message, parent=self.view.window())
         if outcome.success and outcome.winner:
             # Invasion creates a new checkpoint: previous movement undo is no longer allowed.
             self.movement_service.clear_movement_undo()
@@ -1261,7 +1239,6 @@ class GameController(QObject):
             country_id: ID of the invaded country.
             allegiance: Allegiance of the invasion winner.
         """
-        from PySide6.QtWidgets import QMessageBox
         from src.gui.replacements_dialog import ReplacementsDialog
 
         winner_player = self.game_state.players.get(allegiance)
@@ -1283,10 +1260,10 @@ class GameController(QObject):
             self._end_deployment_session()
             self.view.sync_with_model()
             self._refresh_info_panel()
-            QMessageBox.information(
-                self.view.window(),
+            show_info_dialog(
                 "Invasion Deployment",
                 f"{country_id.title()} is AI-controlled. Auto-deployed units: {deployed}.",
+                parent=self.view.window(),
             )
             return
 
@@ -1318,5 +1295,5 @@ class GameController(QObject):
         if allegiance == HL:
             message += "\nNewly deployed units cannot move this turn."
 
-        QMessageBox.information(self.replacements_dialog, "Invasion Deployment", message)
+        show_info_dialog("Invasion Deployment", message, parent=self.replacements_dialog)
 

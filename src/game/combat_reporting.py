@@ -3,11 +3,11 @@ import os
 from typing import Optional, Tuple
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox
+from PySide6.QtWidgets import QApplication
 
 from src.content.config import ICONS_DIR
 from src.content.tools import TextFormatter
+from src.gui.message_dialog import MessageDialog
 
 _PENDING_COMBAT_DIALOGS = deque()
 _COMBAT_DIALOG_ACTIVE = False
@@ -16,12 +16,6 @@ def _is_verbose(game_state) -> bool:
     return str(getattr(game_state, "combat_details", "brief")).strip().lower() == "verbose"
 
 def _to_offset_coords(target_hex) -> Optional[Tuple[int, int]]:
-    """
-    Normalize target_hex into (col, row) offset coords if possible.
-    Accepts:
-      - Hex-like objects with axial_to_offset()
-      - (col, row) tuples/lists
-    """
     if target_hex is None:
         return None
     if hasattr(target_hex, "axial_to_offset"):
@@ -46,7 +40,7 @@ def show_combat_result_popup(
     target_hex=None,
 ):
     """
-    Shows combat details in a QMessageBox only when:
+    Shows combat details in a styled MessageDialog only when:
       - game_state.combat_details == 'verbose'
       - there is at least one human player
 
@@ -89,7 +83,6 @@ def _enqueue_combat_popup(
     highlight_coords: Optional[Tuple[int, int]] = None,
     icon_path: Optional[str] = None,
 ):
-    # Store coords in the queue so highlight + centering can be applied at display time.
     _PENDING_COMBAT_DIALOGS.append((title, message, highlight_coords, icon_path))
     QTimer.singleShot(0, _drain_combat_popup_queue)
 
@@ -109,7 +102,6 @@ def _drain_combat_popup_queue():
     title, message, highlight_coords, icon_path = _PENDING_COMBAT_DIALOGS.popleft()
 
     try:
-        # Apply highlight (red warning channel) and center the view while the dialog is visible.
         if had_map_view:
             if hasattr(map_view, "sync_with_model"):
                 try:
@@ -118,7 +110,6 @@ def _drain_combat_popup_queue():
                     pass
 
             if highlight_coords is not None:
-                # 1) Center camera on the target hex (view-only; MVC-safe).
                 if hasattr(map_view, "get_hex_center") and hasattr(map_view, "centerOn"):
                     try:
                         col, row = highlight_coords
@@ -127,7 +118,6 @@ def _drain_combat_popup_queue():
                     except Exception:
                         pass
 
-                # 2) Highlight target hex in red using warning channel.
                 try:
                     map_view.highlight_movement_range([], [highlight_coords])
                 except Exception:
@@ -135,17 +125,10 @@ def _drain_combat_popup_queue():
 
             QApplication.processEvents()
 
-        dialog = QMessageBox(parent)
-        dialog.setIcon(QMessageBox.Icon.Information)
-        dialog.setWindowTitle(title)
-        dialog.setText(message)
-        dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
-        if icon_path:
-            dialog.setWindowIcon(QIcon(icon_path))
+        dialog = MessageDialog(title, message, parent=parent, icon_path=icon_path)
         dialog.exec()
 
     finally:
-        # Always clear highlight after dialog closes.
         if had_map_view:
             try:
                 map_view.highlight_movement_range([])

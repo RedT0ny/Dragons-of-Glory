@@ -1455,10 +1455,11 @@ class CombatService:
         if self.game_state.are_all_players_ai():
             return
         try:
-            from PySide6.QtWidgets import QApplication, QMessageBox
+            from src.gui.message_dialog import show_info_dialog
+            from PySide6.QtWidgets import QApplication
             app = QApplication.instance()
             if app is not None:
-                QMessageBox.information(None, "Highlord Command", msg)
+                show_info_dialog("Highlord Command", msg)
         except Exception:
             pass
 
@@ -2000,7 +2001,7 @@ class CombatClickHandler:
 
         if clicked_offset in current_targets:
             # --- Scenario 5: Clicked a Possible Target ---
-            from PySide6.QtWidgets import QMessageBox
+            from src.gui.message_dialog import show_question_dialog
 
             is_naval = self._selection_mode(self.attackers) == "naval"
             if is_naval:
@@ -2013,14 +2014,7 @@ class CombatClickHandler:
                 )
                 prompt_text = f"Attack with {len(self.attackers)} units?\nOdds: {odds_str}"
 
-            reply = QMessageBox.question(
-                None,
-                "Confirm Attack",
-                prompt_text,
-                QMessageBox.Yes | QMessageBox.No
-            )
-
-            if reply == QMessageBox.Yes:
+            if show_question_dialog("Confirm Attack", prompt_text):
                 committed_attackers = list(self.attackers)
                 resolution = self.game_state.combat_service.resolve_combat(
                     self.attackers,
@@ -2202,24 +2196,18 @@ class CombatClickHandler:
         return True
 
     def _ask_naval_withdraw(self, side_allegiance, round_number):
-        from PySide6.QtWidgets import QMessageBox
-        answer = QMessageBox.question(
-            None,
+        from src.gui.message_dialog import show_question_dialog
+        return show_question_dialog(
             "Naval Withdrawal",
             f"Round {round_number}: should {side_allegiance} withdraw all fleets and end naval combat?",
-            QMessageBox.Yes | QMessageBox.No,
         )
-        return answer == QMessageBox.Yes
 
     def _ask_dragon_duel_withdraw(self, side_allegiance, round_number):
-        from PySide6.QtWidgets import QMessageBox
-        answer = QMessageBox.question(
-            None,
+        from src.gui.message_dialog import show_question_dialog
+        return show_question_dialog(
             "Dragon Duel",
             f"Dragon duel round {round_number}: should {side_allegiance} withdraw dragons?",
-            QMessageBox.Yes | QMessageBox.No,
         )
-        return answer == QMessageBox.Yes
 
     def _begin_leader_escape(self, leader_escape_requests):
         self.leader_escape_queue = list(leader_escape_requests)
@@ -2251,11 +2239,10 @@ class CombatClickHandler:
 
         self.escape_hexes = {h.axial_to_offset() for h in self.active_leader_escape.options}
         self.view.highlight_movement_range(list(self.escape_hexes))
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.information(
-            None,
+        from src.gui.message_dialog import show_info_dialog
+        show_info_dialog(
             "Leader Escape",
-            f"Select a friendly stack for {self.active_leader_escape.leader.id} to escape."
+            f"Select a friendly stack for {self.active_leader_escape.leader.id} to escape.",
         )
 
     def _handle_leader_escape_click(self, target_hex):
@@ -2277,14 +2264,8 @@ class CombatClickHandler:
         if not self.pending_advance:
             return
 
-        from PySide6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(
-            None,
-            "Advance?",
-            "Advance?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
+        from src.gui.message_dialog import show_question_dialog
+        if show_question_dialog("Advance?", "Advance?"):
             moved_units = self.game_state.combat_service.advance_after_combat(
                 self.pending_advance["attackers"],
                 self.pending_advance["target_hex"],

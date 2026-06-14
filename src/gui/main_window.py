@@ -4,7 +4,7 @@ import webbrowser
 from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                               QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QMessageBox, QApplication,
+                               QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QApplication,
                                QAbstractButton, QDialog, QMenu)
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
@@ -490,13 +490,12 @@ class MainWindow(QMainWindow):
         if not self.controller:
             return
         if getattr(self.game_state, "turn", 0) > 1:
-            confirm = QMessageBox.question(
-                self,
+            from src.gui.message_dialog import show_question_dialog
+            if not show_question_dialog(
                 "Confirm New Game",
                 "Are you sure you want to start a new game? Unsaved progress will be lost.",
-                QMessageBox.Yes | QMessageBox.No,
-            )
-            if confirm != QMessageBox.Yes:
+                parent=self,
+            ):
                 return
         dialog = NewGameDialog(self)
         if not dialog.exec():
@@ -533,7 +532,8 @@ class MainWindow(QMainWindow):
             self.controller.resume_after_startup_loading()
         except Exception as exc:
             loading.close()
-            QMessageBox.critical(self, "New Game Failed", str(exc))
+            from src.gui.message_dialog import show_warning_dialog
+            show_warning_dialog("New Game Failed", str(exc), parent=self)
 
     def on_save_clicked(self):
         """
@@ -563,7 +563,8 @@ class MainWindow(QMainWindow):
             self.controller.save_game(path)
             self.append_log(f"Game saved to {path}\n")
         except Exception as exc:
-            QMessageBox.critical(self, "Save Failed", str(exc))
+            from src.gui.message_dialog import show_warning_dialog
+            show_warning_dialog("Save Failed", str(exc), parent=self)
 
     def on_load_clicked(self):
         """
@@ -604,4 +605,5 @@ class MainWindow(QMainWindow):
             self.controller.resume_after_startup_loading()
         except Exception as exc:
             loading.close()
-            QMessageBox.critical(self, "Load Failed", str(exc))
+            from src.gui.message_dialog import show_warning_dialog
+            show_warning_dialog("Load Failed", str(exc), parent=self)
