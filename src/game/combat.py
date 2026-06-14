@@ -1100,7 +1100,22 @@ class CombatService:
 
         if self._is_naval_combat(attackers, defenders):
             naval_resolver = NavalCombatResolver(self.game_state, attackers, defenders)
-            outcome = naval_resolver.resolve(withdraw_decider=naval_withdraw_decider)
+
+            def _naval_withdraw_wrapper(side_allegiance, rounds):
+                player = self.game_state.players.get(side_allegiance)
+                if player and player.is_ai:
+                    if side_allegiance == naval_resolver._attacker_side():
+                        my_power = sum(u.combat_rating for u in naval_resolver.attackers if u.is_on_map)
+                        enemy_power = sum(u.combat_rating for u in naval_resolver.defenders if u.is_on_map)
+                    else:
+                        my_power = sum(u.combat_rating for u in naval_resolver.defenders if u.is_on_map)
+                        enemy_power = sum(u.combat_rating for u in naval_resolver.attackers if u.is_on_map)
+                    return my_power < enemy_power
+                if naval_withdraw_decider:
+                    return naval_withdraw_decider(side_allegiance, rounds)
+                return False
+
+            outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
             self.cleanup_destroyed_units(attackers + defenders)
             print(TextFormatter.format_naval_log(attackers, defenders, outcome))
             return {
