@@ -155,6 +155,7 @@ class MapConfigSpec:
     terrain_types: List[str]
     hexsides: Dict[str, List[Any]]
     special_locations: List[LocationSpec]
+    fleet_barriers: List[List[int]]
 
 @dataclass
 class AssetSpec:

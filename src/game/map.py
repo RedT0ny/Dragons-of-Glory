@@ -119,6 +119,7 @@ class Board:
         self.navigable_edges = set()
         self.unit_map = defaultdict(list)
         self.locations = {} # (q, r) -> Location
+        self.fleet_barriers = set()  # Hexside keys where fleet movement is blocked
 
     def populate_terrain(self, terrain_data: dict):
         """
@@ -180,6 +181,24 @@ class Board:
                 dir_idx = dir_str_map.get(direction_str)
                 if dir_idx is not None:
                     self.add_hexside_by_offset(col, row, dir_idx, side_type)
+
+    def populate_fleet_barriers(self, barrier_entries: list):
+        """
+        Populates fleet barrier edges from config.
+        Format: [[col, row, dir_str], ...] where dir_str is E/SE/SW/W/NW/NE.
+        Each entry defines an edge that blocks fleet movement (isthmus).
+        """
+        dir_str_map = {
+            "E": 0, "SE": 1,
+            "SW": 2, "W": 3, "NW": 4, "NE": 5
+        }
+        for col, row, direction_str in barrier_entries:
+            dir_idx = dir_str_map.get(direction_str)
+            if dir_idx is not None:
+                origin = Hex.offset_to_axial(col, row)
+                neighbor = origin.neighbors()[dir_idx]
+                key = self._hexside_between(origin, neighbor)
+                self.fleet_barriers.add(key)
 
     def add_hexside(self, q1, r1, q2, r2, side_type):
         """Registers a special border between two hexes (River/Mountain)."""
@@ -504,6 +523,11 @@ class Board:
 
         return self._fleet_count_on_river_hexside(side, exclude_unit=unit) < 2
 
+    def _is_fleet_barrier(self, from_hex, to_hex):
+        """Returns True if the edge between the two hexes blocks fleet movement (isthmus)."""
+        key = self._hexside_between(from_hex, to_hex)
+        return key in self.fleet_barriers
+
     def _fleet_neighbor_states(self, unit, state):
         current_hex, river_hexside = state
         river_hexside = self._coerce_hexside(river_hexside)
@@ -525,6 +549,8 @@ class Board:
                     neighbors.append(((next_hex, next_side), enter_cost))
                     continue
 
+                if self._is_fleet_barrier(current_hex, next_hex):
+                    continue
                 if self._fleet_can_enter_hex(unit, next_hex):
                     neighbors.append(((next_hex, None), 1))
             return neighbors
@@ -539,6 +565,8 @@ class Board:
             neighbors.append(((a, river_hexside), 0))
 
         for endpoint in endpoints:
+            if self._is_fleet_barrier(current_hex, endpoint):
+                continue
             if self._fleet_can_enter_hex(unit, endpoint):
                 neighbors.append(((endpoint, None), 0))
 
@@ -930,7 +958,11 @@ class Board:
         if self._hex_has_enemy_unit_for_fleet(to_hex, unit):
             return float('inf')
 
-        # 2. Check River Movement & Stacking
+        # 2. Fleet barrier (isthmus) — blocks fleets regardless of terrain.
+        if self._is_fleet_barrier(from_hex, to_hex):
+            return float('inf')
+
+        # 3. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
         if self.get_effective_hexside(from_hex, to_hex) == HexsideType.DEEP_RIVER:
             river_side = self.get_hexside_key(from_hex, to_hex)
