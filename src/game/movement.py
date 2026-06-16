@@ -5,7 +5,7 @@ This module handles unit movement, interception, boarding/unboarding, and relate
 It includes pathfinding, cost calculations, and special rules for fleets, wings, and armies.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict
 import random
 from typing import List, Tuple
@@ -32,9 +32,10 @@ class BoardActionResult:
 
 @dataclass
 class MovementRangeResult:
-    """Result containing reachable hexes and neutral warnings for UI."""
+    """Result containing reachable hexes and warnings for UI."""
     reachable_coords: List[Tuple[int, int]]
     neutral_warning_coords: List[Tuple[int, int]]
+    maelstrom_warning_coords: List[Tuple[int, int]] = field(default_factory=list)
 
 @dataclass
 class MoveUnitsResult:
@@ -64,6 +65,14 @@ class NeutralEntryDecision:
     invasion_units: List[object] | None = None
 
 
+@dataclass
+class MaelstromEntryDecision:
+    """Decision on entering a maelstrom hex."""
+    is_maelstrom_entry: bool
+    blocked_message: str | None = None
+    confirmation_prompt: str | None = None
+
+
 class InvasionHandler:
     """Reusable invasion and neutral-entry logic for movement and unboarding flows."""
     def __init__(self, movement_service):
@@ -88,6 +97,14 @@ class InvasionHandler:
             is_neutral_entry=True,
             country_id=country_id,
             confirmation_prompt=f"Invade {country_id}?",
+        )
+
+    def evaluate_maelstrom_entry(self, target_hex) -> MaelstromEntryDecision:
+        if not self.game_state.map.is_maelstrom(target_hex):
+            return MaelstromEntryDecision(is_maelstrom_entry=False)
+        return MaelstromEntryDecision(
+            is_maelstrom_entry=True,
+            confirmation_prompt="Enter Maelstrom?",
         )
 
     def get_invasion_force(self, country_id, extra_units=None):
@@ -906,8 +923,18 @@ class MovementService:
             if not start_hex:
                 return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
             most_restrictive_fleet = min(units, key=self._effective_mp)
-            return self._range_result_from_hexes(
-                self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
+            start_hex_axial = Hex.offset_to_axial(*most_restrictive_fleet.position)
+            if self.game_state.map.is_maelstrom(start_hex_axial):
+                return self._range_result_from_hexes(
+                    self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
+                )
+            normal, warnings = self.game_state.map.get_reachable_hexes_for_fleet(
+                most_restrictive_fleet, split_maelstrom=True
+            )
+            return MovementRangeResult(
+                reachable_coords=[h.axial_to_offset() for h in normal],
+                neutral_warning_coords=[],
+                maelstrom_warning_coords=[h.axial_to_offset() for h in warnings],
             )
 
         start_hex, _ = self.game_state.map.get_stack_start_and_min_mp(units)
@@ -1054,6 +1081,9 @@ class MovementService:
                     self._log_fleet_transition(unit, prev_hex, prev_side, curr_hex, curr_side)
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
                     message = f"{TextFormatter.format_unit_log_string(unit)} cannot move."
+                    return MoveUnitsResult(moved=[], errors=[message])
+                if unit.is_fleet() and unit.is_on_map and getattr(unit, "movement_points", 0) <= 0 and self.game_state.map.is_maelstrom(step_hex):
+                    message = f"{TextFormatter.format_unit_log_string(unit)} trapped in Maelstrom."
                     return MoveUnitsResult(moved=[], errors=[message])
 
             movers_alive = [u for u in units if u.is_on_map]

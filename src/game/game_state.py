@@ -96,6 +96,7 @@ class GameState:
         self.victory_reason = ""
         self.victory_points = {HL: 0, WS: 0}
         self._leader_escape_handler = None
+        self._resolving_maelstrom = False
         self._overlays = {}
         self._overlay_cache = {}
         self._overlay_dirty = set()
@@ -932,9 +933,16 @@ class GameState:
         for unit, hex_obj in trapped_ships:
             if unit.allegiance == self.active_player:
                 print(f"Processing Maelstrom check for trapped ship: {TextFormatter.format_unit_log_string(unit)}")
-                self.resolve_maelstrom_entry(unit, hex_obj)
-                # Note: The 'emerge' result requires handling by the Controller/UI
-                # to prompt selection from result['options'].
+                self._resolving_maelstrom = True
+                try:
+                    result = self.resolve_maelstrom_entry(unit, hex_obj)
+                    if result["effect"] == "emerge" and unit.is_on_map:
+                        options = result.get("options", [])
+                        if options:
+                            exit_hex = random.choice(options)
+                            self.move_unit(unit, exit_hex)
+                finally:
+                    self._resolving_maelstrom = False
 
     def advance_phase(self):
         return self.phase_manager.advance_phase()
@@ -956,6 +964,7 @@ class GameState:
             unit.movement_points = getattr(unit, "movement", 0)
             unit.moved_this_turn = False
             unit._healed_this_combat_turn = False
+        self.process_maelstrom_start_turn()
 
     def finalize_combat_phase(self):
         # Keep end-of-combat rule ordering identical to previous PhaseManager logic.
@@ -1345,7 +1354,27 @@ class GameState:
             if invalidate_overlays:
                 self.invalidate_overlays({"control", "territory", "supply", "ws_power", "hl_power", "threat"})
 
+        self._resolve_maelstrom_entry_if_needed(unit, target_hex)
         self._apply_escape_if_eligible(unit, offset_coords)
+
+    def _resolve_maelstrom_entry_if_needed(self, unit, target_hex):
+        if (
+            self.phase == GamePhase.MOVEMENT
+            and unit.is_fleet()
+            and unit.is_on_map
+            and self.map.is_maelstrom(target_hex)
+            and not getattr(self, "_resolving_maelstrom", False)
+        ):
+            self._resolving_maelstrom = True
+            try:
+                result = self.resolve_maelstrom_entry(unit, target_hex)
+                if result["effect"] == "emerge" and unit.is_on_map:
+                    options = result.get("options", [])
+                    if options:
+                        exit_hex = random.choice(options)
+                        self.move_unit(unit, exit_hex)
+            finally:
+                self._resolving_maelstrom = False
 
     def _apply_escape_if_eligible(self, unit, target_offset):
         if self.phase != GamePhase.MOVEMENT:

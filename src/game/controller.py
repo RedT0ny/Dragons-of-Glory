@@ -64,6 +64,7 @@ class GameController(QObject):
 
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
         self._invasion_deployment_active = False
         self._invasion_deployment_country_id = None
         self._invasion_deployment_allegiance = None
@@ -192,6 +193,7 @@ class GameController(QObject):
         self._pending_phase_advance_after_deployment = False
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
         self.movement_service.clear_movement_undo()
         if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
@@ -694,6 +696,7 @@ class GameController(QObject):
             self._invasion_deployment_allegiance = None
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
+            self.maelstrom_warning_hexes = set()
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
@@ -717,6 +720,7 @@ class GameController(QObject):
         # Clear movement highlights/selection
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
         self.movement_service.clear_movement_undo()
         def _deferred_end_phase_view_update():
             self.view.highlight_movement_range([])
@@ -748,6 +752,7 @@ class GameController(QObject):
         if not self._is_human_interactive_turn():
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
+            self.maelstrom_warning_hexes = set()
             self.view.highlight_movement_range([])
             return
         if self.game_state.phase == GamePhase.COMBAT:
@@ -761,6 +766,7 @@ class GameController(QObject):
         if not selected_units and self.game_state.phase != GamePhase.COMBAT:
             self.view.highlight_movement_range([])
             self.neutral_warning_hexes = set()
+            self.maelstrom_warning_hexes = set()
             return
 
         if self.game_state.phase == GamePhase.MOVEMENT:
@@ -768,13 +774,16 @@ class GameController(QObject):
             if any(u.allegiance != self.game_state.active_player for u in selected_units):
                 self.view.highlight_movement_range([])
                 self.neutral_warning_hexes = set()
+                self.maelstrom_warning_hexes = set()
                 return
 
             movement_range = self.movement_service.get_reachable_hexes(selected_units)
             self.neutral_warning_hexes = set(movement_range.neutral_warning_coords)
+            self.maelstrom_warning_hexes = set(movement_range.maelstrom_warning_coords)
+            combined_warnings = list(self.neutral_warning_hexes | self.maelstrom_warning_hexes)
             self.view.highlight_movement_range(
                 movement_range.reachable_coords,
-                movement_range.neutral_warning_coords
+                combined_warnings
             )
 
         elif self.game_state.phase == GamePhase.COMBAT:
@@ -810,31 +819,20 @@ class GameController(QObject):
                         self._attempt_invasion(decision.country_id or "unknown")
                     return
 
-            # Move all selected units
-            self.movement_service.push_movement_undo_snapshot()
-            move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
-            if move_result.errors:
-                RuntimeDiagnostics.record_event(
-                    f"Movement blocked: target={hex_obj.axial_to_offset()} errors={move_result.errors}"
-                )
-                self.movement_service.discard_last_movement_snapshot()
-                from src.gui.message_dialog import show_info_dialog
-                show_info_dialog("Move Blocked", move_result.errors[0], parent=self.view.window())
-                return
-            RuntimeDiagnostics.record_event(
-                f"Movement applied: target={hex_obj.axial_to_offset()} "
-                f"moved={[u.id for u in move_result.moved]}"
-            )
+            if (col, row) in self.maelstrom_warning_hexes:
+                from src.gui.message_dialog import show_info_dialog, show_question_dialog
+                decision = self.movement_service.invasion_handler.evaluate_maelstrom_entry(hex_obj)
+                if not decision.is_maelstrom_entry:
+                    pass
+                elif decision.blocked_message:
+                    show_info_dialog("Maelstrom", decision.blocked_message, parent=self.view.window())
+                    return
+                elif decision.confirmation_prompt:
+                    if show_question_dialog("Maelstrom", decision.confirmation_prompt, parent=self.view.window()):
+                        self._move_all_selected_to_hex(hex_obj)
+                    return
 
-            # Clear selection/highlights
-            self.view.highlight_movement_range([])
-            # Defer redraw to avoid mutating the scene while click dispatch is active.
-            self._schedule_deferred(self.view.sync_with_model)
-            self._schedule_deferred(self._refresh_info_panel)
-            moved_stack = list(self.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r))
-            self._schedule_deferred(lambda units=moved_stack: self.view.units_clicked.emit(units))
-            self.selected_units_for_movement = []
-            self.neutral_warning_hexes = set()
+            self._move_all_selected_to_hex(hex_obj)
 
         elif self.game_state.phase == GamePhase.COMBAT:
             self.handle_combat_click(hex_obj)
@@ -997,6 +995,7 @@ class GameController(QObject):
             # Reset it before syncing to avoid acting on outdated references.
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
+            self.maelstrom_warning_hexes = set()
             self.view.highlight_movement_range([])
             self._schedule_deferred(self.view.sync_with_model)
             self._schedule_deferred(self._refresh_info_panel)
@@ -1186,6 +1185,7 @@ class GameController(QObject):
         self._invasion_deployment_allegiance = None
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
         self.view.highlight_movement_range([])
         self.view.sync_with_model()
         self._refresh_info_panel()
@@ -1216,6 +1216,33 @@ class GameController(QObject):
             self._start_invasion_deployment(country_id, outcome.winner)
         return outcome
 
+    def _move_all_selected_to_hex(self, hex_obj):
+        self.movement_service.push_movement_undo_snapshot()
+        move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
+        if move_result.errors:
+            RuntimeDiagnostics.record_event(
+                f"Movement blocked: target={hex_obj.axial_to_offset()} errors={move_result.errors}"
+            )
+            self.movement_service.discard_last_movement_snapshot()
+            from src.gui.message_dialog import show_info_dialog
+            show_info_dialog("Move Blocked", move_result.errors[0], parent=self.view.window())
+            return
+        RuntimeDiagnostics.record_event(
+            f"Movement applied: target={hex_obj.axial_to_offset()} "
+            f"moved={[u.id for u in move_result.moved]}"
+        )
+
+        # Clear selection/highlights
+        self.view.highlight_movement_range([])
+        # Defer redraw to avoid mutating the scene while click dispatch is active.
+        self._schedule_deferred(self.view.sync_with_model)
+        self._schedule_deferred(self._refresh_info_panel)
+        moved_stack = list(self.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r))
+        self._schedule_deferred(lambda units=moved_stack: self.view.units_clicked.emit(units))
+        self.selected_units_for_movement = []
+        self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
+
     def on_undo_clicked(self):
         """Handle undo button click during movement phase to undo last movement."""
         if not self._is_human_interactive_turn():
@@ -1226,6 +1253,7 @@ class GameController(QObject):
             return
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
+        self.maelstrom_warning_hexes = set()
         self.view.highlight_movement_range([])
         self.view.sync_with_model()
         self._refresh_info_panel()

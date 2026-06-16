@@ -594,6 +594,7 @@ class Board:
         max_cost=None,
         stop_predicate=None,
         collect_predicate=None,
+        expand_predicate=None,
     ):
         start_key = self._fleet_state_key(start_state)
         frontier = []
@@ -626,6 +627,9 @@ class Board:
                     "cost_so_far": cost_so_far,
                     "collected": collected,
                 }
+
+            if expand_predicate and not expand_predicate(current_state, current_cost):
+                continue
 
             for next_state, step_cost in self._fleet_neighbor_states(unit, current_state):
                 next_key = self._fleet_state_key(next_state)
@@ -683,19 +687,44 @@ class Board:
             result["found_key"],
         ), result["found_cost"]
 
-    def get_reachable_hexes_for_fleet(self, unit):
+    def get_reachable_hexes_for_fleet(self, unit, *, split_maelstrom=False):
         if not getattr(unit, "position", None):
-            return []
+            return ([], []) if split_maelstrom else []
         start_hex = Hex.offset_to_axial(*unit.position)
         max_mp = getattr(unit, "movement_points", unit.movement)
         start_state = (start_hex, self._coerce_hexside(getattr(unit, "river_hexside", None)))
+
+        if not split_maelstrom:
+            result = self._search_fleet_states(
+                unit,
+                start_state,
+                max_cost=max_mp,
+                collect_predicate=lambda state, _: state[0] != start_hex and self.can_stack_move_to([unit], state[0]),
+            )
+            return list({state[0] for state in result["collected"]})
+
+        # With split_maelstrom: stop expanding from maelstrom hexes to hide inner rings
         result = self._search_fleet_states(
             unit,
             start_state,
             max_cost=max_mp,
-            collect_predicate=lambda state, _: state[0] != start_hex and self.can_stack_move_to([unit], state[0]),
+            expand_predicate=lambda state, _: state[0] == start_hex or not self.is_maelstrom(state[0]),
         )
-        return list({state[0] for state in result["collected"]})
+        normal = set()
+        warnings = set()
+        start_key = result["start_key"]
+        for key, cost in result["cost_so_far"].items():
+            if key == start_key:
+                continue
+            state = result["state_by_key"][key]
+            hex_obj = state[0]
+            if not self.can_stack_move_to([unit], hex_obj):
+                continue
+            if self.is_maelstrom(hex_obj):
+                warnings.add(hex_obj)
+            else:
+                normal.add(hex_obj)
+        return list(normal), list(warnings)
 
     def _is_safe_fleet_displacement_state(self, fleet, state):
         current_hex, river_hexside = state
