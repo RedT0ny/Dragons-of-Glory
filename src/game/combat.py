@@ -2206,23 +2206,6 @@ class CombatClickHandler:
             return "naval"
         return "land"
 
-    def _has_enemy_citadel_target(self, target_hex, attackers):
-        active_player = self.game_state.active_player
-        enemy_citadel_present = any(
-            u.is_citadel()
-            and u.allegiance != active_player
-            and u.allegiance != "neutral"
-            and self._is_unit_on_map(u)
-            for u in self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
-        )
-        if not enemy_citadel_present:
-            return False
-
-        if active_player == WS:
-            has_air = any(u.is_flier() for u in attackers)
-            return has_air
-        return True
-
     def _ask_naval_withdraw(self, side_allegiance, round_number):
         from src.gui.message_dialog import show_question_dialog
         return show_question_dialog(
