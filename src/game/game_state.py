@@ -932,6 +932,9 @@ class GameState:
         # Roll for each ship belonging to the active player
         for unit, hex_obj in trapped_ships:
             if unit.allegiance == self.active_player:
+                # Felura grants immunity from the Maelstrom's effects
+                if any(getattr(p, "id", "") == "felura" for p in getattr(unit, "passengers", [])):
+                    continue
                 print(f"Processing Maelstrom check for trapped ship: {TextFormatter.format_unit_log_string(unit)}")
                 self._resolving_maelstrom = True
                 try:
@@ -1364,6 +1367,7 @@ class GameState:
             and unit.is_on_map
             and self.map.is_maelstrom(target_hex)
             and not getattr(self, "_resolving_maelstrom", False)
+            and not getattr(unit, "_maelstrom_immunity", False)
         ):
             self._resolving_maelstrom = True
             try:

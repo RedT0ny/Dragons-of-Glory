@@ -924,7 +924,11 @@ class MovementService:
                 return MovementRangeResult(reachable_coords=[], neutral_warning_coords=[])
             most_restrictive_fleet = min(units, key=self._effective_mp)
             start_hex_axial = Hex.offset_to_axial(*most_restrictive_fleet.position)
-            if self.game_state.map.is_maelstrom(start_hex_axial):
+            stack_immune = any(
+                any(getattr(p, "id", "") == "felura" for p in getattr(u, "passengers", []))
+                for u in units if u.is_fleet()
+            )
+            if self.game_state.map.is_maelstrom(start_hex_axial) or stack_immune:
                 return self._range_result_from_hexes(
                     self.game_state.map.get_reachable_hexes_for_fleet(most_restrictive_fleet)
                 )
@@ -975,6 +979,16 @@ class MovementService:
             seen_ids.add(marker)
             deduped.append(unit)
         units = deduped
+
+        # Felura grants maelstrom immunity to the entire stack
+        stack_immune = any(
+            any(getattr(p, "id", "") == "felura" for p in getattr(u, "passengers", []))
+            for u in units if u.is_fleet()
+        )
+        if stack_immune:
+            for u in units:
+                if u.is_fleet():
+                    u._maelstrom_immunity = True
 
         # Mixed stacks that include ground armies can legally enter enemy-fleet hexes.
         # Validate these as a stack, not unit-by-unit, to avoid false "no valid path".
@@ -1082,7 +1096,7 @@ class MovementService:
                 if getattr(unit, "is_on_map", False) and getattr(unit, "position", None) != step_hex.axial_to_offset():
                     message = f"{TextFormatter.format_unit_log_string(unit)} cannot move."
                     return MoveUnitsResult(moved=[], errors=[message])
-                if unit.is_fleet() and unit.is_on_map and getattr(unit, "movement_points", 0) <= 0 and self.game_state.map.is_maelstrom(step_hex):
+                if unit.is_fleet() and unit.is_on_map and getattr(unit, "movement_points", 0) <= 0 and self.game_state.map.is_maelstrom(step_hex) and not getattr(unit, "_maelstrom_immunity", False):
                     message = f"{TextFormatter.format_unit_log_string(unit)} trapped in Maelstrom."
                     return MoveUnitsResult(moved=[], errors=[message])
 

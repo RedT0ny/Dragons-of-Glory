@@ -683,6 +683,7 @@ class Board:
                 state[1] is not None
                 or state[0] == start_hex
                 or not self.is_maelstrom(state[0])
+                or getattr(unit, "_maelstrom_immunity", False)
             ),
         )
         if result["found_key"] is None:
@@ -714,7 +715,11 @@ class Board:
             unit,
             start_state,
             max_cost=max_mp,
-            expand_predicate=lambda state, _: state[0] == start_hex or not self.is_maelstrom(state[0]),
+            expand_predicate=lambda state, _: (
+                state[0] == start_hex
+                or not self.is_maelstrom(state[0])
+                or getattr(unit, "_maelstrom_immunity", False)
+            ),
         )
         normal = set()
         warnings = set()
