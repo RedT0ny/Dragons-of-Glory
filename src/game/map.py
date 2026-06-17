@@ -666,6 +666,7 @@ class Board:
     def find_fleet_route(self, unit, start_hex, target_hex):
         """
         Finds minimum-MP route for fleets using hex/hexside state.
+        Avoids routing through Maelstrom hexes unless the fleet starts or ends there.
         Returns (state_path, cost), where state_path includes start and end states.
         """
         start_state = (start_hex, self._coerce_hexside(getattr(unit, "river_hexside", None)))
@@ -677,6 +678,11 @@ class Board:
                 (lambda state, _: state[0] == target_hex and state[1] is None)
                 if target_is_hex_destination
                 else (lambda state, _: state[0] == target_hex and state[1] is not None)
+            ),
+            expand_predicate=lambda state, _: (
+                state[1] is not None
+                or state[0] == start_hex
+                or not self.is_maelstrom(state[0])
             ),
         )
         if result["found_key"] is None:
