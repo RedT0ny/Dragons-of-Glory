@@ -1039,6 +1039,11 @@ class MovementService:
 
     def _move_stack_along_path(self, units, target_hex, apply_interception: bool):
         lead = units[0]
+        has_control = any(u.is_army() or u.is_wing() for u in units)
+        if has_control:
+            for u in units:
+                if not u.is_fleet():
+                    u._stack_has_control_unit = True
         evaluations = {}
         lead_evaluation = None
         for unit in units:

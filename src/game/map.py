@@ -1133,7 +1133,10 @@ class Board:
                     continue
 
             # 3. Cannot occupy enemy hex, except ground-army displacement rule.
-            if not self.can_stack_enter_enemy_occupied_hex([unit], neighbor):
+            if getattr(unit, "_stack_has_control_unit", False):
+                if self.has_enemy_ground_wing_or_citadel(neighbor, unit.allegiance):
+                    continue
+            elif not self.can_stack_enter_enemy_occupied_hex([unit], neighbor):
                 continue
 
             # Rule 5: Movement must stop if moving from ZOC to another ZOC hex
