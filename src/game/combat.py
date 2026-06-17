@@ -584,6 +584,11 @@ class CombatResolver:
         return affected
 
     def _apply_depletion_steps(self, units, steps):
+        """ Apply depletion steps to the given units, prioritizing
+        ACTIVE ground units first,
+        then DEPLETED ground units,
+        then ACTIVE wing units,
+        then DEPLETED wing units."""
         for _ in range(steps):
             ground_active = [u for u in units if u.status.name == "ACTIVE" and not u.is_wing()]
             if ground_active:
@@ -612,6 +617,7 @@ class CombatResolver:
             break
 
     def _apply_retreats(self, units):
+        """ Apply retreats to the given units, moving them to a valid hex or eliminating them if no valid retreat hex is available."""
         if not self.game_state or not self.game_state.map:
             return
         if not callable(self._get_valid_retreat_hexes_fn) or not callable(self._move_unit_fn):
@@ -1696,6 +1702,9 @@ class CombatService:
         for neighbor in start_hex.neighbors():
             col, row = neighbor.axial_to_offset()
             if not self.game_state.is_hex_in_bounds(col, row):
+                continue
+            country = self.game_state.get_country_by_hex(col, row)
+            if country and country.allegiance == NEUTRAL:
                 continue
             if not self.map.can_unit_land_on_hex(unit, neighbor):
                 continue
