@@ -883,7 +883,10 @@ class GameState:
         if roll == 1:
             result["effect"] = "sink"
             self.damage_unit(unit, mode="destroy")
-            print(f"Maelstrom Effect (Roll {roll}): Ship {unit_id} destroyed!")
+            msg = f"Maelstrom Effect (Roll {roll}): Ship {unit_id} destroyed!"
+            print(msg)
+            from src.gui.message_dialog import show_maelstrom_dialog
+            show_maelstrom_dialog("Maelstrom", msg)
 
         # 2-5. Stay
         elif 2 <= roll <= 5:
@@ -893,7 +896,10 @@ class GameState:
             # Ensure it is in the maelstrom hex (if passed for placement)
             if maelstrom_hex:
                 self.move_unit(unit, maelstrom_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Ship {unit_id} trapped for the turn.")
+            msg = f"Maelstrom Effect (Roll {roll}): Ship {unit_id} trapped for the turn."
+            print(msg)
+            from src.gui.message_dialog import show_maelstrom_dialog
+            show_maelstrom_dialog("Maelstrom", msg)
 
         # 6-8. Opponent Chooses Exit
         elif 6 <= roll <= 8:
@@ -903,7 +909,10 @@ class GameState:
             # Identify current location to find neighbors
             current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
             result["options"] = self.map.get_maelstrom_exits(current_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Opponent chooses exit for {unit_id}.")
+            msg = f"Maelstrom Effect (Roll {roll}): Opponent chooses exit for {unit_id}."
+            print(msg)
+            from src.gui.message_dialog import show_maelstrom_dialog
+            show_maelstrom_dialog("Maelstrom", msg)
 
         # 9-10. Player Chooses Exit
         else: # 9, 10
@@ -912,7 +921,10 @@ class GameState:
 
             current_hex = maelstrom_hex if maelstrom_hex else Hex.offset_to_axial(*unit.position)
             result["options"] = self.map.get_maelstrom_exits(current_hex)
-            print(f"Maelstrom Effect (Roll {roll}): Player chooses exit for {unit_id}.")
+            msg = f"Maelstrom Effect (Roll {roll}): Player chooses exit for {unit_id}."
+            print(msg)
+            from src.gui.message_dialog import show_maelstrom_dialog
+            show_maelstrom_dialog("Maelstrom", msg)
 
         return result
 
