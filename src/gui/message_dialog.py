@@ -101,6 +101,12 @@ def show_event_dialog(title, body, parent=None, icon_path=None):
     dialog.exec()
 
 
+def show_maelstrom_dialog(title, body, parent=None):
+    icon_path = os.path.join(ICONS_DIR, "maelstrom.svg")
+    dialog = MessageDialog(title, body, parent=parent, icon_path=icon_path)
+    dialog.exec()
+
+
 def show_question_dialog(title, body, parent=None):
     dialog = MessageDialog(title, body, parent=parent, buttons=QDialogButtonBox.Yes | QDialogButtonBox.No)
     result = dialog.exec()

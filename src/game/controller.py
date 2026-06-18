@@ -40,6 +40,7 @@ class GameController(QObject):
         """
         super().__init__()
         self.game_state = game_state
+        self.game_state.on_maelstrom_resolved = self._on_maelstrom_resolved
         self.view = view
         self.replacements_dialog = None
         self.difficulty = str(difficulty).strip().lower()
@@ -179,6 +180,10 @@ class GameController(QObject):
             callback()
         finally:
             RuntimeDiagnostics.record_event(f"Deferred end: {callback_name}")
+
+    def _on_maelstrom_resolved(self):
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
 
     def prepare_for_state_load(self):
         """

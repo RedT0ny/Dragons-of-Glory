@@ -568,13 +568,19 @@ class MovementService:
         }
         if self.game_state.phase == GamePhase.MOVEMENT and unit.is_fleet():
             kwargs["river_hexside"] = evaluation.final_river_hexside
+        start_pos = getattr(unit, "position", None)
         self.game_state.move_unit(unit, target_hex, **kwargs)
         if unit.is_fleet() and evaluation.fleet_state_path:
             for i in range(1, len(evaluation.fleet_state_path)):
                 prev_hex, prev_side = evaluation.fleet_state_path[i - 1]
                 curr_hex, curr_side = evaluation.fleet_state_path[i]
                 self._log_fleet_transition(unit, prev_hex, prev_side, curr_hex, curr_side)
-        return getattr(unit, "position", None) == target_hex.axial_to_offset() or not getattr(unit, "is_on_map", False)
+        final_pos = getattr(unit, "position", None)
+        return (
+            final_pos == target_hex.axial_to_offset()
+            or not getattr(unit, "is_on_map", False)
+            or (final_pos is not None and None not in final_pos and final_pos != start_pos)
+        )
 
     # --- Movement Undo State ---
     def clear_movement_undo(self):
