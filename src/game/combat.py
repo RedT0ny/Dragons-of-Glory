@@ -2275,8 +2275,14 @@ class CombatClickHandler:
         if not self.pending_advance:
             return
 
-        from src.gui.message_dialog import show_question_dialog
-        if show_question_dialog("Advance?", "Advance?"):
+        from PySide6.QtWidgets import QMessageBox
+        reply = QMessageBox.question(
+            None,
+            "Advance?",
+            "Advance?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
             moved_units = self.game_state.combat_service.advance_after_combat(
                 self.pending_advance["attackers"],
                 self.pending_advance["target_hex"],

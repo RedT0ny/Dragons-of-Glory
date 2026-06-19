@@ -276,7 +276,7 @@ class InvasionHandler:
             for unit in stacks_by_hex.get(hex_obj, []):
                 if unit.is_fleet():
                     continue
-                if not self.movement_service._unit_has_movement(unit):
+                if not self.movement_service._effective_mp(unit) > 0:
                     continue
                 eligible.append(unit)
         return eligible
@@ -1197,14 +1197,8 @@ class MovementService:
             unit,
             from_hex,
             target_hex,
-            available_mp=self._unit_movement_points(unit),
+            available_mp=self._effective_mp(unit),
         )
-
-    def _unit_has_movement(self, unit):
-        return self._unit_movement_points(unit) > 0
-
-    def _unit_movement_points(self, unit):
-        return self._effective_mp(unit)
 
     def _can_unit_reach_target(self, unit, target_hex):
         evaluation = self.evaluate_move(unit, target_hex)

@@ -9,6 +9,13 @@ class InterceptionService:
     """Encapsulates interception detection, eligibility, and combat resolution."""
 
     def __init__(self, game_state, movement_service, rng):
+        """Initializes the interception service.
+
+        Args:
+            game_state: The game state to query units and map data from.
+            movement_service: Service used to relocate interceptors during resolution.
+            rng: Random number generator for spot checks and distance rolls.
+        """
         self.game_state = game_state
         self.movement_service = movement_service
         self.rng = rng
@@ -16,6 +23,11 @@ class InterceptionService:
         self._interception_attempted_units = set()
 
     def should_check_interception(self, units):
+        """Returns True if the given units are eligible for interception checks.
+
+        Interception only applies during the MOVEMENT phase and requires all
+        moving units to be Wings or Fleets (air/naval units).
+        """
         if not units:
             return False
         if getattr(self.game_state, "phase", None) != GamePhase.MOVEMENT:
@@ -24,6 +36,12 @@ class InterceptionService:
         return all(u.is_wing() or u.is_fleet() for u in units)
 
     def ensure_step_context(self):
+        """Tracks the current (turn, player, phase) triplet.
+
+        When the triplet changes the set of already-attempted interceptor
+        units is cleared, ensuring each step only allows one interception
+        attempt per eligible unit.
+        """
         context = (
             getattr(self.game_state, "turn", None),
             getattr(self.game_state, "active_player", None),
@@ -34,7 +52,12 @@ class InterceptionService:
             self._interception_attempted_units = set()
 
     def maybe_apply_interception(self, moving_units, current_hex):
-        """Checks if an interception attempt should occur against the moving units at their current hex."""
+        """Checks and applies an interception attempt against the moving units at their current hex.
+
+        Returns True if an interception was resolved (even if combat was skipped),
+        False if no interceptor groups were found, the moving stack evaded
+        the 20 % spot check, or the distance roll failed.
+        """
         in_range_groups = self.find_interceptor_groups_in_range(moving_units, current_hex)
         if not in_range_groups:
             return False
@@ -47,7 +70,7 @@ class InterceptionService:
         for unit in interceptors:
             self._interception_attempted_units.add((unit.id, getattr(unit, "ordinal", 1)))
 
-        dist = self._hex_distance_from_offset(origin_offset, current_hex)
+        dist = Hex.offset_to_axial(*origin_offset).distance_to(current_hex)
         if dist <= 0:
             return False
         roll = self.rng.randint(1, 6)
@@ -59,7 +82,14 @@ class InterceptionService:
         return True
 
     def find_interceptor_groups_in_range(self, moving_units, current_hex):
-        """Returns interceptor stacks in range, grouped by origin hex offset."""
+        """Collects eligible interceptor stacks within 1-6 hexes of the target hex.
+
+        Filters out friendly, neutral, off-map, transported, and already-attempted
+        units. Results are grouped by their origin hex offset.
+
+        Returns:
+            list of (origin_offset, [unit, ...]) pairs.
+        """
         mover_side = moving_units[0].allegiance
         by_hex = {}
         for unit in self.game_state.units:
@@ -79,7 +109,7 @@ class InterceptionService:
                 continue
             if not self.dragon_interceptor_has_required_commander(unit):
                 continue
-            dist = self._hex_distance(unit, current_hex)
+            dist = Hex.offset_to_axial(*unit.position).distance_to(current_hex)
             if 1 <= dist <= 6:
                 key = tuple(unit.position)
                 by_hex.setdefault(key, []).append(unit)
@@ -162,6 +192,16 @@ class InterceptionService:
                 interceptor.river_hexside = state.get("river_hexside", None)
 
     def find_interceptor_attack_hex_for_stack(self, interceptors, moving_hex, origin_hex):
+        """Picks the best adjacent hex from which the interceptors can attack.
+
+        Evaluates all neighbors of the target hex, filtering out those that
+        are out of bounds, impassable for the interceptor types, or unreachable
+        from the origin hex. Among valid candidates the one reachable with the
+        lowest movement cost is chosen.
+
+        Returns:
+            A Hex for the attack, or None if no valid adjacent hex exists.
+        """
         candidates = []
         if not interceptors:
             return None
@@ -256,13 +296,3 @@ class InterceptionService:
                     return True
             return False
         return True
-
-    @staticmethod
-    def _hex_distance(unit, target_hex):
-        start = Hex.offset_to_axial(*unit.position)
-        return start.distance_to(target_hex)
-
-    @staticmethod
-    def _hex_distance_from_offset(offset, target_hex):
-        start = Hex.offset_to_axial(*offset)
-        return start.distance_to(target_hex)

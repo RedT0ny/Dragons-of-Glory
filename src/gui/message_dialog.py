@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QTextEdit,
-    QVBoxLayout,
+    QVBoxLayout, QWidget,
 )
 
 from src.content.config import GAME_ICON, ICONS_DIR
@@ -43,11 +43,17 @@ class MessageDialog(QDialog):
         header.addWidget(self.title_label, 1)
         main_layout.addLayout(header)
 
+        self.body_container = QWidget()
+        self.body_layout = QVBoxLayout(self.body_container)
+        self.body_layout.setContentsMargins(0, 0, 0, 0)
+
         self.body_text = QTextEdit()
         self.body_text.setReadOnly(True)
         self.body_text.setPlainText(body)
         self.body_text.setStyleSheet("font-size: 12px;")
-        main_layout.addWidget(self.body_text, 1)
+        self.body_layout.addWidget(self.body_text)
+
+        main_layout.addWidget(self.body_container, 1)
 
         if buttons is None:
             buttons = QDialogButtonBox.StandardButton.Ok
@@ -75,6 +81,17 @@ class MessageDialog(QDialog):
 
     def set_body_html(self, html):
         self.body_text.setHtml(html)
+
+    def set_body_widget(self, widget):
+        """Replace the QTextEdit body with a custom widget."""
+        while self.body_layout.count():
+            item = self.body_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        self.body_layout.addWidget(widget)
+
+    def set_title_text(self, text):
+        self.title_label.setText(text)
 
 
 def show_info_dialog(title, body, parent=None):

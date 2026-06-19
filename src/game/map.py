@@ -58,7 +58,7 @@ class Hex:
         return [self + offset for offset in ordered_offsets]
 
     def distance_to(self, other):
-        """Cálculo de distancia Manhattan para hexágonos."""
+        """Manhattan distance calculation for hexagons."""
         return (abs(self.q - other.q) + 
                 abs(self.q + self.r - other.q - other.r) + 
                 abs(self.r - other.r)) // 2
