@@ -1046,6 +1046,38 @@ class CombatService:
         dragon_duel_withdraw_decider=None,
         defenders_override=None,
     ):
+        """Resolve combat between attackers and defenders at the given hex.
+
+        This is the main combat entry point. It handles the full resolution
+        pipeline: leader-only stack escape, citadel rule, gate-keeping checks,
+        naval combat (multi-round fleet engagement), pre-combat healing,
+        Dragon Orb / Gnome Tech special resolution, dragon duels, and the core
+        land combat CRT resolution (odds → DRM → d10 roll → CRT lookup → apply
+        results).
+
+        Args:
+            attackers: List of attacking Unit objects.
+            hex_position: Hex object or axial coordinates of the target hex.
+            naval_withdraw_decider: Optional callable(side_allegiance, rounds)
+                → bool to decide whether a side withdraws from naval combat.
+            dragon_duel_withdraw_decider: Optional callable(side_allegiance,
+                rounds) → bool to decide whether a side withdraws from a
+                dragon duel.
+            defenders_override: Optional set of Unit objects; if provided,
+                only those units are considered eligible defenders (used during
+                interception where only air units defend).
+
+        Returns:
+            dict with keys:
+                - "result" (str): CRT result code (e.g. "DR/1", "-/-", "N/NS").
+                - "leader_escape_requests" (list[LeaderEscapeRequest]):
+                  escape/revive requests for leaders.
+                - "advance_available" (bool): whether the attacker may advance
+                  after combat.
+                - "combat_type" (str): "naval", "air", or "land".
+                - "rounds" (int, optional): number of rounds fought in naval
+                  combat.
+        """
         attackers = list(attackers)
         defender_pool = set(defenders_override) if defenders_override is not None else None
 
@@ -1076,6 +1108,7 @@ class CombatService:
                 "result": result,
                 "leader_escape_requests": leader_escape_requests or [],
                 "advance_available": False,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 
         if self._combat_blocked_by_citadel_rule(attackers, defenders):
@@ -1085,6 +1118,7 @@ class CombatService:
                 "result": result,
                 "leader_escape_requests": [],
                 "advance_available": False,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
             }
         attackers = self._filter_ws_ground_attackers_vs_citadel(attackers, defenders)
         if not self.can_units_attack_stack(attackers, defenders, target_hex=hex_position):
@@ -1094,6 +1128,7 @@ class CombatService:
                 "result": result,
                 "leader_escape_requests": [],
                 "advance_available": False,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
             }
         if not attackers:
             result = "-/-"
@@ -1102,6 +1137,7 @@ class CombatService:
                 "result": result,
                 "leader_escape_requests": [],
                 "advance_available": False,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 
         if self._is_naval_combat(attackers, defenders):
@@ -1160,6 +1196,7 @@ class CombatService:
                     "result": result,
                     "leader_escape_requests": [],
                     "advance_available": advance_available,
+                    "combat_type": self._resolve_combat_type(attackers, defenders),
                 }
             if not any(u.is_combat_unit() for u in attackers):
                 result = "-/-"
@@ -1168,6 +1205,7 @@ class CombatService:
                     "result": result,
                     "leader_escape_requests": [],
                     "advance_available": False,
+                    "combat_type": self._resolve_combat_type(attackers, defenders),
                 }
 
         attacker_dragons = [u for u in attackers if u.is_on_map and u.is_dragon()]
@@ -1195,6 +1233,7 @@ class CombatService:
                     "result": result,
                     "leader_escape_requests": [],
                     "advance_available": advance_available,
+                    "combat_type": self._resolve_combat_type(attackers, defenders),
                 }
 
         attackers = self._filter_dragons_for_land_attack(attackers, defenders)
@@ -1205,6 +1244,7 @@ class CombatService:
                 "result": result,
                 "leader_escape_requests": [],
                 "advance_available": False,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 
         gnome_drm = 0
@@ -1236,6 +1276,7 @@ class CombatService:
                     "result": result,
                     "leader_escape_requests": leader_escape_requests,
                     "advance_available": advance_available,
+                    "combat_type": self._resolve_combat_type(attackers, defenders),
                 }
 
         leader_origins = {}
@@ -1282,6 +1323,7 @@ class CombatService:
             "result": result,
             "leader_escape_requests": leader_escape_requests or [],
             "advance_available": advance_available,
+            "combat_type": self._resolve_combat_type(attackers, defenders),
         }
 
     def _apply_combat_healing(self, units):
@@ -1494,6 +1536,21 @@ class CombatService:
             return False
         def_fleets = [u for u in defenders if u.is_fleet() and u.is_on_map and u.allegiance != self.active_player]
         return bool(def_fleets)
+
+    def _resolve_combat_type(self, attackers, defenders) -> str:
+        """Determine the type of combat based on participating units.
+
+        Returns "naval", "air", or "land".
+        """
+        on_map = [u for u in attackers if u.is_on_map] + [u for u in defenders if u.is_on_map]
+        combat_units = [u for u in on_map if u.is_combat_unit()]
+        if not combat_units:
+            return "land"
+        if all(u.is_fleet() for u in combat_units):
+            return "naval"
+        if all(u.is_flier() for u in combat_units):
+            return "air"
+        return "land"
 
     def _fleet_attack_nodes(self, fleet):
         if not fleet.position or None in fleet.position:

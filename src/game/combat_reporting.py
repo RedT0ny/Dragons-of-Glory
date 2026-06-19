@@ -150,7 +150,7 @@ def _enqueue_combat_popup(
     combat_data: Optional[dict] = None,
 ):
     _PENDING_COMBAT_DIALOGS.append((title, highlight_coords, icon_path, combat_data))
-    QTimer.singleShot(0, _drain_combat_popup_queue)
+    _drain_combat_popup_queue()
 
 def _drain_combat_popup_queue():
     global _COMBAT_DIALOG_ACTIVE
