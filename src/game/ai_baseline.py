@@ -4103,6 +4103,22 @@ class TacticalPlanner:
                 debug_print(f"[TRANSPORT] unload_illegal at ({col},{row})")
         return moved
 
+    @staticmethod
+    def _group_would_leave_capital_undefended(ctx: AIContext, group: TaskGroup) -> bool:
+        if not group.has_army or group.has_fleet:
+            return False
+        loc = ctx.game_state.map.get_location(group.hex)
+        if not loc or not getattr(loc, "is_capital", False) or getattr(loc, "occupier", None) != ctx.side:
+            return False
+        col, row = group.hex.axial_to_offset()
+        threat_val = _overlay_value(ctx.overlays.get("threat"), col, row, 0.0)
+        defenders = _friendly_ground_combat_defenders_in_hex(ctx, group.hex, ctx.side)
+        remaining = len(defenders) - sum(1 for u in group.units if u.is_army() and u.is_combat_unit())
+        min_required = _min_capital_ground_defenders(threat_val)
+        if remaining < 1 and not _can_immediately_deploy_ground_defender(ctx, ctx.side, group.hex):
+            return True
+        return remaining < min_required
+
     def execute_best_combat(self, ctx: AIContext, plan: StrategicPlan, missions: List[Mission]) -> bool:
         actions = []
         board = ctx.game_state.map
@@ -4137,6 +4153,10 @@ class TacticalPlanner:
                 key=lambda g: (self._attack_group_strength(ctx, g), g.power),
                 reverse=True,
             )
+            eligible_groups = [
+                g for g in eligible_groups
+                if not self._group_would_leave_capital_undefended(ctx, g)
+            ]
             if not eligible_groups:
                 continue
             for package in self._generate_attack_packages(eligible_groups, max_groups=4):

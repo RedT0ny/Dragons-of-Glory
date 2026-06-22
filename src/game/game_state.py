@@ -9,7 +9,7 @@ from src.content.translator import Translator
 from src.game.combat import CombatService
 from src.game.diplomacy import ConquestService
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
-from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR
+from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR, UNITS_DATA
 from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
 from src.content import loader, factory
@@ -479,7 +479,11 @@ class GameState:
             key = (state.get("unit_id"), int(state.get("ordinal", 1) or 1))
             unit = by_key.get(key)
             if not unit:
-                continue
+                unit = self._create_missing_unit(key, state)
+                if not unit:
+                    continue
+                self.units.append(unit)
+                by_key[key] = unit
             unit.load_state(state)
             # Backward compatibility for old saves that did not serialize unit allegiance:
             # infer allegiance from the unit's country ("land") if available.
@@ -537,6 +541,19 @@ class GameState:
             if getattr(unit, "transport_host", None) is not None:
                 continue
             self.map.add_unit_to_spatial_map(unit)
+
+    def _create_missing_unit(self, key, state):
+        unit_id, ordinal = key
+        catalog = loader.load_units_catalog(UNITS_DATA)
+        for spec in catalog:
+            if spec.id == unit_id:
+                allegiance = state.get("allegiance")
+                created = factory.create_units_from_specs(
+                    [spec], allegiance=allegiance, ready=False
+                )
+                if created:
+                    return created[0]
+        return None
 
     def _restore_players_from_save(self, players_state):
         if not isinstance(players_state, dict):
