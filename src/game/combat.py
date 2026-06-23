@@ -666,6 +666,20 @@ class NavalCombatResolver:
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
 
+    @staticmethod
+    def _fleet_is_in_port(game_state, fleet):
+        """True if the fleet is in a hex with an allied port location."""
+        if not fleet.position or None in fleet.position:
+            return False
+        hex_coord = Hex.offset_to_axial(*fleet.position)
+        loc = game_state.map.get_location(hex_coord)
+        return bool(loc and loc.loc_type == LocType.PORT.value and loc.occupier == fleet.allegiance)
+
+    @staticmethod
+    def _side_has_fleet_in_port(game_state, side_fleets):
+        """True if any fleet in the list is in an allied port."""
+        return any(NavalCombatResolver._fleet_is_in_port(game_state, f) for f in side_fleets if f.is_on_map)
+
     def resolve(self, withdraw_decider=None):
         """
         Run naval combat rounds until one side is eliminated or a withdrawal occurs.
@@ -675,6 +689,8 @@ class NavalCombatResolver:
           2. Hits are applied: ACTIVE -> DEPLETED, DEPLETED -> RESERVE.
           3. Dead ships are pruned from combat lists.
           4. Optional withdraw_decider callbacks allow a side to break off.
+
+        A side whose fleets are in an allied port cannot withdraw.
 
         Args:
             withdraw_decider: Optional callable(side_allegiance, rounds) -> bool.
@@ -722,10 +738,13 @@ class NavalCombatResolver:
             if not self.attackers or not self.defenders:
                 break
 
-            if withdraw_decider and withdraw_decider(self._defender_side(), rounds):
+            defender_can_withdraw = withdraw_decider and not self._side_has_fleet_in_port(self.game_state, self.defenders)
+            attacker_can_withdraw = withdraw_decider and not self._side_has_fleet_in_port(self.game_state, self.attackers)
+
+            if defender_can_withdraw and withdraw_decider(self._defender_side(), rounds):
                 self._withdraw_all(self.defenders)
                 break
-            if withdraw_decider and withdraw_decider(self._attacker_side(), rounds):
+            if attacker_can_withdraw and withdraw_decider(self._attacker_side(), rounds):
                 self._withdraw_all(self.attackers)
                 break
 
@@ -746,16 +765,22 @@ class NavalCombatResolver:
     def _fleet_attack_rating(self, fleet):
         """
         Effective attack rating = fleet's base combat_rating + highest tactical_rating
-        among embarked leaders (if any).
+        among embarked leaders (if any) + 2 if fleet is in an allied port.
         """
         base = fleet.combat_rating
         passengers = list(getattr(fleet, "passengers", []) or [])
         leader_bonus = 0
+        port_bonus = 0
         for p in passengers:
             if not p.is_leader():
                 continue
             leader_bonus = max(leader_bonus, getattr(p, "tactical_rating", 0))
-        return base + leader_bonus
+        if fleet.position and None not in fleet.position:
+            hex_coord = Hex.offset_to_axial(*fleet.position)
+            loc = self.game_state.map.get_location(hex_coord)
+            if loc and loc.loc_type == LocType.PORT.value and loc.occupier == fleet.allegiance:
+                port_bonus = 2
+        return base + leader_bonus + port_bonus
 
     def _select_target(self, attacker, candidates):
         """

@@ -95,18 +95,18 @@ class DeploymentService:
                     # Solamnic conquest exception:
                     # WS units from a Solamnic country can deploy in any still-unconquered
                     # allied Solamnic location (including Tower).
-                    if (
-                        unit.allegiance == WS
-                        and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
-                        and not country.conquered
-                    ):
-                        candidates = list(self._get_solamnic_group_deployment_locations(unit.allegiance))
-                    else:
+                    # if (
+                    #     unit.allegiance == WS
+                    #     and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
+                    #     and not country.conquered
+                    # ):
+                    #     candidates = list(self._get_solamnic_group_deployment_locations(unit.allegiance))
+                    # else:
                     # Rule 9: owner cannot deploy into enemy-occupied locations.
                     # Conqueror can deploy from occupied locations (handled for stateless below).
-                        for loc in country.locations.values():
-                            if loc.coords and self._can_use_location_for_deployment(country, loc, unit.allegiance):
-                                candidates.append(loc.coords)
+                    for loc in country.locations.values():
+                        if loc.coords and self._can_use_location_for_deployment(country, loc, unit.allegiance):
+                            candidates.append(loc.coords)
             else:
                 # Handle stateless units (units without land) during REPLACEMENTS phase
                 # These units should be deployable in any friendly location
