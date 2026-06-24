@@ -714,14 +714,14 @@ class NavalCombatResolver:
                 target = self._select_target(ship, def_round)
                 if target is None:
                     continue
-                if self._roll_hits(ship):
+                if self._roll_hits(ship, target):
                     hits[target] = hits.get(target, 0) + 1
 
             for ship in def_round:
                 target = self._select_target(ship, atk_round)
                 if target is None:
                     continue
-                if self._roll_hits(ship):
+                if self._roll_hits(ship, target):
                     hits[target] = hits.get(target, 0) + 1
 
             for target, amount in hits.items():
@@ -756,9 +756,13 @@ class NavalCombatResolver:
             "defender_survivors": len([u for u in self.defenders if u.is_on_map]),
         }
 
-    def _roll_hits(self, fleet):
-        """Roll 1d10; hit if <= fleet_attack_rating. True = hit scored."""
+    def _roll_hits(self, fleet, target):
+        """Roll 1d10; hit if <= fleet_attack_rating. True = hit scored.
+        If target is in port, the attacker takes a -2 penalty.
+        """
         threshold = self._fleet_attack_rating(fleet)
+        if self._fleet_is_in_port(self.game_state, target):
+            threshold -= 2
         roll = self._roll_d10()
         return roll <= threshold
 
