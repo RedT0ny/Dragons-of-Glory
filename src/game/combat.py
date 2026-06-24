@@ -176,6 +176,7 @@ class CombatResolver:
         self._move_unit_fn = move_unit_fn
         self.precombat_drm_bonus = int(precombat_drm_bonus or 0)
         self.allow_consumable_other_bonus = bool(allow_consumable_other_bonus)
+        self._pending_depletions = []
         # Use the centralized loader
         self.crt_data = load_data(CRT_DATA) # csv or yaml?
 
@@ -212,6 +213,15 @@ class CombatResolver:
 
     def _damage_unit(self, unit, mode: str = "deplete"):
         self.game_state.damage_unit(unit, mode=mode)
+
+    def _side_is_human(self, units):
+        if not self.game_state:
+            return False
+        for unit in units:
+            player = self.game_state.players.get(getattr(unit, "allegiance", None))
+            if player and not getattr(player, "is_ai", True):
+                return True
+        return False
 
     def resolve(self):
         # Core land/air resolution pipeline:
@@ -281,7 +291,14 @@ class CombatResolver:
                 self._damage_unit(unit, mode="deplete")
 
         if depletion_steps:
-            self._apply_depletion_steps(affected, depletion_steps)
+            if self._side_is_human(affected):
+                self._pending_depletions.append({
+                    "affected": list(affected),
+                    "steps": depletion_steps,
+                    "side": "attacker" if is_attacker else "defender",
+                })
+            else:
+                self._apply_depletion_steps(affected, depletion_steps)
 
         if must_retreat and not (not is_attacker and self._defender_ignores_retreat()):
             self._apply_retreats(affected)
@@ -615,6 +632,34 @@ class CombatResolver:
                 continue
 
             break
+
+    def apply_pending_depletions(self, manual_allocations=None):
+        """
+        Apply pending depletion steps.
+        manual_allocations: dict mapping side_name -> dict mapping unit -> steps
+        Sides not in manual_allocations, or with surplus steps, are auto-allocated.
+        """
+        manual_allocations = manual_allocations or {}
+        for item in self._pending_depletions:
+            side = item["side"]
+            affected = item["affected"]
+            steps = item["steps"]
+            if side in manual_allocations and manual_allocations[side]:
+                alloc = manual_allocations[side]
+                allocated = sum(alloc.values())
+                for unit, count in alloc.items():
+                    for _ in range(count):
+                        if not unit.is_on_map:
+                            break
+                        if unit.status == UnitState.ACTIVE:
+                            self._damage_unit(unit, mode="deplete")
+                        elif unit.status == UnitState.DEPLETED:
+                            self._damage_unit(unit, mode="eliminate")
+                if allocated < steps:
+                    self._apply_depletion_steps(affected, steps - allocated)
+            else:
+                self._apply_depletion_steps(affected, steps)
+        self._pending_depletions.clear()
 
     def _apply_retreats(self, units):
         """ Apply retreats to the given units, moving them to a valid hex or eliminating them if no valid retreat hex is available."""
@@ -1334,6 +1379,32 @@ class CombatService:
         result = resolver.resolve()
         print(f"Combat at Hex ({hex_position})")
         print(TextFormatter.format_combat_log(attackers, defenders, result))
+
+        pending = getattr(resolver, "_pending_depletions", [])
+        if pending:
+            manual_allocations = {}
+            if self.game_state.has_human_player():
+                for item in pending:
+                    side = item["side"]
+                    affected = item["affected"]
+                    steps = item["steps"]
+                    if not affected or steps <= 0:
+                        continue
+                    is_human = any(
+                        not getattr(self.game_state.players.get(getattr(u, "allegiance", None)), "is_ai", True)
+                        for u in affected
+                    )
+                    if not is_human:
+                        continue
+                    from src.game.combat_reporting import DamageAllocationDialog
+                    from PySide6.QtWidgets import QApplication
+                    app = QApplication.instance()
+                    parent = app.activeWindow() if app else None
+                    dialog = DamageAllocationDialog(affected, steps, side, game_state=self.game_state, parent=parent)
+                    if dialog.exec():
+                        manual_allocations[side] = dialog.get_allocations()
+            resolver.apply_pending_depletions(manual_allocations)
+
         self.cleanup_destroyed_units(attackers + defenders)
         revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
