@@ -56,14 +56,14 @@ class InterceptionService:
 
         Returns True if an interception was resolved (even if combat was skipped),
         False if no interceptor groups were found, the moving stack evaded
-        the 15 % spot check, or the distance roll failed.
+        the 10 % spot check, or the distance roll failed.
         """
         in_range_groups = self.find_interceptor_groups_in_range(moving_units, current_hex)
         if not in_range_groups:
             return False
 
-        # 15% possibility that the moving stack is spotted.
-        if self.rng.random() >= 0.15:
+        # 10% possibility that the moving stack is spotted.
+        if self.rng.random() >= 0.10:
             return False
 
         origin_offset, interceptors = self.rng.choice(in_range_groups)
