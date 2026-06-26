@@ -215,7 +215,7 @@ class Unit:
         return False # Base unit is not an army either
 
     def is_fleet(self) -> bool:
-        return False # Base unit is not an army either
+        return False # Base unit is not a fleet either
 
     def is_citadel(self) -> bool:
         return False # Base unit is not a citadel either
@@ -224,15 +224,19 @@ class Unit:
         return False # Base unit cannot carry anything
 
     def is_control_unit(self) -> bool:
+        """Returns True if the unit is a control unit (Army, Wing, or Citadel)."""
         return self.is_army() or self.is_wing() or self.is_citadel()
 
     def is_combat_unit(self) -> bool:
+        """Returns True if the unit is a combat unit (Army, Fleet, Wing or Citadel)."""
         return self.is_army() or self.is_fleet() or self.is_wing() or self.is_citadel()
 
     def is_flier(self) -> bool:
+        """Returns True if the unit is a flier (Wing or Citadel)."""
         return self.is_wing() or self.is_citadel()
 
     def is_carrier(self) -> bool:
+        """Returns True if the unit can carry passengers."""
         return self.is_fleet() or self.is_wing() or self.is_citadel()
 
     def is_dragon(self) -> bool:

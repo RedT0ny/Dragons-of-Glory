@@ -549,6 +549,7 @@ class CombatResolver:
         return min(candidates, key=lambda item: (item[1], -tie_priority.get(item[0], 0)))
 
     def _normalize_loc_type(self, loc):
+        """ Returns the normalized location type string for a given location object or dict, or None if not applicable."""
         if not loc:
             return None
         if hasattr(loc, "loc_type"):
@@ -1093,7 +1094,11 @@ class CombatService:
 
     def _project_combat_odds(self, attackers, defenders, hex_position):
         terrain = self.game_state.map.get_terrain(hex_position)
-        resolver = CombatResolver(attackers, defenders, terrain, game_state=self.game_state)
+        land_attackers = [u for u in attackers if not u.is_fleet()]
+        land_defenders = [u for u in defenders if not u.is_fleet()]
+        if not land_attackers or not land_defenders:
+            return {"attacker_cs": 0, "defender_cs": 0, "odds_str": "-", "ratio": 0}
+        resolver = CombatResolver(land_attackers, land_defenders, terrain, game_state=self.game_state)
         attacker_cs, defender_cs = resolver.calculate_effective_combat_strengths()
         odds_str = resolver.calculate_odds(attacker_cs, defender_cs)
         ratio = float("inf") if defender_cs <= 0 else (attacker_cs / defender_cs)
@@ -1185,6 +1190,22 @@ class CombatService:
                 "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 
+        if self._is_fleet_only_defense(attackers, defenders, hex_position):
+            invading = next(
+                (u for u in attackers if u.is_on_map and u.is_control_unit()),
+                None,
+            )
+            if invading:
+                self.game_state.apply_forced_entry_displacement(invading, hex_position)
+            result = "-/-"
+            print(TextFormatter.format_combat_log(attackers, defenders, result))
+            return {
+                "result": result,
+                "leader_escape_requests": [],
+                "advance_available": True,
+                "combat_type": self._resolve_combat_type(attackers, defenders),
+            }
+
         if self._combat_blocked_by_citadel_rule(attackers, defenders):
             result = "-/-"
             print(TextFormatter.format_combat_log(attackers, defenders, result))
@@ -1241,6 +1262,13 @@ class CombatService:
                 "combat_type": "naval",
                 "rounds": outcome.get("rounds", 0),
             }
+
+        attackers = [u for u in attackers if not u.is_fleet()]
+        if defender_pool is None:
+            defender_pool = {u for u in defenders if not u.is_fleet()}
+        else:
+            defender_pool = {u for u in defender_pool if not u.is_fleet()}
+        defenders = [u for u in defender_pool if u.is_on_map]
 
         for msg in self._apply_combat_healing(attackers + defenders):
             print(msg)
@@ -1899,7 +1927,23 @@ class CombatService:
             and u.is_combat_unit()
         ]
         if remaining_defender_combat_units:
-            return False
+            only_fleets = all(u.is_fleet() for u in remaining_defender_combat_units)
+            if only_fleets:
+                invading = next(
+                    (u for u in attackers if u.is_on_map and (u.is_army() or u.is_wing())),
+                    None,
+                )
+                if invading:
+                    self.game_state.apply_forced_entry_displacement(invading, target_hex)
+                    remaining_defender_combat_units = [
+                        u for u in self.map.get_units_in_hex(target_hex.q, target_hex.r)
+                        if u.is_on_map
+                        and u.position == target_offset
+                        and u.allegiance in defender_allegiances
+                        and u.is_combat_unit()
+                    ]
+            if remaining_defender_combat_units:
+                return False
 
         for unit in attackers:
             if not unit.is_on_map or not unit.position:
@@ -2049,6 +2093,29 @@ class CombatService:
             return False
         return all(u.is_leader() for u in live_units)
 
+    def _is_fleet_only_defense(self, attackers, defenders, hex_position):
+        """True when land units attack a hex where only fleets (and possibly
+        leaders) defend — no armies, wings, or citadels. In this case no land combat
+        is resolved; instead the fleets are displaced and leaders escape as if an
+        army moved into the hex (apply_forced_entry_displacement)."""
+        atk_has_control = any(
+            u.is_on_map and u.is_control_unit()
+            for u in attackers
+        )
+        if not atk_has_control:
+            return False
+        def_has_land_combat = any(
+            u.is_on_map and (u.is_army() or u.is_wing() or u.is_citadel())
+            for u in defenders
+        )
+        if def_has_land_combat:
+            return False
+        def_has_fleet = any(
+            u.is_on_map and u.is_fleet()
+            for u in defenders
+        )
+        return def_has_fleet
+
     @staticmethod
     def _attack_triggers_leader_stack_escape(attackers):
         return any(u.is_control_unit()
@@ -2149,6 +2216,13 @@ class CombatClickHandler:
         # --- Scenario 2: Clicked Friendly Stack ---
         if friendly_units:
             mode = self._selection_mode(self.attackers)
+            if mode is None:
+                if any(u.is_army() or u.is_wing() for u in friendly_units):
+                    mode = "land"
+                elif any(u.is_fleet() for u in friendly_units):
+                    mode = "naval"
+                else:
+                    return
             if mode == "naval":
                 friendly_units = [u for u in friendly_units if u.is_fleet()]
             elif mode == "land":
@@ -2197,7 +2271,8 @@ class CombatClickHandler:
                     enemy_units,
                     target_hex,
                 )
-                prompt_text = f"Attack with {len(self.attackers)} units?\nOdds: {odds_str}"
+                land_count = sum(1 for u in self.attackers if not u.is_fleet())
+                prompt_text = f"Attack with {land_count} units?\nOdds: {odds_str}"
 
             if show_question_dialog("Confirm Attack", prompt_text):
                 committed_attackers = list(self.attackers)
@@ -2207,11 +2282,19 @@ class CombatClickHandler:
                     naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
                     dragon_duel_withdraw_decider=self._ask_dragon_duel_withdraw if not is_naval else None,
                 )
+                popup_attackers = (
+                    [u for u in self.attackers if not u.is_fleet()]
+                    if not is_naval else self.attackers
+                )
+                popup_defenders = (
+                    [u for u in enemy_units if not u.is_fleet()]
+                    if not is_naval else enemy_units
+                )
                 show_combat_result_popup(
                     self.game_state,
                     title="Combat Details",
-                    attackers=self.attackers,
-                    defenders=enemy_units,
+                    attackers=popup_attackers,
+                    defenders=popup_defenders,
                     resolution=resolution,
                     context="manual_combat",
                     target_hex=target_hex,
