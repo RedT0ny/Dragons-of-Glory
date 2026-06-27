@@ -442,6 +442,23 @@ class GameController(QObject):
                 return
 
             self.view.sync_with_model()
+
+            # Center view on the active enemy unit during AI movement/combat
+            if self.game_state.phase in (GamePhase.MOVEMENT, GamePhase.COMBAT):
+                current_player = self.game_state.current_player
+                if current_player and current_player.is_ai:
+                    hex_pos = None
+                    if self.game_state.phase == GamePhase.MOVEMENT:
+                        hex_pos = self.ai_baseline._last_movement_offset
+                        self.ai_baseline._last_movement_offset = None
+                    elif self.game_state.phase == GamePhase.COMBAT:
+                        hex_pos = self.ai_baseline._last_combat_offset
+                        self.ai_baseline._last_combat_offset = None
+                    if hex_pos:
+                        col, row = hex_pos
+                        center = self.view.get_hex_center(col, row)
+                        self.view.centerOn(center)
+
             self._refresh_info_panel()
             self._refresh_turn_panel()
             self._announce_victory_if_needed()

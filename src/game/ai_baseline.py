@@ -215,6 +215,7 @@ class AIContext:
     friendly_adjacent_combat_count: Dict[Tuple[int, int], int] = field(default_factory=dict)
     movement_history: Optional[Dict[Tuple[Tuple[str, int], ...], Dict[str, Any]]] = None
     front_analysis: Optional[Dict[str, Any]] = None
+    last_action_hex: Optional[Tuple[int, int]] = None
 
 
 @dataclass
@@ -3180,15 +3181,21 @@ class TacticalPlanner:
             mission = next((m for m in missions if _task_group_key(m.group) == _task_group_key(best.group)), None)
             if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
                 ctx.moved_task_groups.add(_task_group_key(best.group))
+            ctx.last_action_hex = target_hex.axial_to_offset()
             return True
 
         decision = ctx.movement_service.invasion_handler.evaluate_neutral_entry(target_hex)
         if decision.is_neutral_entry:
             if decision.blocked_message:
                 return False
-            if decision.confirmation_prompt and attempt_invasion:
-                attempt_invasion(decision.country_id or "unknown")
-                return True
+            if decision.confirmation_prompt:
+                if attempt_invasion:
+                    attempt_invasion(decision.country_id or "unknown")
+                    ctx.last_action_hex = target_hex.axial_to_offset()
+                    return True
+                # AI: block movement into neutral hex — centralized
+                # _try_neutral_invasion already evaluated and declined.
+                return False
 
         before_positions = {u: tuple(u.position) if u.position else (None, None) for u in best.group.units}
         execute_t0 = perf_counter()
@@ -3218,8 +3225,11 @@ class TacticalPlanner:
         )
         if ctx.moved_task_groups is not None and (mission is None or self._should_lock_group_after_action(ctx, plan, mission, best)):
             ctx.moved_task_groups.add(_task_group_key(best.group))
+        ctx.last_action_hex = target_hex.axial_to_offset()
         self._reachable_cache.clear()
         return True
+
+
 
     def _best_move_for_mission(
         self,
@@ -4224,6 +4234,7 @@ class TacticalPlanner:
             failed_targets.add(target_key)
         if resolution and resolution.get("advance_available"):
             ctx.game_state.combat_service.advance_after_combat(attackers, target_hex)
+        ctx.last_action_hex = target_hex.axial_to_offset()
         return True
 
     @staticmethod
@@ -4522,6 +4533,8 @@ class BaselineAIPlayer:
         self._failed_combat_targets = defaultdict(set)
         self._moved_task_groups_in_phase: set = set()
         self._front_diag_logged_phase: Set[Tuple[Any, ...]] = set()
+        self._last_movement_offset: Optional[Tuple[int, int]] = None
+        self._last_combat_offset: Optional[Tuple[int, int]] = None
         # NOTE: No planning cache - board state changes after each action, so caching
         # TaskGroups/Missions across moves causes stale decisions. Rebuild fresh each time.
         self._strategic = StrategicPlanner()
@@ -4864,6 +4877,10 @@ class BaselineAIPlayer:
         # Neutral invasion override
         if self._try_neutral_invasion(ctx, plan, attempt_invasion):
             target_country_id = getattr(plan, "invasion_target", None)
+            if target_country_id:
+                probe_hexes = list((ctx.country_hexes_by_id or {}).get(target_country_id, []))
+                if probe_hexes:
+                    self._last_movement_offset = probe_hexes[0].axial_to_offset()
             post_country = ctx.game_state.countries.get(target_country_id) if target_country_id else None
             post_allegiance = getattr(post_country, "allegiance", None) if post_country is not None else None
             if post_allegiance == side:
@@ -4894,13 +4911,16 @@ class BaselineAIPlayer:
             )
             return True
         
-        # Keep neutral invasion centralized in _try_neutral_invasion to avoid invalid popup churn.
+        # Centralized invasion check runs first. The tactical planner blocks
+        # movement into neutral hexes when no attempt_invasion callback is
+        # available (AI), so units don't wander into neutral territory unchecked.
         moved = self._tactical.execute_best_movement(ctx, plan, missions, attempt_invasion=None)
         t5 = perf_counter()
         if moved:
             self._log(f"movement: executed ({plan.posture})")
             for line in ctx.movement_logs:
                 self._log(line)
+            self._last_movement_offset = ctx.last_action_hex
         self._log(
             "movement_timing "
             f"context={((t1 - t0) * 1000):.1f}ms "
@@ -4931,6 +4951,7 @@ class BaselineAIPlayer:
         fought = self._tactical.execute_best_combat(ctx, plan, missions)
         if fought:
             self._log("combat: executed")
+            self._last_combat_offset = ctx.last_action_hex
         return fought
 
     # ---------- Context ----------

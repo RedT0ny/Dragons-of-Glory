@@ -1090,8 +1090,8 @@ class Board:
         if terrain == TerrainType.MOUNTAIN and hexside_type != HexsideType.PASS:
                 return float('inf')
 
-        # Jungle and Forest cost 2, unless unit has affinity (e.g. Elves/Kender and Forests)
-        if terrain in (TerrainType.JUNGLE,TerrainType.FOREST):
+        # Jungle, Glacier & Forest cost 2, unless unit has affinity (e.g. Elves/Kender and Forests, Thanoi and glaciers)
+        if terrain in (TerrainType.JUNGLE,TerrainType.FOREST,TerrainType.GLACIER):
             if not unit.terrain_affinity == terrain:
                 cost += 1
 
