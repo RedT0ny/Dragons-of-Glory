@@ -671,6 +671,7 @@ class CombatResolver:
 
         from src.game.map import Hex
 
+        processed_leader_hexes = set()
         for unit in units:
             if not unit.position or unit.position[0] is None or unit.position[1] is None:
                 continue
@@ -681,6 +682,13 @@ class CombatResolver:
                 continue
             retreat_hex = random.choice(valid_hexes)
             self._move_unit_fn(unit, retreat_hex)
+
+            key = (start_hex.q, start_hex.r)
+            if key not in processed_leader_hexes:
+                processed_leader_hexes.add(key)
+                for other in self.game_state.get_units_at(start_hex):
+                    if other.is_leader() and other.is_on_map and other.position == unit.position:
+                        self._move_unit_fn(other, retreat_hex)
 
 
 class NavalCombatResolver:
@@ -2059,6 +2067,15 @@ class CombatService:
         )
 
     def _resolve_leader_escapes(self, leader_origins, leader_stack_has_army):
+        from src.game.map import Hex
+        active_origins = {
+            leader: origin
+            for leader, origin in leader_origins.items()
+            if leader.is_on_map
+            and leader.position
+            and None not in leader.position
+            and Hex.offset_to_axial(*leader.position) == origin
+        }
         checks = [
             LeaderEscapeCheck(
                 leader=leader,
@@ -2070,7 +2087,7 @@ class CombatService:
                 skip_if_allied_combat_present=True,
                 auto_place_on_success=False,
             )
-            for leader, origin_hex in leader_origins.items()
+            for leader, origin_hex in active_origins.items()
         ]
         return self.game_state._get_leader_escape_handler().handle_leader_escapes(checks, auto_resolve_ai=True)
 
