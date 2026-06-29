@@ -2214,21 +2214,9 @@ class CombatClickHandler:
         ]
 
         # --- Scenario 2: Clicked Friendly Stack ---
+        # Keep all units (land, air, naval). Mixed stacks show a union
+        # of land and naval valid targets via calculate_valid_targets.
         if friendly_units:
-            mode = self._selection_mode(self.attackers)
-            if mode is None:
-                if any(u.is_army() or u.is_wing() for u in friendly_units):
-                    mode = "land"
-                elif any(u.is_fleet() for u in friendly_units):
-                    mode = "naval"
-                else:
-                    return
-            if mode == "naval":
-                friendly_units = [u for u in friendly_units if u.is_fleet()]
-            elif mode == "land":
-                friendly_units = [u for u in friendly_units if not u.is_fleet()]
-            if not friendly_units:
-                return
 
             if self.attackers:
                 new_selection = list(set(self.attackers + friendly_units))
@@ -2262,33 +2250,76 @@ class CombatClickHandler:
             # --- Scenario 5: Clicked a Possible Target ---
             from src.gui.message_dialog import show_question_dialog
 
-            is_naval = self._selection_mode(self.attackers) == "naval"
+            # Determine defender composition at the target hex
+            enemy_on_map = [u for u in enemy_units if self._is_unit_on_map(u)]
+            def_has_fleet = any(u.is_fleet() for u in enemy_on_map)
+            def_has_land = any(not u.is_fleet() for u in enemy_on_map)
+
+            # Determine which attacker types are available
+            atk_has_fleet = any(u.is_fleet() for u in self.attackers)
+            atk_has_land = any(not u.is_fleet() for u in self.attackers)
+
+            # Decide committed attackers and combat type
+            committed = None
+            is_naval = False
+
+            if def_has_fleet and not def_has_land:
+                # Fleet-only defenders
+                if atk_has_fleet:
+                    # Use fleet attackers → naval combat
+                    committed = [u for u in self.attackers if u.is_fleet()]
+                    is_naval = True
+                else:
+                    # No fleet attackers → land assault displaces enemy fleets
+                    committed = [u for u in self.attackers if not u.is_fleet()]
+                    is_naval = False
+            elif def_has_land and not def_has_fleet:
+                # Land/air-only defenders → non-fleet attackers
+                committed = [u for u in self.attackers if not u.is_fleet()]
+                is_naval = False
+            elif atk_has_fleet and atk_has_land and def_has_fleet and def_has_land:
+                # Both types on both sides → prompt user
+                if show_question_dialog("Attack Type", "Use naval units?"):
+                    committed = [u for u in self.attackers if u.is_fleet()]
+                    is_naval = True
+                elif show_question_dialog("Attack Type", "Use land/air units?"):
+                    committed = [u for u in self.attackers if not u.is_fleet()]
+                    is_naval = False
+                else:
+                    return  # cancelled
+            elif atk_has_fleet:
+                committed = [u for u in self.attackers if u.is_fleet()]
+                is_naval = True
+            else:
+                committed = [u for u in self.attackers if not u.is_fleet()]
+                is_naval = False
+
+            if not committed:
+                return
+
+            # Show confirmation prompt
             if is_naval:
-                prompt_text = f"Start naval combat with {len(self.attackers)} fleet(s)?"
+                prompt_text = f"Start naval combat with {len(committed)} fleet(s)?"
             else:
                 odds_str = self.game_state.combat_service.calculate_odds_preview(
-                    self.attackers,
-                    enemy_units,
-                    target_hex,
+                    committed, enemy_units, target_hex,
                 )
-                land_count = sum(1 for u in self.attackers if not u.is_fleet())
-                prompt_text = f"Attack with {land_count} units?\nOdds: {odds_str}"
+                prompt_text = f"Attack with {len(committed)} units?\nOdds: {odds_str}"
 
             if show_question_dialog("Confirm Attack", prompt_text):
-                committed_attackers = list(self.attackers)
                 resolution = self.game_state.combat_service.resolve_combat(
-                    self.attackers,
+                    committed,
                     target_hex,
                     naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
                     dragon_duel_withdraw_decider=self._ask_dragon_duel_withdraw if not is_naval else None,
                 )
                 popup_attackers = (
-                    [u for u in self.attackers if not u.is_fleet()]
-                    if not is_naval else self.attackers
+                    [u for u in committed if not u.is_fleet()]
+                    if not is_naval else committed
                 )
                 popup_defenders = (
-                    [u for u in enemy_units if not u.is_fleet()]
-                    if not is_naval else enemy_units
+                    [u for u in enemy_on_map if not u.is_fleet()]
+                    if not is_naval else enemy_on_map
                 )
                 show_combat_result_popup(
                     self.game_state,
@@ -2299,8 +2330,8 @@ class CombatClickHandler:
                     context="manual_combat",
                     target_hex=target_hex,
                 )
-                # Mark attackers
-                for u in self.attackers:
+                # Mark only committed attackers
+                for u in committed:
                     u.attacked_this_turn = True
 
                 # Clear all
@@ -2316,7 +2347,7 @@ class CombatClickHandler:
                 advance_available = bool(resolution and resolution.get("advance_available"))
                 if advance_available:
                     self.pending_advance = {
-                        "attackers": committed_attackers,
+                        "attackers": committed,
                         "target_hex": target_hex,
                     }
                 if leader_escape:
@@ -2381,10 +2412,18 @@ class CombatClickHandler:
         if not attackers:
             return []
 
-        if self._selection_mode(attackers) == "naval":
-            return self._calculate_naval_targets(attackers)
+        fleets = [u for u in attackers if u.is_fleet()]
+        non_fleets = [u for u in attackers if not u.is_fleet()]
 
-        # 1. Get all unique positions of attackers (usually they are in one stack, but could be multi-hex attack)
+        valid_target_offsets = set()
+        if non_fleets:
+            valid_target_offsets.update(self._calculate_land_targets(non_fleets))
+        if fleets:
+            valid_target_offsets.update(self._calculate_naval_targets(fleets))
+        return list(valid_target_offsets)
+
+    def _calculate_land_targets(self, attackers):
+        """Returns list of (col, row) tuples for valid land/air attack targets."""
         attacker_hexes = set()
         for u in attackers:
             if u.position and None not in u.position:
@@ -2392,8 +2431,6 @@ class CombatClickHandler:
                 attacker_hexes.add(Hex.offset_to_axial(*u.position))
 
         valid_target_offsets = set()
-
-        # 2. Check neighbors of all attacker positions
         for start_hex in attacker_hexes:
             for next_hex in start_hex.neighbors():
                 enemy_units = [
@@ -2403,7 +2440,6 @@ class CombatClickHandler:
                 ]
                 if not enemy_units:
                     continue
-
                 if not self.game_state.can_units_attack_target_hex(attackers, next_hex):
                     continue
                 if not self.game_state.combat_service.can_units_attack_stack(attackers, enemy_units, target_hex=next_hex):
@@ -2450,14 +2486,14 @@ class CombatClickHandler:
         from src.gui.message_dialog import show_question_dialog
         return show_question_dialog(
             "Naval Withdrawal",
-            f"Round {round_number}: should {side_allegiance} withdraw all fleets and end naval combat?",
+            f"Round {round_number}: should {side_allegiance.capitalize()} withdraw all fleets and end naval combat?",
         )
 
     def _ask_dragon_duel_withdraw(self, side_allegiance, round_number):
         from src.gui.message_dialog import show_question_dialog
         return show_question_dialog(
             "Dragon Duel",
-            f"Dragon duel round {round_number}: should {side_allegiance} withdraw dragons?",
+            f"Dragon duel round {round_number}: should {side_allegiance.capitalize()} withdraw dragons?",
         )
 
     def _begin_leader_escape(self, leader_escape_requests):
