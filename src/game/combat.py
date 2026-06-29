@@ -1197,12 +1197,15 @@ class CombatService:
             )
             if invading:
                 self.game_state.apply_forced_entry_displacement(invading, hex_position)
+            col, row = hex_position.axial_to_offset()
+            country = self.game_state.get_country_by_hex(col, row)
+            can_advance = not (country and country.allegiance == NEUTRAL)
             result = "-/-"
             print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": [],
-                "advance_available": True,
+                "advance_available": can_advance,
                 "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 
@@ -1944,6 +1947,11 @@ class CombatService:
                     ]
             if remaining_defender_combat_units:
                 return False
+
+        col, row = target_hex.axial_to_offset()
+        country = self.game_state.get_country_by_hex(col, row)
+        if country and country.allegiance == NEUTRAL:
+            return False
 
         for unit in attackers:
             if not unit.is_on_map or not unit.position:
