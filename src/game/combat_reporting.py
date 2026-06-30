@@ -99,6 +99,38 @@ def _build_combat_body_widget(
     return widget
 
 
+def _center_view_on_hex(highlight_coords):
+    """Center the map view on the given hex and highlight it in red."""
+    if highlight_coords is None:
+        return
+    app = QApplication.instance()
+    if app is None:
+        return
+    parent = app.activeWindow()
+    if parent is None:
+        return
+    map_view = getattr(parent, "map_view", None)
+    if map_view is None:
+        return
+    if hasattr(map_view, "sync_with_model"):
+        try:
+            map_view.sync_with_model()
+        except Exception:
+            pass
+    if hasattr(map_view, "get_hex_center") and hasattr(map_view, "centerOn"):
+        try:
+            col, row = highlight_coords
+            center_pt = map_view.get_hex_center(col, row)
+            map_view.centerOn(center_pt)
+        except Exception:
+            pass
+    try:
+        map_view.highlight_movement_range([], [highlight_coords])
+    except Exception:
+        pass
+    QApplication.processEvents()
+
+
 def show_combat_result_popup(
     game_state,
     title: str,
@@ -117,6 +149,10 @@ def show_combat_result_popup(
     is highlighted in red using the "warning" highlight channel, and the map
     view is centered on that hex.
     """
+    # Always center the view on the combat/interception hex
+    highlight_coords = _to_offset_coords(target_hex)
+    _center_view_on_hex(highlight_coords)
+
     if not _is_verbose(game_state) or not game_state.has_human_player():
         return
 
@@ -128,8 +164,6 @@ def show_combat_result_popup(
 
     target_hex_str = TextFormatter.format_target_hex(target_hex)
     body_title_text = f"{combat_type.capitalize()} battle at {target_hex_str}"
-
-    highlight_coords = _to_offset_coords(target_hex)
     icon_name = "intercept.svg" if context == "interception" else "battle.svg"
     icon_path = os.path.join(ICONS_DIR, icon_name)
 
