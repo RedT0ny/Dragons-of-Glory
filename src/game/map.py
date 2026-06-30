@@ -946,6 +946,13 @@ class Board:
                     return True
         return False
 
+    def has_friendly_counter(self, hex_coord, allegiance):
+        """Returns True if the hex contains any non-leader unit of the given allegiance."""
+        for unit in self.get_units_in_hex(hex_coord.q, hex_coord.r):
+            if not unit.is_leader() and unit.allegiance == allegiance:
+                return True
+        return False
+
     def get_movement_cost(self, unit, from_hex, to_hex):
         """
         Dispatches to the correct movement logic based on unit class.

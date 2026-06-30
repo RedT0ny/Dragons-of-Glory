@@ -22,6 +22,7 @@ class Player:
         # For now we initialize empty and let GameState populate it
 
     def add_country(self, country: Country):
+        """Add a country to the player's controlled territories."""
         self.controlled_countries[country.spec.id] = country
 
     def set_ai(self, enabled: bool):

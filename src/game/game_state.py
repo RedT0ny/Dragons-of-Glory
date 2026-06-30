@@ -1,5 +1,5 @@
 import random
-from collections import defaultdict, deque
+from collections import defaultdict
 from pathlib import Path
 from typing import Set, Tuple, List, Dict, Optional
 
@@ -17,6 +17,7 @@ from src.game.map import Board, Hex
 from src.game.deployment import DeploymentService
 from src.game.event_system import EventSystem
 from src.game.movement import MovementService
+from src.game.supply import SupplyService
 from src.game.phase_manager import PhaseManager, CalendarService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
@@ -62,6 +63,7 @@ class GameState:
         self.deployment_service = DeploymentService(self)
         self.movement_service = MovementService(self)
         self.combat_service = CombatService(self)
+        self.supply_service = SupplyService(self)
         self.conquest_service = ConquestService(self)
         self.calendar = CalendarService()
         self.translator = Translator()
@@ -608,15 +610,6 @@ class GameState:
             if value in (HL, WS, "contested"):
                 self.territory_overrides[(col, row)] = value
 
-    def _compute_territory_scenario_baseline(self) -> Dict[Tuple[int, int], str]:
-        return board_analysis.compute_territory_scenario_baseline(self)
-
-    def _apply_country_territory_overrides(self, values: Dict[Tuple[int, int], str]) -> Dict[Tuple[int, int], str]:
-        return board_analysis.apply_country_territory_overrides(self, values)
-
-    def compute_territory_baseline(self) -> Dict[Tuple[int, int], str]:
-        return board_analysis.compute_territory_baseline(self)
-
     def update_territory_overrides(self):
         facts = self.get_control_facts()
         self.territory_overrides = board_analysis.compute_territory_overrides(self, control_facts=facts)
@@ -982,9 +975,6 @@ class GameState:
     def advance_phase(self):
         return self.phase_manager.advance_phase()
 
-    def next_turn(self):
-        return self.phase_manager.next_turn()
-
     def on_finish_replacements_round_for_player(self, allegiance: str):
         # Preserve existing behavior: only HL replacement round triggers draconian production.
         if allegiance == HL:
@@ -1027,123 +1017,7 @@ class GameState:
         self.evaluate_victory_conditions()
 
     def resolve_supply_phase(self):
-        """
-        Rule 12 (advanced supply):
-        - Only stacked ground armies (>1 in a hex) must trace supply.
-        - If no legal path to any friendly location, one army in that stack goes to RESERVE.
-        """
-        supply_mode = str(getattr(self, "supply", "standard")).strip().lower()
-        if supply_mode != "advanced" or not self.map:
-            return []
-
-        active = self.active_player
-        friendly_locations = {
-            (q, r)
-            for (q, r), loc in getattr(self.map, "locations", {}).items()
-            if getattr(loc, "occupier", None) == active
-        }
-
-        losses = []
-        # Snapshot current hex occupancy because we may mutate unit_map as losses are applied.
-        for (q, r), units in list(self.map.unit_map.items()):
-            stack_armies = [
-                u for u in units
-                if u.is_on_map
-                and u.allegiance == active
-                and u.is_army()
-            ]
-            if len(stack_armies) <= 1:
-                continue
-
-            stack_hex = Hex(q, r)
-            if self._can_trace_supply_line(stack_hex, active, stack_armies[0], friendly_locations):
-                continue
-
-            casualty = self._select_supply_attrition_unit(stack_armies)
-            if casualty is None:
-                continue
-            if getattr(casualty, "is_on_map", False):
-                self.map.remove_unit_from_spatial_map(casualty)
-            casualty.status = UnitState.RESERVE
-            casualty.position = (None, None)
-            losses.append(casualty)
-
-        self.finalize_board_state_change()
-        return losses
-
-    def _can_trace_supply_line(self, start_hex, allegiance, sample_unit, friendly_locations):
-        if not friendly_locations:
-            return False
-
-        frontier = deque([start_hex])
-        visited = {(start_hex.q, start_hex.r)}
-
-        while frontier:
-            current = frontier.popleft()
-            if (current.q, current.r) in friendly_locations:
-                return True
-
-            for neighbor in current.neighbors():
-                nk = (neighbor.q, neighbor.r)
-                if nk in visited:
-                    continue
-                if not self._is_valid_supply_step(current, neighbor, allegiance, sample_unit):
-                    continue
-                visited.add(nk)
-                frontier.append(neighbor)
-
-        return False
-
-    def _is_valid_supply_step(self, from_hex, to_hex, allegiance, sample_unit):
-        col, row = to_hex.axial_to_offset()
-        if not (0 <= col < self.map.width and 0 <= row < self.map.height):
-            return False
-
-        terrain = self.map.get_terrain(to_hex)
-        if terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM, TerrainType.DESERT, TerrainType.SWAMP):
-            return False
-
-        # Neutral countries block supply
-        country = self.get_country_by_hex(col, row)
-        if country and country.allegiance == NEUTRAL:
-            return False
-
-        hexside = self.map.get_effective_hexside(from_hex, to_hex)
-        if hexside in {HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER, HexsideType.SEA}:
-            return False
-
-        if self.map.has_enemy_army(to_hex, allegiance):
-            return False
-
-        # Enemy ZOC blocks trace unless the hex has a friendly counter.
-        if self.map.is_adjacent_to_enemy(to_hex, sample_unit) and not self._hex_has_friendly_counter(to_hex, allegiance):
-            return False
-
-        return True
-
-    def _hex_has_friendly_counter(self, hex_coord, allegiance):
-        for unit in self.map.get_units_in_hex(hex_coord.q, hex_coord.r):
-            if not unit.is_leader() and unit.allegiance == allegiance:
-                return True
-        return False
-
-    @staticmethod
-    def _select_supply_attrition_unit(stack_armies):
-        depleted = [u for u in stack_armies if u.status.name == "DEPLETED"]
-        if depleted:
-            return min(depleted, key=lambda u: (int(u.combat_rating), str(u.id), int(u.ordinal)))
-        active = [u for u in stack_armies if u.status.name == "ACTIVE"]
-        if active:
-            return min(active, key=lambda u: (int(u.combat_rating), str(u.id), int(u.ordinal)))
-        return min(
-            stack_armies,
-            key=lambda u: (
-                0 if u.is_on_map else 1,
-                int(u.combat_rating),
-                str(u.id),
-                int(u.ordinal),
-            ),
-        ) if stack_armies else None
+        return self.supply_service.resolve_supply_phase()
 
     def check_events(self):
         return self.event_system.check_events()
@@ -1219,14 +1093,12 @@ class GameState:
     def get_combat_bonus(self, allegiance: str) -> int:
         return int(self.combat_bonuses.get(allegiance, 0))
 
-    def clear_combat_bonus(self, allegiance: str):
-        if allegiance not in self.combat_bonuses:
-            return
-        self.combat_bonuses[allegiance] = 0
-
-    def clear_combat_bonuses(self):
-        for key in list(self.combat_bonuses.keys()):
-            self.combat_bonuses[key] = 0
+    def clear_combat_bonus(self, allegiance: str | None = None):
+        if allegiance is None:
+            for key in list(self.combat_bonuses.keys()):
+                self.combat_bonuses[key] = 0
+        elif allegiance in self.combat_bonuses:
+            self.combat_bonuses[allegiance] = 0
 
     def _force_move_fleet_to_state(self, fleet, state):
         retreat_hex, retreat_side = state
@@ -1543,12 +1415,4 @@ class GameState:
         if allegiance == WS:
             return HL
         return None
-
-    def resolve_event(self, event):
-        pass
-
-
-
-
-
 

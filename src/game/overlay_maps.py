@@ -411,7 +411,7 @@ def _compute_supply_reach(game_state, allegiance: str):
             nk = (neighbor.q, neighbor.r)
             if nk in visited:
                 continue
-            if not game_state._is_valid_supply_step(current, neighbor, allegiance, sample_unit):
+            if not game_state.supply_service.is_valid_supply_step(current, neighbor, allegiance, sample_unit):
                 continue
             visited.add(nk)
             frontier.append(neighbor)

@@ -1239,6 +1239,7 @@ class GameController(QObject):
         return outcome
 
     def _move_all_selected_to_hex(self, hex_obj):
+        """Move all selected units to the specified hex."""
         self.movement_service.push_movement_undo_snapshot()
         move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
         if move_result.errors:
