@@ -1394,25 +1394,25 @@ class OperationalPlanner:
                 is_high_urgency = plan.urgency_score >= 0.5 or plan.must_act
 
                 if plan.posture == "desperate_offensive":
-                    # Desperate offensive: commit 80-85% of force
-                    main_count = max(3, (len(candidates) * 80) // 100)
-                    support_count = max(2, (len(candidates) * 15) // 100)
+                    # Desperate offensive: commit 85-90% of force
+                    main_count = max(3, (len(candidates) * 85) // 100)
+                    support_count = max(2, (len(candidates) * 12) // 100)
                 elif is_high_urgency:
-                    # High urgency: commit 70-75% of force
-                    main_count = max(3, (len(candidates) * 70) // 100)
-                    support_count = max(2, (len(candidates) * 15) // 100)
+                    # High urgency: commit 78-82% of force
+                    main_count = max(3, (len(candidates) * 78) // 100)
+                    support_count = max(2, (len(candidates) * 12) // 100)
                 elif plan.posture == "offensive":
-                    # Standard offensive: commit 60-65% of force
-                    main_count = max(2, (len(candidates) * 60) // 100)
-                    support_count = max(1, (len(candidates) * 15) // 100)
+                    # Standard offensive: commit 72-75% of force
+                    main_count = max(3, (len(candidates) * 72) // 100)
+                    support_count = max(2, (len(candidates) * 12) // 100)
                 elif plan.posture == "cautious_offensive":
-                    # Cautious offensive: commit 55-60% of force
-                    main_count = max(2, (len(candidates) * 55) // 100)
-                    support_count = max(1, (len(candidates) * 15) // 100)
+                    # Cautious offensive: commit 62-65% of force
+                    main_count = max(2, (len(candidates) * 62) // 100)
+                    support_count = max(1, (len(candidates) * 12) // 100)
                 else:
                     # Balanced: conservative but still meaningful commitment
-                    main_count = max(2, (len(candidates) * 50) // 100)
-                    support_count = max(1, (len(candidates) * 15) // 100)
+                    main_count = max(2, (len(candidates) * 55) // 100)
+                    support_count = max(1, (len(candidates) * 12) // 100)
 
                 # Clamp to available candidates
                 if is_hl_control_campaign:
@@ -1750,12 +1750,17 @@ class OperationalPlanner:
                         and group_key not in main_effort_group_keys
                         and group_key not in support_group_keys
                         and objective.owner == ctx.side
-                        and local_threat < 2.0
+                        and local_threat < 3.0
                     ):
+                        target = main_hex
+                        if primary_front_country:
+                            front_hexes = list((ctx.country_hexes_by_id or {}).get(str(primary_front_country), []))
+                            if front_hexes:
+                                target = min(front_hexes, key=lambda h: group.hex.distance_to(h))
                         append_mission(Mission(
                             group=group,
                             mission_type="support_main_effort",
-                            target_hex=main_hex,
+                            target_hex=target,
                             objective=main_objective,
                             priority=96 + plan.urgency_score * 24 + group.power * 0.55,
                         ))
@@ -1785,14 +1790,37 @@ class OperationalPlanner:
                         and self._should_prepare_assault(ctx, plan, group, objective)
                     ):
                         mission_type = "prepare_assault"
-                    append_mission(Mission(
-                        group=group,
-                        mission_type=mission_type,
-                        target_hex=Hex.offset_to_axial(objective.coords[0], objective.coords[1]),
-                        objective=objective,
-                        priority=max(20.0, objective.value - distance * 1.5)
-                        + (15 if offensive and objective.owner != ctx.side else 0),
-                    ))
+                    # Redirect idle "secure" groups toward the front instead of holding friendly objectives.
+                    if (
+                        offensive
+                        and mission_type == "secure"
+                        and group.has_army
+                        and not group.has_fleet
+                        and main_hex is not None
+                        and local_threat < 2.0
+                        and group_key not in main_effort_group_keys
+                    ):
+                        target = main_hex
+                        if primary_front_country:
+                            front_hexes = list((ctx.country_hexes_by_id or {}).get(str(primary_front_country), []))
+                            if front_hexes:
+                                target = min(front_hexes, key=lambda h: group.hex.distance_to(h))
+                        append_mission(Mission(
+                            group=group,
+                            mission_type="support_main_effort",
+                            target_hex=target,
+                            objective=main_objective,
+                            priority=90 + plan.urgency_score * 20 + group.power * 0.5,
+                        ))
+                    else:
+                        append_mission(Mission(
+                            group=group,
+                            mission_type=mission_type,
+                            target_hex=Hex.offset_to_axial(objective.coords[0], objective.coords[1]),
+                            objective=objective,
+                            priority=max(20.0, objective.value - distance * 1.5)
+                            + (15 if offensive and objective.owner != ctx.side else 0),
+                        ))
                 else:
                     append_mission(Mission(
                         group=group,
@@ -2898,13 +2926,22 @@ class TacticalPlanner:
 
         penalty = 0.0
         if last_from == target and last_to == current and not justified:
-            penalty -= 55.0
+            penalty -= 80.0
         elif last_from == target and last_to == current:
-            penalty -= 18.0
+            penalty -= 25.0
 
         repeat_count = int(entry.get("repeat_count", 0) or 0)
         if repeat_count >= 2 and {last_from, last_to} == {current, target} and not justified:
-            penalty -= 20.0 * min(3, repeat_count - 1)
+            penalty -= 30.0 * min(4, repeat_count - 1)
+
+        # Penalize returning to any recently-visited hex (beyond just exact reversal).
+        last_visited = entry.get("visited_hexes", []) or []
+        if target in last_visited and not justified and target != current:
+            penalty -= 40.0
+
+        last_3 = last_visited[-3:] if len(last_visited) >= 3 else last_visited
+        if len(last_3) >= 3 and last_3[-1] == target and last_3[-2] == current and last_3[-3] == target:
+            penalty -= 35.0
 
         return penalty
 
@@ -2923,12 +2960,19 @@ class TacticalPlanner:
         repeat_count = 1
         if previous.get("from") == to_offset and previous.get("to") == from_offset:
             repeat_count = int(previous.get("repeat_count", 1) or 1) + 1
+
+        visited = list(previous.get("visited_hexes", []) or [])
+        visited.append(from_offset)
+        if len(visited) > 6:
+            visited = visited[-6:]
+
         ctx.movement_history[group_key] = {
             "from": from_offset,
             "to": to_offset,
             "mission": mission.mission_type,
             "turn": ctx.turn,
             "repeat_count": repeat_count,
+            "visited_hexes": visited,
         }
 
     @staticmethod
@@ -3158,7 +3202,7 @@ class TacticalPlanner:
 
         actions.sort(key=lambda a: (a.score, a.group.power), reverse=True)
         best = actions[0]
-        if best.score < 5 and not self._is_follow_up_worthy(plan, best):
+        if best.score < 0 and not self._is_follow_up_worthy(plan, best):
             if commander_boarded:
                 ctx.movement_logs.append(f"movement_tactical_exec transport_action={transport_ms:.1f}ms moved=True")
                 return True
@@ -3739,6 +3783,11 @@ class TacticalPlanner:
                         if ukey in ashore_state:
                             debug_print(f"[TRANSPORT] skip_reboard ashore_committed={getattr(unit, 'id', '?')}")
                             continue
+                        reboard_blocked_until = dict((ctx.invasion_state or {}).get("reboard_blocked_until", {}) or {})
+                        blocked_until = reboard_blocked_until.get(ukey)
+                        if blocked_until is not None and ctx.turn < blocked_until:
+                            debug_print(f"[TRANSPORT] skip_reboard cooldown={getattr(unit, 'id', '?')} until_turn={blocked_until}")
+                            continue
                         if transport_actions and ("landed_army", ukey) in transport_actions:
                             debug_print(f"[TRANSPORT] skip_reboard landed={getattr(unit, 'id', '?')}")
                             continue
@@ -3747,11 +3796,6 @@ class TacticalPlanner:
                             continue
                         if unit.position and tuple(unit.position) in beachhead_slot_offsets:
                             debug_print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
-                            continue
-                        if ukey in landed_state and unit.position:
-                            uhex = Hex.offset_to_axial(*unit.position)
-                            if any(uhex.distance_to(slot) <= 1 for slot in beachhead_slots):
-                                debug_print(f"[TRANSPORT] skip_reboard beachhead={getattr(unit, 'id', '?')}")
                             continue
                         if unit.moved_this_turn:
                             debug_print(f"[TRANSPORT] skip_reboard exhausted={getattr(unit, 'id', '?')}")
@@ -3900,6 +3944,7 @@ class TacticalPlanner:
         landed_state = set((ctx.invasion_state or {}).get("landed_armies", set()) or set())
         landed_leader_state = set((ctx.invasion_state or {}).get("landed_leaders", set()) or set())
         ashore_state = set((ctx.invasion_state or {}).get("ashore_committed_armies", set()) or set())
+        cooldown_map = dict((ctx.invasion_state or {}).get("reboard_blocked_until", {}) or {})
         unloaded = 0
         for fleet, selected, _score in actions:
             if unloaded >= max_actions:
@@ -3921,6 +3966,7 @@ class TacticalPlanner:
                         transport_actions.add(("landed_army", _unit_key(p)))
                         landed_state.add(_unit_key(p))
                         ashore_state.add(_unit_key(p))
+                        cooldown_map[_unit_key(p)] = ctx.turn + 2
                         debug_print(f"[TRANSPORT] ashore_committed={getattr(p, 'id', '?')}")
                     elif p.is_leader():
                         transport_actions.add(("landed_leader", _unit_key(p)))
@@ -3929,6 +3975,7 @@ class TacticalPlanner:
                 ctx.invasion_state["landed_armies"] = set(landed_state)
                 ctx.invasion_state["landed_leaders"] = set(landed_leader_state)
                 ctx.invasion_state["ashore_committed_armies"] = set(ashore_state)
+                ctx.invasion_state["reboard_blocked_until"] = dict(cooldown_map)
         return unloaded > 0
 
     @staticmethod
@@ -5388,6 +5435,7 @@ class BaselineAIPlayer:
                 "landed_leaders": set(),
                 "ashore_committed_armies": set(),
                 "committed_fleets": set(),
+                "reboard_blocked_until": {},
                 "version": 1,
             }
         return self._invasion_state_by_side[side]
@@ -5421,6 +5469,9 @@ class BaselineAIPlayer:
             return
         if unit.allegiance != side or not unit.is_on_map:
             state["ashore_committed_armies"].discard(key)
+            cooldown_map = dict(state.get("reboard_blocked_until", {}) or {})
+            cooldown_map.pop(key, None)
+            state["reboard_blocked_until"] = cooldown_map
 
     def _prune_ashore_committed_state(self, side: str):
         state = self._get_invasion_state(side)
@@ -5435,6 +5486,13 @@ class BaselineAIPlayer:
             and u.is_army()
         }
         state["ashore_committed_armies"] = committed.intersection(valid)
+
+        cooldown_map = dict(state.get("reboard_blocked_until", {}) or {})
+        current_turn = int(getattr(self.game_state, "turn", 0) or 0)
+        stale = [k for k in cooldown_map if k not in valid and current_turn > cooldown_map[k]]
+        for k in stale:
+            cooldown_map.pop(k, None)
+        state["reboard_blocked_until"] = cooldown_map
 
     def _clear_landed_flag_if_inland(self, side: str, unit):
         if not (unit.is_army() or unit.is_leader()):
