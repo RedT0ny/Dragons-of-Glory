@@ -4397,8 +4397,21 @@ class TacticalPlanner:
         if crossing_pen >= 4.0 and odds < 1.35:
             return {"allow": False, "note": "crossing_gate", "odds": odds}
         if odds < min_odds:
+            debug_print(f"[AI_GATE] odds_gate REJECT odds={odds:.3f} min_odds={min_odds:.3f} projected_ratio={projected_ratio} hex=({target_hex.q},{target_hex.r})")
             return {"allow": False, "note": "odds_gate", "odds": odds}
 
+        check_ratio = projected_ratio if projected_ratio is not None else odds
+        if check_ratio <= 1.0:
+            combat_service = getattr(ctx.game_state, "combat_service", None)
+            if combat_service and hasattr(combat_service, "calculate_total_drm"):
+                drm = combat_service.calculate_total_drm(attackers, defenders, target_hex)
+                if drm < -2:
+                    debug_print(f"[AI_GATE] drm_gate REJECT odds={odds:.3f} projected_ratio={projected_ratio} drm={drm} hex=({target_hex.q},{target_hex.r})")
+                    return {"allow": False, "note": "drm_gate", "odds": odds, "drm": drm, "projected_ratio": projected_ratio}
+                else:
+                    debug_print(f"[AI_GATE] drm_gate PASS odds={odds:.3f} projected_ratio={projected_ratio} drm={drm} hex=({target_hex.q},{target_hex.r})")
+
+        debug_print(f"[AI_GATE] ALLOW odds={odds:.3f} projected_ratio={projected_ratio} min_odds={min_odds:.3f} hex=({target_hex.q},{target_hex.r})")
         return {
             "allow": True,
             "note": "ok",
