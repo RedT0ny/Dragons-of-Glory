@@ -329,7 +329,19 @@ class CombatResolver:
 
         # LEADERS: + Tactical rating of attacking leaders - Tactical rating of defending leaders.
         atk_leader = sum( u.tactical_rating for u in self.attackers if u.is_leader() )
+        atk_leader += sum(
+            p.tactical_rating
+            for u in self.attackers
+            for p in (getattr(u, "passengers", []) or [])
+            if p.is_leader()
+        )
         def_leader = sum( u.tactical_rating for u in self.defenders if u.is_leader() )
+        def_leader += sum(
+            p.tactical_rating
+            for u in self.defenders
+            for p in (getattr(u, "passengers", []) or [])
+            if p.is_leader()
+        )
         add_part("attacker_leader", atk_leader)
         add_part("defender_leader", -def_leader)
 
