@@ -1,6 +1,33 @@
-from typing import Any, Iterable
+import os
+from typing import Any, Iterable, Optional, TextIO
 
 from src.content.config import DEBUG
+
+_debug_log_file: Optional[TextIO] = None
+
+
+def set_debug_log_path(path: str) -> None:
+    """Open a file for debug_print output. All subsequent debug_print calls
+    will write to this file regardless of the DEBUG flag."""
+    global _debug_log_file
+    close_debug_log()
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        _debug_log_file = open(path, "a", encoding="utf-8", buffering=1)
+    except Exception:
+        _debug_log_file = None
+
+
+def close_debug_log() -> None:
+    """Close the debug log file if open."""
+    global _debug_log_file
+    if _debug_log_file is not None:
+        try:
+            _debug_log_file.close()
+        except Exception:
+            pass
+        _debug_log_file = None
+
 
 def to_roman(n: int):
     """Convert an integer to Roman numeral."""
@@ -51,6 +78,16 @@ def caption_id(unit_id: str):
 
     # No underscores: capitalize the whole thing
     return id_text.capitalize()
+
+def debug_print(message):
+    if _debug_log_file is not None:
+        try:
+            _debug_log_file.write(f"{message}\n")
+            _debug_log_file.flush()
+        except Exception:
+            pass
+    if DEBUG:
+        print(message)
 
 
 class TextFormatter:
@@ -337,8 +374,3 @@ class TextFormatter:
                 return default
             cursor = cursor.get(part)
         return cursor if isinstance(cursor, str) else default
-
-
-def debug_print(message):
-    if DEBUG:
-        print(message)

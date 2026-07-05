@@ -3161,6 +3161,12 @@ class TacticalPlanner:
             self._reachable_cache.clear()
             return True
 
+        leaders_moved = self._move_leaders_to_front(ctx, plan)
+        if leaders_moved:
+            ctx.movement_logs.append(f"movement_tactical_exec leader_front={transport_ms:.1f}ms moved=True")
+            self._reachable_cache.clear()
+            return True
+
         eval_start = perf_counter()
         eval_reach_ms = 0.0
         eval_score_ms = 0.0
@@ -4073,6 +4079,123 @@ class TacticalPlanner:
 
         return selected_armies + companion_leaders
 
+    def _move_leaders_to_front(self, ctx: AIContext, plan: StrategicPlan) -> bool:
+        """Move leaders toward the main offensive front when posture is aggressive.
+
+        Leaders provide tactical_rating DRM bonuses in land combat. An aggressive AI
+        should ensure its leaders are positioned where they can contribute to offensive
+        combat, especially when attacking locations or well-defended points that benefit
+        most from the extra combat modifier.
+        """
+        aggressive_postures = {"offensive", "desperate_offensive", "cautious_offensive"}
+        if plan.posture not in aggressive_postures:
+            return False
+        if not plan.main_objective:
+            return False
+
+        main_hex = Hex.offset_to_axial(plan.main_objective.coords[0], plan.main_objective.coords[1])
+
+        # Collect on-map leaders not already aboard a carrier
+        leaders = [
+            u for u in ctx.friendly_units
+            if u.is_leader()
+            and u.is_on_map
+            and u.transport_host is None
+            and u.position and None not in u.position
+        ]
+        if not leaders:
+            return False
+
+        # Assess the target: locations and strong defenses increase the value of leader support
+        target_stack = ctx.game_state.map.get_units_in_hex(main_hex.q, main_hex.r)
+        enemy_defenders = [
+            u for u in target_stack
+            if u.allegiance == ctx.enemy and u.is_on_map and u.is_combat_unit()
+        ]
+        target_loc = ctx.game_state.map.get_location(main_hex)
+        target_is_location = bool(target_loc and getattr(target_loc, "occupier", None) == ctx.enemy)
+        enemy_defender_power = sum(u.combat_rating for u in enemy_defenders)
+
+        urgency_mult = 1.0
+        if target_is_location:
+            urgency_mult += 1.0
+        if enemy_defender_power >= 5:
+            urgency_mult += 0.5
+        if plan.urgency_score >= 0.7:
+            urgency_mult += 0.5
+
+        threat_overlay = ctx.overlays.get("threat")
+        friendly_power_overlay = ctx.overlays.get("ws_power") if ctx.side == WS else ctx.overlays.get("hl_power")
+
+        moved_any = False
+        for leader in leaders:
+            leader_hex = Hex.offset_to_axial(*leader.position)
+            dist_to_main = leader_hex.distance_to(main_hex)
+
+            # Skip leaders already close to the main effort or already at the front
+            if dist_to_main <= 2:
+                continue
+            if ctx.enemy_adjacent_combat_count.get((leader_hex.q, leader_hex.r), 0) > 0:
+                continue
+
+            reachable = ctx.movement_service.get_reachable_hexes([leader])
+            if not reachable or not reachable.reachable_coords:
+                continue
+
+            candidates = list(reachable.reachable_coords)
+            if not candidates:
+                continue
+
+            best_score = float("-inf")
+            best_hex = None
+
+            for col, row in candidates:
+                target_hex = Hex.offset_to_axial(col, row)
+                if target_hex == leader_hex:
+                    continue
+
+                dist = target_hex.distance_to(main_hex)
+                threat_val = _overlay_value(threat_overlay, col, row, 0.0)
+                support_val = _overlay_value(friendly_power_overlay, col, row, 0.0)
+
+                score = max(0.0, 12.0 - dist) * 6.0 * urgency_mult
+                score -= threat_val * 4.0
+                score += support_val * 2.0
+
+                # Reward forward progress toward the main objective
+                if dist < dist_to_main:
+                    score += (dist_to_main - dist) * 10.0 * urgency_mult
+
+                # Prefer hexes where friendly combat units are already present
+                stack = ctx.game_state.map.get_units_in_hex(col, row)
+                friendly_combat = [
+                    u for u in stack
+                    if u.allegiance == ctx.side and u.is_on_map and u.is_combat_unit()
+                ]
+                if friendly_combat:
+                    score += min(20.0, float(len(friendly_combat)) * 5.0)
+
+                # Bonus for front-line hexes adjacent to the enemy
+                if ctx.enemy_adjacent_combat_count.get((col, row), 0) > 0:
+                    score += 12.0 * urgency_mult
+
+                if score > best_score:
+                    best_score = score
+                    best_hex = target_hex
+
+            if best_hex is None or best_score < 5.0:
+                continue
+
+            move_result = ctx.movement_service.move_units_to_hex([leader], best_hex)
+            if move_result and move_result.moved:
+                debug_print(
+                    f"[LEADER_FRONT] moved {TextFormatter.format_unit_log_string(leader)} "
+                    f"from {leader_hex.axial_to_offset()} to {best_hex.axial_to_offset()}"
+                )
+                moved_any = True
+
+        return moved_any
+
     def _board_dragon_commanders(self, ctx: AIContext) -> bool:
         """Board eligible leaders onto dragon wings that lack a commander.
         
@@ -4397,19 +4520,44 @@ class TacticalPlanner:
         if crossing_pen >= 4.0 and odds < 1.35:
             return {"allow": False, "note": "crossing_gate", "odds": odds}
         if odds < min_odds:
-            debug_print(f"[AI_GATE] odds_gate REJECT odds={odds:.3f} min_odds={min_odds:.3f} projected_ratio={projected_ratio} hex=({target_hex.q},{target_hex.r})")
+            cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
+            debug_print(
+                f"[AI_GATE] odds_gate REJECT "
+                f"Combat odds: attacker_cs={cs_info.get('attacker_cs', '?')} "
+                f"defender_cs={cs_info.get('defender_cs', '?')} "
+                f"-> {cs_info.get('odds_str', '?')} "
+                f"min_odds={min_odds:.3f} "
+                f"hex=({target_hex.q},{target_hex.r})"
+            )
             return {"allow": False, "note": "odds_gate", "odds": odds}
 
         check_ratio = projected_ratio if projected_ratio is not None else odds
         if check_ratio <= 1.0:
             combat_service = getattr(ctx.game_state, "combat_service", None)
             if combat_service and hasattr(combat_service, "calculate_total_drm"):
-                drm = combat_service.calculate_total_drm(attackers, defenders, target_hex)
+                drm, drm_parts = combat_service.calculate_total_drm(attackers, defenders, target_hex, return_breakdown=True)
+                parts_text = ", ".join(f"{name}={value:+d}" for name, value in drm_parts if value)
                 if drm < -2:
-                    debug_print(f"[AI_GATE] drm_gate REJECT odds={odds:.3f} projected_ratio={projected_ratio} drm={drm} hex=({target_hex.q},{target_hex.r})")
+                    cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
+                    debug_print(
+                        f"[AI_GATE] drm_gate REJECT "
+                        f"Combat odds: attacker_cs={cs_info.get('attacker_cs', '?')} "
+                        f"defender_cs={cs_info.get('defender_cs', '?')} "
+                        f"-> {cs_info.get('odds_str', '?')} "
+                        f"Combat DRM: total={drm:+d} [{parts_text}] "
+                        f"hex=({target_hex.q},{target_hex.r})"
+                    )
                     return {"allow": False, "note": "drm_gate", "odds": odds, "drm": drm, "projected_ratio": projected_ratio}
                 else:
-                    debug_print(f"[AI_GATE] drm_gate PASS odds={odds:.3f} projected_ratio={projected_ratio} drm={drm} hex=({target_hex.q},{target_hex.r})")
+                    cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
+                    debug_print(
+                        f"[AI_GATE] drm_gate PASS "
+                        f"Combat odds: attacker_cs={cs_info.get('attacker_cs', '?')} "
+                        f"defender_cs={cs_info.get('defender_cs', '?')} "
+                        f"-> {cs_info.get('odds_str', '?')} "
+                        f"Combat DRM: total={drm:+d} [{parts_text}] "
+                        f"hex=({target_hex.q},{target_hex.r})"
+                    )
 
         debug_print(f"[AI_GATE] ALLOW odds={odds:.3f} projected_ratio={projected_ratio} min_odds={min_odds:.3f} hex=({target_hex.q},{target_hex.r})")
         return {

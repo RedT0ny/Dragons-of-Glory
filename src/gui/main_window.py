@@ -1,6 +1,7 @@
 import sys
 import os
 import webbrowser
+from datetime import datetime
 from time import monotonic
 from time import perf_counter
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -9,8 +10,8 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
 
-from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES
-from src.content.tools import debug_print
+from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, LOGS_DIR
+from src.content.tools import debug_print, set_debug_log_path, close_debug_log
 from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
 from src.gui.new_game_dialog import NewGameDialog
@@ -30,19 +31,45 @@ class ConsoleRedirector(QObject):
     """Custom stream object to redirect stdout/stderr to a Qt Signal while keeping original output."""
     text_written = Signal(str)
 
-    def __init__(self, original_stream):
+    def __init__(self, original_stream, log_file_path=None):
         super().__init__()
         self.original_stream = original_stream
+        self.log_file = None
+        if log_file_path:
+            try:
+                os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+                self.log_file = open(log_file_path, "a", encoding="utf-8", buffering=1)
+            except Exception:
+                self.log_file = None
 
     def write(self, text):
         # 1. Emit signal for the GUI log area
         self.text_written.emit(str(text))
         # 2. Write to the original python console stream
         self.original_stream.write(text)
+        # 3. Write to persistent log file
+        if self.log_file is not None:
+            try:
+                self.log_file.write(str(text))
+                self.log_file.flush()
+            except Exception:
+                pass
 
     def flush(self):
-        # Pass flush to original stream (required for file-like objects)
         self.original_stream.flush()
+        if self.log_file is not None:
+            try:
+                self.log_file.flush()
+            except Exception:
+                pass
+
+    def close_log(self):
+        if self.log_file is not None:
+            try:
+                self.log_file.close()
+            except Exception:
+                pass
+            self.log_file = None
 
 
 class MainWindow(QMainWindow):
@@ -129,13 +156,19 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.body_row, stretch=1)
 
         # Redirect console output to the log area while keeping original console
-        self.stdout_redirector = ConsoleRedirector(sys.stdout)
+        session_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_log = os.path.join(LOGS_DIR, f"session_{session_timestamp}.log")
+        debug_log = os.path.join(LOGS_DIR, f"debug_{session_timestamp}.log")
+
+        self.stdout_redirector = ConsoleRedirector(sys.stdout, log_file_path=session_log)
         self.stdout_redirector.text_written.connect(self.append_log)
         sys.stdout = self.stdout_redirector
 
-        self.stderr_redirector = ConsoleRedirector(sys.stderr)
+        self.stderr_redirector = ConsoleRedirector(sys.stderr, log_file_path=session_log)
         self.stderr_redirector.text_written.connect(self.append_log)
         sys.stderr = self.stderr_redirector
+
+        set_debug_log_path(debug_log)
 
         # Initialize visual grid from the game state
         self.map_view.sync_with_model()
@@ -153,9 +186,12 @@ class MainWindow(QMainWindow):
         """Restores original console streams on exit to prevent segfaults."""
         # Restore original streams to avoid crash on shutdown (Access Violation 0xC0000005)
         # because Python might try to flush stdout/stderr to a destroyed QObject.
+        close_debug_log()
         if hasattr(self, 'stdout_redirector'):
+            self.stdout_redirector.close_log()
             sys.stdout = self.stdout_redirector.original_stream
         if hasattr(self, 'stderr_redirector'):
+            self.stderr_redirector.close_log()
             sys.stderr = self.stderr_redirector.original_stream
 
         super().closeEvent(event)

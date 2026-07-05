@@ -3,7 +3,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from src.content.specs import HexsideType, UnitType, UnitRace, LocType, TerrainType
-from src.content.constants import NEUTRAL
+from src.content.constants import NEUTRAL, WS, HL
+from src.content.tools import debug_print
 from src.game.country import Location
 
 
@@ -443,12 +444,22 @@ class Board:
         turn = (d2 - d1) % 6
         return turn in (1, 5)
 
+    @staticmethod
+    def _are_opposing_sides(a: str, b: str) -> bool:
+        """Returns True if two allegiances are on opposing sides (WS vs HL)."""
+        return (a == WS and b == HL) or (a == HL and b == WS)
+
     def _is_enemy_for_fleet(self, unit, other):
-        return (
-            other.allegiance != unit.allegiance
-            and other.allegiance != NEUTRAL
-            and other.is_on_map
-        )
+        if not other.is_on_map:
+            return False
+        enemy = self._are_opposing_sides(unit.allegiance, other.allegiance)
+        if not enemy and unit.allegiance != other.allegiance and other.allegiance != NEUTRAL:
+            debug_print(
+                f"[FLEET_ENEMY] {unit.id} (allegiance={unit.allegiance}) at {getattr(unit, 'position', None)} "
+                f"sees {other.id} (allegiance={other.allegiance}) as NOT enemy "
+                f"(same side despite different string)"
+            )
+        return enemy
 
     def _hex_has_enemy_unit_for_fleet(self, hex_obj, unit):
         for other in self.get_units_in_hex(hex_obj.q, hex_obj.r):
@@ -554,6 +565,10 @@ class Board:
                 if self._fleet_can_enter_hex(unit, next_hex):
                     neighbors.append(((next_hex, None), 1))
             return neighbors
+
+        # Allow exiting the river into the current hex so hex-based
+        # neighbors (like coastal hexes) become reachable via (current_hex, None).
+        neighbors.append(((current_hex, None), 0))
 
         endpoints = self._river_endpoints_local(river_hexside)
         if len(endpoints) != 2:
@@ -752,12 +767,39 @@ class Board:
         """
         start_state = (start_hex, self._coerce_hexside(getattr(fleet, "river_hexside", None)))
         start_key = self._fleet_state_key(start_state)
-        result = self._search_fleet_states(
-            fleet,
-            start_state,
-            stop_predicate=lambda state, _: self._fleet_state_key(state) != start_key and self._is_safe_fleet_displacement_state(fleet, state),
-        )
-        return result["found_state"]
+        start_off = start_hex.axial_to_offset()
+
+        def _stop(state, cost):
+            h, rs = state
+            if h == start_hex:
+                return False
+            key = self._fleet_state_key(state)
+            if key == start_key:
+                return False
+            safe = self._is_safe_fleet_displacement_state(fleet, state)
+            if not safe:
+                h, rs = state
+                off = h.axial_to_offset()
+                debug_print(
+                    f"[FLEET_DISPLACE] {fleet.id} skip state=({off[0]},{off[1]}, river={rs}) "
+                    f"cost={cost} reason=unsafe"
+                )
+            return safe
+
+        result = self._search_fleet_states(fleet, start_state, stop_predicate=_stop)
+        found = result["found_state"]
+        if found:
+            h, rs = found
+            off = h.axial_to_offset()
+            debug_print(
+                f"[FLEET_DISPLACE] {fleet.id} displaced to state=({off[0]},{off[1]}, river={rs}) "
+                f"from start=({start_off[0]},{start_off[1]})"
+            )
+        else:
+            debug_print(
+                f"[FLEET_DISPLACE] {fleet.id} NO safe state found from start=({start_off[0]},{start_off[1]})"
+            )
+        return found
 
     def get_location(self, hex_coord) -> Location | None:
         """Returns Location if one exists at this hex."""
