@@ -1137,6 +1137,19 @@ class CombatService:
         """Returns effective attacker/defender combat ratio for the given combat context."""
         return self._project_combat_odds(attackers, defenders, hex_position)["ratio"]
 
+    def calculate_total_drm(self, attackers, defenders, hex_position):
+        """Calculate the total DRM for the given combat context without resolving combat.
+
+        Returns the integer DRM total (e.g. -8, +3, 0).
+        """
+        terrain = self.game_state.map.get_terrain(hex_position)
+        land_attackers = [u for u in attackers if not u.is_fleet()]
+        land_defenders = [u for u in defenders if not u.is_fleet()]
+        if not land_attackers or not land_defenders:
+            return 0
+        resolver = CombatResolver(land_attackers, land_defenders, terrain, game_state=self.game_state)
+        return resolver.calculate_total_drm()
+
     def resolve_combat(
         self,
         attackers,
