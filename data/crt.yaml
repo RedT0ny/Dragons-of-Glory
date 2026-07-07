@@ -1162,7 +1162,7 @@ rows:
         result: ''
         retreat: false
       defender:
-        result: '2'
+        result: '1'
         retreat: true
     2:3:
       attacker:
