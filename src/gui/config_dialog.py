@@ -100,7 +100,6 @@ class Ui_configDialog(object):
 
         self.gridLayout_3.addWidget(self.cdComboBox, 1, 1, 1, 1)
 
-
         self.gridLayout.addWidget(self.gameOptions, 0, 0, 1, 1)
 
         self.rulesConfig = QGroupBox(configDialog)
@@ -133,6 +132,19 @@ class Ui_configDialog(object):
 
         self.gridLayout_4.addWidget(self.depComboBox, 1, 1, 1, 1)
 
+        self.intLabel = QLabel(self.rulesConfig)
+        self.intLabel.setObjectName(u"intLabel")
+        self.intLabel.setFont(font)
+
+        self.gridLayout_4.addWidget(self.intLabel, 2, 0, 1, 1)
+
+        self.intComboBox = QComboBox(self.rulesConfig)
+        self.intComboBox.addItem("")
+        self.intComboBox.addItem("")
+        self.intComboBox.addItem("")
+        self.intComboBox.setObjectName(u"intComboBox")
+
+        self.gridLayout_4.addWidget(self.intComboBox, 2, 1, 1, 1)
 
         self.gridLayout.addWidget(self.rulesConfig, 1, 0, 1, 1)
 
@@ -173,6 +185,11 @@ class Ui_configDialog(object):
         self.depLabel.setText(QCoreApplication.translate("configDialog", u"Deployment", None))
         self.depComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Canonical", None))
         self.depComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Manual", None))
+
+        self.intLabel.setText(QCoreApplication.translate("configDialog", u"Interception", None))
+        self.intComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Enabled", None))
+        self.intComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Disabled", None))
+        self.intComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Naval only", None))
 
     # retranslateUi
 
@@ -217,6 +234,11 @@ class ConfigDialog(QDialog):
         self.ui.depComboBox.addItem(tr("dialogs.config.deployment_canonical", "Canonical"), "canonical")
         self.ui.depComboBox.addItem(tr("dialogs.config.deployment_manual", "Manual"), "manual")
 
+        self.ui.intComboBox.clear()
+        self.ui.intComboBox.addItem(tr("dialogs.config.interception_enabled", "Enabled"), "enabled")
+        self.ui.intComboBox.addItem(tr("dialogs.config.interception_disabled", "Disabled"), "disabled")
+        self.ui.intComboBox.addItem(tr("dialogs.config.interception_naval", "Naval only"), "naval")
+
         self.ui.hlComboBox.clear()
         self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
         self.ui.hlComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
@@ -237,6 +259,7 @@ class ConfigDialog(QDialog):
         combat_details = str(config.get("combat_details", "brief")).strip().lower()
         supply = str(config.get("supply", "standard")).strip().lower()
         deployment = str(config.get("deployment", "canonical")).strip().lower()
+        interception = str(config.get("interception", "disabled")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
@@ -251,6 +274,9 @@ class ConfigDialog(QDialog):
         dep_idx = self.ui.depComboBox.findData("manual" if deployment == "manual" else "canonical")
         if dep_idx >= 0:
             self.ui.depComboBox.setCurrentIndex(dep_idx)
+        int_idx = self.ui.intComboBox.findData(interception if interception in {"enabled", "disabled", "naval"} else "disabled")
+        if int_idx >= 0:
+            self.ui.intComboBox.setCurrentIndex(int_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
         if hl_idx >= 0:
             self.ui.hlComboBox.setCurrentIndex(hl_idx)
@@ -287,10 +313,12 @@ class ConfigDialog(QDialog):
         combat_details = str(self.ui.cdComboBox.currentData() or "brief")
         supply = str(self.ui.supComboBox.currentData() or "standard")
         deployment = str(self.ui.depComboBox.currentData() or "canonical")
+        interception = str(self.ui.intComboBox.currentData() or "disabled")
 
         return {
             "difficulty": difficulty,
             "combat_details": combat_details,
             "supply": supply,
             "deployment": deployment,
+            "interception": interception,
         }
