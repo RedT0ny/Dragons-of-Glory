@@ -88,6 +88,7 @@ class GameState:
         self.combat_bonuses = {HL: 0, WS: 0}
         self.supply = "standard"
         self.deployment_mode = "canonical"
+        self.interception_mode = "disabled"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"

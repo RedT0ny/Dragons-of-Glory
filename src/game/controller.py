@@ -26,6 +26,7 @@ class GameController(QObject):
         combat_details="brief",
         supply="standard",
         deployment="canonical",
+        interception="disabled",
     ):
         """Initialize the game controller with state, view, and configuration.
         
@@ -37,6 +38,7 @@ class GameController(QObject):
             difficulty: Game difficulty level (default "normal").
             combat_details: Level of combat detail to display (default "brief").
             supply: Supply ruleset variant (default "standard").
+            interception: Interception mode - "enabled", "disabled", or "naval" (default "disabled").
         """
         super().__init__()
         self.game_state = game_state
@@ -47,10 +49,12 @@ class GameController(QObject):
         self.combat_details = str(combat_details).strip().lower()
         self.supply = str(supply).strip().lower()
         self.deployment = str(deployment).strip().lower()
+        self.interception = str(interception).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
         self.game_state.deployment_mode = self.deployment
+        self.game_state.interception_mode = self.interception
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -108,6 +112,7 @@ class GameController(QObject):
             "combat_details": self.combat_details,
             "supply": self.supply,
             "deployment": self.deployment,
+            "interception": self.interception,
         }
 
     def apply_runtime_config(self, config: dict):
@@ -127,10 +132,12 @@ class GameController(QObject):
         self.combat_details = str(config.get("combat_details", self.combat_details)).strip().lower()
         self.supply = str(config.get("supply", self.supply)).strip().lower()
         self.deployment = str(config.get("deployment", self.deployment)).strip().lower()
+        self.interception = str(config.get("interception", self.interception)).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
         self.game_state.deployment_mode = self.deployment
+        self.game_state.interception_mode = self.interception
 
         if HL in self.game_state.players:
             self.game_state.players[HL].set_ai(hl_ai)

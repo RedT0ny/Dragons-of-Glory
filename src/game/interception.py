@@ -25,14 +25,20 @@ class InterceptionService:
     def should_check_interception(self, units):
         """Returns True if the given units are eligible for interception checks.
 
-        Interception only applies during the MOVEMENT phase and requires all
-        moving units to be Wings or Fleets (air/naval units).
+        Interception only applies during the MOVEMENT phase when the interception
+        mode is not "disabled". In "naval" mode, only fleet units are eligible.
+        In "enabled" mode, wings and fleets are eligible.
         """
         if not units:
             return False
         if getattr(self.game_state, "phase", None) != GamePhase.MOVEMENT:
             return False
+        mode = getattr(self.game_state, "interception_mode", "disabled")
+        if mode == "disabled":
+            return False
         self.ensure_step_context()
+        if mode == "naval":
+            return all(u.is_fleet() for u in units)
         return all(u.is_wing() or u.is_fleet() for u in units)
 
     def ensure_step_context(self):
@@ -56,24 +62,25 @@ class InterceptionService:
 
         Returns True if an interception was resolved (even if combat was skipped),
         False if no interceptor groups were found, the moving stack evaded
-        the 10 % spot check, or the distance roll failed.
+        the spot check, or the distance roll failed.
         """
         in_range_groups = self.find_interceptor_groups_in_range(moving_units, current_hex)
         if not in_range_groups:
             return False
 
-        # 10% possibility that the moving stack is spotted.
-        if self.rng.random() >= 0.10:
+        origin_offset, interceptors = self.rng.choice(in_range_groups)
+        dist = Hex.offset_to_axial(*origin_offset).distance_to(current_hex)
+
+        spot_chance = 0.50 if dist == 2 else 1.0
+        if self.rng.random() >= spot_chance:
             return False
 
-        origin_offset, interceptors = self.rng.choice(in_range_groups)
         for unit in interceptors:
             self._interception_attempted_units.add((unit.id, getattr(unit, "ordinal", 1)))
 
-        dist = Hex.offset_to_axial(*origin_offset).distance_to(current_hex)
         if dist <= 0:
             return False
-        roll = self.rng.randint(1, 6)
+        roll = self.rng.randint(1, 4)
         print(f"Interception attempt by stack at {origin_offset}: roll {roll} vs distance {dist}.")
         if roll < dist:
             return False
@@ -82,15 +89,17 @@ class InterceptionService:
         return True
 
     def find_interceptor_groups_in_range(self, moving_units, current_hex):
-        """Collects eligible interceptor stacks within 1-6 hexes of the target hex.
+        """Collects eligible interceptor stacks within 1-2 hexes of the target hex.
 
         Filters out friendly, neutral, off-map, transported, and already-attempted
-        units. Results are grouped by their origin hex offset.
+        units. In "naval" mode, only fleet interceptors are considered.
+        Results are grouped by their origin hex offset.
 
         Returns:
             list of (origin_offset, [unit, ...]) pairs.
         """
         mover_side = moving_units[0].allegiance
+        mode = getattr(self.game_state, "interception_mode", "disabled")
         by_hex = {}
         for unit in self.game_state.units:
             if unit.allegiance in (mover_side, NEUTRAL, None):
@@ -99,8 +108,12 @@ class InterceptionService:
                 continue
             if unit.transport_host is not None:
                 continue
-            if not unit.is_wing() and not unit.is_fleet():
-                continue
+            if mode == "naval":
+                if not unit.is_fleet():
+                    continue
+            else:
+                if not unit.is_wing() and not unit.is_fleet():
+                    continue
             if not unit.position or None in unit.position:
                 continue
             if (unit.id, getattr(unit, "ordinal", 1)) in self._interception_attempted_units:
@@ -110,7 +123,7 @@ class InterceptionService:
             if not self.dragon_interceptor_has_required_commander(unit):
                 continue
             dist = Hex.offset_to_axial(*unit.position).distance_to(current_hex)
-            if 1 <= dist <= 6:
+            if 1 <= dist <= 2:
                 key = tuple(unit.position)
                 by_hex.setdefault(key, []).append(unit)
         return list(by_hex.items())

@@ -97,6 +97,7 @@ class GameApp:
             combat_details=player_config.get("combat_details", "brief"),
             supply=player_config.get("supply", "standard"),
             deployment=player_config.get("deployment", "canonical"),
+            interception=player_config.get("interception", "disabled"),
         )
 
         if loading:
