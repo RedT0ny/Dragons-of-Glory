@@ -1240,6 +1240,7 @@ class GameController(QObject):
 
     def _move_all_selected_to_hex(self, hex_obj):
         """Move all selected units to the specified hex."""
+        before_positions = {u: tuple(u.position) if u.position else (None, None) for u in self.selected_units_for_movement}
         self.movement_service.push_movement_undo_snapshot()
         move_result = self.movement_service.move_units_to_hex(self.selected_units_for_movement, hex_obj)
         if move_result.errors:
@@ -1254,6 +1255,11 @@ class GameController(QObject):
             f"Movement applied: target={hex_obj.axial_to_offset()} "
             f"moved={[u.id for u in move_result.moved]}"
         )
+        for unit in move_result.moved:
+            prev = before_positions.get(unit, (None, None))
+            now = tuple(unit.position) if unit.position else (None, None)
+            unit_name = TextFormatter.format_unit_log_string(unit)
+            print(f"movement unit={unit_name} from={prev} to={now}")
 
         # Clear selection/highlights
         self.view.highlight_movement_range([])

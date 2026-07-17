@@ -14,6 +14,42 @@ from src.game.map import Hex
 # This module is intentionally rule-dense: it centralizes combat math, special-case
 # rule handling, and click-driven combat UX orchestration in one place.
 
+_crt_cache = None
+
+
+def _get_crt_data():
+    global _crt_cache
+    if _crt_cache is None:
+        _crt_cache = load_data(CRT_DATA)
+    return _crt_cache
+
+
+def compute_crt_survival_probability(odds_ratio: float, drm: int) -> float:
+    """Iterates all 10 d10 rolls through CRT data to compute attacker survival probability.
+
+    Args:
+        odds_ratio: Attacker CS / defender CS ratio (includes defender multipliers).
+        drm: Total combat DRM.
+
+    Returns:
+        Float 0.0–1.0: proportion of die rolls where attacker is not eliminated.
+    """
+    data = _get_crt_data()
+    if not data:
+        return 0.5
+    odds_str = CombatResolver.calculate_odds(odds_ratio * 100, 100)
+    surv = 0
+    for die in range(1, 11):
+        adj = die + drm
+        adj = max(-5, min(16, adj))
+        try:
+            result = data[adj][odds_str]
+        except KeyError:
+            continue
+        if not result.startswith("E/"):
+            surv += 1
+    return surv / 10.0
+
 
 def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, damage_unit_fn, roll_d6_fn=None):
     """
@@ -177,10 +213,10 @@ class CombatResolver:
         self.precombat_drm_bonus = int(precombat_drm_bonus or 0)
         self.allow_consumable_other_bonus = bool(allow_consumable_other_bonus)
         self._pending_depletions = []
-        # Use the centralized loader
-        self.crt_data = load_data(CRT_DATA) # csv or yaml?
+        self.crt_data = _get_crt_data()
 
-    def calculate_odds(self, attacker_cs: float, defender_cs: float) -> str:
+    @staticmethod
+    def calculate_odds(attacker_cs: float, defender_cs: float) -> str:
         """
         Calculates the odds of a combat based on the attacker's combat rating and the defender's combat rating.
         Rule 7.2: Minimum 1/3 odds, Maximum 6/1 odds logic
@@ -1480,6 +1516,32 @@ class CombatService:
         revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
         leader_escape_requests = (revive_escape_requests or []) + (leader_escape_requests or [])
+
+        # Let human choose escape destination for their own leaders
+        if leader_escape_requests and self.game_state.has_human_player():
+            from PySide6.QtWidgets import QInputDialog, QApplication
+            app = QApplication.instance()
+            parent = app.activeWindow() if app else None
+            handler = self.game_state._get_leader_escape_handler()
+            for req in leader_escape_requests:
+                leader = req.leader
+                options = list(req.options or [])
+                if not leader:
+                    continue
+                if options:
+                    option_strs = [f"({h.q},{h.r})" for h in options]
+                    choice, ok = QInputDialog.getItem(
+                        parent, f"Leader Escape: {leader.id}",
+                        "Choose destination:", option_strs, 0, False)
+                    if ok:
+                        idx = option_strs.index(choice)
+                        handler._place_leader(leader, options[idx])
+                        continue
+                    dest = handler.choose_escape_destination(leader, options)
+                    if dest and handler._place_leader(leader, dest):
+                        continue
+                self.game_state.damage_unit(leader, mode="destroy")
+            leader_escape_requests = []
 
         attacker_result_code = result.split('/')[0] if '/' in result else result
         attacker_had_to_retreat = 'R' in attacker_result_code

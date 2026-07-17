@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from collections import defaultdict
+from collections import defaultdict, deque
 from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple, Set
 
@@ -15,6 +15,7 @@ from src.content.specs import UnitType, UnitState, LocType, UnitRace, HexsideTyp
 from src.content.tools import debug_print
 from src.game.map import Hex
 from src.game.combat_reporting import show_combat_result_popup
+from src.game.combat import compute_crt_survival_probability
 
 translator = Translator()
 
@@ -1446,23 +1447,53 @@ class OperationalPlanner:
                     for capital_hex, assigned_group in capital_defense_groups.items()
                 )
                 can_deploy_relief = _can_immediately_deploy_ground_defender(ctx, ctx.side, group.hex)
-                if remaining_ground < 1 and not (incoming_relief or can_deploy_relief):
+                already_has_defender = any(
+                    capital_hex == group.hex
+                    for capital_hex, _ in capital_defense_groups.items()
+                )
+                has_leader = any(u.is_leader() for u in group.units)
+                has_non_leader_ground_at_capital = any(
+                    g.hex == group.hex and g.has_army and not g.has_fleet
+                    and g is not group
+                    and not any(u2.is_leader() for u2 in g.units)
+                    for g in groups
+                )
+                if not already_has_defender and not has_leader and not (incoming_relief or can_deploy_relief):
                     append_mission(Mission(
                         group=group,
                         mission_type="defend_allied_capital",
                         target_hex=group.hex,
                         objective=None,
-                        priority=185 + local_threat * 12,
+                        priority=155 + local_threat * 12,
                     ))
+                    capital_defense_groups[group.hex] = group
                     continue
-                if len(defenders) < min_required:
+                elif (
+                    has_leader
+                    and not already_has_defender
+                    and has_non_leader_ground_at_capital
+                    and not (incoming_relief or can_deploy_relief)
+                ):
+                    pass
+                elif remaining_ground < 1 and not (incoming_relief or can_deploy_relief):
                     append_mission(Mission(
                         group=group,
                         mission_type="defend_allied_capital",
                         target_hex=group.hex,
                         objective=None,
-                        priority=165 + local_threat * 10,
+                        priority=155 + local_threat * 12,
                     ))
+                    capital_defense_groups[group.hex] = group
+                    continue
+                elif len(defenders) < min_required:
+                    append_mission(Mission(
+                        group=group,
+                        mission_type="defend_allied_capital",
+                        target_hex=group.hex,
+                        objective=None,
+                        priority=145 + local_threat * 10,
+                    ))
+                    capital_defense_groups[group.hex] = group
                     continue
 
             if capital_defense_groups:
@@ -1691,12 +1722,20 @@ class OperationalPlanner:
                 
                 # Fallback to reinforce nearest important objective/front
                 if objective:
+                    is_main = bool(
+                        plan.main_objective
+                        and objective.coords[0] == plan.main_objective.coords[0]
+                        and objective.coords[1] == plan.main_objective.coords[1]
+                    )
+                    priority = max(50.0, objective.value - distance * 2)
+                    if is_main:
+                        priority += 30.0
                     append_mission(Mission(
                         group=group,
                         mission_type="reinforce",
                         target_hex=Hex.offset_to_axial(objective.coords[0], objective.coords[1]),
                         objective=objective,
-                        priority=max(50.0, objective.value - distance * 2),
+                        priority=priority,
                     ))
                     continue
                 
@@ -2928,7 +2967,7 @@ class TacticalPlanner:
         if last_from == target and last_to == current and not justified:
             penalty -= 80.0
         elif last_from == target and last_to == current:
-            penalty -= 25.0
+            penalty -= 55.0
 
         repeat_count = int(entry.get("repeat_count", 0) or 0)
         if repeat_count >= 2 and {last_from, last_to} == {current, target} and not justified:
@@ -3410,6 +3449,110 @@ class TacticalPlanner:
         passengers = list(getattr(fleet, "passengers", []) or [])
         return any(p.is_army() for p in passengers)
 
+    @staticmethod
+    def _compute_approach_heights(ctx: AIContext, target_hex: Hex) -> Dict[str, Any]:
+        """BFS from all valid ground-attack hexes adjacent to target_hex.
+
+        Returns a dict with two keys:
+          "ground" — height map for ground movement (respects terrain/hexside limits)
+          "wing"   — height map for wing units (all neighbors valid, no hexside restrictions)
+          "ground_count" — how many unique valid attack hexes can reach each ground hex
+        Each value is a dict mapping (q,r) → minimum steps to reach a hex from
+        which an attacker can strike target_hex. Hexes not present are unreachable.
+        """
+        valid_attack = [
+            n for n in target_hex.neighbors()
+            if ctx.game_state.map.can_ground_probe_cross_hexside(n, target_hex)
+        ]
+        heights: Dict[Tuple[int, int], int] = {}
+        if valid_attack:
+            q: deque = deque()
+            for va in valid_attack:
+                key = (va.q, va.r)
+                heights[key] = 0
+                q.append(va)
+            _iter = 0
+            while q:
+                cur = q.popleft()
+                cur_key = (cur.q, cur.r)
+                cur_h = heights[cur_key]
+                for nb in cur.neighbors():
+                    nb_key = (nb.q, nb.r)
+                    if nb_key in heights:
+                        continue
+                    if nb == target_hex:
+                        continue
+                    _iter += 1
+                    if _iter > 5000:
+                        break
+                    ok = ctx.game_state.map.can_ground_probe_cross_hexside(nb, cur)
+                    if not ok:
+                        continue
+                    if cur_h + 1 > 15:
+                        continue
+                    heights[nb_key] = cur_h + 1
+                    q.append(nb)
+                if _iter > 5000:
+                    break
+
+        # Compute ground_count: number of unique valid attack hexes reachable
+        # from each BFS hex within a SHORT range (height <= 4).  For large
+        # BFS (spanning continents), full propagation causes all sets to
+        # converge to the total count, making the metric meaningless.
+        # Instead, only propagate up to height 4 — beyond that the corridor
+        # width is already fully determined and all paths have merged.
+        ground_count: Dict[Tuple[int, int], int] = {}
+        if valid_attack and heights:
+            ground_width: Dict[Tuple[int, int], set] = {}
+            for key in heights:
+                if heights.get(key, 99) <= 4:
+                    ground_width[key] = set()
+            for idx, va in enumerate(valid_attack):
+                ground_width[(va.q, va.r)].add(idx)
+            max_h = max(heights.values()) if heights else 0
+            for h in range(1, min(max_h + 1, 5)):
+                for key, hh in heights.items():
+                    if hh != h:
+                        continue
+                    if key not in ground_width:
+                        continue
+                    hex_obj = Hex(key[0], key[1])
+                    for nb in hex_obj.neighbors():
+                        nb_key = (nb.q, nb.r)
+                        nb_h = heights.get(nb_key, 99)
+                        if nb_h == h - 1 and nb_key in ground_width:
+                            ground_width[key].update(ground_width.get(nb_key, set()))
+            ground_count = {key: len(s) for key, s in ground_width.items() if heights.get(key, 99) <= 4}
+
+        # Wing-specific approach BFS: all adjacent hexes are valid attack origins,
+        # and traversal ignores hexside terrain (wings fly over DEEP_RIVER, MOUNTAIN, etc.)
+        wing_heights: Dict[Tuple[int, int], int] = {}
+        wq: deque = deque()
+        for n in target_hex.neighbors():
+            key = (n.q, n.r)
+            wing_heights[key] = 0
+            wq.append(n)
+        _witer = 0
+        while wq:
+            cur = wq.popleft()
+            cur_key = (cur.q, cur.r)
+            cur_h = wing_heights[cur_key]
+            for nb in cur.neighbors():
+                nb_key = (nb.q, nb.r)
+                if nb_key in wing_heights:
+                    continue
+                if nb == target_hex:
+                    continue
+                _witer += 1
+                if _witer > 5000:
+                    break
+                wing_heights[nb_key] = cur_h + 1
+                wq.append(nb)
+            if _witer > 5000:
+                break
+
+        return {"ground": heights, "wing": wing_heights, "ground_count": ground_count}
+
     def _score_move(self, ctx: AIContext, plan: StrategicPlan, mission: Mission, target_hex: Hex) -> float:
         weights = self.MOVE_WEIGHTS.get(mission.mission_type, self.MOVE_WEIGHTS["screen"])
         col, row = target_hex.axial_to_offset()
@@ -3638,6 +3781,29 @@ class TacticalPlanner:
             support_gain = support - support_now
             advance_gain = current_dist - next_dist
 
+            # Pre-compute approach heights early so both cur_h and next_h
+            # are available for the stay-penalty and approach-scoring below.
+            cur_h = 99
+            next_h = 99
+            app_advance = 0
+            appr_data = None
+            has_wing = mission.group.has_wing
+            appr = None
+            if plan.main_objective:
+                cache_key = (main_hex.q, main_hex.r)
+                if not hasattr(self, "_appr_cache") or self._appr_cache.get("key") != cache_key:
+                    self._appr_cache = {
+                        "key": cache_key,
+                        "heights": self._compute_approach_heights(ctx, main_hex),
+                    }
+                appr_data = self._appr_cache["heights"]
+                appr = appr_data["wing"] if has_wing else appr_data["ground"]
+                current_key = (current_hex.q, current_hex.r)
+                target_key = (target_hex.q, target_hex.r)
+                cur_h = appr.get(current_key, 99)
+                next_h = appr.get(target_key, 99)
+                app_advance = cur_h - next_h
+
             # REWARD: Advancing toward the objective
             if advance_gain > 0:
                 # Base reward for any forward progress
@@ -3657,11 +3823,15 @@ class TacticalPlanner:
                     pressure += 12.0
                 if advance_gain == 0:
                     if support_gain <= 0:
-                        # No progress AND no support gain = useless move
-                        score -= 45 + pressure
+                        penalty = 45 + pressure
+                        if cur_h < 99:
+                            penalty = 15 + pressure * 0.3
+                        score -= penalty
                     else:
-                        # Support gain alone doesn't justify no advance on offensive missions
-                        score -= 10 + pressure * 0.5
+                        penalty = 10 + pressure * 0.5
+                        if cur_h < 99:
+                            penalty = 10 + pressure * 0.2
+                        score -= penalty
                         score += min(2.0, support_gain)
                 else:
                     retreat_penalty = 55 + abs(advance_gain) * 14 + pressure
@@ -3686,6 +3856,169 @@ class TacticalPlanner:
                 elif turns_left <= 5:
                     if next_dist >= current_dist and support_gain <= 0:
                         score -= 32
+
+            # APPROACH-AWARE SCORING: uses pre-computed cur_h, next_h, app_advance
+            # from above (avoids rebuilding the BFS cache a second time).
+
+            # Reward moving toward a valid attack position
+            if app_advance > 0:
+                score += app_advance * 18
+                if app_advance >= 2:
+                    score += 20
+
+            # Penalize moving away from valid attack hexes (increase in approach
+            # height).  Without this, the approach gradient is one-sided: the
+            # scorer rewards advancing but is indifferent to retreating, so wings
+            # ping-pong between height=0 and height=2+ hexes every turn.
+            if app_advance < 0:
+                retreat_penalty = app_advance * 25  # negative, e.g. -3 * 25 = -75
+                # Extra penalty when retreating WITHOUT making Euclidean progress
+                # toward the objective.  Catches the narrow-corridor case where
+                # units shuffle laterally to hexes with higher BFS height but
+                # same Euclidean distance (e.g. (32,16)→(34,15)).
+                if advance_gain <= 0:
+                    retreat_penalty += app_advance * 20  # more negative
+                score += retreat_penalty
+
+            # Penalize moving away from all valid attack hexes into unreachable territory
+            if next_h >= 99 and cur_h < 99:
+                score -= 70
+
+            # Valid attack hex bonus (next_h == 0): these are the few hexes from
+            # which ground armies can actually strike the main objective.
+            # The bonus ensures groups compete for these premium positions.
+            if mission.group.has_army and next_h == 0 and next_dist == 1:
+                score += 40
+
+            # Wing adjacency bonus: wings can attack from ANY adjacent hex
+            # regardless of hexside terrain (they fly over DEEP_RIVER).
+            # With the wing BFS, next_h is 0 for all adjacent hexes, so this
+            # fires for any hex next to the main objective.
+            if has_wing and next_h == 0 and next_dist == 1:
+                score += 25
+
+            # Bridge hex bonus: concentrate ALL groups (wing and ground) at
+            # hexes from which ground armies can also attack the main objective.
+            # Wings otherwise scatter across all adjacent hexs (all same score),
+            # preventing combined-arms combat packages at the critical bridge hex.
+            if next_h == 0 and next_dist == 1:
+                if ctx.game_state.map.can_ground_probe_cross_hexside(target_hex, main_hex):
+                    score += 15
+
+            # Prong formation: avoid stacking multiple ground armies on the
+            # same attack-adjacent hex when other hexes are available.
+            # Mirrors the human HL tactic of surrounding the target from
+            # multiple directions to maximise combat strength contribution.
+            if (
+                mission.group.has_army
+                and next_h == 0
+                and next_dist == 1
+                and target_hex != current_hex
+            ):
+                stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+                existing_friendly_armies = sum(
+                    1 for u in stack
+                    if u.allegiance == ctx.side and u.is_on_map and u.is_army()
+                )
+                if existing_friendly_armies >= 2:
+                    score -= 60
+                elif existing_friendly_armies >= 1:
+                    score -= 20
+
+            # Approach vector diversity: prefer hexes that can reach
+            # multiple valid attack hexes.  Prevents funnelling through a
+            # narrow corridor (e.g. (35,15) reaches only 1 valid attack hex)
+            # when a wider approach exists (e.g. (32,16) reaches 2+).
+            if mission.group.has_army and next_h < 99 and appr_data is not None:
+                ground_count = appr_data.get("ground_count", {})
+                target_count = ground_count.get(target_key, 0)
+                if target_count >= 2:
+                    score += (target_count - 1) * 12  # +12 per extra valid attack hex
+
+            # Approach-narrowing penalty: moving to a hex that reaches fewer
+            # valid attack hexes than the current hex reduces strategic
+            # flexibility.  Penalize proportionally to offset the app_advance
+            # reward that otherwise pulls armies into narrow corridors.
+            if mission.group.has_army and cur_h < 99 and next_h < 99 and appr_data is not None:
+                ground_count = appr_data.get("ground_count", {})
+                cur_count = ground_count.get(current_key, 0)
+                target_count = ground_count.get(target_key, 0)
+                if cur_count > target_count and cur_count > 0 and target_count > 0:
+                    score -= (cur_count - target_count) * 25
+
+            # Unit rotation on the front line: prefer moving stronger armies
+            # to front-line hexes (they contribute more to the assault) and
+            # let weaker armies rotate to the rear for refit/replacement.
+            if mission.group.has_army and next_h == 0 and next_dist == 1:
+                group_power = sum(
+                    u.combat_rating for u in mission.group.units
+                    if u.is_army() and u.is_combat_unit()
+                )
+                if target_hex != current_hex:
+                    stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+                    existing_power = sum(
+                        u.combat_rating for u in stack
+                        if u.allegiance == ctx.side and u.is_on_map
+                        and u.is_army() and u.is_combat_unit()
+                    )
+                    power_diff = group_power - existing_power
+                    if power_diff > 0:
+                        score += min(20, power_diff * 3)
+
+            # Stay-put bonus: groups already at an attack-adjacent hex should
+            # not shuffle between equivalent hexes (e.g., wing ping-ponging
+            # between two adjacent hexes with identical approach height).
+            # Must be significant enough to outweigh support/threat incentives
+            # that make intermediate hexes look attractive.
+            if target_hex == current_hex and next_h == 0 and next_dist == 1:
+                stay_bonus = 35
+                if mission.group.has_army:
+                    group_power = sum(
+                        u.combat_rating for u in mission.group.units
+                        if u.is_army() and u.is_combat_unit()
+                    )
+                    stack = ctx.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
+                    other_power = sum(
+                        u.combat_rating for u in stack
+                        if u.allegiance == ctx.side and u.is_on_map
+                        and u.is_army() and u.is_combat_unit()
+                        and u not in mission.group.units
+                    )
+                    if other_power > group_power * 1.5:
+                        stay_bonus = max(0, stay_bonus - 25)
+                score += stay_bonus
+
+            # Forward-hex stay bonus: groups in the approach BFS zone that
+            # have zero Euclidean progress (advance_gain == 0) should not
+            # shuffle between equivalent intermediate hexes.  The stay-bonus
+            # for attack-adjacent hexes (above) doesn't cover these — they
+            # are 2-3 hexes from the objective.  A small bonus prevents
+            # ping-pong driven by small support-overlay differences.
+            if (
+                advance_gain == 0
+                and target_hex != current_hex
+                and cur_h < 99
+                and next_h < 99
+            ):
+                score -= 18
+
+            # Approach mismatch: Euclidean distance is small but approach
+            # distance is large = this hex looks close but isn't. Penalize
+            # strongly to prevent parking in useless positions.
+            if mission.group.has_army and next_h > next_dist * 3 and next_h >= 3:
+                score -= (next_h - next_dist) * 8
+
+            # Direct dead-end guard for any hex adjacent with impassable hexside
+            # (catches cases where approach_heights might still show connectivity
+            # through a circuitous ground path).
+            if (
+                mission.group.has_army
+                and next_dist == 1
+                and advance_gain > 0
+            ):
+                if not ctx.game_state.map.can_ground_probe_cross_hexside(target_hex, main_hex):
+                    score -= 120
+
         return score
 
     @staticmethod
@@ -4080,15 +4413,15 @@ class TacticalPlanner:
         return selected_armies + companion_leaders
 
     def _move_leaders_to_front(self, ctx: AIContext, plan: StrategicPlan) -> bool:
-        """Move leaders toward the main offensive front when posture is aggressive.
+        """Move leaders toward the main front regardless of posture.
 
-        Leaders provide tactical_rating DRM bonuses in land combat. An aggressive AI
-        should ensure its leaders are positioned where they can contribute to offensive
-        combat, especially when attacking locations or well-defended points that benefit
-        most from the extra combat modifier.
+        Leaders provide tactical_rating DRM bonuses in land combat. Even in defensive
+        or balanced postures, leaders should be close enough to the main objective to
+        contribute their combat modifier. The distance threshold is stricter for defensive
+        (only move if further than 3 hexes) vs aggressive (move if further than 2 hexes).
         """
-        aggressive_postures = {"offensive", "desperate_offensive", "cautious_offensive"}
-        if plan.posture not in aggressive_postures:
+        supported_postures = {"offensive", "desperate_offensive", "cautious_offensive", "balanced", "defensive"}
+        if plan.posture not in supported_postures:
             return False
         if not plan.main_objective:
             return False
@@ -4133,7 +4466,8 @@ class TacticalPlanner:
             dist_to_main = leader_hex.distance_to(main_hex)
 
             # Skip leaders already close to the main effort or already at the front
-            if dist_to_main <= 2:
+            max_dist = 3 if plan.posture == "defensive" else 2
+            if dist_to_main <= max_dist:
                 continue
             if ctx.enemy_adjacent_combat_count.get((leader_hex.q, leader_hex.r), 0) > 0:
                 continue
@@ -4178,6 +4512,12 @@ class TacticalPlanner:
                 # Bonus for front-line hexes adjacent to the enemy
                 if ctx.enemy_adjacent_combat_count.get((col, row), 0) > 0:
                     score += 12.0 * urgency_mult
+
+                # Penalty for hexes adjacent to the main objective but with impassable hexside.
+                # Leaders (on foot) need to stack where armies can project combat power.
+                if dist == 1:
+                    if not ctx.game_state.map.can_ground_probe_cross_hexside(target_hex, main_hex):
+                        score -= 40
 
                 if score > best_score:
                     best_score = score
@@ -4290,6 +4630,21 @@ class TacticalPlanner:
         loc = ctx.game_state.map.get_location(group.hex)
         if not loc or not getattr(loc, "is_capital", False) or getattr(loc, "occupier", None) != ctx.side:
             return False
+        # Siege-break: if EVERY adjacent hex has an enemy unit, the group is
+        # ZOC-locked and cannot leave the capital anyway.  Allow combat so
+        # they can fight the besiegers instead of passively sitting.
+        if ctx.game_state and group.hex:
+            all_surrounded = True
+            for n in group.hex.neighbors():
+                if not ctx.game_state.is_hex_in_bounds(n.q, n.r):
+                    continue
+                enemies = ctx.game_state.map.get_units_in_hex(n.q, n.r)
+                has_enemy = any(u.allegiance == ctx.enemy for u in enemies)
+                if not has_enemy:
+                    all_surrounded = False
+                    break
+            if all_surrounded:
+                return False
         col, row = group.hex.axial_to_offset()
         threat_val = _overlay_value(ctx.overlays.get("threat"), col, row, 0.0)
         defenders = _friendly_ground_combat_defenders_in_hex(ctx, group.hex, ctx.side)
@@ -4319,7 +4674,7 @@ class TacticalPlanner:
                 defenders = [u for u in defenders if u.allegiance == ctx.enemy and u.is_on_map]
                 if not defenders:
                     continue
-                if not ctx.game_state.combat_service.can_units_attack_stack(group.units, defenders):
+                if not ctx.game_state.can_units_attack_target_hex(group.units, neighbor):
                     continue
                 target_key = (neighbor.q, neighbor.r)
                 bucket = target_to_groups.setdefault(target_key, {"hex": neighbor, "defenders": defenders, "groups": {}})
@@ -4339,7 +4694,8 @@ class TacticalPlanner:
             ]
             if not eligible_groups:
                 continue
-            for package in self._generate_attack_packages(eligible_groups, max_groups=4):
+            max_g = 10 if (plan.main_objective and target_hex.axial_to_offset() == plan.main_objective.coords) else 4
+            for package in self._generate_attack_packages(eligible_groups, max_groups=max_g):
                 attackers = [
                     u for g in package for u in g.units
                     if u.is_on_map
@@ -4459,6 +4815,32 @@ class TacticalPlanner:
                 projected_odds_str = None
                 projected_ratio = None
 
+        # Use the accurate combat service projection (includes defender 2x city / 3x fortress multiplier)
+        if projected_ratio is not None:
+            odds = projected_ratio
+        else:
+            loc = ctx.game_state.map.get_location(target_hex)
+            multiplier = 1.0
+            if loc:
+                lt = str(getattr(loc, "loc_type", "") or "")
+                if lt == LocType.FORTRESS.value:
+                    multiplier = 3.0
+                elif lt in (LocType.CITY.value, LocType.PORT.value):
+                    multiplier = 2.0
+            effective_att = max(1.0, att_power)
+            effective_def = max(1.0, def_power * multiplier)
+            odds = effective_att / effective_def
+
+        # Calculate DRM for DRM-compensated min_odds
+        drm = 0
+        drm_parts = []
+        if combat_service and hasattr(combat_service, "calculate_total_drm"):
+            try:
+                drm, drm_parts = combat_service.calculate_total_drm(attackers, defenders, target_hex, return_breakdown=True)
+            except Exception:
+                drm = 0
+                drm_parts = []
+
         loc = ctx.game_state.map.get_location(target_hex)
         loc_bonus = 0.0
         if loc:
@@ -4474,11 +4856,6 @@ class TacticalPlanner:
             if getattr(loc, "is_capital", False):
                 loc_bonus += 2.0
 
-        crossing_pen = self._crossing_attack_penalty(ctx, attackers, target_hex)
-        effective_att = max(1.0, att_power - crossing_pen)
-        effective_def = max(1.0, def_power + loc_bonus)
-        odds = effective_att / effective_def
-
         offensive = plan.offensive_side == ctx.side
         min_odds = 1.05 if offensive else 1.2
         if offensive and ctx.side == HL and str(plan.victory_category or "").lower() == "control":
@@ -4492,15 +4869,40 @@ class TacticalPlanner:
         critical_deadline = bool(plan.must_act or (turns_left is not None and turns_left <= 2))
         if critical_deadline:
             min_odds -= 0.2
-        min_odds = max(0.85, min_odds)
+
+        # DRM compensation: each +1 DRM shifts the CRT result one row better.
+        # At poor odds this makes the difference between E/- and D/1 or better.
+        if drm > 0:
+            min_odds -= drm * 0.04
+        elif drm < -2:
+            min_odds += abs(drm) * 0.02
 
         main_obj_hex = Hex.offset_to_axial(*plan.main_objective.coords) if plan.main_objective else None
         is_main_objective_hex = bool(main_obj_hex and target_hex.q == main_obj_hex.q and target_hex.r == main_obj_hex.r)
 
+        # Main objective desperation: when desperate on the decisive point, accept very poor odds
+        if is_main_objective_hex and plan.posture == "desperate_offensive":
+            min_odds = min(min_odds, 0.6)
+
+        # Peripheral clearing bonus: reduce min_odds for attacks on enemy
+        # units near (≤3 hexes) the main objective even when they are NOT
+        # on the main objective hex itself.  This encourages the AI to clear
+        # approach lanes before assaulting the main target (human HL tactic:
+        # destroy weaker peripheral enemies first to maximise siege odds).
+        if (
+            offensive
+            and plan.main_objective
+            and not is_main_objective_hex
+            and target_hex.distance_to(main_obj_hex) <= 3
+        ):
+            min_odds -= 0.15
+
+        min_odds = max(0.55, min_odds)
+
         defensive_desperate_recovery = False
         if not offensive:
             defensive_desperate_recovery = self._is_desperate_defensive_recovery_attack(ctx, target_hex)
-            if projected_ratio is not None and projected_ratio < 2.0 and not defensive_desperate_recovery:
+            if projected_ratio is not None and projected_ratio < 1.5 and not defensive_desperate_recovery:
                 return {
                     "allow": False,
                     "note": "defensive_crt_2to1_gate",
@@ -4515,10 +4917,10 @@ class TacticalPlanner:
         if air_only and not self._is_air_special_opportunity(ctx, target_hex, defenders, is_main_objective_hex):
             return {"allow": False, "note": "air_only_gate", "odds": odds}
 
-        if odds < 0.75 and not (critical_deadline and is_main_objective_hex and odds >= 0.6):
+        # Suicide gate: relaxed from 0.75 to 0.6 for desperate pushes
+        if odds < 0.6 and not (critical_deadline and is_main_objective_hex and odds >= 0.5):
             return {"allow": False, "note": "suicide_odds_gate", "odds": odds}
-        if crossing_pen >= 4.0 and odds < 1.35:
-            return {"allow": False, "note": "crossing_gate", "odds": odds}
+
         if odds < min_odds:
             cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
             debug_print(
@@ -4527,45 +4929,39 @@ class TacticalPlanner:
                 f"defender_cs={cs_info.get('defender_cs', '?')} "
                 f"-> {cs_info.get('odds_str', '?')} "
                 f"min_odds={min_odds:.3f} "
+                f"drm={drm:+d} "
                 f"hex=({target_hex.q},{target_hex.r})"
             )
             return {"allow": False, "note": "odds_gate", "odds": odds}
 
-        check_ratio = projected_ratio if projected_ratio is not None else odds
-        if check_ratio <= 1.0:
-            combat_service = getattr(ctx.game_state, "combat_service", None)
-            if combat_service and hasattr(combat_service, "calculate_total_drm"):
-                drm, drm_parts = combat_service.calculate_total_drm(attackers, defenders, target_hex, return_breakdown=True)
-                parts_text = ", ".join(f"{name}={value:+d}" for name, value in drm_parts if value)
-                if drm < -2:
-                    cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
-                    debug_print(
-                        f"[AI_GATE] drm_gate REJECT "
-                        f"Combat odds: attacker_cs={cs_info.get('attacker_cs', '?')} "
-                        f"defender_cs={cs_info.get('defender_cs', '?')} "
-                        f"-> {cs_info.get('odds_str', '?')} "
-                        f"Combat DRM: total={drm:+d} [{parts_text}] "
-                        f"hex=({target_hex.q},{target_hex.r})"
-                    )
-                    return {"allow": False, "note": "drm_gate", "odds": odds, "drm": drm, "projected_ratio": projected_ratio}
-                else:
-                    cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
-                    debug_print(
-                        f"[AI_GATE] drm_gate PASS "
-                        f"Combat odds: attacker_cs={cs_info.get('attacker_cs', '?')} "
-                        f"defender_cs={cs_info.get('defender_cs', '?')} "
-                        f"-> {cs_info.get('odds_str', '?')} "
-                        f"Combat DRM: total={drm:+d} [{parts_text}] "
-                        f"hex=({target_hex.q},{target_hex.r})"
-                    )
+        # CRT survival probability gate: replaces old hard DRM threshold
+        survival_prob = compute_crt_survival_probability(odds, drm)
+        threshold = 0.35
+        if is_main_objective_hex:
+            threshold -= 0.10
+        if plan.posture == "desperate_offensive":
+            threshold -= 0.05
+        if critical_deadline:
+            threshold -= 0.10
+        threshold = max(0.15, threshold)
+        if survival_prob < threshold:
+            cs_info = combat_service._project_combat_odds(attackers, defenders, target_hex) if combat_service else {}
+            debug_print(
+                f"[AI_GATE] crt_gate REJECT "
+                f"survival={survival_prob:.0%} threshold={threshold:.0%} "
+                f"odds={cs_info.get('odds_str', '?')} drm={drm:+d} "
+                f"hex=({target_hex.q},{target_hex.r})"
+            )
+            return {"allow": False, "note": "crt_gate", "odds": odds, "drm": drm,
+                    "survival_prob": survival_prob, "threshold": threshold}
 
-        debug_print(f"[AI_GATE] ALLOW odds={odds:.3f} projected_ratio={projected_ratio} min_odds={min_odds:.3f} hex=({target_hex.q},{target_hex.r})")
+        debug_print(f"[AI_GATE] ALLOW odds={odds:.3f} projected_ratio={projected_ratio} min_odds={min_odds:.3f} drm={drm:+d} hex=({target_hex.q},{target_hex.r})")
         return {
             "allow": True,
             "note": "ok",
             "odds": odds,
-            "effective_att": effective_att,
-            "effective_def": effective_def,
+            "effective_att": att_power,
+            "effective_def": def_power,
             "projected_odds": projected_odds_str,
             "projected_ratio": projected_ratio,
             "defensive_desperate_recovery": defensive_desperate_recovery,
@@ -4676,7 +5072,7 @@ class TacticalPlanner:
         if any(m and m.objective and m.objective.coords == target_hex.axial_to_offset() for m in missions):
             score += 10.0
         if plan.main_objective and target_hex.axial_to_offset() == plan.main_objective.coords:
-            score += 20.0 + plan.urgency_score * 15.0
+            score += 200.0 + plan.urgency_score * 100.0
         if plan.must_act:
             score += 8.0
         if len(groups) >= 2:
