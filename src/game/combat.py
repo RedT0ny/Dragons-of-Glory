@@ -2281,6 +2281,7 @@ class CombatClickHandler:
         self.escape_hexes = set()
         self.pending_advance = None
         self._escape_completion_callback = None
+        self._escape_info_dialog = None
 
     def handle_click(self, target_hex):
         # UI click state machine:
@@ -2601,6 +2602,9 @@ class CombatClickHandler:
         if not self.leader_escape_queue:
             self.active_leader_escape = None
             self.escape_hexes = set()
+            if self._escape_info_dialog:
+                self._escape_info_dialog.close()
+                self._escape_info_dialog = None
             self.view.highlight_movement_range([])
             callback = self._escape_completion_callback
             self._escape_completion_callback = None
@@ -2628,13 +2632,23 @@ class CombatClickHandler:
 
         self.escape_hexes = {h.axial_to_offset() for h in self.active_leader_escape.options}
         self.view.highlight_movement_range(list(self.escape_hexes))
-        from src.gui.message_dialog import show_info_dialog
-        show_info_dialog(
+        from src.gui.message_dialog import MessageDialog
+        from src.content.config import ICONS_DIR
+        from PySide6.QtCore import Qt
+        self._escape_info_dialog = MessageDialog(
             "Leader Escape",
             f"Select a friendly stack for {self.active_leader_escape.leader.id} to escape.",
         )
+        icon_path = os.path.join(ICONS_DIR, "info.svg")
+        if os.path.exists(icon_path):
+            self._escape_info_dialog.set_icon(icon_path)
+        self._escape_info_dialog.setWindowModality(Qt.NonModal)
+        self._escape_info_dialog.show()
 
     def _handle_leader_escape_click(self, target_hex):
+        if self._escape_info_dialog:
+            self._escape_info_dialog.close()
+            self._escape_info_dialog = None
         clicked_offset = target_hex.axial_to_offset()
         if clicked_offset not in self.escape_hexes:
             return
