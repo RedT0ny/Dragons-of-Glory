@@ -1332,11 +1332,11 @@ class CombatService:
                 return False
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
-            self.cleanup_destroyed_units(attackers + defenders)
+            carrier_escape_requests = self.cleanup_destroyed_units(attackers + defenders)
             print(TextFormatter.format_naval_log(attackers, defenders, outcome))
             return {
                 "result": outcome.get("result", "-/-"),
-                "leader_escape_requests": [],
+                "leader_escape_requests": carrier_escape_requests or [],
                 "advance_available": False,
                 "combat_type": "naval",
                 "rounds": outcome.get("rounds", 0),
@@ -1441,11 +1441,11 @@ class CombatService:
 
         special_retreat = self._apply_precombat_special_retreat(attackers, defenders, hex_position)
         if special_retreat["applied"]:
-            self.cleanup_destroyed_units(defenders)
+            carrier_escape_requests = self.cleanup_destroyed_units(defenders)
             defenders = current_defenders()
             if not any(u.is_combat_unit() for u in defenders):
                 result = special_retreat["result"]
-                leader_escape_requests = special_retreat.get("leader_escape_requests", []) or []
+                leader_escape_requests = (carrier_escape_requests or []) + (special_retreat.get("leader_escape_requests", []) or [])
                 advance_available = self._can_advance_after_combat(
                     attackers=attackers,
                     target_hex=hex_position,
@@ -1512,10 +1512,10 @@ class CombatService:
                         manual_allocations[side] = dialog.get_allocations()
             resolver.apply_pending_depletions(manual_allocations)
 
-        self.cleanup_destroyed_units(attackers + defenders)
+        carrier_escape_requests = self.cleanup_destroyed_units(attackers + defenders)
         revive_escape_requests = self._resolve_leader_revives(attackers + defenders, leader_origins)
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
-        leader_escape_requests = (revive_escape_requests or []) + (leader_escape_requests or [])
+        leader_escape_requests = (carrier_escape_requests or []) + (revive_escape_requests or []) + (leader_escape_requests or [])
 
         # Let human choose escape destination for their own leaders
         if leader_escape_requests and self.game_state.has_human_player():
@@ -2283,9 +2283,10 @@ class CombatService:
                 all_leader_escapes.extend(pending)
                 unit._pending_leader_escapes = None
 
+        carrier_escape_requests = []
         if all_leader_escapes:
             escape_handler = LeaderEscapeHandler(self.game_state, roll_d6_fn=lambda: random.randint(1, 6))
-            escape_handler.handle_leader_escapes(all_leader_escapes, auto_resolve_ai=True)
+            carrier_escape_requests = escape_handler.handle_leader_escapes(all_leader_escapes, auto_resolve_ai=True)
 
         for unit in units:
             if not unit.is_on_map or not unit.position or unit.position[0] is None or unit.position[1] is None:
@@ -2293,6 +2294,7 @@ class CombatService:
         if emperor_destroyed:
             self._maybe_promote_highlord_to_emperor()
         self.game_state.finalize_board_state_change()
+        return carrier_escape_requests
 
 
 class CombatClickHandler:

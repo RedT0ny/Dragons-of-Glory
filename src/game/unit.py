@@ -352,7 +352,7 @@ class Unit:
                         allow_fleet_destinations=allow_fleet,
                         roll_required=not allow_fleet,
                         skip_if_allied_combat_present=False,
-                        auto_place_on_success=True,
+                        auto_place_on_success=False,
                         require_leader_on_map=False,
                     )
                 )
