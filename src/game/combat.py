@@ -1517,32 +1517,6 @@ class CombatService:
         leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
         leader_escape_requests = (carrier_escape_requests or []) + (revive_escape_requests or []) + (leader_escape_requests or [])
 
-        # Let human choose escape destination for their own leaders
-        if leader_escape_requests and self.game_state.has_human_player():
-            from PySide6.QtWidgets import QInputDialog, QApplication
-            app = QApplication.instance()
-            parent = app.activeWindow() if app else None
-            handler = self.game_state._get_leader_escape_handler()
-            for req in leader_escape_requests:
-                leader = req.leader
-                options = list(req.options or [])
-                if not leader:
-                    continue
-                if options:
-                    option_strs = [f"({h.q},{h.r})" for h in options]
-                    choice, ok = QInputDialog.getItem(
-                        parent, f"Leader Escape: {leader.id}",
-                        "Choose destination:", option_strs, 0, False)
-                    if ok:
-                        idx = option_strs.index(choice)
-                        handler._place_leader(leader, options[idx])
-                        continue
-                    dest = handler.choose_escape_destination(leader, options)
-                    if dest and handler._place_leader(leader, dest):
-                        continue
-                self.game_state.damage_unit(leader, mode="destroy")
-            leader_escape_requests = []
-
         attacker_result_code = result.split('/')[0] if '/' in result else result
         attacker_had_to_retreat = 'R' in attacker_result_code
         advance_available = self._can_advance_after_combat(
@@ -2306,6 +2280,7 @@ class CombatClickHandler:
         self.active_leader_escape = None
         self.escape_hexes = set()
         self.pending_advance = None
+        self._escape_completion_callback = None
 
     def handle_click(self, target_hex):
         # UI click state machine:
@@ -2617,8 +2592,9 @@ class CombatClickHandler:
             f"Dragon duel round {round_number}: should {side_allegiance.capitalize()} withdraw dragons?",
         )
 
-    def _begin_leader_escape(self, leader_escape_requests):
+    def _begin_leader_escape(self, leader_escape_requests, completion_callback=None):
         self.leader_escape_queue = list(leader_escape_requests)
+        self._escape_completion_callback = completion_callback
         self._activate_next_leader_escape()
 
     def _activate_next_leader_escape(self):
@@ -2626,7 +2602,12 @@ class CombatClickHandler:
             self.active_leader_escape = None
             self.escape_hexes = set()
             self.view.highlight_movement_range([])
-            self._prompt_advance_after_combat()
+            callback = self._escape_completion_callback
+            self._escape_completion_callback = None
+            if callback:
+                callback()
+            else:
+                self._prompt_advance_after_combat()
             return
 
         self.active_leader_escape = self.leader_escape_queue.pop(0)

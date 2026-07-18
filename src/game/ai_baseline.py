@@ -4660,6 +4660,7 @@ class TacticalPlanner:
         failed_targets = ctx.failed_combat_targets or set()
         missions_by_group = {_task_group_key(m.group): m for m in missions}
         target_to_groups: Dict[Tuple[int, int], Dict[str, Any]] = {}
+        all_leader_escapes = []
 
         for mission in missions:
             group = mission.group
@@ -4744,6 +4745,9 @@ class TacticalPlanner:
         attackers = [u for u in best["attackers"] if u.is_on_map]
         defenders_before = list(ctx.game_state.get_units_at(target_hex))
         resolution = ctx.game_state.combat_service.resolve_combat(attackers, target_hex)
+        leader_escapes = (resolution or {}).get("leader_escape_requests", []) or []
+        if leader_escapes:
+            all_leader_escapes.extend(leader_escapes)
         show_combat_result_popup(
             ctx.game_state,
             title="AI Combat",
@@ -4761,6 +4765,7 @@ class TacticalPlanner:
         if resolution and resolution.get("advance_available"):
             ctx.game_state.combat_service.advance_after_combat(attackers, target_hex)
         ctx.last_action_hex = target_hex.axial_to_offset()
+        self._pending_leader_escapes = all_leader_escapes
         return True
 
     @staticmethod
@@ -5139,6 +5144,7 @@ class BaselineAIPlayer:
         self._front_diag_logged_phase: Set[Tuple[Any, ...]] = set()
         self._last_movement_offset: Optional[Tuple[int, int]] = None
         self._last_combat_offset: Optional[Tuple[int, int]] = None
+        self._pending_leader_escapes: list = []
         # NOTE: No planning cache - board state changes after each action, so caching
         # TaskGroups/Missions across moves causes stale decisions. Rebuild fresh each time.
         self._strategic = StrategicPlanner()
@@ -5553,6 +5559,8 @@ class BaselineAIPlayer:
         groups = self._operational.build_task_groups(ctx)
         missions = self._operational.build_missions(ctx, plan, groups)
         fought = self._tactical.execute_best_combat(ctx, plan, missions)
+        self._pending_leader_escapes = getattr(self._tactical, "_pending_leader_escapes", [])
+        self._tactical._pending_leader_escapes = []
         if fought:
             self._log("combat: executed")
             self._last_combat_offset = ctx.last_action_hex

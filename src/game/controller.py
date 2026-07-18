@@ -585,6 +585,16 @@ class GameController(QObject):
             self.game_state.advance_phase()
             return False
 
+        if action == TurnAction.REQUEST_LEADER_ESCAPE:
+            requests = payload.get("leader_escape_requests", []) if payload else []
+            if requests:
+                self.ai_timer.stop()
+                self.combat_click_handler._begin_leader_escape(
+                    requests,
+                    completion_callback=self._resume_ai_after_escape,
+                )
+            return True
+
         return False
 
     def _announce_victory_if_needed(self):
@@ -874,6 +884,10 @@ class GameController(QObject):
         """
         if self.combat_click_handler:
             self.combat_click_handler.handle_click(target_hex)
+
+    def _resume_ai_after_escape(self):
+        """Resume AI turn processing after leader escape UI completes."""
+        self._schedule_deferred(self.process_game_turn)
 
     def reset_combat_selection(self):
         """Clear any combat selection and target highlights."""

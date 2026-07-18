@@ -167,6 +167,7 @@ class TurnAction(Enum):
     REQUEST_HUMAN_REPLACEMENTS = "request_human_replacements"
     REQUEST_HUMAN_EVENT_DIALOG = "request_human_event_dialog"
     REQUEST_HUMAN_ACTIVATION = "request_human_activation"
+    REQUEST_LEADER_ESCAPE = "request_leader_escape"
 
 
 @dataclass(frozen=True)
@@ -303,6 +304,13 @@ class TurnEngine:
             self._log_phase_header_once(f"Step 6: Combat phase - {active_player.capitalize()}")
             if is_ai:
                 fought = self.ai_baseline.execute_best_combat(active_player)
+                pending_escapes = getattr(self.ai_baseline, "_pending_leader_escapes", [])
+                if pending_escapes:
+                    self.ai_baseline._pending_leader_escapes = []
+                    return TurnOutcome(
+                        action=TurnAction.REQUEST_LEADER_ESCAPE,
+                        payload={"leader_escape_requests": pending_escapes},
+                    )
                 if not fought:
                     self.game_state.advance_phase()
                     return TurnOutcome(advanced=True)
