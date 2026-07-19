@@ -26,13 +26,17 @@ jobs:
           pip install -r requirements-windows.txt
           pip install pyinstaller
 
+      - name: Set app version
+        run: |
+          python -c "from src.content.config import APP_VERSION; print(f'APP_VERSION={APP_VERSION}')" >> $env:GITHUB_ENV
+
       - name: Build EXE (PyInstaller)
         run: |
           pyinstaller `
             --noconfirm `
             --clean `
             --onefile `
-            --name dog `
+            --name "dog_$env:APP_VERSION" `
             --icon assets/icon/DOG_icon.ico `
             --collect-binaries PySide6.QtMultimedia `
             --collect-binaries PySide6.QtMultimediaWidgets `
@@ -51,4 +55,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dog-windows-exe
-          path: dist/dog.exe
+          path: dist/dog_${{ env.APP_VERSION }}.exe

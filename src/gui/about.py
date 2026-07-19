@@ -24,13 +24,13 @@ ABOUT_HTML = """
 <head>
   <meta charset="utf-8">
   <style>
-    body {{ font-family: "Segoe UI", sans-serif; font-size: 9pt; color: #0f1115; }}
+    body {{ font-family: "Segoe UI", sans-serif; font-size: 9pt; }}
     .mono {{ font-family: "Courier New", monospace; font-size: 10pt; }}
     h3 {{ margin: 12px 0 6px; }}
     p {{ margin: 6px 0; }}
     ul {{ margin: 6px 0 6px 18px; padding: 0; }}
-    hr {{ border: none; border-top: 1px solid #0f1115; margin: 12px 0; }}
-    a {{ color: #14427c; text-decoration: underline; }}
+    hr {{ border: none; border-top: 1px solid; margin: 12px 0; }}
+    a {{ text-decoration: underline; }}
     .center {{ text-align: center; }}
   </style>
 </head>
@@ -130,6 +130,7 @@ class Ui_aboutDialog(object):
 
         self.textBrowser = QTextBrowser(aboutDialog)
         self.textBrowser.setObjectName(u"textBrowser")
+        self.textBrowser.setOpenExternalLinks(True)
 
         self.verticalLayout.addWidget(self.textBrowser)
 
