@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                                QFrame, QTextEdit, QTabWidget, QLabel, QFileDialog, QApplication,
                                QAbstractButton, QDialog, QMenu)
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
-from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer
+from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer, QSettings
 
 from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, LOGS_DIR
 from src.content.tools import debug_print, set_debug_log_path, close_debug_log
@@ -25,6 +25,18 @@ from src.gui.about import Ui_aboutDialog
 from src.gui.config_dialog import ConfigDialog
 from src.gui.volume_dialog import Ui_volumeDialog
 from src.content.audio_manager import AudioManager
+
+
+def _last_dir(key):
+    """Return the last-browsed directory for a dialog, or SAVEGAME_DIR."""
+    s = QSettings()
+    return s.value(f"lastDir/{key}", SAVEGAME_DIR)
+
+
+def _save_last_dir(key, path):
+    """Persist the directory of a successfully chosen file."""
+    s = QSettings()
+    s.setValue(f"lastDir/{key}", os.path.dirname(path))
 
 
 class ConsoleRedirector(QObject):
@@ -582,10 +594,9 @@ class MainWindow(QMainWindow):
         dialog = QFileDialog(self, "Save Game")
         dialog.setAcceptMode(QFileDialog.AcceptSave)
         dialog.setFileMode(QFileDialog.AnyFile)
-        dialog.setDirectory(SAVEGAME_DIR)
+        dialog.setDirectory(_last_dir("save"))
         dialog.setDefaultSuffix("yaml")
         dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         if not dialog.exec():
             return
         files = dialog.selectedFiles()
@@ -595,6 +606,7 @@ class MainWindow(QMainWindow):
         root, ext = os.path.splitext(path)
         if not ext:
             path = f"{path}.yaml"
+        _save_last_dir("save", path)
         try:
             self.controller.save_game(path)
             self.append_log(f"Game saved to {path}\n")
@@ -613,15 +625,15 @@ class MainWindow(QMainWindow):
         dialog = QFileDialog(self, "Load Game")
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setDirectory(SAVEGAME_DIR)
+        dialog.setDirectory(_last_dir("load"))
         dialog.setNameFilter("YAML Files (*.yaml *.yml);;All Files (*)")
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
         if not dialog.exec():
             return
         files = dialog.selectedFiles()
         if not files:
             return
         path = files[0]
+        _save_last_dir("load", path)
         config_dialog = ConfigDialog(self)
         config_dialog.set_from_config(self.controller.get_runtime_config())
         if not config_dialog.exec():

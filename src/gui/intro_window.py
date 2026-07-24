@@ -2,12 +2,22 @@ import os
 from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QSizePolicy, QFileDialog, QDialog, QGraphicsScene, QGraphicsView
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
-from PySide6.QtCore import QUrl, Qt, Signal
+from PySide6.QtCore import QUrl, Qt, Signal, QSettings
 from src.content.config import APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
 from src.content.audio_manager import AudioManager
 from src.gui.config_dialog import ConfigDialog
 from src.gui.new_game_dialog import NewGameDialog
 from src.gui.volume_dialog import Ui_volumeDialog
+
+
+def _last_dir(key):
+    s = QSettings()
+    return s.value(f"lastDir/{key}", SAVEGAME_DIR)
+
+
+def _save_last_dir(key, path):
+    s = QSettings()
+    s.setValue(f"lastDir/{key}", os.path.dirname(path))
 
 
 class IntroWindow(QMainWindow):
@@ -131,10 +141,8 @@ class IntroWindow(QMainWindow):
         dialog = QFileDialog(self, self.translator.get_text("intro", "menu_continue"))
         dialog.setAcceptMode(QFileDialog.AcceptOpen)
         dialog.setFileMode(QFileDialog.ExistingFile)
-        dialog.setDirectory(save_dir)
+        dialog.setDirectory(_last_dir("load"))
         dialog.setNameFilter("Save Files (*.yaml *.yml *.json);;All Files (*)")
-        # Avoid native Windows dialog COM/threading issues (0x8001010e).
-        dialog.setOption(QFileDialog.DontUseNativeDialog, True)
 
         if not dialog.exec():
             return
@@ -142,6 +150,7 @@ class IntroWindow(QMainWindow):
         files = dialog.selectedFiles()
         if files:
             file_path = files[0]
+            _save_last_dir("load", file_path)
             config_dialog = ConfigDialog(self)
             config_dialog.set_from_config(
                 {

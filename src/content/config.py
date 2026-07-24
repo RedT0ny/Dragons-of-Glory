@@ -1,6 +1,8 @@
 # config.py - Constants moved to constants.py
 import math
 import os
+import platform
+import sys
 
 # --- DEBUG & RUNTIME ---
 DEBUG = False
@@ -10,8 +12,33 @@ APP_VERSION = "0.46.4-beta"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _user_data_dir():
+    """Return a stable, user-writable directory for saves and logs.
+
+    When running from a PyInstaller bundle, the frozen exe is extracted to a
+    temporary folder that is cleaned up on exit.  We redirect user data to a
+    proper per-platform location so saves persist across runs.
+    """
+    if getattr(sys, 'frozen', False):
+        if platform.system() == "Windows":
+            base = os.path.expandvars(r"%LOCALAPPDATA%")
+        elif platform.system() == "Darwin":
+            base = os.path.join(os.path.expanduser("~"),
+                                "Library", "Application Support")
+        else:  # Linux / other
+            base = os.environ.get(
+                "XDG_DATA_HOME",
+                os.path.join(os.path.expanduser("~"), ".local", "share"))
+        return os.path.join(base, APP_NAME)
+    return BASE_DIR
+
+
+USER_DATA_DIR = _user_data_dir()
+
 DATA_DIR = os.path.join(BASE_DIR, "data")
-LOGS_DIR = os.path.join(BASE_DIR, "logs")
+LOGS_DIR = os.path.join(USER_DATA_DIR, "logs")
 LOCALE_DIR = os.path.join(DATA_DIR, "locale")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 AUDIO_DIR = os.path.join(ASSETS_DIR, "audio")
@@ -20,7 +47,7 @@ FONTS_DIR = os.path.join(ASSETS_DIR, "font")
 ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
 SCENARIOS_DIR = os.path.join(DATA_DIR, "scenarios")
-SAVEGAME_DIR = os.path.join(BASE_DIR, "saves")
+SAVEGAME_DIR = os.path.join(USER_DATA_DIR, "saves")
 VIDEOS_DIR = os.path.join(ASSETS_DIR, "video")
 
 # --- DATA FILES ---

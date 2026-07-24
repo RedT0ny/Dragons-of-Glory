@@ -2,7 +2,7 @@ import sys, locale
 
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, QCoreApplication
 
 from src.content.config import GAME_ICON
 from src.gui.main_window import MainWindow
@@ -48,6 +48,10 @@ class GameApp:
 
         # Initialize the Translator
         self.translator = Translator(lang_code=lang_code)
+
+        # Set organization/application for QSettings placement
+        QCoreApplication.setOrganizationName("DragonsOfGlory")
+        QCoreApplication.setApplicationName("DragonsOfGlory")
 
         # Create the application instance
         app = QApplication(sys.argv)
