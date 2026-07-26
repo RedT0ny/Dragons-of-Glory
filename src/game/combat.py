@@ -1846,12 +1846,14 @@ class CombatService:
 
         leader_escape_requests = []
         for unit in combat_defenders:
-            leader_escape_requests.extend(self._retreat_single_unit(unit) or [])
+            leader_escape_requests.extend(
+                self._retreat_single_unit(unit, eliminate_if_no_retreat=False) or []
+            )
 
         result = "-/SRC" if cavalry_rule else "-/SRW"
         return {"applied": True, "result": result, "leader_escape_requests": leader_escape_requests}
 
-    def _retreat_single_unit(self, unit):
+    def _retreat_single_unit(self, unit, eliminate_if_no_retreat=True):
         """
         Handles retreat logic for a single unit, including forced boarding of leaders onto Wings and escape rolls
         for leaders who can't board.
@@ -1862,7 +1864,8 @@ class CombatService:
         start_hex = Hex.offset_to_axial(*unit.position)
         valid_hexes = self._get_valid_retreat_hexes(unit, start_hex)
         if not valid_hexes:
-            self.game_state.damage_unit(unit, mode="eliminate")
+            if eliminate_if_no_retreat:
+                self.game_state.damage_unit(unit, mode="eliminate")
             return []
 
         leaders_here = [

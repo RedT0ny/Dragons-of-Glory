@@ -1,5 +1,5 @@
 import re
-from typing import Set, Dict, Any, Optional, Callable, List, Union
+from typing import Set, Dict, Any, Optional
 
 from src.content.translator import Translator
 from src.content.specs import PlayerSpec
@@ -83,46 +83,3 @@ class Player:
     def has_asset(self, asset_id: str) -> bool:
         return asset_id in self.assets
 
-    def get_deployment_hexes(self, all_countries: Dict[str, Country], is_hex_in_bounds: Callable[[int, int], bool]) -> Set[tuple]:
-        """
-        Calculates valid deployment hexes based on spec and controlled countries.
-        """
-        hexes = set()
-        area_spec = self.spec.deployment_area
-
-        # Case 1: deployment_area is None -> Use all controlled countries (from setup)
-        if area_spec is None:
-            for country in self.controlled_countries.values():
-                hexes.update(country.territories)
-            return hexes
-
-        # Case 2: deployment_area is a Dictionary
-        if isinstance(area_spec, dict):
-            # 'countries' key: list of country IDs to use
-            countries_to_use = area_spec.get("countries", [])
-            for cid in countries_to_use:
-                if cid in all_countries:
-                    hexes.update(all_countries[cid].territories)
-            
-            # 'coords' or 'hexes' keys: explicit lists of coordinates
-            for key in ["coords", "hexes"]:
-                coords_list = area_spec.get(key)
-                if isinstance(coords_list, list):
-                    for item in coords_list:
-                        if isinstance(item, (list, tuple)) and len(item) == 2:
-                            coord = tuple(item)
-                            if is_hex_in_bounds(*coord):
-                                hexes.add(coord)
-
-        # Case 3: deployment_area is a List (mixed coords and country IDs)
-        elif isinstance(area_spec, list):
-            for item in area_spec:
-                if isinstance(item, str): # Country ID
-                    if item in all_countries:
-                        hexes.update(all_countries[item].territories)
-                elif isinstance(item, (list, tuple)) and len(item) == 2: # Coordinate
-                    coord = tuple(item)
-                    if is_hex_in_bounds(*coord):
-                        hexes.add(coord)
-
-        return hexes

@@ -24,6 +24,7 @@ def _unit():
         land="icewall",
         status=UnitState.READY,
         movement_points=3,
+        is_leader=lambda: False,
     )
 
 

@@ -72,8 +72,11 @@ ABOUT_HTML = """
   <hr>
 
   <h3 class="mono">Contact / Credits</h3>
-  <p class="mono"><b>Creator</b>: <a href="mailto:redtony@gmail.com?subject=About DoG">Tony J. Soler</a></p>
-
+  <ul class="mono">
+      <li><b>Creator</b>: <a href="mailto:redtony@gmail.com?subject=About DoG">Tony J. Soler</a></li>
+      <li><b>Design and Testing</b>: Brian Bradford</li>
+  </ul>
+  
   <hr>
 
   <h3 class="mono">Licensing</h3>

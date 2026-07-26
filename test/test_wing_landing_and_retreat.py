@@ -1,8 +1,8 @@
 from types import SimpleNamespace
 
-from src.content.constants import HL
-from src.content.specs import TerrainType, UnitType
-from src.game.combat import CombatResolver
+from src.content.constants import HL, WS
+from src.content.specs import TerrainType, UnitState, UnitType
+from src.game.combat import CombatResolver, CombatService
 from src.game.map import Board, Hex
 from src.game.movement import MovementService
 
@@ -13,14 +13,49 @@ def _set_terrain(board: Board, col: int, row: int, terrain: str):
 
 
 def _wing_unit():
-    return SimpleNamespace(
+    unit = SimpleNamespace(
         id="wing_1",
         unit_type=UnitType.WING,
         allegiance=HL,
         movement=4,
         movement_points=4,
         position=(2, 2),
+        status=UnitState.ACTIVE,
+        ordinal=None,
     )
+    unit.is_wing = lambda: True
+    unit.is_army = lambda: False
+    unit.is_fleet = lambda: False
+    unit.is_citadel = lambda: False
+    unit.is_leader = lambda: False
+    return unit
+
+
+def _combat_unit(unit_id, unit_type, allegiance, position):
+    def is_army():
+        return unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
+
+    def is_wing():
+        return unit_type == UnitType.WING
+
+    unit = SimpleNamespace(
+        id=unit_id,
+        unit_type=unit_type,
+        allegiance=allegiance,
+        movement=4,
+        movement_points=4,
+        position=position,
+        status=UnitState.ACTIVE,
+        transport_host=None,
+        is_on_map=True,
+        is_army=is_army,
+        is_wing=is_wing,
+        is_fleet=lambda: False,
+        is_citadel=lambda: False,
+        is_leader=lambda: False,
+        is_combat_unit=lambda: is_army() or is_wing(),
+    )
+    return unit
 
 
 def test_wing_cannot_land_on_ocean_hex():
@@ -50,6 +85,7 @@ def test_movement_service_rejects_wing_ocean_destination():
         can_unit_land_on_hex=lambda unit, h: False if h == target else True,
         find_shortest_path=lambda unit, start, goal: [goal],
         get_movement_cost=lambda unit, current, nxt: 1,
+        get_terrain=lambda hex_obj: TerrainType.OCEAN,
     )
     gs = SimpleNamespace(map=fake_map)
     service = MovementService(gs)
@@ -81,11 +117,83 @@ def test_wing_retreat_options_exclude_ocean_hex():
     game_state = SimpleNamespace(
         map=fake_map,
         is_hex_in_bounds=lambda col, row: True,
+        get_country_by_hex=lambda col, row: None,
     )
-    resolver = CombatResolver([], [], TerrainType.GRASSLAND, game_state=game_state)
     wing = _wing_unit()
 
-    valid = resolver._get_valid_retreat_hexes(wing, start)
+    service = CombatService(game_state)
+
+    valid = service._get_valid_retreat_hexes(wing, start)
 
     assert ocean_neighbor not in valid
     assert land_neighbor in valid
+
+
+def test_blocked_crt_retreat_eliminates_unit():
+    unit = _combat_unit("cavalry_1", UnitType.CAVALRY, WS, (4, 4))
+    damage_calls = []
+    fake_map = SimpleNamespace()
+    game_state = SimpleNamespace(
+        map=fake_map,
+        units=[],
+        players={},
+        active_player=HL,
+        movement_service=SimpleNamespace(normalize_transport_state=lambda: None),
+        damage_unit=lambda damaged, mode=None: (
+            damage_calls.append((damaged, mode)),
+            setattr(damaged, "status", UnitState.DESTROYED),
+        ),
+    )
+    service = CombatService(game_state)
+    service._get_valid_retreat_hexes = lambda unit_arg, start_hex: []
+
+    service._retreat_single_unit(unit)
+
+    assert damage_calls == [(unit, "eliminate")]
+    assert unit.status == UnitState.DESTROYED
+
+
+def test_blocked_src_cavalry_stays_to_fight():
+    attacker = _combat_unit("infantry_1", UnitType.INFANTRY, HL, (3, 4))
+    defender = _combat_unit("cavalry_1", UnitType.CAVALRY, WS, (4, 4))
+    target_hex = Hex.offset_to_axial(4, 4)
+    fake_map = SimpleNamespace(get_location=lambda hex_obj: None)
+    game_state = SimpleNamespace(
+        map=fake_map,
+        units=[],
+        players={},
+        active_player=HL,
+        movement_service=SimpleNamespace(normalize_transport_state=lambda: None),
+    )
+    service = CombatService(game_state)
+    service._get_valid_retreat_hexes = lambda unit_arg, start_hex: []
+
+    result = service._apply_precombat_special_retreat([attacker], [defender], target_hex)
+
+    assert result["applied"] is True
+    assert result["result"] == "-/SRC"
+    assert defender.status == UnitState.ACTIVE
+    assert defender.position == (4, 4)
+
+
+def test_blocked_srw_wing_stays_to_fight():
+    attacker = _combat_unit("cavalry_1", UnitType.CAVALRY, HL, (3, 4))
+    defender = _combat_unit("wing_1", UnitType.WING, WS, (4, 4))
+    target_hex = Hex.offset_to_axial(4, 4)
+    fake_map = SimpleNamespace(get_location=lambda hex_obj: None)
+    game_state = SimpleNamespace(
+        map=fake_map,
+        units=[],
+        players={},
+        active_player=HL,
+        movement_service=SimpleNamespace(normalize_transport_state=lambda: None),
+    )
+    service = CombatService(game_state)
+    service._get_valid_retreat_hexes = lambda unit_arg, start_hex: []
+
+    result = service._apply_precombat_special_retreat([attacker], [defender], target_hex)
+
+    assert result["applied"] is True
+    assert result["result"] == "-/SRW"
+    assert defender.status == UnitState.ACTIVE
+    assert defender.position == (4, 4)

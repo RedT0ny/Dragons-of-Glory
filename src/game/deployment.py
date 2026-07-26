@@ -47,15 +47,47 @@ class DeploymentService:
     def get_deployment_hexes(self, allegiance: str) -> Set[tuple]:
         """
         Returns a set of (x, y) coordinates where a player can deploy.
-        Delegates to the Player object.
         """
-        if allegiance not in self.game_state.players:
+        player = self.game_state.players.get(allegiance)
+        if not player:
             return set()
 
-        return self.game_state.players[allegiance].get_deployment_hexes(
-            self.game_state.countries,
-            self.game_state.is_hex_in_bounds
-        )
+        hexes = set()
+        area_spec = player.spec.deployment_area
+
+        if area_spec is None:
+            for country in player.controlled_countries.values():
+                hexes.update(country.territories)
+            return hexes
+
+        if isinstance(area_spec, dict):
+            for country_id in area_spec.get("countries", []):
+                country = self.game_state.countries.get(country_id)
+                if country:
+                    hexes.update(country.territories)
+
+            for key in ("coords", "hexes"):
+                coords_list = area_spec.get(key)
+                if not isinstance(coords_list, list):
+                    continue
+                for item in coords_list:
+                    if isinstance(item, (list, tuple)) and len(item) == 2:
+                        coord = tuple(item)
+                        if self.game_state.is_hex_in_bounds(*coord):
+                            hexes.add(coord)
+
+        elif isinstance(area_spec, list):
+            for item in area_spec:
+                if isinstance(item, str):
+                    country = self.game_state.countries.get(item)
+                    if country:
+                        hexes.update(country.territories)
+                elif isinstance(item, (list, tuple)) and len(item) == 2:
+                    coord = tuple(item)
+                    if self.game_state.is_hex_in_bounds(*coord):
+                        hexes.add(coord)
+
+        return hexes
 
     def get_valid_deployment_hexes(self, unit, allow_territory_wide: bool = False) -> List[Tuple[int, int]]:
         """
@@ -93,20 +125,20 @@ class DeploymentService:
                     candidates = list(country.territories)
                 else:
                     # Solamnic conquest exception:
-                    # WS units from a Solamnic country can deploy in any still-unconquered
-                    # allied Solamnic location (including Tower).
-                    # if (
-                    #     unit.allegiance == WS
-                    #     and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
-                    #     and not country.conquered
-                    # ):
-                    #     candidates = list(self._get_solamnic_group_deployment_locations(unit.allegiance))
-                    # else:
-                    # Rule 9: owner cannot deploy into enemy-occupied locations.
-                    # Conqueror can deploy from occupied locations (handled for stateless below).
-                    for loc in country.locations.values():
-                        if loc.coords and self._can_use_location_for_deployment(country, loc, unit.allegiance):
-                            candidates.append(loc.coords)
+                    # WS fleets from a Solamnic country can deploy in any still-unconquered
+                    # allied Solamnic port.
+                    if (
+                        unit.is_fleet()
+                        and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
+                        and not country.conquered
+                    ):
+                        candidates = list(self._get_solamnic_ports(unit.allegiance))
+                    else:
+                        # Rule 9: owner cannot deploy into enemy-occupied locations.
+                        # Conqueror can deploy from occupied locations (handled for stateless below).
+                        for loc in country.locations.values():
+                            if loc.coords and self._can_use_location_for_deployment(country, loc, unit.allegiance):
+                                candidates.append(loc.coords)
             else:
                 # Handle stateless units (units without land) during REPLACEMENTS phase
                 # These units should be deployable in any friendly location
@@ -171,10 +203,10 @@ class DeploymentService:
 
         return location.occupier == allegiance
 
-    def _get_solamnic_group_deployment_locations(self, allegiance: str):
+    def _get_solamnic_ports(self, allegiance: str):
         """
-        Returns deployable locations in the Solamnic conquest group for the given side.
-        Used to allow pooled replacements before the group is fully conquered.
+        Returns deployable ports in the Solamnic countries.
+        Used to allow deploying solamnic fleets in any port before all Knight countries are conquered.
         """
         coords = []
         for country in self.game_state.countries.values():
@@ -185,7 +217,7 @@ class DeploymentService:
             if country.conquered:
                 continue
             for loc in country.locations.values():
-                if loc.coords and self._can_use_location_for_deployment(country, loc, allegiance):
+                if loc.loc_type == LocType.PORT.value and self._can_use_location_for_deployment(country, loc, allegiance):
                     coords.append(loc.coords)
         return coords
 

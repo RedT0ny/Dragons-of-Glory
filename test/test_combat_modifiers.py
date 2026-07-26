@@ -41,6 +41,24 @@ class DummyUnit:
     def is_leader(self):
         return self._is_leader
 
+    def is_wing(self):
+        return self.unit_type == UnitType.WING
+
+    def is_fleet(self):
+        return self.unit_type == UnitType.FLEET
+
+    def is_citadel(self):
+        return self.unit_type == UnitType.CITADEL
+
+    def is_flier(self):
+        return self.is_wing() or self.is_citadel()
+
+    def is_dragon(self):
+        return self.race == UnitRace.DRAGON and self.is_wing()
+
+    def is_control_unit(self):
+        return self.is_army() or self.is_wing() or self.is_fleet() or self.is_citadel() or self.is_leader()
+
     def deplete(self):
         if self.status == UnitState.ACTIVE:
             self.status = UnitState.DEPLETED
