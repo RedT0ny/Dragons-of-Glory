@@ -514,14 +514,16 @@ class AnsalonMapView(QGraphicsView):
 
     # Removed the old draw_unit method as it is replaced by draw_stack logic
 
-    def highlight_movement_range(self, reachable_coords, warning_coords=None):
+    def highlight_movement_range(self, reachable_coords, warning_coords=None, enemy_reachable_coords=None):
         """
         Loops through all HexagonItems in the scene and highlights them
         if their coordinates are in the reachable_coords list.
         reachable_coords: List of (col, row) tuples.
+        enemy_reachable_coords: List of (col, row) tuples for enemy range preview.
         """
         reachable_set = set(reachable_coords)
         warning_set = set(warning_coords or [])
+        enemy_set = set(enemy_reachable_coords or [])
         # Highlights reachable hexagons by comparing item coordinates
         for item in self.scene.items():
             if isinstance(item, HexagonItem):
@@ -529,7 +531,10 @@ class AnsalonMapView(QGraphicsView):
                     item.set_highlight(True, UI_COLORS["neutral_warning_hex"])
                 elif item.coords in reachable_set:
                     if not item.is_highlighted or item.highlight_color is not None:
-                        item.set_highlight(True)
+                        item.set_highlight(True, QColor(0, 200, 0, 100))
+                elif item.coords in enemy_set:
+                    if not item.is_highlighted or item.highlight_color is not None:
+                        item.set_highlight(True, QColor(255, 255, 0, 100))
                 else:
                     if item.is_highlighted:
                         item.set_highlight(False)

@@ -809,11 +809,10 @@ class GameController(QObject):
             return
 
         if self.game_state.phase == GamePhase.MOVEMENT:
-            # Only highlight if it's the active player's turn
+            # Highlight in yellow enemy units' range
             if any(u.allegiance != self.game_state.active_player for u in selected_units):
-                self.view.highlight_movement_range([])
-                self.neutral_warning_hexes = set()
-                self.maelstrom_warning_hexes = set()
+                enemy_range = self.movement_service.get_reachable_hexes(selected_units)
+                self.view.highlight_movement_range([], [], enemy_range.reachable_coords)
                 return
 
             movement_range = self.movement_service.get_reachable_hexes(selected_units)
