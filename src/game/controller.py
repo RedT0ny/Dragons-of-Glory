@@ -860,7 +860,7 @@ class GameController(QObject):
 
             if (col, row) in self.maelstrom_warning_hexes:
                 from src.gui.message_dialog import show_info_dialog, show_question_dialog
-                decision = self.movement_service.invasion_handler.evaluate_maelstrom_entry(hex_obj)
+                decision = self.movement_service.evaluate_maelstrom_entry(hex_obj)
                 if not decision.is_maelstrom_entry:
                     pass
                 elif decision.blocked_message:
