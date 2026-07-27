@@ -11,7 +11,7 @@ from src.content.translator import Translator
 from src.content.tools import debug_print
 from src.content.config import UNIT_ICON_SIZE, LIBRA_FONT, DEBUG
 from src.content.constants import DRAGONFLIGHTS
-from src.content.specs import UnitColumn
+from src.content.specs import UnitColumn, UnitState
 from src.content.tools import TextFormatter
 from src.gui.map_items import UnitCounter
 
@@ -437,6 +437,70 @@ class UnitTable(QTableWidget):
         # Emit signal to notify caller to re-scan selection if needed
         if first_enabled_item:
             self.itemChanged.emit(first_enabled_item) # Hack to trigger notify
+
+class InteractiveUnitTable(UnitTable):
+    """
+    A UnitTable subclass that supports left-click to allocate damage
+    and right-click to de-allocate during manual damage allocation.
+    """
+    def __init__(self, columns, parent=None):
+        super().__init__(columns, parent)
+        self.allocations = {}
+        self.max_per_unit = {}
+        self.setContextMenuPolicy(Qt.NoContextMenu)
+
+    def set_allocation_data(self, allocations, max_per_unit):
+        self.allocations = allocations
+        self.max_per_unit = max_per_unit
+
+    def mousePressEvent(self, event):
+        index = self.indexAt(event.pos())
+        if not index.isValid():
+            super().mousePressEvent(event)
+            return
+        row = index.row()
+        unit = self.current_units[row] if row < len(self.current_units) else None
+        if unit is None:
+            super().mousePressEvent(event)
+            return
+
+        handled = False
+        if event.button() == Qt.LeftButton:
+            parent = self.parent()
+            while parent and not hasattr(parent, "on_unit_allocate"):
+                parent = parent.parent()
+            if parent:
+                parent.on_unit_allocate(unit)
+                handled = True
+        elif event.button() == Qt.RightButton:
+            parent = self.parent()
+            while parent and not hasattr(parent, "on_unit_deallocate"):
+                parent = parent.parent()
+            if parent:
+                parent.on_unit_deallocate(unit)
+                handled = True
+        super().mousePressEvent(event)
+        if handled:
+            event.accept()
+
+    def update_status_display(self, unit):
+        """Update the STATUS cell for a unit based on current allocation."""
+        status_col = self.columns_config.index(UnitColumn.STATUS)
+        row = self.current_units.index(unit)
+        alloc = self.allocations.get(unit, 0)
+        item = self.item(row, status_col)
+
+        if alloc == 0:
+            item.setText(unit.status.name.title())
+            item.setForeground(QColor(0, 0, 0))
+        else:
+            if unit.status == UnitState.ACTIVE:
+                projected = "Depleted" if alloc == 1 else "Reserve"
+            else:
+                projected = "Reserve"
+            item.setText(projected)
+            item.setForeground(QColor(200, 0, 0))
+
 
 class AllegiancePanel(QWidget):
     """

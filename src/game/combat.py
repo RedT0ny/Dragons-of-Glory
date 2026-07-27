@@ -171,7 +171,7 @@ def apply_gnome_tech_bonus(
 def _get_equipped_asset(unit, asset_id: str):
     """Returns the asset with the given ID equipped by the unit, or None if not found."""
     for asset in getattr(unit, "equipment", []) or []:
-        if getattr(asset, "id", None) == asset_id:
+        if getattr(asset, "base_id", None) == asset_id:
             return asset
     return None
 
@@ -1503,7 +1503,7 @@ class CombatService:
                     )
                     if not is_human:
                         continue
-                    from src.game.combat_reporting import DamageAllocationDialog
+                    from src.gui.dmg_allocation_dialog import DamageAllocationDialog
                     from PySide6.QtWidgets import QApplication
                     app = QApplication.instance()
                     parent = app.activeWindow() if app else None
