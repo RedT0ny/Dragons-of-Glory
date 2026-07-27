@@ -2048,20 +2048,25 @@ class CombatService:
                 return True
         return False
 
-    def advance_after_combat(self, attackers, target_hex):
+    def get_advance_candidates(self, attackers, target_hex):
+        """Return units eligible to advance into target_hex after combat."""
         candidates = []
         for unit in attackers:
             if not unit.is_on_map or not unit.position:
                 continue
             if None in unit.position:
                 continue
-            if not (unit.is_army() or unit.is_wing()):
-                continue
-
             from_hex = Hex.offset_to_axial(*unit.position)
             if target_hex not in from_hex.neighbors():
                 continue
             candidates.append(unit)
+        return candidates
+
+    def advance_after_combat(self, attackers, target_hex, chosen_units=None):
+        candidates = self.get_advance_candidates(attackers, target_hex)
+        if chosen_units is not None:
+            chosen_ids = {id(u) for u in chosen_units}
+            candidates = [u for u in candidates if id(u) in chosen_ids]
 
         if not candidates:
             return []
@@ -2076,19 +2081,23 @@ class CombatService:
                 no_adjacent_enemy[src] = not self.map.is_adjacent_to_enemy(src_hex, u)
 
         moved = []
+        leaders = [u for u in candidates if u.is_leader()]
+        non_leaders = [u for u in candidates if not u.is_leader()]
+
+        # ALWAYS move non-leaders first
         groups = [
-            [u for u in candidates if u.is_wing()],
-            [u for u in candidates if u.unit_type == UnitType.CAVALRY],
-            [u for u in candidates if u.is_army() and u.unit_type != UnitType.CAVALRY],
+            [u for u in non_leaders if u.is_wing()],
+            [u for u in non_leaders if u.unit_type == UnitType.CAVALRY],
+            [u for u in non_leaders if u.is_army() and u.unit_type != UnitType.CAVALRY],
         ]
 
+        # Move all non-leaders
         for group in groups:
             pool = list(group)
             while pool:
                 legal = [
                     u for u in pool
                     if self.map.can_stack_move_to([u], target_hex)
-                    and not self._would_leave_leaders_alone_after_advance(u)
                 ]
                 if not legal:
                     break
@@ -2097,6 +2106,7 @@ class CombatService:
                 legal.sort(key=lambda u: self._advance_priority_key(u, remaining_by_source, no_adjacent_enemy))
                 chosen = legal[0]
                 source_before_move = tuple(chosen.position)
+
                 self.game_state.move_unit(chosen, target_hex)
                 moved.append(chosen)
 
@@ -2105,28 +2115,42 @@ class CombatService:
 
                 pool.remove(chosen)
 
+        # Now move leaders with safety check
+        pool = list(leaders)
+        while pool:
+            legal = [
+                u for u in pool
+                if self.map.can_stack_move_to([u], target_hex)
+            ]
+            if not legal:
+                break
+
+            random.shuffle(legal)
+            legal.sort(key=lambda u: self._advance_priority_key(u, remaining_by_source, no_adjacent_enemy))
+            chosen = legal[0]
+            source_before_move = tuple(chosen.position)
+            target_coords = target_hex.axial_to_offset()
+
+            # Check if leader can advance (only blocked if no support at target)
+            target_units = len([u for u in moved if tuple(u.position) == target_coords])
+
+            # Leader moves only if there's support at target
+            if target_units >= 1:
+                self.game_state.move_unit(chosen, target_hex)
+                moved.append(chosen)
+
+                if source_before_move in remaining_by_source and remaining_by_source[source_before_move] > 0:
+                    remaining_by_source[source_before_move] -= 1
+
+                pool.remove(chosen)
+            else:
+                # No support at target, leader stays
+                pool.remove(chosen)
+                # No need to continue checking other leaders since target is empty
+                # (but we break anyway since no leaders can move without support)
+                break
+
         return moved
-
-    def _would_leave_leaders_alone_after_advance(self, unit):
-        if not unit.position or unit.position[0] is None or unit.position[1] is None:
-            return False
-        src_hex = Hex.offset_to_axial(*unit.position)
-        src_units = [
-            u for u in self.map.get_units_in_hex(src_hex.q, src_hex.r)
-            if u.is_on_map
-            and u.allegiance == unit.allegiance
-            and u.transport_host is None
-        ]
-        has_leader = any(u.is_leader() for u in src_units)
-        if not has_leader:
-            return False
-
-        escort_count = sum(
-            1
-            for u in src_units
-            if u.is_control_unit()
-        )
-        return escort_count <= 1
 
     def _advance_priority_key(self, unit, remaining_by_source, no_adjacent_enemy):
         src = tuple(unit.position)
@@ -2670,17 +2694,22 @@ class CombatClickHandler:
         if not self.pending_advance:
             return
 
-        from PySide6.QtWidgets import QMessageBox
-        reply = QMessageBox.question(
-            None,
-            "Advance?",
-            "Advance?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        if reply == QMessageBox.Yes:
+        attackers = self.pending_advance["attackers"]
+        target_hex = self.pending_advance["target_hex"]
+
+        candidates = self.game_state.combat_service.get_advance_candidates(attackers, target_hex)
+        if not candidates:
+            self.pending_advance = None
+            self.view.sync_with_model()
+            return
+
+        from src.gui.advance_dialog import show_advance_dialog
+
+        chosen = show_advance_dialog(candidates, self.game_state)
+
+        if chosen:
             moved_units = self.game_state.combat_service.advance_after_combat(
-                self.pending_advance["attackers"],
-                self.pending_advance["target_hex"],
+                attackers, target_hex, chosen_units=chosen,
             )
             if moved_units:
                 print(f"Advance after combat: moved {len(moved_units)} units.")
