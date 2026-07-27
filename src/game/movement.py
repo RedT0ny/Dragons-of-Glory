@@ -507,6 +507,7 @@ class MovementService:
                 if hasattr(carrier, "movement_points"):
                     carrier.movement_points = 0
                 carrier.moved_this_turn = True
+                unit.attacked_this_turn = True
         self.normalize_transport_state()
         return True
 

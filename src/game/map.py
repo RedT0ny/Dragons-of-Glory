@@ -422,6 +422,7 @@ class Board:
         return None
 
     def _river_other_endpoint(self, river_hexside, endpoint_hex):
+        """ Given a river hexside and one of its endpoints, returns the other endpoint."""
         endpoints = self._river_endpoints_local(river_hexside)
         if len(endpoints) != 2:
             return None
@@ -433,6 +434,7 @@ class Board:
         return None
 
     def _fleet_vertex_adjacent_switch(self, endpoint_hex, current_side, next_side):
+        """ Returns True if the two river hexsides are adjacent at the given endpoint (i.e., a legal turn)."""
         current_other = self._river_other_endpoint(current_side, endpoint_hex)
         next_other = self._river_other_endpoint(next_side, endpoint_hex)
         if current_other is None or next_other is None:
@@ -462,12 +464,14 @@ class Board:
         return enemy
 
     def _hex_has_enemy_unit_for_fleet(self, hex_obj, unit):
+        """ Returns True if any enemy unit is present in the given hex for the fleet's allegiance."""
         for other in self.get_units_in_hex(hex_obj.q, hex_obj.r):
             if self._is_enemy_for_fleet(unit, other):
                 return True
         return False
 
     def _hexside_has_enemy_ship(self, river_hexside, unit):
+        """ Returns True if any enemy ship is present on the given river hexside for the fleet's allegiance."""
         side = self._coerce_hexside(river_hexside)
         if side is None:
             return False
@@ -483,6 +487,7 @@ class Board:
         return False
 
     def _fleet_count_on_river_hexside(self, river_hexside, exclude_unit=None):
+        """ Returns the number of fleets currently occupying the given river hexside, excluding a specific unit if provided."""
         side = self._coerce_hexside(river_hexside)
         if side is None:
             return 0
@@ -500,6 +505,7 @@ class Board:
         return count
 
     def _fleet_can_enter_hex(self, unit, hex_obj):
+        """ Returns True if the fleet can legally enter the given hex, considering terrain, ports, and enemy units."""
         if not self._is_valid_local_hex(hex_obj):
             return False
         if self._hex_has_enemy_unit_for_fleet(hex_obj, unit):
@@ -515,6 +521,7 @@ class Board:
         return terrain in (TerrainType.OCEAN, TerrainType.MAELSTROM) or self.is_coastal(hex_obj)
 
     def _fleet_can_enter_river_hexside(self, unit, river_hexside):
+        """ Returns True if the fleet can legally enter the given river hexside, considering endpoints and enemy units."""
         side = self._coerce_hexside(river_hexside)
         if side is None:
             return False
@@ -540,6 +547,7 @@ class Board:
         return key in self.fleet_barriers
 
     def _fleet_neighbor_states(self, unit, state):
+        """ Returns a list of (next_state, step_cost) tuples for the given fleet unit and current state. """
         current_hex, river_hexside = state
         river_hexside = self._coerce_hexside(river_hexside)
         neighbors = []
@@ -611,6 +619,7 @@ class Board:
         collect_predicate=None,
         expand_predicate=None,
     ):
+        """ Searches for valid fleet states starting from a given state. """
         start_key = self._fleet_state_key(start_state)
         frontier = []
         heapq.heappush(frontier, (0, 0, start_state))
@@ -670,6 +679,7 @@ class Board:
         }
 
     def _reconstruct_fleet_path(self, came_from, state_by_key, end_key):
+        """ Reconstructs the path from the start state to the end state using the came_from mapping. """
         rev_keys = []
         node = end_key
         while node is not None:
@@ -710,6 +720,7 @@ class Board:
         ), result["found_cost"]
 
     def get_reachable_hexes_for_fleet(self, unit, *, split_maelstrom=False):
+        """ Returns a list of reachable hexes for the given fleet unit, optionally splitting maelstrom hexes into warnings."""
         if not getattr(unit, "position", None):
             return ([], []) if split_maelstrom else []
         start_hex = Hex.offset_to_axial(*unit.position)
@@ -753,6 +764,7 @@ class Board:
         return list(normal), list(warnings)
 
     def _is_safe_fleet_displacement_state(self, fleet, state):
+        """ Returns True if the given fleet state is safe for displacement (no enemy units present). """
         current_hex, river_hexside = state
         if self._hex_has_enemy_unit_for_fleet(current_hex, fleet):
             return False
@@ -882,13 +894,10 @@ class Board:
         army_limit = 2
         wing_limit = 2
 
-        # Fortified bonus (City, Port, Fortress, or Capital) increases army limit to 3
+        # Fortified cities have higher army stacking limit (3)
         loc = self.get_location(target_hex)
-        if loc:
-            is_fortified = (loc.is_capital or
-                            loc.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value])
-            if is_fortified:
-                army_limit = 3
+        if loc and loc.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value]:
+            army_limit = 3
 
         if army_count > army_limit:
             return False
