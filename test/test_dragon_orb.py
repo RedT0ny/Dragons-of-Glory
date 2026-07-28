@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from src.content.constants import HL, WS
 from src.content.specs import TerrainType, UnitRace, UnitState, UnitType
-from src.game.combat import apply_dragon_orb_bonus
+from src.game.combat import activate_dragon_orb
 from src.game.game_state import GameState
 from src.game.map import Hex
 
@@ -123,7 +123,7 @@ def test_dragon_orb_success_destroys_only_dragons_and_consumes_orb():
         is_army=True,
     )
 
-    logs = apply_dragon_orb_bonus(
+    logs = activate_dragon_orb(
         [leader],
         [dragon, draconian],
         consume_asset_fn=gs._consume_asset,
@@ -164,7 +164,7 @@ def test_dragon_orb_failure_destroys_leader_and_consumes_orb():
         position=(5, 4),
     )
 
-    logs = apply_dragon_orb_bonus(
+    logs = activate_dragon_orb(
         [leader],
         [enemy_dragon],
         consume_asset_fn=gs._consume_asset,

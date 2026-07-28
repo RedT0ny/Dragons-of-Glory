@@ -146,6 +146,19 @@ class Ui_configDialog(object):
 
         self.gridLayout_4.addWidget(self.intComboBox, 2, 1, 1, 1)
 
+        self.navLabel = QLabel(self.rulesConfig)
+        self.navLabel.setObjectName(u"navLabel")
+        self.navLabel.setFont(font)
+
+        self.gridLayout_4.addWidget(self.navLabel, 3, 0, 1, 1)
+
+        self.navComboBox = QComboBox(self.rulesConfig)
+        self.navComboBox.addItem("")
+        self.navComboBox.addItem("")
+        self.navComboBox.setObjectName(u"navComboBox")
+
+        self.gridLayout_4.addWidget(self.navComboBox, 3, 1, 1, 1)
+
         self.gridLayout.addWidget(self.rulesConfig, 1, 0, 1, 1)
 
 
@@ -189,7 +202,11 @@ class Ui_configDialog(object):
         self.intLabel.setText(QCoreApplication.translate("configDialog", u"Interception", None))
         self.intComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Enabled", None))
         self.intComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Disabled", None))
-        self.intComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Naval only", None))
+        self.intComboBox.setItemText(2, QCoreApplication.translate("configDialog", u"Naval only", None))
+
+        self.navLabel.setText(QCoreApplication.translate("configDialog", u"Naval Combat", None))
+        self.navComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Classic", None))
+        self.navComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Advanced", None))
 
     # retranslateUi
 
@@ -239,6 +256,10 @@ class ConfigDialog(QDialog):
         self.ui.intComboBox.addItem(tr("dialogs.config.interception_disabled", "Disabled"), "disabled")
         self.ui.intComboBox.addItem(tr("dialogs.config.interception_naval", "Naval only"), "naval")
 
+        self.ui.navComboBox.clear()
+        self.ui.navComboBox.addItem(tr("dialogs.config.naval_classic", "Classic"), "classic")
+        self.ui.navComboBox.addItem(tr("dialogs.config.naval_advanced", "Advanced"), "advanced")
+
         self.ui.hlComboBox.clear()
         self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
         self.ui.hlComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
@@ -260,6 +281,7 @@ class ConfigDialog(QDialog):
         supply = str(config.get("supply", "standard")).strip().lower()
         deployment = str(config.get("deployment", "canonical")).strip().lower()
         interception = str(config.get("interception", "disabled")).strip().lower()
+        naval_combat = str(config.get("naval_combat", "classic")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
@@ -274,9 +296,12 @@ class ConfigDialog(QDialog):
         dep_idx = self.ui.depComboBox.findData("manual" if deployment == "manual" else "canonical")
         if dep_idx >= 0:
             self.ui.depComboBox.setCurrentIndex(dep_idx)
-        int_idx = self.ui.intComboBox.findData(interception if interception in {"enabled", "disabled", "naval"} else "disabled")
+        int_idx = self.ui.intComboBox.findData("interception" if interception in {"enabled", "disabled", "naval"} else "disabled")
         if int_idx >= 0:
             self.ui.intComboBox.setCurrentIndex(int_idx)
+        nav_idx = self.ui.navComboBox.findData("naval_combat" if naval_combat == "advanced" else "classic")
+        if nav_idx >= 0:
+            self.ui.navComboBox.setCurrentIndex(nav_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
         if hl_idx >= 0:
             self.ui.hlComboBox.setCurrentIndex(hl_idx)
@@ -314,6 +339,7 @@ class ConfigDialog(QDialog):
         supply = str(self.ui.supComboBox.currentData() or "standard")
         deployment = str(self.ui.depComboBox.currentData() or "canonical")
         interception = str(self.ui.intComboBox.currentData() or "disabled")
+        naval_combat = str(self.ui.navComboBox.currentData() or "classic")
 
         return {
             "difficulty": difficulty,
@@ -321,4 +347,5 @@ class ConfigDialog(QDialog):
             "supply": supply,
             "deployment": deployment,
             "interception": interception,
+            "naval_combat": naval_combat,
         }

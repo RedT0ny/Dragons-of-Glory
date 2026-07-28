@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from src.content.constants import HL, WS, NEUTRAL
 from src.content.specs import AssetSpec, TerrainType, UnitSpec, UnitState, UnitType
-from src.game.combat import CombatResolver, apply_gnome_tech_bonus
+from src.game.combat import CombatResolver, activate_gnome_tech
 from src.game.diplomacy import DiplomacyService
 from src.game.event import Asset
 from src.game.game_state import GameState
@@ -141,7 +141,7 @@ def test_gnome_tech_bonus_non_double_and_doubles_cases():
 
     consumed = []
     rolls = iter([5, 2, 3, 3])
-    bonuses, _ = apply_gnome_tech_bonus(
+    bonuses, _ = activate_gnome_tech(
         [attacker],
         [defender],
         consume_asset_fn=lambda asset, unit: consumed.append((asset.id, unit.id)),

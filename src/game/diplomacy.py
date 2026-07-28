@@ -2,6 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional
 
+from game.unit import Unit
 from src.game.unit import Fleet, Unit
 from src.content.translator import Translator
 from src.content.constants import HL, WS
@@ -222,6 +223,10 @@ class ConquestService:
         self.game_state = game_state
 
     def _update_location_occupiers(self):
+        """ Updates the occupier of each location based on the units present in that location.
+        If a unit from an enemy allegiance is present in a location, that unit's allegiance becomes the occupier
+        of that location. This method ensures that the game state accurately reflects which country currently controls
+        each location on the map."""
         gs = self.game_state
         for map_loc in gs.map.locations.values():
             if not map_loc or not map_loc.coords:
@@ -237,6 +242,7 @@ class ConquestService:
                     break
 
     def _is_country_fully_occupied_by_enemy(self, country) -> bool:
+        """ Returns True if all locations in the country are occupied by enemy forces, False otherwise."""
         gs = self.game_state
         enemy = gs.get_enemy_allegiance(country.allegiance)
         if not enemy:
@@ -282,6 +288,10 @@ class ConquestService:
             if unit.is_fleet():
                 continue
 
+            if country.id == "dtemple" and unit.is_on_map:
+                # Existing Draconians are not destroyed.
+                continue
+
             if unit.status == UnitState.DESTROYED:
                 continue
 
@@ -294,6 +304,7 @@ class ConquestService:
         print(f"Country {translator.get_country_name(country.id)} conquered. Destroyed units: {destroyed_count}")
 
     def _apply_country_conquest_or_liberation(self, country, conqueror: str):
+        """ Applies the conquest or liberation of a country based on its current state."""
         if country.conquered:
             country.allegiance = conqueror
             country.conquered = False
@@ -302,6 +313,7 @@ class ConquestService:
         self._destroy_country_upon_conquest(country, conqueror)
 
     def _enforce_conquered_fleet_replacement_rule(self):
+        """ Fleets in conquered countries must be replaced if they are in reserve and the country is conquered."""
         gs = self.game_state
         any_knight_unconquered = any(
             (not c.conquered) for c in gs._countries_with_tag(gs.tag_knight_countries)
@@ -322,6 +334,8 @@ class ConquestService:
             gs.map.remove_unit_from_spatial_map(unit)
 
     def _apply_standard_country_conquests(self):
+        """ Applies standard conquest rules for countries that are fully occupied by enemy forces,
+        excluding special Solamnic Knight country rules."""
         gs = self.game_state
         for country in gs.countries.values():
             if country.allegiance not in (HL, WS):
@@ -334,6 +348,8 @@ class ConquestService:
                     self._apply_country_conquest_or_liberation(country, conqueror)
 
     def _apply_solamnic_group_conquest(self):
+        """ Applies special conquest rules for the group of Solamnic Knight countries.
+        If all Solamnic Knight countries are fully occupied by enemy forces, they are conquered together."""
         gs = self.game_state
         group = [c for c in gs._countries_with_tag(gs.tag_knight_countries) if c.allegiance == WS]
         if not group:
@@ -347,6 +363,7 @@ class ConquestService:
                 self._apply_country_conquest_or_liberation(country, conqueror)
 
     def resolve_end_of_combat_conquest(self):
+        """ Resolves the conquest of countries at the end of combat, applying special rules for Solamnic countries."""
         gs = self.game_state
         if not gs.map:
             return

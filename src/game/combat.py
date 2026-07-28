@@ -51,7 +51,7 @@ def compute_crt_survival_probability(odds_ratio: float, drm: int) -> float:
     return surv / 10.0
 
 
-def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, damage_unit_fn, roll_d6_fn=None):
+def activate_dragon_orb(attackers, defenders, consume_asset_fn, damage_unit_fn, roll_d6_fn=None):
     """
     Resolves Dragon Orb usage before normal land combat.
 
@@ -104,7 +104,7 @@ def apply_dragon_orb_bonus(attackers, defenders, consume_asset_fn, damage_unit_f
     return logs
 
 
-def apply_gnome_tech_bonus(
+def activate_gnome_tech(
     attackers,
     defenders,
     consume_asset_fn,
@@ -1351,7 +1351,7 @@ class CombatService:
 
         for msg in self._apply_combat_healing(attackers + defenders):
             print(msg)
-        orb_events = apply_dragon_orb_bonus(
+        orb_events = activate_dragon_orb(
             attackers,
             defenders,
             consume_asset_fn=self._consume_asset,
@@ -1429,7 +1429,7 @@ class CombatService:
             }
 
         gnome_drm = 0
-        gnome_effects, gnome_logs = apply_gnome_tech_bonus(
+        gnome_effects, gnome_logs = activate_gnome_tech(
             attackers,
             defenders,
             consume_asset_fn=self._consume_asset,

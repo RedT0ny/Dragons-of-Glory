@@ -129,6 +129,7 @@ class DeploymentService:
                     # allied Solamnic port.
                     if (
                         unit.is_fleet()
+                        and unit.allegiance == WS
                         and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
                         and not country.conquered
                     ):
