@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer, QSettings
 
-from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, LOGS_DIR
+from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, HOUSE_RULES, LOGS_DIR
 from src.content.tools import debug_print, set_debug_log_path, close_debug_log
 from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
@@ -24,6 +24,7 @@ from src.gui.turn_panel import TurnPanel
 from src.gui.about import Ui_aboutDialog
 from src.gui.config_dialog import ConfigDialog
 from src.gui.volume_dialog import Ui_volumeDialog
+from src.gui.event_timeline_dialog import EventTimelineDialog
 from src.content.audio_manager import AudioManager
 
 
@@ -401,6 +402,15 @@ class MainWindow(QMainWindow):
         advrules_action = QAction("Advanced &Rules", self)
         advrules_action.triggered.connect(self.on_advrules_clicked)
         help_menu.addAction(advrules_action)
+        houserules_action = QAction("&House Rules", self)
+        houserules_action.triggered.connect(self.on_houserules_clicked)
+        help_menu.addAction(houserules_action)
+
+        help_menu.addSeparator()
+
+        event_timeline_action = QAction("&Event Timeline", self)
+        event_timeline_action.triggered.connect(self.on_event_timeline_clicked)
+        help_menu.addAction(event_timeline_action)
 
         help_menu.addSeparator()
 
@@ -435,20 +445,23 @@ class MainWindow(QMainWindow):
         try:
             webbrowser.open(ADVANCED_RULES)
         except Exception as e:
-            print(f"Error opening manual: {e}")
+            print(f"Error opening advanced rules: {e}")
 
+    def on_houserules_clicked(self):
+        """Opens Brian Bradford's house rules using the system's default PDF viewer."""
+        try:
+            webbrowser.open(HOUSE_RULES)
+        except Exception as e:
+            print(f"Error opening house rules: {e}")
+
+    def on_event_timeline_clicked(self):
+        """Opens the event timeline dialog."""
+        dialog = EventTimelineDialog(self)
+        dialog.exec()
 
     def on_config_clicked(self):
         if not self.controller:
             return
-        # current_player = getattr(self.game_state, "current_player", None)
-        # if current_player and getattr(current_player, "is_ai", False):
-        #     QMessageBox.information(
-        #         self,
-        #         "Configuration",
-        #         "Player configuration can be changed only during a human player's turn.",
-        #     )
-        #     return
 
         dialog = ConfigDialog(self)
         dialog.set_from_config(self.controller.get_runtime_config())

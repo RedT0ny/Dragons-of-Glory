@@ -1,15 +1,16 @@
-import sys
 import os
-import yaml
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QScrollArea, QFrame, QTextEdit, QSplitter, QPushButton,
-    QDialog, QSizePolicy
-)
-from PySide6.QtGui import QFont, QColor, QPalette, QPixmap
-from PySide6.QtCore import Qt, QSize
+from typing import Dict, List
 
-from src.content.config import DATA_DIR, IMAGES_DIR
+from PySide6.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
+    QTextEdit, QPushButton, QDialog, QWidget
+)
+from PySide6.QtGui import QFont, QColor, QPixmap
+from PySide6.QtCore import Qt
+
+from src.content.config import EVENTS_DATA, IMAGES_DIR
+from src.content.loader import load_events_yaml
+from src.content.specs import EventSpec
 
 ALLEGIANCE_COLORS = {
     "whitestone": QColor("#2b7be4"),
@@ -27,23 +28,20 @@ TYPE_COLORS = {
     "resource":  QColor("#8bc34a"),
 }
 
-def load_events():
-    path = os.path.join(DATA_DIR, "events.yaml")
-    with open(path, encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+
+def _events_to_dicts(event_specs: Dict[str, EventSpec]) -> List[dict]:
     events = []
-    for eid, data in raw.items():
-        turn = data.get("turn", 0)
+    for eid, spec in event_specs.items():
         events.append({
-            "id": eid,
-            "turn": turn,
-            "type": data.get("type", "unknown"),
-            "allegiance": data.get("allegiance", "none"),
-            "description": data.get("description", ""),
-            "picture": data.get("picture", ""),
-            "effects": data.get("effects", {}),
-            "max_occurrences": data.get("max_occurrences"),
-            "requirements": data.get("requirements", []),
+            "id": spec.id,
+            "turn": spec.turn or 0,
+            "type": spec.event_type,
+            "allegiance": spec.allegiance or "none",
+            "description": spec.description,
+            "picture": spec.picture,
+            "effects": spec.effects or {},
+            "max_occurrences": spec.max_occurrences,
+            "requirements": spec.requirements or [],
         })
     events.sort(key=lambda e: (e["turn"], e["id"]))
     return events
@@ -282,7 +280,7 @@ class TimelineWidget(QWidget):
 
         effects_text = ", ".join(str(v) for v in event["effects"].values())
         if effects_text:
-            eff = QLabel(f"→ {effects_text}")
+            eff = QLabel(f"\u2192 {effects_text}")
             eff.setStyleSheet("color: #ffcc00; font-size: 10px;")
             layout.addWidget(eff)
 
@@ -294,27 +292,15 @@ class TimelineWidget(QWidget):
         dlg.exec()
 
 
-class TimelineWindow(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Dragons of Glory - Event Timeline Viewer")
-        self.resize(1200, 800)
-        events = load_events()
-        self.timeline = TimelineWidget(events)
+class EventTimelineDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Event Timeline")
+        self.resize(1100, 700)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+
+        raw = load_events_yaml(EVENTS_DATA)
+        events = _events_to_dicts(raw)
+        self.timeline = TimelineWidget(events)
         layout.addWidget(self.timeline)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    app.setStyle("Fusion")
-    palette = QPalette()
-    palette.setColor(QPalette.Window, QColor(30, 30, 30))
-    palette.setColor(QPalette.WindowText, QColor(224, 224, 224))
-    palette.setColor(QPalette.Base, QColor(42, 42, 42))
-    palette.setColor(QPalette.Text, QColor(224, 224, 224))
-    app.setPalette(palette)
-    window = TimelineWindow()
-    window.show()
-    sys.exit(app.exec())
