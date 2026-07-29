@@ -767,6 +767,7 @@ class NavalCombatResolver:
         self._roll_d10 = roll_d10_fn or (lambda: random.randint(1, 10))
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
+        self._is_advanced = str(getattr(game_state, "naval_combat", "classic")).strip().lower() == "advanced"
 
     @staticmethod
     def _fleet_is_in_port(game_state, fleet):
@@ -781,6 +782,47 @@ class NavalCombatResolver:
     def _side_has_fleet_in_port(game_state, side_fleets):
         """True if any fleet in the list is in an allied port."""
         return any(NavalCombatResolver._fleet_is_in_port(game_state, f) for f in side_fleets if f.is_on_map)
+
+    def _collect_round_hits(self, atk_round, def_round):
+        """Collect hits for both sides in a combat round. Returns a dict mapping target fleets to hit counts."""
+        atk_hits = self._collect_side_hits(atk_round, def_round)
+        def_hits = self._collect_side_hits(def_round, atk_round)
+        hits = atk_hits | def_hits
+        return hits
+
+    def _collect_side_hits(self, side_fleets, enemy_fleets):
+        """Collect hits for a side in combat."""
+        hits = {}
+        for ship in side_fleets:
+            target = self._select_target(ship, enemy_fleets)
+            if target is None:
+                continue
+            if self._roll_hits(ship, target):
+                hits[target] = hits.get(target, 0) + 1
+        return hits
+
+    def _collect_round_hits_advanced(self, atk_round, def_round):
+        atk_hits = self._collect_side_hits_advanced(atk_round, def_round)
+        def_hits = self._collect_side_hits_advanced(def_round, atk_round)
+        hits = atk_hits | def_hits
+        return hits
+
+    def _collect_side_hits_advanced(self, side_fleets, enemy_fleets):
+        hits = {}
+        live_enemy = [u for u in enemy_fleets if u.is_on_map]
+        if not live_enemy:
+            return hits
+        assignments = {}
+        for ship in side_fleets:
+            target = min(live_enemy, key=lambda u: (
+                assignments.get(u, 0),
+                0 if u.status.name == "DEPLETED" else 1,
+                getattr(u, "combat_rating", 0),
+            ))
+            assignments[target] = assignments.get(target, 0) + 1
+            if self._roll_hits(ship, target):
+                hits[target] = hits.get(target, 0) + 1
+        return hits
 
     def resolve(self, withdraw_decider=None):
         """
@@ -810,21 +852,10 @@ class NavalCombatResolver:
             if not atk_round or not def_round:
                 break
 
-            # Simultaneous fire: collect all hits first, then apply
-            hits = {}
-            for ship in atk_round:
-                target = self._select_target(ship, def_round)
-                if target is None:
-                    continue
-                if self._roll_hits(ship, target):
-                    hits[target] = hits.get(target, 0) + 1
-
-            for ship in def_round:
-                target = self._select_target(ship, atk_round)
-                if target is None:
-                    continue
-                if self._roll_hits(ship, target):
-                    hits[target] = hits.get(target, 0) + 1
+            if self._is_advanced:
+                hits = self._collect_round_hits_advanced(atk_round, def_round)
+            else:
+                hits = self._collect_round_hits(atk_round, def_round)
 
             for target, amount in hits.items():
                 for _ in range(amount):
