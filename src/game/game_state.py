@@ -89,6 +89,7 @@ class GameState:
         self.supply = "standard"
         self.deployment_mode = "canonical"
         self.interception_mode = "disabled"
+        self.naval_combat = "classic"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -243,6 +244,10 @@ class GameState:
                 "second_player_has_acted": self.second_player_has_acted,
                 "activation_bonuses": dict(self.activation_bonuses),
                 "combat_bonuses": dict(self.combat_bonuses),
+                "supply": self.supply,
+                "deployment_mode": self.deployment_mode,
+                "interception_mode": self.interception_mode,
+                "naval_combat": self.naval_combat,
             },
             "world_state": {
                 "countries": {
@@ -336,6 +341,11 @@ class GameState:
             HL: int(saved_combat_bonuses.get(HL, 0) or 0),
             WS: int(saved_combat_bonuses.get(WS, 0) or 0),
         }
+
+        self.supply = str(metadata.get("supply", self.supply)).strip().lower()
+        self.deployment_mode = str(metadata.get("deployment_mode", self.deployment_mode)).strip().lower()
+        self.interception_mode = str(metadata.get("interception_mode", self.interception_mode)).strip().lower()
+        self.naval_combat = str(metadata.get("naval_combat", self.naval_combat)).strip().lower()
 
         self._restore_countries_from_save(world_state.get("countries", {}))
         self._restore_units_from_save(
