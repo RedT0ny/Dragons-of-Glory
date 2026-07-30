@@ -768,20 +768,19 @@ class NavalCombatResolver:
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
         self._is_advanced = str(getattr(game_state, "naval_combat", "classic")).strip().lower() == "advanced"
+        self._battle_location = defenders[0].position if defenders else None
+        self._original_attacker_positions = {
+            id(f): (f.position, getattr(f, "river_hexside", None))
+            for f in self.attackers
+        }
 
     @staticmethod
     def _fleet_is_in_port(game_state, fleet):
-        """True if the fleet is in a hex with an allied port location."""
         if not fleet.position or None in fleet.position:
             return False
         hex_coord = Hex.offset_to_axial(*fleet.position)
         loc = game_state.map.get_location(hex_coord)
         return bool(loc and loc.loc_type == LocType.PORT.value and loc.occupier == fleet.allegiance)
-
-    @staticmethod
-    def _side_has_fleet_in_port(game_state, side_fleets):
-        """True if any fleet in the list is in an allied port."""
-        return any(NavalCombatResolver._fleet_is_in_port(game_state, f) for f in side_fleets if f.is_on_map)
 
     def _collect_round_hits(self, atk_round, def_round):
         """Collect hits for both sides in a combat round. Returns a dict mapping target fleets to hit counts."""
@@ -834,17 +833,24 @@ class NavalCombatResolver:
           3. Dead ships are pruned from combat lists.
           4. Optional withdraw_decider callbacks allow a side to break off.
 
-        A side whose fleets are in an allied port cannot withdraw.
+        Does NOT move units in the spatial map.  Callers are responsible for
+        post-resolution movement based on the returned flags.
 
         Args:
-            withdraw_decider: Optional callable(side_allegiance, rounds) -> bool.
+            withdraw_decider: Optional callable(side_allegiance, rounds,
+                current_attackers, current_defenders) -> bool.
                 Return True to withdraw that side from combat.
 
         Returns:
             dict with keys: result (str), rounds (int),
-            attacker_survivors (int), defender_survivors (int).
+            attacker_survivors (int), defender_survivors (int),
+            attacker_withdrew (bool), defender_withdrew (bool),
+            battle_location ((int,int) or None).
         """
         rounds = 0
+        attacker_withdrew = False
+        defender_withdrew = False
+
         while self.attackers and self.defenders:
             rounds += 1
             atk_round = [u for u in self.attackers if u.is_on_map]
@@ -871,22 +877,28 @@ class NavalCombatResolver:
             if not self.attackers or not self.defenders:
                 break
 
-            defender_can_withdraw = withdraw_decider and not self._side_has_fleet_in_port(self.game_state, self.defenders)
-            attacker_can_withdraw = withdraw_decider and not self._side_has_fleet_in_port(self.game_state, self.attackers)
+            if withdraw_decider:
+                cur_atk = [u for u in self.attackers if u.is_on_map]
+                cur_def = [u for u in self.defenders if u.is_on_map]
+                if withdraw_decider(self._defender_side(), rounds, cur_atk, cur_def):
+                    defender_withdrew = True
+                    break
+                if withdraw_decider(self._attacker_side(), rounds, cur_atk, cur_def):
+                    attacker_withdrew = True
+                    break
 
-            if defender_can_withdraw and withdraw_decider(self._defender_side(), rounds):
-                self._withdraw_all(self.defenders)
-                break
-            if attacker_can_withdraw and withdraw_decider(self._attacker_side(), rounds):
-                self._withdraw_all(self.attackers)
-                break
-
-        result = self._result_code()
+        result_code = self._result_code(attacker_withdrew, defender_withdrew)
+        attacker_survivors = [u for u in self.attackers if u.is_on_map]
+        defender_survivors = [u for u in self.defenders if u.is_on_map]
         return {
-            "result": result,
+            "result": result_code,
             "rounds": rounds,
-            "attacker_survivors": len([u for u in self.attackers if u.is_on_map]),
-            "defender_survivors": len([u for u in self.defenders if u.is_on_map]),
+            "attacker_survivors": len(attacker_survivors),
+            "defender_survivors": len(defender_survivors),
+            "attacker_withdrew": attacker_withdrew,
+            "defender_withdrew": defender_withdrew,
+            "battle_location": self._battle_location,
+            "original_attacker_positions": dict(self._original_attacker_positions),
         }
 
     def _roll_hits(self, fleet, target):
@@ -912,11 +924,8 @@ class NavalCombatResolver:
             if not p.is_leader():
                 continue
             leader_bonus = max(leader_bonus, getattr(p, "tactical_rating", 0))
-        if fleet.position and None not in fleet.position:
-            hex_coord = Hex.offset_to_axial(*fleet.position)
-            loc = self.game_state.map.get_location(hex_coord)
-            if loc and loc.loc_type == LocType.PORT.value and loc.occupier == fleet.allegiance:
-                port_bonus = 2
+        if self._fleet_is_in_port(self.game_state, fleet):
+            port_bonus = 2
         return base + leader_bonus + port_bonus
 
     def _select_target(self, attacker, candidates):
@@ -935,32 +944,12 @@ class NavalCombatResolver:
         live.sort(key=lambda u: (0 if u.status.name == "DEPLETED" else 1, getattr(u, "combat_rating", 0)))
         return live[0]
 
-    def _withdraw_all(self, side_fleets):
-        """
-        Move every fleet in the given side to the first valid neighbor hex
-        (only one step, following river navigation rules).
-
-        Used when a player decides to break off naval combat.
-        """
-        for fleet in list(side_fleets):
-            if not fleet.is_on_map or not fleet.position or None in fleet.position:
-                continue
-            from src.game.map import Hex
-            start_hex = Hex.offset_to_axial(*fleet.position)
-            state = (start_hex, getattr(fleet, "river_hexside", None))
-            neighbors = self.game_state.map._fleet_neighbor_states(fleet, state)
-            if not neighbors:
-                continue
-            next_hex, next_side = neighbors[0][0]
-            self.game_state.move_unit(fleet, next_hex)
-            fleet.river_hexside = next_side
-
     def _sync_combat_lists(self):
         """Remove destroyed/off-map fleets from the attacker and defender lists."""
         self.attackers = [u for u in self.attackers if u.is_on_map]
         self.defenders = [u for u in self.defenders if u.is_on_map]
 
-    def _result_code(self):
+    def _result_code(self, attacker_withdrew=False, defender_withdrew=False):
         """
         Determine the combat result code.
 
@@ -1348,18 +1337,20 @@ class CombatService:
         if self._is_naval_combat(attackers, defenders):
             naval_resolver = NavalCombatResolver(self.game_state, attackers, defenders)
 
-            def _naval_withdraw_wrapper(side_allegiance, rounds):
+            def _naval_withdraw_wrapper(side_allegiance, rounds, cur_atk, cur_def) -> bool:
                 player = self.game_state.players.get(side_allegiance)
                 if player and player.is_ai:
                     if side_allegiance == naval_resolver._attacker_side():
-                        my_power = sum(u.combat_rating for u in naval_resolver.attackers if u.is_on_map)
-                        enemy_power = sum(u.combat_rating for u in naval_resolver.defenders if u.is_on_map)
+                        my_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
+                        enemy_power = sum(u.combat_rating for u in cur_def if u.is_on_map)
                     else:
-                        my_power = sum(u.combat_rating for u in naval_resolver.defenders if u.is_on_map)
-                        enemy_power = sum(u.combat_rating for u in naval_resolver.attackers if u.is_on_map)
+                        my_power = sum(u.combat_rating for u in cur_def if u.is_on_map)
+                        enemy_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
                     return my_power < enemy_power
                 if naval_withdraw_decider:
-                    return naval_withdraw_decider(side_allegiance, rounds)
+                    all_atk = [u for u in attackers if u.is_fleet()]
+                    all_def = [u for u in defenders if u.is_fleet()]
+                    return naval_withdraw_decider(side_allegiance, rounds, cur_atk, cur_def, all_atk, all_def)
                 return False
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
@@ -1371,6 +1362,9 @@ class CombatService:
                 "advance_available": False,
                 "combat_type": "naval",
                 "rounds": outcome.get("rounds", 0),
+                "attacker_withdrew": outcome.get("attacker_withdrew", False),
+                "defender_withdrew": outcome.get("defender_withdrew", False),
+                "battle_location": outcome.get("battle_location"),
             }
 
         attackers = [u for u in attackers if not u.is_fleet()]
@@ -2340,6 +2334,10 @@ class CombatClickHandler:
         self.pending_advance = None
         self._escape_completion_callback = None
         self._escape_info_dialog = None
+        self._defender_withdrawal_fleets = []
+        self._defender_withdrawal_hexes = set()
+        self._defender_withdrawal_battle_loc = None
+        self._post_naval_attackers = []
 
     def handle_click(self, target_hex):
         # UI click state machine:
@@ -2349,6 +2347,10 @@ class CombatClickHandler:
         # 4) post-combat leader escape / advance prompts
         if self.active_leader_escape:
             self._handle_leader_escape_click(target_hex)
+            return
+
+        if self._defender_withdrawal_fleets:
+            self._handle_defender_withdrawal_click(target_hex)
             return
 
         units_at_hex = self.game_state.map.get_units_in_hex(target_hex.q, target_hex.r)
@@ -2495,6 +2497,28 @@ class CombatClickHandler:
                 self.view.units_clicked.emit(post_combat_units)
 
                 if is_naval:
+                    battle_loc = resolution.get("battle_location")
+                    att_withdrew = resolution.get("attacker_withdrew", False)
+                    def_withdrew = resolution.get("defender_withdrew", False)
+                    def_survivors = resolution.get("defender_survivors", 0)
+
+                    if att_withdrew:
+                        self.view.sync_with_model()
+                        return
+
+                    if def_withdrew:
+                        def_fleets = [u for u in enemy_on_map if u.is_fleet() and u.is_on_map]
+                        self._post_naval_attackers = [u for u in committed if u.is_on_map and u.is_fleet()]
+                        self._begin_defender_withdrawal(def_fleets, battle_loc)
+                        return
+
+                    if def_survivors == 0 and battle_loc:
+                        from src.game.map import Hex
+                        dest = Hex.offset_to_axial(*battle_loc)
+                        for u in committed:
+                            if u.is_on_map and u.is_fleet():
+                                self.game_state.move_unit(u, dest)
+
                     self.view.sync_with_model()
                     return
 
@@ -2637,11 +2661,15 @@ class CombatClickHandler:
             return "naval"
         return "land"
 
-    def _ask_naval_withdraw(self, side_allegiance, round_number):
-        from src.gui.message_dialog import show_question_dialog
-        return show_question_dialog(
-            "Naval Withdrawal",
-            f"Round {round_number}: should {side_allegiance.capitalize()} withdraw all fleets and end naval combat?",
+    def _ask_naval_withdraw(self, side_allegiance, round_number, attackers, defenders, all_attackers=None, all_defenders=None):
+        from src.gui.combat_result_widget import show_naval_withdraw_dialog
+        return show_naval_withdraw_dialog(
+            side_allegiance,
+            round_number,
+            all_attackers or attackers,
+            all_defenders or defenders,
+            game_state=self.game_state,
+            parent=self.view,
         )
 
     def _ask_dragon_duel_withdraw(self, side_allegiance, round_number):
@@ -2650,6 +2678,73 @@ class CombatClickHandler:
             "Dragon Duel",
             f"Dragon duel round {round_number}: should {side_allegiance.capitalize()} withdraw dragons?",
         )
+
+    def _begin_defender_withdrawal(self, defending_fleets, battle_location):
+        self._defender_withdrawal_fleets = list(defending_fleets)
+        self._defender_withdrawal_battle_loc = battle_location
+        self._defender_withdrawal_hexes = self._get_defender_withdrawal_hexes(defending_fleets, battle_location)
+        if not self._defender_withdrawal_hexes:
+            return
+        self.view.highlight_movement_range(list(self._defender_withdrawal_hexes))
+        from src.gui.message_dialog import MessageDialog
+        from PySide6.QtCore import Qt
+        self._escape_info_dialog = MessageDialog(
+            "Fleet Withdrawal",
+            "Select a valid hex to withdraw your fleets.",
+        )
+        self._escape_info_dialog.setWindowModality(Qt.NonModal)
+        self._escape_info_dialog.show()
+
+    def _get_defender_withdrawal_hexes(self, fleets, battle_location):
+        from src.game.map import Hex
+        hexes = set()
+        for fleet in fleets:
+            if not fleet.position or None in fleet.position:
+                continue
+            start_hex = Hex.offset_to_axial(*fleet.position)
+            state = (start_hex, getattr(fleet, "river_hexside", None))
+            neighbors = self.game_state.map._fleet_neighbor_states(fleet, state)
+            for (next_hex, next_side), step_cost in neighbors:
+                if step_cost > 1:
+                    continue
+                if next_hex == start_hex:
+                    continue
+                col, row = next_hex.axial_to_offset()
+                if not self.game_state.is_hex_in_bounds(col, row):
+                    continue
+                units_there = self.game_state.map.get_units_in_hex(next_hex.q, next_hex.r)
+                enemy_present = any(
+                    u.is_on_map and u.allegiance != fleet.allegiance
+                    for u in units_there
+                )
+                if enemy_present:
+                    continue
+                hexes.add(next_hex.axial_to_offset())
+        return hexes
+
+    def _handle_defender_withdrawal_click(self, target_hex):
+        if self._escape_info_dialog:
+            self._escape_info_dialog.close()
+            self._escape_info_dialog = None
+        clicked_offset = target_hex.axial_to_offset()
+        if clicked_offset not in self._defender_withdrawal_hexes:
+            return
+        from src.game.map import Hex
+        dest_hex = Hex.offset_to_axial(*clicked_offset)
+        for fleet in self._defender_withdrawal_fleets:
+            if fleet.is_on_map:
+                self.game_state.move_unit(fleet, dest_hex)
+        if self._defender_withdrawal_battle_loc:
+            battle_hex = Hex.offset_to_axial(*self._defender_withdrawal_battle_loc)
+            for u in self._post_naval_attackers:
+                if u.is_on_map and u.is_fleet():
+                    self.game_state.move_unit(u, battle_hex)
+        self._defender_withdrawal_fleets = []
+        self._defender_withdrawal_hexes = set()
+        self._defender_withdrawal_battle_loc = None
+        self._post_naval_attackers = []
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
 
     def _begin_leader_escape(self, leader_escape_requests, completion_callback=None):
         self.leader_escape_queue = list(leader_escape_requests)

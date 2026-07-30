@@ -107,6 +107,13 @@ class DamageAllocationDialog(QDialog):
         self._update_ui()
 
     def _on_auto(self):
+        """ Automatically allocate damage steps based on the following priority:
+            1. Active non-wing units
+            2. Depleted non-wing units
+            3. Active flier units
+            4. Depleted flier units
+        Within each category, units with lower combat rating are prioritized.
+        """
         for u in self.units:
             self.allocations[u] = 0
         self.remaining = self.total_steps

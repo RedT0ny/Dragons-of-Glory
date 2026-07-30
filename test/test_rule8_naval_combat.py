@@ -34,6 +34,9 @@ class FakeMap:
         (q1, r1), (q2, r2) = river_hexside
         return [Hex(q1, r1), Hex(q2, r2)]
 
+    def get_location(self, hex_coord):
+        return None
+
     def _fleet_neighbor_states(self, fleet, state):
         return []
 
@@ -82,13 +85,13 @@ class DummyUnit:
         return self.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
 
     def is_fleet(self):
-        return self.is_fleet()
+        return self.unit_type == UnitType.FLEET
 
     def is_wing(self):
-        return self.is_wing()
+        return self.unit_type == UnitType.WING
 
     def is_citadel(self):
-        return self.is_citadel()
+        return getattr(self, 'unit_type', None) == UnitType.CITADEL
 
     def deplete(self):
         if self.status == UnitState.ACTIVE:
