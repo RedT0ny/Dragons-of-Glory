@@ -1348,9 +1348,7 @@ class CombatService:
                         enemy_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
                     return my_power < enemy_power
                 if naval_withdraw_decider:
-                    all_atk = [u for u in attackers if u.is_fleet()]
-                    all_def = [u for u in defenders if u.is_fleet()]
-                    return naval_withdraw_decider(side_allegiance, rounds, cur_atk, cur_def, all_atk, all_def)
+                    return naval_withdraw_decider(side_allegiance, rounds, attackers, defenders)
                 return False
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
@@ -2661,13 +2659,13 @@ class CombatClickHandler:
             return "naval"
         return "land"
 
-    def _ask_naval_withdraw(self, side_allegiance, round_number, attackers, defenders, all_attackers=None, all_defenders=None):
+    def _ask_naval_withdraw(self, side_allegiance, round_number, attackers, defenders):
         from src.gui.combat_result_widget import show_naval_withdraw_dialog
         return show_naval_withdraw_dialog(
             side_allegiance,
             round_number,
-            all_attackers or attackers,
-            all_defenders or defenders,
+            attackers,
+            defenders,
             game_state=self.game_state,
             parent=self.view,
         )
