@@ -825,6 +825,7 @@ class GameController(QObject):
             if any(u.allegiance != self.game_state.active_player for u in selected_units):
                 enemy_range = self.movement_service.get_reachable_hexes(selected_units)
                 self.view.highlight_movement_range([], [], enemy_range.reachable_coords)
+                self.selected_units_for_movement = []
                 return
 
             movement_range = self.movement_service.get_reachable_hexes(selected_units)
@@ -845,6 +846,10 @@ class GameController(QObject):
         if not self._is_human_interactive_turn():
             return
         if self.game_state.phase == GamePhase.MOVEMENT:
+            self.selected_units_for_movement = [
+                u for u in self.selected_units_for_movement
+                if u.allegiance == self.game_state.active_player
+            ]
             if not self.selected_units_for_movement:
                 return
             try:
@@ -1015,6 +1020,8 @@ class GameController(QObject):
 
         selected = self.selected_units_for_movement
         if not selected:
+            return
+        if any(u.allegiance != self.game_state.active_player for u in selected):
             return
         from src.gui.message_dialog import show_info_dialog, show_question_dialog
         decision = self.movement_service.invasion_handler.evaluate_unboard_neutral_entry(selected)
