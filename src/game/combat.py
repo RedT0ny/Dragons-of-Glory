@@ -2320,7 +2320,6 @@ class CombatClickHandler:
         self._defender_withdrawal_fleets = []
         self._defender_withdrawal_hexes = set()
         self._defender_withdrawal_battle_loc = None
-        self._post_naval_attackers = []
 
     def handle_click(self, target_hex):
         # UI click state machine:
@@ -2491,16 +2490,15 @@ class CombatClickHandler:
 
                     if def_withdrew:
                         def_fleets = [u for u in enemy_on_map if u.is_fleet() and u.is_on_map]
-                        self._post_naval_attackers = [u for u in committed if u.is_on_map and u.is_fleet()]
                         self._begin_defender_withdrawal(def_fleets, battle_loc)
                         return
 
                     if def_survivors == 0 and battle_loc:
                         from src.game.map import Hex
-                        dest = Hex.offset_to_axial(*battle_loc)
-                        for u in committed:
-                            if u.is_on_map and u.is_fleet():
-                                self.game_state.move_unit(u, dest)
+                        battle_hex = Hex.offset_to_axial(*battle_loc)
+                        allegiance = enemy_on_map[0].allegiance if enemy_on_map else None
+                        if allegiance:
+                            self._retreat_non_fleet_units_if_needed(battle_hex, allegiance)
 
                     self.view.sync_with_model()
                     return
@@ -2662,12 +2660,61 @@ class CombatClickHandler:
             f"Dragon duel round {round_number}: should {side_allegiance.capitalize()} withdraw dragons?",
         )
 
+    def _retreat_non_fleet_units_if_needed(self, battle_hex, allegiance):
+        units = self.game_state.map.get_units_in_hex(battle_hex.q, battle_hex.r)
+        non_fleet = [
+            u for u in units
+            if u.is_on_map and u.allegiance == allegiance and not u.is_fleet()
+        ]
+        if not non_fleet:
+            return
+
+        is_leader_only = all(u.is_leader() for u in non_fleet)
+
+        if is_leader_only:
+            from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
+            checks = [
+                LeaderEscapeCheck(
+                    leader=leader,
+                    origin_hex=battle_hex,
+                    allow_fleet_destinations=True,
+                    roll_required=False,
+                    require_prior_combat_stack=False,
+                    prior_had_combat_stack=True,
+                    skip_if_allied_combat_present=False,
+                    auto_place_on_success=True,
+                )
+                for leader in non_fleet
+            ]
+            LeaderEscapeHandler(self.game_state).handle_leader_escapes(checks, auto_resolve_ai=True)
+        else:
+            for unit in non_fleet:
+                valid = self.game_state.combat_service._get_valid_retreat_hexes(unit, battle_hex)
+                if not valid:
+                    continue
+                retreat_hex = random.choice(valid)
+                self.game_state.move_unit(unit, retreat_hex)
+
     def _begin_defender_withdrawal(self, defending_fleets, battle_location):
         self._defender_withdrawal_fleets = list(defending_fleets)
         self._defender_withdrawal_battle_loc = battle_location
         self._defender_withdrawal_hexes = self._get_defender_withdrawal_hexes(defending_fleets, battle_location)
         if not self._defender_withdrawal_hexes:
             return
+
+        allegiance = defending_fleets[0].allegiance if defending_fleets else None
+        player = self.game_state.players.get(allegiance) if allegiance else None
+        if player and player.is_ai:
+            non_maelstrom = [
+                h for h in self._defender_withdrawal_hexes
+                if not self.game_state.map.is_maelstrom(Hex.offset_to_axial(*h))
+            ]
+            pool = non_maelstrom if non_maelstrom else list(self._defender_withdrawal_hexes)
+            chosen_offset = random.choice(pool)
+            chosen_hex = Hex.offset_to_axial(*chosen_offset)
+            self._complete_defender_withdrawal(chosen_hex)
+            return
+
         self.view.highlight_movement_range(list(self._defender_withdrawal_hexes))
         from src.gui.message_dialog import MessageDialog
         from PySide6.QtCore import Qt
@@ -2705,6 +2752,24 @@ class CombatClickHandler:
                 hexes.add(next_hex.axial_to_offset())
         return hexes
 
+    def _complete_defender_withdrawal(self, dest_hex):
+        from src.game.map import Hex
+        for fleet in self._defender_withdrawal_fleets:
+            if fleet.is_on_map:
+                self.game_state.move_unit(fleet, dest_hex)
+                if self.game_state.map.is_maelstrom(dest_hex):
+                    self.game_state.resolve_maelstrom_entry(fleet, dest_hex)
+        if self._defender_withdrawal_battle_loc:
+            battle_hex = Hex.offset_to_axial(*self._defender_withdrawal_battle_loc)
+            allegiance = self._defender_withdrawal_fleets[0].allegiance if self._defender_withdrawal_fleets else None
+            if allegiance:
+                self._retreat_non_fleet_units_if_needed(battle_hex, allegiance)
+        self._defender_withdrawal_fleets = []
+        self._defender_withdrawal_hexes = set()
+        self._defender_withdrawal_battle_loc = None
+        self.view.highlight_movement_range([])
+        self.view.sync_with_model()
+
     def _handle_defender_withdrawal_click(self, target_hex):
         if self._escape_info_dialog:
             self._escape_info_dialog.close()
@@ -2714,20 +2779,7 @@ class CombatClickHandler:
             return
         from src.game.map import Hex
         dest_hex = Hex.offset_to_axial(*clicked_offset)
-        for fleet in self._defender_withdrawal_fleets:
-            if fleet.is_on_map:
-                self.game_state.move_unit(fleet, dest_hex)
-        if self._defender_withdrawal_battle_loc:
-            battle_hex = Hex.offset_to_axial(*self._defender_withdrawal_battle_loc)
-            for u in self._post_naval_attackers:
-                if u.is_on_map and u.is_fleet():
-                    self.game_state.move_unit(u, battle_hex)
-        self._defender_withdrawal_fleets = []
-        self._defender_withdrawal_hexes = set()
-        self._defender_withdrawal_battle_loc = None
-        self._post_naval_attackers = []
-        self.view.highlight_movement_range([])
-        self.view.sync_with_model()
+        self._complete_defender_withdrawal(dest_hex)
 
     def _begin_leader_escape(self, leader_escape_requests, completion_callback=None):
         self.leader_escape_queue = list(leader_escape_requests)
