@@ -820,6 +820,7 @@ nergoth:
   locations:
     gwynned: {loc_type: port, coords: [11, 21]}
     lancton: {loc_type: city, coords: [13, 18]}
+    zhea_harbor: {loc_type: port, coords: [14, 31]}
   territories:
     - [11, 16]
     - [12, 16]

@@ -439,7 +439,6 @@ master_map:
       - [13, 36, NE]
       - [13, 36, E]
       - [13, 37, NE]
-      - [22, 12, NW]
       - [22, 12, W]
       - [21, 13, NW]
       - [21, 13, W]
@@ -1010,5 +1009,3 @@ master_map:
       - { id: "pax_tharkas", coords: [22, 38] }
       - { id: "winston_tower", coords: [58, 7] }
       - { id: "wayreth", coords: [18, 40] }
-    port:
-      - { id: "zhea_harbor", coords: [14, 31] }

@@ -517,7 +517,7 @@ class CombatResolver:
             return 1
 
         loc = self._get_defender_location()
-        if loc and loc.loc_type == LocType.FORTRESS:
+        if loc and loc.loc_type == LocType.FORTRESS.value:
             return 3
         if loc and loc.loc_type in (LocType.CITY.value, LocType.TEMPLE.value, LocType.PORT.value):
             return 2
@@ -1370,7 +1370,7 @@ class CombatService:
                         enemy_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
                     return my_power < enemy_power
                 if naval_withdraw_decider:
-                    return naval_withdraw_decider(side_allegiance, rounds, attackers, defenders)
+                    return naval_withdraw_decider(side_allegiance, rounds, naval_resolver.attackers, naval_resolver.defenders)
                 return False
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
