@@ -2,7 +2,7 @@ import re
 from typing import Optional, Tuple, List, Any
 
 from src.content.tools import TextFormatter
-from src.content.specs import UnitSpec, UnitType, UnitRace, UnitState, TerrainType
+from src.content.specs import LocType, UnitSpec, UnitType, UnitRace, UnitState, TerrainType
 from src.content.constants import NEUTRAL, HL, WS
 from src.content.tools import caption_id
 
@@ -467,6 +467,7 @@ class FlyingCitadel(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
         self.passengers = []
+        self.loc_type = LocType.CITY.value  # Treat as a fortified city for defense purposes
 
     def is_citadel(self) -> bool:
         return True

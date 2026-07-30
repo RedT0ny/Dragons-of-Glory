@@ -1,7 +1,6 @@
 import os
 import random
 
-from src.game.unit import Unit
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS
@@ -361,7 +360,6 @@ class CombatResolver:
         defender_hex = self._get_defender_hex()
         defender_terrain = self._effective_defender_terrain()
         defender_location = self._get_defender_location()
-        defender_loc_type = self._normalize_loc_type(defender_location)
 
         # LEADERS: + Tactical rating of attacking leaders - Tactical rating of defending leaders.
         atk_leader = sum( u.tactical_rating for u in self.attackers if u.is_leader() )
@@ -386,7 +384,7 @@ class CombatResolver:
         attacker_dragon_bonus = sum(
             u.combat_rating
             for u in self.attackers
-            if u.is_wing() and u.is_dragon()
+            if u.is_dragon()
         )
         if self._defender_has_other_bonus("dragon_slayer") and attacker_dragon_bonus:
             attacker_dragon_bonus = 0
@@ -396,7 +394,7 @@ class CombatResolver:
         defender_dragon_bonus = sum(
             u.combat_rating
             for u in self.defenders
-            if u.is_wing() and u.is_dragon()
+            if u.is_dragon()
         )
         add_part("defender_dragons", -defender_dragon_bonus)
 
@@ -412,7 +410,7 @@ class CombatResolver:
 
         # FLIGHT (+1 attacker if has fliers, -1 defender if has fliers)
         flight_blocked = (
-            defender_loc_type == LocType.UNDERCITY.value
+            defender_location.loc_type == LocType.UNDERCITY.value
             or defender_terrain in (TerrainType.FOREST, TerrainType.MOUNTAIN, TerrainType.JUNGLE)
         )
         if not flight_blocked:
@@ -422,12 +420,8 @@ class CombatResolver:
                 add_part("defender_fliers", -1)
 
         # LOCATIONS (defender benefit only)
-        if defender_loc_type == LocType.FORTRESS.value:
-            add_part("location_fortress", -4)
-        elif defender_loc_type in (LocType.CITY.value, LocType.PORT.value, LocType.TEMPLE.value):
-            add_part("location_city_port", -2)
-        elif defender_loc_type == LocType.UNDERCITY.value:
-            add_part("location_undercity", -10)
+        if defender_location:
+            add_part("location",defender_location.get_defense_modifier() or 0)
 
         # CROSSINGS: Apply exactly one crossing DRM (the single worst among participating ground attackers)
         crossing_label, crossing_drm = self._resolve_worst_attacker_crossing(defender_hex)
@@ -468,7 +462,7 @@ class CombatResolver:
             return None
         if self._attacking_air_against_citadel():
             # Air attacking a citadel is treated like city defense for modifiers.
-            return {"type": LocType.CITY.value}
+            return any(u for u in self.defenders if u.is_citadel())
 
         defender_hex = self._get_defender_hex()
         if not defender_hex or not self.game_state or not self.game_state.map:
@@ -480,10 +474,9 @@ class CombatResolver:
             return 1
 
         loc = self._get_defender_location()
-        loc_type = self._normalize_loc_type(loc)
-        if loc_type == LocType.FORTRESS.value:
+        if loc and loc.loc_type == LocType.FORTRESS:
             return 3
-        if loc_type in (LocType.CITY.value, LocType.PORT.value):
+        if loc and loc.loc_type in (LocType.CITY.value, LocType.TEMPLE.value, LocType.PORT.value):
             return 2
         return 1
 
@@ -595,20 +588,6 @@ class CombatResolver:
             "crossing_pass": 1,
         }
         return min(candidates, key=lambda item: (item[1], -tie_priority.get(item[0], 0)))
-
-    def _normalize_loc_type(self, loc):
-        """ Returns the normalized location type string for a given location object or dict, or None if not applicable."""
-        if not loc:
-            return None
-        if hasattr(loc, "loc_type"):
-            value = loc.loc_type
-        elif isinstance(loc, dict):
-            value = loc.get("type")
-        else:
-            return None
-        if isinstance(value, LocType):
-            return value.value
-        return value
 
     def _count_attacker_terrain_affinity_bonus(self):
         if not self.game_state or not self.game_state.map:
@@ -914,7 +893,7 @@ class NavalCombatResolver:
     def _fleet_attack_rating(self, fleet):
         """
         Effective attack rating = fleet's base combat_rating + highest tactical_rating
-        among embarked leaders (if any) + 2 if fleet is in an allied port.
+        among embarked leaders (if any) + 1 if fleet is in an allied port.
         """
         base = fleet.combat_rating
         passengers = list(getattr(fleet, "passengers", []) or [])
@@ -925,7 +904,7 @@ class NavalCombatResolver:
                 continue
             leader_bonus = max(leader_bonus, getattr(p, "tactical_rating", 0))
         if self._fleet_is_in_port(self.game_state, fleet):
-            port_bonus = 2
+            port_bonus = 1
         return base + leader_bonus + port_bonus
 
     def _select_target(self, attacker, candidates):
