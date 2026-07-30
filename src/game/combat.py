@@ -212,6 +212,7 @@ class CombatResolver:
         self.precombat_drm_bonus = int(precombat_drm_bonus or 0)
         self.allow_consumable_other_bonus = bool(allow_consumable_other_bonus)
         self._pending_depletions = []
+        self._kender_taunt_drm = 0
         self.crt_data = _get_crt_data()
 
     @staticmethod
@@ -266,16 +267,19 @@ class CombatResolver:
         
         odds_str = self.calculate_odds(attacker_cs, defender_cs)
         
-        # 2. Determine DRMs (Leader Tactical Ratings, Terrain, etc.)
+        # 2. Kender taunt (random roll, done before DRM calculation)
+        self._resolve_kender_taunt()
+
+        # 3. Determine DRMs (Leader Tactical Ratings, Terrain, etc.)
         drm, drm_parts = self.calculate_total_drm(return_breakdown=True)
 
-        # 3. Roll 1d10
+        # 4. Roll 1d10
         roll = random.randint(1, 10)
 
         # min -5, max 16
         final_roll = max(MIN_COMBAT_ROLL, min(MAX_COMBAT_ROLL, roll + drm))
 
-        # 4. Look up result from CRT data
+        # 5. Look up result from CRT data
         result = self.crt_data[final_roll][odds_str]
         parts_text = ", ".join(f"{name}={value:+d}" for name, value in drm_parts if value)
         if not parts_text:
@@ -342,6 +346,53 @@ class CombatResolver:
             error_msg = f"Invalid combat result: {result_code}"
             raise ValueError(error_msg)
 
+    def _sum_leaders_tactical_rating(self, units):
+        total = sum(u.tactical_rating for u in units if u.is_leader())
+        total += sum(
+            p.tactical_rating
+            for u in units
+            for p in (getattr(u, "passengers", []) or [])
+            if p.is_leader()
+        )
+        return total
+
+    def _resolve_taunt_for_side(self, enemy_units, is_attacking):
+        roll_mod = -self._sum_leaders_tactical_rating(enemy_units)
+        if is_attacking:
+            loc = self._get_defender_location()
+            if loc:
+                roll_mod += loc.get_defense_modifier()
+        roll = random.randint(1, 10)
+        final = roll + roll_mod
+        label = "attacking" if is_attacking else "defending"
+        if final >= 6:
+            self._kender_taunt_drm = 2 if is_attacking else -2
+            drm_label = "defender +2" if is_attacking else "attacker -2"
+            print(f"Kender taunt ({label}): roll={roll} mod={roll_mod:+d} -> final={final} — SUCCESS, {drm_label} DRM")
+        else:
+            print(f"Kender taunt ({label}): roll={roll} mod={roll_mod:+d} -> final={final} — FAILED")
+
+    def _resolve_kender_taunt(self):
+        has_kender_atk = any(
+            u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY
+            for u in self.attackers
+        )
+        has_kender_def = any(
+            u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY
+            for u in self.defenders
+        )
+        if not has_kender_atk and not has_kender_def:
+            return
+
+        if has_kender_atk and has_kender_def:
+            print("Kender taunt: both sides have kender — no taunt effect")
+            return
+
+        if has_kender_atk:
+            self._resolve_taunt_for_side(enemy_units=self.defenders, is_attacking=True)
+        else:
+            self._resolve_taunt_for_side(enemy_units=self.attackers, is_attacking=False)
+
     def calculate_total_drm(self, return_breakdown=False):
         """
         Calculate the total DRM for the combat, including leader tactical ratings, terrain effects, crossing penalties,
@@ -362,20 +413,8 @@ class CombatResolver:
         defender_location = self._get_defender_location()
 
         # LEADERS: + Tactical rating of attacking leaders - Tactical rating of defending leaders.
-        atk_leader = sum( u.tactical_rating for u in self.attackers if u.is_leader() )
-        atk_leader += sum(
-            p.tactical_rating
-            for u in self.attackers
-            for p in (getattr(u, "passengers", []) or [])
-            if p.is_leader()
-        )
-        def_leader = sum( u.tactical_rating for u in self.defenders if u.is_leader() )
-        def_leader += sum(
-            p.tactical_rating
-            for u in self.defenders
-            for p in (getattr(u, "passengers", []) or [])
-            if p.is_leader()
-        )
+        atk_leader = self._sum_leaders_tactical_rating(self.attackers)
+        def_leader = self._sum_leaders_tactical_rating(self.defenders)
         add_part("attacker_leader", atk_leader)
         add_part("defender_leader", -def_leader)
 
@@ -410,7 +449,7 @@ class CombatResolver:
 
         # FLIGHT (+1 attacker if has fliers, -1 defender if has fliers)
         flight_blocked = (
-            defender_location.loc_type == LocType.UNDERCITY.value
+            getattr(defender_location, "loc_type", None) == LocType.UNDERCITY.value
             or defender_terrain in (TerrainType.FOREST, TerrainType.MOUNTAIN, TerrainType.JUNGLE)
         )
         if not flight_blocked:
@@ -439,6 +478,10 @@ class CombatResolver:
                 add_part("event_combat_bonus", int(self.game_state.get_combat_bonus(active_player)))
 
         add_part("precombat_drm_bonus", self.precombat_drm_bonus)
+
+        # KENDER TAUNT
+        add_part("kender_taunt", self._kender_taunt_drm)
+
         if return_breakdown:
             return drm, breakdown
         return drm

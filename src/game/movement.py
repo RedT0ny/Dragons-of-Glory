@@ -502,7 +502,7 @@ class MovementService:
             in_port = False
             if carrier.position:
                 loc = self.game_state.map.get_location(Hex.offset_to_axial(*carrier.position))
-                in_port = bool(loc and loc.loc_type == LocType.PORT.value)
+                in_port = bool(loc and loc.is_port() and loc.occupier in [NEUTRAL, carrier.allegiance])
             if not in_port:
                 if hasattr(carrier, "movement_points"):
                     carrier.movement_points = 0
