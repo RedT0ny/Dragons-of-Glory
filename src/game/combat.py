@@ -1832,48 +1832,33 @@ class CombatService:
         return any(self._fleets_are_adjacent_for_combat(fleet, d) for d in defenders)
 
     def _apply_precombat_special_retreat(self, attackers, defenders, target_hex):
-        """
-        Applies special retreat rules that can trigger before combat rolls, such as Wing/Cavalry escaping slower units.
-        """
-        combat_defenders = [
-            u for u in defenders
-            if u.is_on_map
-            and u.position and None not in u.position
-            and u.is_combat_unit()
-        ]
-        if not combat_defenders:
-            return {"applied": False, "result": None, "leader_escape_requests": []}
-
+        # If defending a location, retreat is not allowed
         if self.map.get_location(target_hex):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        combat_attackers = [
-            u for u in attackers
-            if u.is_on_map
-            and u.position and None not in u.position
-            and u.is_combat_unit()
-        ]
-        if not combat_attackers:
+        # All defenders must be Wing or Cavalry
+        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in defenders):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in combat_defenders):
+        # Wings in attacker prevent retreat
+        if any(u.is_wing() for u in attackers):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        attacker_has_wing = any(u.is_wing() for u in combat_attackers)
-        attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in combat_attackers)
+        # Cavalry in attacker blocks retreat if defenders have any Cavalry
+        attacker_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in attackers)
+        defender_has_cavalry = any(u.unit_type == UnitType.CAVALRY for u in defenders)
 
-        wing_rule = not attacker_has_wing
-        cavalry_rule = not attacker_has_wing and not attacker_has_cavalry
-        if not (wing_rule or cavalry_rule):
+        if attacker_has_cavalry and defender_has_cavalry:
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
+        # Retreat all defenders
         leader_escape_requests = []
-        for unit in combat_defenders:
+        for unit in defenders:
             leader_escape_requests.extend(
                 self._retreat_single_unit(unit, eliminate_if_no_retreat=False) or []
             )
 
-        result = "-/SRC" if cavalry_rule else "-/SRW"
+        result = "-/SRC" if defender_has_cavalry else "-/SRW"
         return {"applied": True, "result": result, "leader_escape_requests": leader_escape_requests}
 
     def _retreat_single_unit(self, unit, eliminate_if_no_retreat=True):
