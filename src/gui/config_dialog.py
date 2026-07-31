@@ -287,19 +287,19 @@ class ConfigDialog(QDialog):
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
         if diff_idx >= 0:
             self.ui.diffComboBox.setCurrentIndex(diff_idx)
-        cd_idx = self.ui.cdComboBox.findData("verbose" if combat_details == "verbose" else "brief")
+        cd_idx = self.ui.cdComboBox.findData(combat_details if combat_details in {"brief", "verbose"} else "brief")
         if cd_idx >= 0:
             self.ui.cdComboBox.setCurrentIndex(cd_idx)
-        sup_idx = self.ui.supComboBox.findData("advanced" if supply == "advanced" else "standard")
+        sup_idx = self.ui.supComboBox.findData(supply if supply in {"standard", "advanced"} else "standard")
         if sup_idx >= 0:
             self.ui.supComboBox.setCurrentIndex(sup_idx)
-        dep_idx = self.ui.depComboBox.findData("manual" if deployment == "manual" else "canonical")
+        dep_idx = self.ui.depComboBox.findData(deployment if deployment in {"canonical", "manual"} else "canonical")
         if dep_idx >= 0:
             self.ui.depComboBox.setCurrentIndex(dep_idx)
-        int_idx = self.ui.intComboBox.findData("interception" if interception in {"enabled", "disabled", "naval"} else "disabled")
+        int_idx = self.ui.intComboBox.findData(interception if interception in {"enabled", "disabled", "naval"} else "disabled")
         if int_idx >= 0:
             self.ui.intComboBox.setCurrentIndex(int_idx)
-        nav_idx = self.ui.navComboBox.findData("naval_combat" if naval_combat == "advanced" else "classic")
+        nav_idx = self.ui.navComboBox.findData(naval_combat if naval_combat in {"classic", "advanced"} else "classic")
         if nav_idx >= 0:
             self.ui.navComboBox.setCurrentIndex(nav_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
