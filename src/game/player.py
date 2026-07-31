@@ -81,5 +81,8 @@ class Player:
         print(f"Player {self.allegiance.capitalize()} received asset: {self.translator.get_asset_name(spec.id)} ({spec.asset_type}) [Instance: {new_asset.instance_num}]")
 
     def has_asset(self, asset_id: str) -> bool:
-        return asset_id in self.assets
+        if asset_id in self.assets:
+            return True
+        prefix = f"{asset_id}_"
+        return any(key.startswith(prefix) for key in self.assets)
 

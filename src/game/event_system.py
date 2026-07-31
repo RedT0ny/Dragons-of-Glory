@@ -201,16 +201,19 @@ class EventSystem:
             weights.append(weight)
 
         if not possible_events:
+            print(f"No events to draw for {allegiance.capitalize()} on turn {self.game_state.turn}. Phase skipped.")
             return None
 
         # Draw one
         chosen = random.choices(possible_events, weights=weights, k=1)[0]
+        print(f"Event drawn: {chosen.id.replace('_', ' ').title()}")
         return chosen
 
     def check_events(self):
         """Iterates through active events to see if turn-based triggers fire."""
         for event in self.game_state.events[:]:  # Iterate over a copy to allow removal
             if event.check_trigger(self.game_state):
+                print(f"Event triggered: {event.id.replace('_', ' ').title()}")
                 event.activate(self.game_state)
 
                 # Logic: If the event has hit its specific limit, remove it from the active pool
