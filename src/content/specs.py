@@ -305,6 +305,20 @@ class UnitType(Enum):
     WING = "wing"
     HIGHLORD = "highlord"
 
+# --- UNIT CATEGORIES ---
+LEADER_TYPES = frozenset({
+    UnitType.GENERAL,
+    UnitType.ADMIRAL,
+    UnitType.EMPEROR,
+    UnitType.HIGHLORD,
+    UnitType.WIZARD,
+})
+
+ARMY_TYPES = frozenset({
+    UnitType.INFANTRY,
+    UnitType.CAVALRY,
+})
+
 class LocType(Enum):
     CITY = "city"
     PORT = "port"

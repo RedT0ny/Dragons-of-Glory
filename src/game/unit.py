@@ -2,7 +2,7 @@ import re
 from typing import Optional, Tuple, List, Any
 
 from src.content.tools import TextFormatter
-from src.content.specs import LocType, UnitSpec, UnitType, UnitRace, UnitState, TerrainType
+from src.content.specs import LocType, UnitSpec, UnitType, UnitRace, UnitState, TerrainType, LEADER_TYPES, ARMY_TYPES
 from src.content.constants import NEUTRAL, HL, WS
 from src.content.tools import caption_id
 
@@ -206,19 +206,22 @@ class Unit:
         return (not self.escaped) and self.status in UnitState.on_map_states()
 
     def is_leader(self) -> bool:
-        return False # Base unit is not a leader
+        return self.unit_type in LEADER_TYPES
+
+    def is_wizard(self) -> bool:
+        return self.unit_type == UnitType.WIZARD
 
     def is_wing(self) -> bool:
-        return False # Base unit is not a wing either
+        return self.unit_type == UnitType.WING
 
     def is_army(self) -> bool:
-        return False # Base unit is not an army either
+        return self.unit_type in ARMY_TYPES
 
     def is_fleet(self) -> bool:
-        return False # Base unit is not a fleet either
+        return self.unit_type == UnitType.FLEET
 
     def is_citadel(self) -> bool:
-        return False # Base unit is not a citadel either
+        return self.unit_type == UnitType.CITADEL
 
     def can_carry(self, unit):
         return False # Base unit cannot carry anything
@@ -379,9 +382,6 @@ class Leader(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
 
-    def is_leader(self) -> bool:
-        return True
-
 class Wizard(Leader):
     """
     Wizards can move to any hex on the map (except enemy hexes) once per turn.
@@ -395,9 +395,6 @@ class Fleet(Unit):
         super().__init__(spec, ordinal)
         self.passengers = []
         self.river_hexside = None
-
-    def is_fleet(self) -> bool:
-        return True
 
     def can_carry(self, unit):
         """Ships carry one ground army and any number of leaders."""
@@ -414,9 +411,6 @@ class Wing(Unit):
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
         self.passengers = []
-
-    def is_wing(self) -> bool:
-        return True
 
     def can_carry(self, unit: Unit) -> bool:
         # Griffons and Pegasi: Can carry 1 Infantry AND 1 Leader
@@ -469,9 +463,6 @@ class FlyingCitadel(Unit):
         self.passengers = []
         self.loc_type = LocType.CITY.value  # Treat as a fortified city for defense purposes
 
-    def is_citadel(self) -> bool:
-        return True
-
     def can_carry(self, unit: Unit) -> bool:
         if unit.allegiance != HL:
             return False
@@ -499,6 +490,3 @@ class Army(Unit):
     """
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
-
-    def is_army(self) -> bool:
-        return True

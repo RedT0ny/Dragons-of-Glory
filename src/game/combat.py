@@ -348,6 +348,8 @@ class CombatResolver:
             raise ValueError(error_msg)
 
     def _sum_leaders_tactical_rating(self, units):
+        """ Returns the sum of tactical ratings of leaders in the given units, including passengers.
+        Note: this is not used for DRM calculation, but may be useful for other purposes."""
         total = sum(u.tactical_rating for u in units if u.is_leader())
         total += sum(
             p.tactical_rating
@@ -357,8 +359,20 @@ class CombatResolver:
         )
         return total
 
+    def _max_leader_tactical_rating(self, units):
+        """ Returns the maximum tactical rating among leaders in the given units, including passengers."""
+        land_rating = max(u.tactical_rating for u in units if u.is_leader() and not u.is_wizard())
+        magic_rating = max(u.tactical_rating for u in units if u.is_leader() and u.is_wizard())
+        air_rating = max(
+            p.tactical_rating
+            for u in units
+            for p in (getattr(u, "passengers", []) or [])
+            if p.is_leader()
+        )
+        return land_rating + magic_rating + air_rating
+
     def _resolve_taunt_for_side(self, enemy_units, is_attacking):
-        roll_mod = -self._sum_leaders_tactical_rating(enemy_units)
+        roll_mod = -self._max_leader_tactical_rating(enemy_units)
         if is_attacking:
             loc = self._get_defender_location()
             if loc:
@@ -414,8 +428,8 @@ class CombatResolver:
         defender_location = self._get_defender_location()
 
         # LEADERS: + Tactical rating of attacking leaders - Tactical rating of defending leaders.
-        atk_leader = self._sum_leaders_tactical_rating(self.attackers)
-        def_leader = self._sum_leaders_tactical_rating(self.defenders)
+        atk_leader = self._max_leader_tactical_rating(self.attackers)
+        def_leader = self._max_leader_tactical_rating(self.defenders)
         add_part("attacker_leader", atk_leader)
         add_part("defender_leader", -def_leader)
 

@@ -5,12 +5,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QFrame,
     QTextEdit, QPushButton, QDialog, QWidget
 )
-from PySide6.QtGui import QFont, QColor, QPixmap
+from PySide6.QtGui import QFont, QColor, QPalette, QPixmap
 from PySide6.QtCore import Qt
 
 from src.content.config import EVENTS_DATA, IMAGES_DIR
 from src.content.loader import load_events_yaml
 from src.content.specs import EventSpec
+from src.content.translator import Translator
 
 ALLEGIANCE_COLORS = {
     "whitestone": QColor("#2b7be4"),
@@ -27,6 +28,13 @@ TYPE_COLORS = {
     "bonus":     QColor("#00bcd4"),
     "resource":  QColor("#8bc34a"),
 }
+
+
+def _palette_color(widget, role, alpha=255):
+    color = widget.palette().color(role)
+    if alpha < 255:
+        color.setAlpha(alpha)
+    return color.name(QColor.HexArgb)
 
 
 def _events_to_dicts(event_specs: Dict[str, EventSpec]) -> List[dict]:
@@ -67,11 +75,12 @@ class EventDetailDialog(QDialog):
         turn_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         meta.addWidget(turn_label)
         type_label = QLabel(f"Type: {event['type']}")
-        type_label.setStyleSheet(f"font-size: 14px; color: {TYPE_COLORS.get(event['type'], QColor('#888')).name()}; font-weight: bold;")
+        tc = TYPE_COLORS.get(event["type"]) or QColor(_palette_color(self, QPalette.Mid))
+        type_label.setStyleSheet(f"font-size: 14px; color: {tc.name()}; font-weight: bold;")
         meta.addWidget(type_label)
         if event["allegiance"] != "none":
             ali = event["allegiance"]
-            c = ALLEGIANCE_COLORS.get(ali, QColor("#888"))
+            c = ALLEGIANCE_COLORS.get(ali) or QColor(_palette_color(self, QPalette.Mid))
             ali_label = QLabel(f"Allegiance: {ALLEGIANCE_LABELS.get(ali, ali)}")
             ali_label.setStyleSheet(f"font-size: 14px; color: {c.name()}; font-weight: bold;")
             meta.addWidget(ali_label)
@@ -95,18 +104,18 @@ class EventDetailDialog(QDialog):
         effects_text = ", ".join(f"{k}: {v}" for k, v in event["effects"].items())
         if effects_text:
             eff = QLabel(f"Effects: {effects_text}")
-            eff.setStyleSheet("font-size: 13px; font-style: italic; color: #aaa;")
+            eff.setStyleSheet("font-size: 13px; font-style: italic;")
             layout.addWidget(eff)
 
         if event.get("requirements"):
             req_text = "; ".join(f"{r['type']}: {r['id']}" for r in event["requirements"])
             req = QLabel(f"Requirements: {req_text}")
-            req.setStyleSheet("font-size: 13px; color: #ffaa00;")
+            req.setStyleSheet("font-size: 13px;")
             layout.addWidget(req)
 
         if event.get("max_occurrences"):
             occ = QLabel(f"Max occurrences: {event['max_occurrences']}")
-            occ.setStyleSheet("font-size: 13px; color: #888;")
+            occ.setStyleSheet("font-size: 13px;")
             layout.addWidget(occ)
 
         close_btn = QPushButton("Close")
@@ -121,7 +130,6 @@ class TimelineWidget(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        self.setStyleSheet("background-color: #1e1e1e; color: #e0e0e0;")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
 
@@ -142,7 +150,7 @@ class TimelineWidget(QWidget):
         title_font.setBold(True)
         title.setFont(title_font)
         title.setAlignment(Qt.AlignCenter)
-        title.setStyleSheet("color: #fff; padding: 20px;")
+        title.setStyleSheet("padding: 20px;")
         self.layout.addWidget(title)
 
         self.populate()
@@ -176,16 +184,16 @@ class TimelineWidget(QWidget):
             turn_font.setPointSize(16)
             turn_font.setBold(True)
             turn_label.setFont(turn_font)
-            turn_label.setStyleSheet("color: #888; padding: 6px 0;")
+            turn_label.setStyleSheet("padding: 6px 0;")
             turn_marker_layout.addWidget(turn_label)
 
             line = QFrame()
             line.setFrameShape(QFrame.Shape.VLine)
             line.setFixedWidth(2)
             if turn_events:
-                line.setStyleSheet("background-color: #555;")
+                line.setStyleSheet(f"background-color: {_palette_color(self, QPalette.Mid)};")
             else:
-                line.setStyleSheet("background-color: #333;")
+                line.setStyleSheet(f"background-color: {_palette_color(self, QPalette.Mid, 120)};")
             turn_marker_layout.addWidget(line, stretch=1)
 
             row.addWidget(turn_marker, alignment=Qt.AlignTop)
@@ -213,22 +221,21 @@ class TimelineWidget(QWidget):
                 connector = QFrame()
                 connector.setFrameShape(QFrame.HLine)
                 connector.setFixedHeight(1)
-                connector.setStyleSheet("background-color: #333; margin-left: 76px;")
+                connector.setStyleSheet(f"background-color: {_palette_color(self, QPalette.Mid, 120)}; margin-left: 76px;")
                 self.layout.addWidget(connector)
 
     def create_event_card(self, event):
         card = QFrame()
         card.setFixedWidth(220)
-        card.setStyleSheet("""
-            QFrame {
-                background-color: #2a2a2a;
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.palette().color(QPalette.Window).name()};
                 border-radius: 8px;
-                border: 1px solid #444;
-            }
-            QFrame:hover {
-                background-color: #333;
-                border: 1px solid #666;
-            }
+                border: 1px solid {self.palette().color(QPalette.Mid).name()};
+            }}
+            QFrame:hover {{
+                border: 1px solid {self.palette().color(QPalette.Highlight).name()};
+            }}
         """)
         card.setCursor(Qt.PointingHandCursor)
 
@@ -241,7 +248,7 @@ class TimelineWidget(QWidget):
 
         type_dot = QLabel()
         type_dot.setFixedSize(10, 10)
-        tc = TYPE_COLORS.get(event["type"], QColor("#888"))
+        tc = TYPE_COLORS.get(event["type"]) or QColor(_palette_color(self, QPalette.Mid))
         type_dot.setStyleSheet(f"background-color: {tc.name()}; border-radius: 5px;")
         header.addWidget(type_dot)
 
@@ -252,7 +259,7 @@ class TimelineWidget(QWidget):
         header.addStretch()
 
         if event["allegiance"] != "none":
-            ac = ALLEGIANCE_COLORS.get(event["allegiance"], QColor("#888"))
+            ac = ALLEGIANCE_COLORS.get(event["allegiance"]) or QColor(_palette_color(self, QPalette.Mid))
             ali_dot = QLabel()
             ali_dot.setFixedSize(8, 8)
             ali_dot.setStyleSheet(f"background-color: {ac.name()}; border-radius: 4px;")
@@ -266,7 +273,6 @@ class TimelineWidget(QWidget):
         name_font.setPointSize(11)
         name_font.setBold(True)
         name.setFont(name_font)
-        name.setStyleSheet("color: #fff;")
         layout.addWidget(name)
 
         desc_preview = event["description"].replace("\n", " ").strip()
@@ -274,14 +280,14 @@ class TimelineWidget(QWidget):
             desc_preview = desc_preview[:77] + "..."
         preview = QLabel(desc_preview)
         preview.setWordWrap(True)
-        preview.setStyleSheet("color: #aaa; font-size: 10px;")
+        preview.setStyleSheet("font-size: 10px;")
         preview.setFixedHeight(36)
         layout.addWidget(preview)
 
         effects_text = ", ".join(str(v) for v in event["effects"].values())
         if effects_text:
             eff = QLabel(f"\u2192 {effects_text}")
-            eff.setStyleSheet("color: #ffcc00; font-size: 10px;")
+            eff.setStyleSheet("font-size: 11px;")
             layout.addWidget(eff)
 
         card.mousePressEvent = lambda e, ev=event: self.show_event_detail(ev)
