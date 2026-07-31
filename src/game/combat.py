@@ -361,14 +361,14 @@ class CombatResolver:
 
     def _max_leader_tactical_rating(self, units):
         """ Returns the maximum tactical rating among leaders in the given units, including passengers."""
-        land_rating = max(u.tactical_rating for u in units if u.is_leader() and not u.is_wizard())
-        magic_rating = max(u.tactical_rating for u in units if u.is_leader() and u.is_wizard())
-        air_rating = max(
+        land_rating = max((u.tactical_rating for u in units if u.is_leader() and not u.is_wizard()), default=0)
+        magic_rating = max((u.tactical_rating for u in units if u.is_leader() and u.is_wizard()), default=0)
+        air_rating = max((
             p.tactical_rating
             for u in units
             for p in (getattr(u, "passengers", []) or [])
             if p.is_leader()
-        )
+        ), default=0)
         return land_rating + magic_rating + air_rating
 
     def _resolve_taunt_for_side(self, enemy_units, is_attacking):
