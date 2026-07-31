@@ -1024,14 +1024,11 @@ class GameState:
             unit.moved_this_turn = False
             unit._healed_this_combat_turn = False
 
-        self.check_events()
+        self.event_system.check_events()
         self.evaluate_victory_conditions()
 
     def resolve_supply_phase(self):
         return self.supply_service.resolve_supply_phase()
-
-    def check_events(self):
-        return self.event_system.check_events()
 
     def get_units_at(self, hex_coord):
         """

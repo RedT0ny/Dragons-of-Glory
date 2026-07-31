@@ -196,7 +196,7 @@ dragonlance_forged:
   requirements:
     - { type: "asset", id: "dragonmetal" }       # Check Player.assets
   effects: { grant_asset: "dragonlance" }
-  max_ocurrences: 5
+  max_occurrences: 5
 
 dragon_orb:
   type: "artifact"

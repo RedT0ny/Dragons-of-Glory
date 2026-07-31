@@ -2,7 +2,6 @@ import os
 import random
 from functools import partial
 
-from content.specs import LocType
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS
