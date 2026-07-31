@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QFrame, QGroupBox, QHBoxLayout, QLabel, QScrollArea, QVBoxLayout, QWidget
 
 from src.content.specs import UnitColumn
 from src.content.tools import TextFormatter
@@ -26,6 +26,8 @@ def _build_tables_row(attackers, defenders, game_state):
 
 def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defenders, game_state=None, parent=None):
     from PySide6.QtWidgets import QDialog, QDialogButtonBox
+    from src.content.specs import LocType
+    from src.game.map import Hex
 
     dialog = QDialog(parent)
     dialog.setWindowTitle("Naval Withdrawal")
@@ -36,13 +38,39 @@ def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defende
     round_label.setStyleSheet("font-size: 16px; font-weight: bold;")
     layout.addWidget(round_label)
 
-    layout.addLayout(_build_tables_row(attackers, defenders, game_state))
+    tables_widget = QWidget()
+    tables_widget.setLayout(_build_tables_row(attackers, defenders, game_state))
+    tables_scroll = QScrollArea()
+    tables_scroll.setWidgetResizable(True)
+    tables_scroll.setFrameShape(QFrame.NoFrame)
+    tables_scroll.setMaximumHeight(400)
+    tables_scroll.setWidget(tables_widget)
+    layout.addWidget(tables_scroll)
+
+    is_defender = bool(defenders) and defenders[0].allegiance == side_allegiance
+    defending_port = False
+    if is_defender and game_state and defenders:
+        fleet = defenders[0]
+        if fleet.position and None not in fleet.position:
+            hex_coord = Hex.offset_to_axial(*fleet.position)
+            loc = game_state.map.get_location(hex_coord)
+            defending_port = bool(loc and loc.loc_type == LocType.PORT.value and loc.occupier == side_allegiance)
 
     question = QLabel(f"Should {side_allegiance.capitalize()} withdraw all fleets and end naval combat?")
     question.setStyleSheet("font-size: 14px; margin-top: 12px;")
     layout.addWidget(question)
 
+    if defending_port:
+        port_note = QLabel("Fleets defending a port cannot withdraw.")
+        port_note.setStyleSheet("font-size: 12px; color: #cc4400; font-style: italic;")
+        layout.addWidget(port_note)
+
     buttons = QDialogButtonBox(QDialogButtonBox.Yes | QDialogButtonBox.No)
+
+    if defending_port:
+        yes_button = buttons.button(QDialogButtonBox.Yes)
+        yes_button.setEnabled(False)
+
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addWidget(buttons)
@@ -63,7 +91,17 @@ class CombatResultWidget(QWidget):
         parent=None,
     ):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.addWidget(scroll)
+
+        content = QWidget()
+        layout = QVBoxLayout(content)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
@@ -86,3 +124,5 @@ class CombatResultWidget(QWidget):
             layout.addWidget(breakthrough_label)
 
         layout.addStretch()
+
+        scroll.setWidget(content)

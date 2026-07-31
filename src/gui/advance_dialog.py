@@ -39,16 +39,12 @@ def show_advance_dialog(candidates, game_state):
     ]
     table = UnitTable(columns, parent=dlg)
     table.set_units(candidates, game_state)
+    table.setMaximumHeight(400)
 
     for row in range(table.rowCount()):
         item = table.item(row, 0)
         if item and (item.flags() & Qt.ItemIsEnabled):
             item.setCheckState(Qt.Checked)
-
-    h = table.horizontalHeader().height()
-    for r in range(table.rowCount()):
-        h += table.rowHeight(r)
-    table.setFixedHeight(h + 2)
 
     layout.addWidget(table)
 

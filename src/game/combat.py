@@ -1,6 +1,7 @@
 import os
 import random
 
+from content.specs import LocType
 from src.content.config import CRT_DATA
 from src.content.specs import HexsideType, LocType, TerrainType, UnitRace, UnitState, UnitType
 from src.content.constants import HL, MIN_COMBAT_ROLL, MAX_COMBAT_ROLL, NEUTRAL, WS
@@ -519,7 +520,7 @@ class CombatResolver:
         loc = self._get_defender_location()
         if loc and loc.loc_type == LocType.FORTRESS.value:
             return 3
-        if loc and loc.loc_type in (LocType.CITY.value, LocType.TEMPLE.value, LocType.PORT.value):
+        if loc and loc.loc_type in (LocType.CITY.value, LocType.TEMPLE.value, LocType.PORT.value, LocType.UNDERCITY.value):
             return 2
         return 1
 
@@ -791,6 +792,8 @@ class NavalCombatResolver:
         self._leader_escape_handler = LeaderEscapeHandler(game_state, roll_d6_fn=self._roll_d6)
         self._is_advanced = str(getattr(game_state, "naval_combat", "classic")).strip().lower() == "advanced"
         self._battle_location = defenders[0].position if defenders else None
+        self._original_attackers = list(self.attackers)
+        self._original_defenders = list(self.defenders)
         self._original_attacker_positions = {
             id(f): (f.position, getattr(f, "river_hexside", None))
             for f in self.attackers
@@ -900,12 +903,10 @@ class NavalCombatResolver:
                 break
 
             if withdraw_decider:
-                cur_atk = [u for u in self.attackers if u.is_on_map]
-                cur_def = [u for u in self.defenders if u.is_on_map]
-                if withdraw_decider(self._defender_side(), rounds, cur_atk, cur_def):
+                if withdraw_decider(self._defender_side(), rounds, atk_round, def_round):
                     defender_withdrew = True
                     break
-                if withdraw_decider(self._attacker_side(), rounds, cur_atk, cur_def):
+                if withdraw_decider(self._attacker_side(), rounds, atk_round, def_round):
                     attacker_withdrew = True
                     break
 
@@ -1366,11 +1367,13 @@ class CombatService:
                         my_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
                         enemy_power = sum(u.combat_rating for u in cur_def if u.is_on_map)
                     else:
+                        if any(NavalCombatResolver._fleet_is_in_port(self.game_state, u) for u in cur_def if u.is_on_map):
+                            return False
                         my_power = sum(u.combat_rating for u in cur_def if u.is_on_map)
                         enemy_power = sum(u.combat_rating for u in cur_atk if u.is_on_map)
                     return my_power < enemy_power
                 if naval_withdraw_decider:
-                    return naval_withdraw_decider(side_allegiance, rounds, naval_resolver.attackers, naval_resolver.defenders)
+                    return naval_withdraw_decider(side_allegiance, rounds, naval_resolver._original_attackers, naval_resolver._original_defenders)
                 return False
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
@@ -2683,6 +2686,10 @@ class CombatClickHandler:
         )
 
     def _retreat_non_fleet_units_if_needed(self, battle_hex, allegiance):
+        """Retreat non-fleet units if needed."""
+        loc = self.game_state.map.get_location(battle_hex)
+        if loc and loc.loc_type == LocType.PORT.value:
+            return
         units = self.game_state.map.get_units_in_hex(battle_hex.q, battle_hex.r)
         non_fleet = [
             u for u in units

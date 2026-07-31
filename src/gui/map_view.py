@@ -319,6 +319,8 @@ class AnsalonMapView(QGraphicsView):
         self.overlay_items = []
         self.overlay_items_by_coords = {}
         self.bg_item = self.scene.addPixmap(QPixmap(MAP_IMAGE_PATH))
+        # Set the transformation mode to 'Smooth' for better scaling quality
+        # self.bg_item.setTransformationMode(Qt.SmoothTransformation)
         self.bg_item.setZValue(-1)
 
         board = self.game_state.map

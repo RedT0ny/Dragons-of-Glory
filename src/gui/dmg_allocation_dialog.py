@@ -56,6 +56,7 @@ class DamageAllocationDialog(QDialog):
         self.table = InteractiveUnitTable([UnitColumn.ICON, UnitColumn.NAME, UnitColumn.STATUS], parent=self)
         self.table.set_units(self.units, self.game_state)
         self.table.set_allocation_data(self.allocations, self.max_per_unit)
+        self.table.setMaximumHeight(400)
         layout.addWidget(self.table)
 
         self.remaining_label = QLabel()
