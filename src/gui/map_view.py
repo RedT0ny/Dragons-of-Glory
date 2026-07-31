@@ -423,7 +423,9 @@ class AnsalonMapView(QGraphicsView):
                     # Skip transported units (they are represented on the carrier)
                     if getattr(unit, 'transport_host', None):
                         continue
-                    if hasattr(unit, 'position') and unit.is_on_map:
+                    # Skip units with no valid hex (e.g. leaders awaiting escape from a
+                    # destroyed carrier); is_on_map alone doesn't guarantee a position.
+                    if hasattr(unit, 'position') and unit.is_on_map and unit.position and None not in unit.position:
                         pos = unit.position # (col, row)
                         if pos not in units_by_hex:
                             units_by_hex[pos] = []

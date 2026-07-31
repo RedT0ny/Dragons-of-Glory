@@ -31,6 +31,9 @@ class Location:
     def coords(self):
         return self.spec.coords
 
+    def is_port(self):
+        return self.loc_type == LocType.PORT.value
+
     def get_defense_modifier(self):
         # Access type via spec
         if self.loc_type == LocType.FORTRESS.value:

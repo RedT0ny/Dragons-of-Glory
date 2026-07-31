@@ -2538,14 +2538,24 @@ class CombatClickHandler:
                     att_withdrew = resolution.get("attacker_withdrew", False)
                     def_withdrew = resolution.get("defender_withdrew", False)
                     def_survivors = resolution.get("defender_survivors", 0)
+                    leader_escape = resolution.get("leader_escape_requests", []) if resolution else []
 
                     if att_withdrew:
-                        self.view.sync_with_model()
+                        if leader_escape:
+                            self._begin_leader_escape(leader_escape, completion_callback=self.view.sync_with_model)
+                        else:
+                            self.view.sync_with_model()
                         return
 
                     if def_withdrew:
                         def_fleets = [u for u in enemy_on_map if u.is_fleet() and u.is_on_map]
-                        self._begin_defender_withdrawal(def_fleets, battle_loc)
+                        if leader_escape:
+                            self._begin_leader_escape(
+                                leader_escape,
+                                completion_callback=lambda: self._begin_defender_withdrawal(def_fleets, battle_loc),
+                            )
+                        else:
+                            self._begin_defender_withdrawal(def_fleets, battle_loc)
                         return
 
                     if def_survivors == 0 and battle_loc:
@@ -2555,7 +2565,10 @@ class CombatClickHandler:
                         if allegiance:
                             self._retreat_non_fleet_units_if_needed(battle_hex, allegiance)
 
-                    self.view.sync_with_model()
+                    if leader_escape:
+                        self._begin_leader_escape(leader_escape, completion_callback=self.view.sync_with_model)
+                    else:
+                        self.view.sync_with_model()
                     return
 
                 leader_escape = resolution.get("leader_escape_requests", []) if resolution else []
