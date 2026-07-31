@@ -15,7 +15,7 @@ from shiboken6.Shiboken import Object
 from src.content.tools import TextFormatter, debug_print
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, LocType, UnitType
-from src.game.interception import InterceptionService
+from src.game.interception import INTERCEPTION_DEFENDER_WITHDREW, InterceptionService
 from src.game.invasion import InvasionHandler
 from src.game.map import Hex, Hexside
 
@@ -761,12 +761,16 @@ class MovementService:
                 return MoveUnitsResult(moved=[], errors=[])
 
             if apply_interception:
-                intercepted = self.interception_service.maybe_apply_interception(movers_alive, step_hex)
+                interception_status = self.interception_service.maybe_apply_interception(movers_alive, step_hex)
                 movers_alive = [u for u in units if u.is_on_map]
                 if not movers_alive:
                     return MoveUnitsResult(moved=[], errors=[])
 
-                if intercepted:
+                if interception_status == INTERCEPTION_DEFENDER_WITHDREW:
+                    self.game_state.finalize_board_state_change()
+                    return MoveUnitsResult(moved=movers_alive, errors=[])
+
+                if interception_status:
                     print(f"Interception resolved at {step_hex.axial_to_offset()}.")
 
         self.game_state.finalize_board_state_change()

@@ -2,8 +2,9 @@ from collections import defaultdict
 
 from src.content.constants import HL, WS
 from src.content.specs import UnitState, UnitType
-from src.game.combat import NavalCombatResolver
+from src.game.combat import CombatService, NavalCombatResolver
 from src.game.game_state import GameState
+from src.game.interception import InterceptionService
 from src.game.map import Hex
 
 
@@ -41,6 +42,11 @@ class FakeMap:
         return []
 
 
+class FakeOddsMap(FakeMap):
+    def get_terrain(self, hex_coord):
+        return None
+
+
 class DummyUnit:
     def __init__(
         self,
@@ -66,6 +72,9 @@ class DummyUnit:
         self.is_transported = False
         self.river_hexside = None
         self._pending_leader_escapes = None
+        self.movement_points = 0
+        self.moved_this_turn = False
+        self.attacked_this_turn = False
 
     @property
     def is_on_map(self):
@@ -155,6 +164,229 @@ def test_naval_combat_is_simultaneous_even_if_both_sink():
     assert result["result"] == "NS/NS"
     assert a.status == UnitState.RESERVE
     assert d.status == UnitState.RESERVE
+
+
+def test_fleet_only_combat_odds_projection_returns_fleet_rating():
+    """Fleet-only projection returns a real ratio/odds column so naval
+    interceptions are not always cancelled by the odds gate."""
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    service = CombatService(gs)
+
+    proj = service._project_combat_odds([a], [d], Hex(4, 4))
+
+    assert proj["attacker_cs"] == 6
+    assert proj["defender_cs"] == 3
+    assert proj["odds_str"] == "2:1"
+    assert proj["ratio"] == 2.0
+
+
+def test_fleet_only_combat_odds_projection_still_zero_for_no_fleets():
+    """Projection stays at ratio 0 when neither side has fleets to rate."""
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    a.unit_type = UnitType.WING
+    service = CombatService(gs)
+
+    proj = service._project_combat_odds([a], [d], Hex(4, 4))
+
+    assert proj["ratio"] == 0
+    assert proj["odds_str"] == "-"
+
+
+class _StubPlayer:
+    def __init__(self, is_ai):
+        self.is_ai = is_ai
+
+
+def test_ask_naval_withdraw_shows_dialog_only_for_human_side(monkeypatch):
+    from src.gui.combat_result_widget import ask_naval_withdraw
+
+    gs = GameState()
+    gs.players[HL] = _StubPlayer(is_ai=False)
+    gs.players[WS] = _StubPlayer(is_ai=True)
+
+    calls = []
+
+    def _fake_dialog(side, rnd, atk_units, def_units, **kwargs):
+        calls.append((side, rnd))
+        return True
+
+    monkeypatch.setattr(
+        "src.gui.combat_result_widget.show_naval_withdraw_dialog",
+        _fake_dialog,
+    )
+
+    assert ask_naval_withdraw(gs, HL, 2, [], []) is True
+    assert calls == [(HL, 2)]
+
+    # AI sides get no dialog and never withdraw through this helper.
+    assert ask_naval_withdraw(gs, WS, 2, [], []) is False
+    # Unknown side gets no dialog either.
+    assert ask_naval_withdraw(gs, "neutral", 2, [], []) is False
+    assert calls == [(HL, 2)]
+
+
+def test_interception_naval_withdraw_uses_shared_helper(monkeypatch):
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=False)
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    captured = {}
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        captured["decider"] = kwargs.get("naval_withdraw_decider")
+        return {"result": "-/-", "rounds": []}
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        "src.game.interception.ask_naval_withdraw",
+        lambda gs_, side, rnd, atk, def_, **kw: side == HL,
+    )
+
+    class _StubMovement:
+        def relocate_unit_on_board(self, unit, hex_coord):
+            pass
+
+    svc = InterceptionService(gs, _StubMovement(), None)
+    attack_hex = Hex.offset_to_axial(5, 4)
+    monkeypatch.setattr(svc, "find_interceptor_attack_hex_for_stack", lambda *args: attack_hex)
+
+    svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    decider = captured["decider"]
+    assert decider is not None
+    assert decider(HL, 1, [a], [d]) is True
+    assert decider(WS, 1, [a], [d]) is False
+
+
+def test_interception_defender_withdrawal_zeroes_moving_fleet_mp(monkeypatch):
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=False)
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    d.movement_points = 5
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return {"result": "-/-", "rounds": 1, "defender_withdrew": True}
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+
+    class _StubMovement:
+        def relocate_unit_on_board(self, unit, hex_coord):
+            pass
+
+    svc = InterceptionService(gs, _StubMovement(), None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    status = svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert status == "defender_withdrew"
+    assert d.movement_points == 0
+
+
+def test_interception_attacker_withdrawal_preserves_moving_fleet_mp(monkeypatch):
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=False)
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    d.movement_points = 5
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return {"result": "-/-", "rounds": 1, "attacker_withdrew": True}
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+
+    class _StubMovement:
+        def relocate_unit_on_board(self, unit, hex_coord):
+            pass
+
+    svc = InterceptionService(gs, _StubMovement(), None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    status = svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert status == "resolved"
+    assert d.movement_points == 5
+
+
+def test_maybe_apply_interception_reports_defender_withdrawal(monkeypatch):
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=False)
+    a = _fleet("a", HL, 3, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    d.movement_points = 5
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return {"result": "-/-", "rounds": 1, "defender_withdrew": True}
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+
+    class _StubMovement:
+        def relocate_unit_on_board(self, unit, hex_coord):
+            pass
+
+    class _StubRng:
+        def choice(self, seq):
+            return seq[0]
+
+        def random(self):
+            return 0.0
+
+        def randint(self, a, b):
+            return 4
+
+    svc = InterceptionService(gs, _StubMovement(), _StubRng())
+    monkeypatch.setattr(
+        svc,
+        "find_interceptor_groups_in_range",
+        lambda moving_units, hex_coord: [((3, 4), [a])],
+    )
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    status = svc.maybe_apply_interception([d], Hex(4, 4))
+
+    assert status == "defender_withdrew"
+    assert d.movement_points == 0
 
 
 def test_admiral_or_wizard_tactical_rating_adds_to_fleet_attack():

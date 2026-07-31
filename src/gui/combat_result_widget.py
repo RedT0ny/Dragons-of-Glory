@@ -78,6 +78,25 @@ def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defende
     return dialog.exec() == QDialog.Accepted
 
 
+def ask_naval_withdraw(game_state, side_allegiance, round_number, attackers, defenders, parent=None):
+    """Ask a human side whether to withdraw from naval combat.
+
+    AI sides (and sides with no player entry) decide automatically and no
+    dialog is shown.  Returns True when the side chooses to withdraw.
+    """
+    player = game_state.players.get(side_allegiance) if game_state else None
+    if not player or getattr(player, "is_ai", True):
+        return False
+    return show_naval_withdraw_dialog(
+        side_allegiance,
+        round_number,
+        attackers,
+        defenders,
+        game_state=game_state,
+        parent=parent,
+    )
+
+
 class CombatResultWidget(QWidget):
     def __init__(
         self,

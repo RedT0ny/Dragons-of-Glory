@@ -1,5 +1,6 @@
 import os
 import random
+from functools import partial
 
 from content.specs import LocType
 from src.content.config import CRT_DATA
@@ -10,6 +11,7 @@ from src.content.tools import TextFormatter, caption_id
 from src.game.combat_reporting import show_combat_result_popup
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler, LeaderEscapeRequest
 from src.game.map import Hex
+from src.gui.combat_result_widget import ask_naval_withdraw
 
 # This module is intentionally rule-dense: it centralizes combat math, special-case
 # rule handling, and click-driven combat UX orchestration in one place.
@@ -1210,6 +1212,21 @@ class CombatService:
         land_attackers = [u for u in attackers if not u.is_fleet()]
         land_defenders = [u for u in defenders if not u.is_fleet()]
         if not land_attackers or not land_defenders:
+            # Fleet-only (or fleet-vs-nonland) projection: naval combat has no
+            # CRT odds column, so project the ratio from fleet combat ratings.
+            fleet_attackers = [u for u in attackers if u.is_fleet()]
+            fleet_defenders = [u for u in defenders if u.is_fleet()]
+            if fleet_attackers and fleet_defenders:
+                attacker_cs = sum(u.combat_rating for u in fleet_attackers)
+                defender_cs = sum(u.combat_rating for u in fleet_defenders)
+                odds_str = CombatResolver.calculate_odds(attacker_cs, defender_cs)
+                ratio = float("inf") if defender_cs <= 0 else (attacker_cs / defender_cs)
+                return {
+                    "attacker_cs": attacker_cs,
+                    "defender_cs": defender_cs,
+                    "odds_str": odds_str,
+                    "ratio": ratio,
+                }
             return {"attacker_cs": 0, "defender_cs": 0, "odds_str": "-", "ratio": 0}
         resolver = CombatResolver(land_attackers, land_defenders, terrain, game_state=self.game_state)
         attacker_cs, defender_cs = resolver.calculate_effective_combat_strengths()
@@ -2488,7 +2505,7 @@ class CombatClickHandler:
                 resolution = self.game_state.combat_service.resolve_combat(
                     committed,
                     target_hex,
-                    naval_withdraw_decider=self._ask_naval_withdraw if is_naval else None,
+                    naval_withdraw_decider=partial(ask_naval_withdraw, self.game_state, parent=self.view) if is_naval else None,
                     dragon_duel_withdraw_decider=self._ask_dragon_duel_withdraw if not is_naval else None,
                 )
                 popup_attackers = (
@@ -2680,17 +2697,6 @@ class CombatClickHandler:
         if fleets and len(fleets) == len(attackers):
             return "naval"
         return "land"
-
-    def _ask_naval_withdraw(self, side_allegiance, round_number, attackers, defenders):
-        from src.gui.combat_result_widget import show_naval_withdraw_dialog
-        return show_naval_withdraw_dialog(
-            side_allegiance,
-            round_number,
-            attackers,
-            defenders,
-            game_state=self.game_state,
-            parent=self.view,
-        )
 
     def _ask_dragon_duel_withdraw(self, side_allegiance, round_number):
         from src.gui.message_dialog import show_question_dialog

@@ -1,8 +1,13 @@
+from functools import partial
+
 from src.game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, UnitRace, UnitType
 from src.game.combat_reporting import show_combat_result_popup
 from src.game.map import Hex
+from src.gui.combat_result_widget import ask_naval_withdraw
+
+INTERCEPTION_DEFENDER_WITHDREW = "defender_withdrew"
 
 
 class InterceptionService:
@@ -85,8 +90,8 @@ class InterceptionService:
         if roll < dist:
             return False
 
-        self.resolve_interception_attack(interceptors, moving_units, current_hex, origin_offset)
-        return True
+        status = self.resolve_interception_attack(interceptors, moving_units, current_hex, origin_offset)
+        return status or True
 
     def find_interceptor_groups_in_range(self, moving_units, current_hex):
         """Collects eligible interceptor stacks within 1-2 hexes of the target hex.
@@ -150,6 +155,7 @@ class InterceptionService:
 
         previous_active_player = self.game_state.active_player
         self.game_state.active_player = interceptors[0].allegiance
+        status = "resolved"
         try:
             live_interceptors = [u for u in interceptors if u.is_on_map and (u.is_wing() or u.is_fleet())]
             if live_interceptors:
@@ -179,6 +185,7 @@ class InterceptionService:
                     live_interceptors,
                     moving_hex,
                     defenders_override=air_defenders,
+                    naval_withdraw_decider=partial(ask_naval_withdraw, self.game_state),
                 )
                 show_combat_result_popup(
                     self.game_state,
@@ -189,6 +196,10 @@ class InterceptionService:
                     context="interception",
                     target_hex=moving_hex,
                 )
+                if resolution.get("defender_withdrew"):
+                    for unit in air_defenders:
+                        unit.movement_points = 0
+                    status = INTERCEPTION_DEFENDER_WITHDREW
         finally:
             self.game_state.active_player = previous_active_player
 
@@ -203,6 +214,8 @@ class InterceptionService:
             interceptor.attacked_this_turn = state.get("attacked_this_turn", False)
             if hasattr(interceptor, "river_hexside"):
                 interceptor.river_hexside = state.get("river_hexside", None)
+
+        return status
 
     def find_interceptor_attack_hex_for_stack(self, interceptors, moving_hex, origin_hex):
         """Picks the best adjacent hex from which the interceptors can attack.
