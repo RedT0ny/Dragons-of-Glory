@@ -72,6 +72,11 @@ class Asset:
     bonuses, and type information. Artifact-type assets can be equipped
     to units if they satisfy all requirements. Consumable assets provide
     a one-shot effect.
+
+    Assignment is permanent from the player's perspective (cannot be
+    freely reassigned after the carrier has moved or attacked). When a
+    carrier is permanently destroyed, the asset is destroyed with it.
+    Army merges transfer a single asset to the surviving army.
     """
 
     def __init__(self, spec, instance_id: Optional[str] = None):
@@ -93,6 +98,44 @@ class Asset:
         """Whether this asset can be equipped (only ARTIFACT type)."""
         return self.asset_type == AssetType.ARTIFACT
 
+    @property
+    def display_name(self) -> str:
+        """Human-readable asset name, including instance number when present."""
+        name = translator.get_asset_name(self.base_id)
+        if self.instance_num > 0:
+            return f"{name} #{self.instance_num}"
+        return name
+
+    def get_equip_failure_reason(self, unit) -> Optional[str]:
+        """Return a human-readable reason why *unit* cannot equip this asset.
+
+        Returns ``None`` when assignment is allowed.
+        """
+        if unit is None:
+            return "No unit selected."
+
+        if not self.is_equippable:
+            return f"'{self.display_name}' is not equippable."
+
+        if self.assigned_to is not None and self.assigned_to is not unit:
+            carrier = TextFormatter.format_unit_log_string(self.assigned_to)
+            return f"'{self.display_name}' is already assigned to '{carrier}'."
+
+        if not getattr(unit, "is_on_map", False):
+            return "Unit is not on the map."
+
+        existing = [a for a in (getattr(unit, "equipment", None) or []) if a is not self]
+        if existing:
+            return "Unit already carries an asset."
+
+        for requirement in self.requirements or []:
+            req_type = requirement.get("type")
+            req_value = requirement.get("value")
+            if not self._check_requirement(unit, req_type, req_value):
+                return self._format_requirement_failure(req_type, req_value)
+
+        return None
+
     def can_equip(self, unit, log_reason=False) -> bool:
         """Check if *unit* can equip this asset based on its requirements.
 
@@ -110,28 +153,46 @@ class Asset:
             True if the unit satisfies all requirements and the asset
             is equippable.
         """
-        unit_id = TextFormatter.format_unit_log_string(unit)
-        asset_id = translator.get_asset_name(self.id)
-        if not self.is_equippable:
-            if log_reason:
-                print(f"Asset '{asset_id}' is not equippable.")
-            return False
+        reason = self.get_equip_failure_reason(unit)
+        if reason is None:
+            return True
+        if log_reason:
+            unit_id = TextFormatter.format_unit_log_string(unit) if unit is not None else "None"
+            print(f"Cannot equip '{self.display_name}' to '{unit_id}': {reason}")
+        return False
 
-        if not unit.is_on_map:
-            if log_reason:
-                print(f"Cannot equip '{asset_id}' to '{unit_id}': Unit is not on the map.")
-            return False
+    def can_unassign_from(self, unit) -> tuple[bool, Optional[str]]:
+        """Whether this asset may be unassigned from *unit* by the player.
 
-        for requirement in self.requirements:
-            req_type = requirement.get("type")
-            req_value = requirement.get("value")
+        An asset cannot be unassigned if the carrier has moved or attacked
+        this turn.
+        """
+        if unit is None:
+            return False, "No unit selected."
+        if self.assigned_to is not None and self.assigned_to is not unit:
+            return False, "Asset is not assigned to the selected unit."
+        if getattr(unit, "moved_this_turn", False):
+            return False, "Cannot unassign: the unit has moved this turn."
+        if getattr(unit, "attacked_this_turn", False):
+            return False, "Cannot unassign: the unit has attacked this turn."
+        return True, None
 
-            if not self._check_requirement(unit, req_type, req_value):
-                if log_reason:
-                    print(f"Cannot equip '{asset_id}' to '{unit_id}': Requirement {req_type}='{req_value}' failed.")
-                return False
-        return True
-
+    @staticmethod
+    def _format_requirement_failure(req_type, req_value) -> str:
+        """Build a readable message for a failed equip requirement."""
+        if req_type == RequirementType.RACE.value:
+            return f"Unit race does not match requirement '{req_value}'."
+        if req_type == RequirementType.TRAIT.value:
+            return f"Unit does not have required trait '{req_value}'."
+        if req_type == RequirementType.ALLEGIANCE.value:
+            return f"Unit allegiance does not match requirement '{req_value}'."
+        if req_type == RequirementType.UNIT_TYPE.value:
+            return f"Unit type does not match requirement '{req_value}'."
+        if req_type == RequirementType.ITEM.value:
+            return f"Unit is missing required item '{req_value}'."
+        if req_type == RequirementType.CUSTOM.value:
+            return "Unit does not satisfy a custom requirement."
+        return f"Requirement {req_type}='{req_value}' failed."
 
     def _check_requirement(self, unit, req_type, req_value) -> bool:
         """Evaluate a single requirement against a unit.
@@ -166,7 +227,7 @@ class Asset:
 
         return False
 
-    def apply_to(self, unit, on_assign_callback=None) -> None:
+    def apply_to(self, unit, on_assign_callback=None) -> bool:
         """Equip this asset to *unit*, applying all runtime effects.
 
         Parameters
@@ -175,26 +236,104 @@ class Asset:
             The target unit.
         on_assign_callback : callable or None
             Optional callback invoked after a successful assignment.
-        """
-        if self.can_equip(unit, log_reason=True):
-            if not hasattr(unit, 'equipment'):
-                unit.equipment = []
-            if self in unit.equipment:
-                return
-            unit.equipment.append(self)
-            self.assigned_to = unit
-            self._apply_runtime_effects(unit)
-            if on_assign_callback is not None:
-                on_assign_callback(self)
-            unit_id = TextFormatter.format_unit_log_string(unit)
-            asset_id = translator.get_asset_name(self.base_id) + (' #'+ str(self.instance_num) if self.instance_num > 1 else '')
-            print(f"'{unit_id}' equipped '{asset_id}'!")
 
-    def remove_from(self, unit) -> None:
-        """Unequip this asset from *unit*, reversing runtime effects."""
+        Returns
+        -------
+        bool
+            True if the asset was successfully equipped.
+        """
+        if not self.can_equip(unit, log_reason=True):
+            return False
+        if not hasattr(unit, 'equipment'):
+            unit.equipment = []
+        if self in unit.equipment:
+            return True
+        unit.equipment.append(self)
+        self.assigned_to = unit
+        self._apply_runtime_effects(unit)
+        if on_assign_callback is not None:
+            on_assign_callback(self)
+        unit_id = TextFormatter.format_unit_log_string(unit)
+        print(f"'{unit_id}' equipped '{self.display_name}'!")
+        return True
+
+    def remove_from(self, unit, force: bool = False) -> bool:
+        """Unequip this asset from *unit*, reversing runtime effects.
+
+        Parameters
+        ----------
+        unit :
+            The unit currently carrying the asset.
+        force : bool
+            When True, bypass the moved/attacked unassign restriction
+            (used for combat consumption, destruction, and merges).
+
+        Returns
+        -------
+        bool
+            True if the asset was removed (or was not equipped).
+        """
+        if unit is None:
+            self.assigned_to = None
+            return True
+
+        if not force:
+            allowed, _reason = self.can_unassign_from(unit)
+            if not allowed:
+                return False
+
         if hasattr(unit, 'equipment') and self in unit.equipment:
             unit.equipment.remove(self)
         self._remove_runtime_effects(unit)
+        if self.assigned_to is unit:
+            self.assigned_to = None
+        elif self.assigned_to is None:
+            pass
+        return True
+
+    def transfer_to(self, new_unit) -> bool:
+        """Move this asset from its current carrier to *new_unit*.
+
+        Used when armies merge. Bypasses player unassign restrictions and
+        does not re-check equip requirements (merge keeps unit identity of
+        the same replacement group).
+        """
+        if new_unit is None:
+            return False
+
+        old_unit = self.assigned_to
+        if old_unit is new_unit:
+            return True
+
+        if old_unit is not None:
+            self.remove_from(old_unit, force=True)
+
+        if not hasattr(new_unit, "equipment"):
+            new_unit.equipment = []
+
+        # One-asset-per-unit rule: do not overwrite an existing carrier asset.
+        if any(a is not self for a in new_unit.equipment):
+            return False
+
+        if self not in new_unit.equipment:
+            new_unit.equipment.append(self)
+        self.assigned_to = new_unit
+        self._apply_runtime_effects(new_unit)
+        return True
+
+    def destroy(self) -> None:
+        """Permanently destroy this asset (removed from carrier and owner pool)."""
+        unit = self.assigned_to
+        if unit is not None:
+            self.remove_from(unit, force=True)
+        elif unit is None:
+            # Ensure equipment lists cannot retain a dangling reference.
+            pass
+
+        owner = self.owner
+        if owner is not None and hasattr(owner, "assets"):
+            owner.assets.pop(self.id, None)
+        self.owner = None
         self.assigned_to = None
 
     def _apply_runtime_effects(self, unit) -> None:
@@ -220,9 +359,13 @@ class Asset:
         """Consume this asset, executing its one-shot bonus effect."""
         if self.is_consumable and callable(self.bonus):
             self.bonus(game_state)
-            if self.assigned_to and hasattr(self.assigned_to, 'equipment'):
-                self.assigned_to.equipment.remove(self)
+            carrier = self.assigned_to
+            if carrier is not None:
+                self.remove_from(carrier, force=True)
             self.assigned_to = None
+            if self.owner is not None and hasattr(self.owner, "assets"):
+                self.owner.assets.pop(self.id, None)
+            self.owner = None
 
 
 def check_requirements(req, active_player, game_state) -> bool:

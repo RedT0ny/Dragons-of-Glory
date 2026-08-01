@@ -283,7 +283,24 @@ class Unit:
             self.eliminate()
 
     def destroy(self):
-        """Permanently removed."""
+        """Permanently removed.
+
+        Any assets carried by this unit are destroyed with it (removed from
+        the owner's asset pool, not returned).
+        """
+        for asset in list(getattr(self, "equipment", []) or []):
+            if hasattr(asset, "destroy"):
+                asset.destroy()
+            else:
+                # Fallback for lightweight test doubles / non-Asset equipment
+                if hasattr(self, "equipment") and asset in self.equipment:
+                    self.equipment.remove(asset)
+                if getattr(asset, "assigned_to", None) is self:
+                    asset.assigned_to = None
+                owner = getattr(asset, "owner", None)
+                if owner is not None and hasattr(owner, "assets"):
+                    owner.assets.pop(getattr(asset, "id", None), None)
+
         self.status = UnitState.DESTROYED
         self.position = (None, None)
         print(f"{TextFormatter.format_unit_log_string(self)} destroyed.")

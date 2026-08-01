@@ -163,8 +163,17 @@ class AssetDetails(QFrame):
         # Case: Unit with artifact is selected (Removal logic)
         if unit and hasattr(unit, 'equipment') and unit.equipment:
             # If the displayed asset IS the one on the unit, enable remove
+            # only when the unit has neither moved nor attacked this turn.
             if asset in unit.equipment:
-                self.btn_remove.setEnabled(True)
+                can_unassign = True
+                if hasattr(asset, "can_unassign_from"):
+                    can_unassign, _reason = asset.can_unassign_from(unit)
+                else:
+                    can_unassign = (
+                        not getattr(unit, "moved_this_turn", False)
+                        and not getattr(unit, "attacked_this_turn", False)
+                    )
+                self.btn_remove.setEnabled(bool(can_unassign))
             return
 
         # Case: Asset selected, Empty Unit selected (Assign logic)
@@ -402,7 +411,10 @@ class AssetsTab(QWidget):
         if not asset: return # Category label
 
         self.details_panel.display_asset(asset)
-        self.details_panel.update_buttons_state(self.current_selected_unit)
+        if asset.assigned_to is not None:
+            self.details_panel.update_buttons_state(asset.assigned_to)
+        else:
+            self.details_panel.update_buttons_state(self.current_selected_unit)
 
     def on_assign_clicked(self):
         unit = self.details_panel.current_unit

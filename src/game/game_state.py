@@ -721,7 +721,8 @@ class GameState:
         else:
             kept_unit.status = UnitState.READY
 
-        discarded_unit.status = UnitState.DESTROYED
+        # destroy() also destroys any carried assets (removed from the pool).
+        discarded_unit.destroy()
         self.movement_service.remove_unit_from_board(
             discarded_unit,
             escaped=False,

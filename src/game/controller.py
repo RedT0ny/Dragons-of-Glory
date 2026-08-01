@@ -1131,6 +1131,10 @@ class GameController(QObject):
         """
         Resolve depleted-stack merge decision in controller (MVC-safe):
         chosen unit -> ACTIVE, other -> RESERVE off-map.
+
+        Assets: transferred to the surviving army. If both armies carry an
+        asset, the discarded (second) army's asset is unassigned back to the
+        player pool.
         """
         from src.gui.replacements_dialog import UnitSelectionDialog
 
@@ -1139,6 +1143,9 @@ class GameController(QObject):
         if dlg.exec():
             kept_unit = dlg.selected_unit
             discarded_unit = dlg.discarded_unit
+
+            if kept_unit and discarded_unit:
+                self._transfer_assets_on_army_merge(kept_unit, discarded_unit)
 
             if kept_unit:
                 kept_unit.status = UnitState.ACTIVE
@@ -1154,11 +1161,53 @@ class GameController(QObject):
 
             self.view.sync_with_model()
             self._refresh_info_panel()
+            self._refresh_assets_tab()
             if self._is_replacements_dialog_visible():
                 self.replacements_dialog.refresh()
 
+    @staticmethod
+    def _transfer_assets_on_army_merge(kept_unit, discarded_unit):
+        """Handle asset ownership when two depleted armies merge.
+
+        - Only discarded has asset(s): transfer to kept.
+        - Only kept has asset(s): keep as-is.
+        - Both have asset(s): unassign discarded's asset(s) back to the pool.
+        """
+        kept_assets = list(getattr(kept_unit, "equipment", []) or [])
+        discarded_assets = list(getattr(discarded_unit, "equipment", []) or [])
+        if not discarded_assets:
+            return
+
+        if kept_assets:
+            # Both armies have assets: return the second army's asset to the pool.
+            for asset in discarded_assets:
+                if hasattr(asset, "remove_from"):
+                    try:
+                        asset.remove_from(discarded_unit, force=True)
+                    except TypeError:
+                        asset.remove_from(discarded_unit)
+                else:
+                    if asset in discarded_unit.equipment:
+                        discarded_unit.equipment.remove(asset)
+                    asset.assigned_to = None
+            return
+
+        # Transfer discarded assets onto the surviving army.
+        for asset in discarded_assets:
+            if hasattr(asset, "transfer_to"):
+                asset.transfer_to(kept_unit)
+            elif hasattr(asset, "remove_from") and hasattr(asset, "apply_to"):
+                try:
+                    asset.remove_from(discarded_unit, force=True)
+                except TypeError:
+                    asset.remove_from(discarded_unit)
+                asset.apply_to(kept_unit)
+
     def on_asset_assign_requested(self, asset, unit):
         """Handle request to assign an asset to a unit (human player only).
+
+        Prompts for confirmation. Assignment cannot be undone. Shows a warning
+        when the asset cannot be assigned, including the reason.
         
         Args:
             asset: Asset object to assign.
@@ -1168,11 +1217,42 @@ class GameController(QObject):
             return
         if not asset or not unit:
             return
+
+        from src.gui.message_dialog import show_question_dialog, show_warning_dialog
+
+        parent = self.view.window() if self.view else None
+        asset_name = getattr(asset, "display_name", None) or str(getattr(asset, "id", "asset"))
+        unit_name = TextFormatter.format_unit_log_string(unit)
+
+        reason = None
+        if hasattr(asset, "get_equip_failure_reason"):
+            reason = asset.get_equip_failure_reason(unit)
+        elif hasattr(asset, "can_equip") and not asset.can_equip(unit):
+            reason = "The unit does not meet the asset requirements."
+
+        if reason:
+            show_warning_dialog(
+                "Cannot Assign Asset",
+                f"Cannot assign {asset_name} to {unit_name}.\n\nReason: {reason}",
+                parent=parent,
+            )
+            return
+
+        confirmed = show_question_dialog(
+            "Assign Asset",
+            f"Assign {asset_name} to {unit_name}? Note: This cannot be undone.",
+            parent=parent,
+        )
+        if not confirmed:
+            return
+
         if hasattr(asset, "apply_to"):
             asset.apply_to(unit, on_assign_callback=self._on_asset_assigned)
 
     def on_asset_remove_requested(self, asset, unit):
         """Handle request to remove an asset from a unit (human player only).
+
+        Unassign is blocked if the unit has moved or attacked this turn.
         
         Args:
             asset: Asset object to remove.
@@ -1182,8 +1262,29 @@ class GameController(QObject):
             return
         if not asset or not unit:
             return
+
+        from src.gui.message_dialog import show_warning_dialog
+
+        parent = self.view.window() if self.view else None
+        if hasattr(asset, "can_unassign_from"):
+            allowed, reason = asset.can_unassign_from(unit)
+            if not allowed:
+                show_warning_dialog(
+                    "Cannot Unassign Asset",
+                    reason or "This asset cannot be unassigned right now.",
+                    parent=parent,
+                )
+                return
+
         if hasattr(asset, "remove_from"):
-            asset.remove_from(unit)
+            removed = asset.remove_from(unit)
+            if removed is False:
+                show_warning_dialog(
+                    "Cannot Unassign Asset",
+                    "This asset cannot be unassigned right now.",
+                    parent=parent,
+                )
+                return
         self._refresh_assets_tab()
 
     def _on_asset_assigned(self, asset):

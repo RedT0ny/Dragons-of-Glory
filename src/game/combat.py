@@ -1664,8 +1664,13 @@ class CombatService:
         return requests
 
     def _consume_asset(self, asset, unit):
+        # Combat consumption bypasses the player unassign restriction
+        # (moved/attacked this turn).
         if hasattr(asset, "remove_from"):
-            asset.remove_from(unit)
+            try:
+                asset.remove_from(unit, force=True)
+            except TypeError:
+                asset.remove_from(unit)
         else:
             if hasattr(unit, "equipment") and asset in unit.equipment:
                 unit.equipment.remove(asset)
