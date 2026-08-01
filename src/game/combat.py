@@ -947,7 +947,7 @@ class NavalCombatResolver:
         if self._fleet_is_in_port(self.game_state, target):
             threshold -= 2
         roll = self._roll_d10()
-        return roll <= threshold
+        return roll <= max(threshold,1)
 
     def _fleet_attack_rating(self, fleet):
         """
@@ -1308,6 +1308,8 @@ class CombatService:
         """
         attackers = list(attackers)
         defender_pool = set(defenders_override) if defenders_override is not None else None
+        col, row = hex_position.axial_to_offset()
+        print(f"Battle at ({col},{row})")
 
         def current_defenders():
             defenders_now = list(self.game_state.get_units_at(hex_position))
@@ -1346,7 +1348,6 @@ class CombatService:
             )
             if invading:
                 self.game_state.apply_forced_entry_displacement(invading, hex_position)
-            col, row = hex_position.axial_to_offset()
             country = self.game_state.get_country_by_hex(col, row)
             can_advance = not (country and country.allegiance == NEUTRAL)
             result = "-/-"
@@ -1408,6 +1409,7 @@ class CombatService:
 
             outcome = naval_resolver.resolve(withdraw_decider=_naval_withdraw_wrapper)
             carrier_escape_requests = self.cleanup_destroyed_units(attackers + defenders)
+            print(f"Naval battle at ({col},{row})")
             print(TextFormatter.format_naval_log(attackers, defenders, outcome))
             return {
                 "result": outcome.get("result", "-/-"),
@@ -1473,7 +1475,7 @@ class CombatService:
             duel = DragonDuelResolver(self.game_state, attacker_dragons, defender_dragons)
             duel_outcome = duel.resolve(withdraw_decider=dragon_duel_withdraw_decider)
             print(
-                f"Dragon duel after {duel_outcome.get('rounds', 0)} rounds: "
+                f"Dragon duel at ({col},{row}) after {duel_outcome.get('rounds', 0)} rounds: "
                 f"A={duel_outcome.get('attacker_survivors', 0)} D={duel_outcome.get('defender_survivors', 0)}"
             )
             self.cleanup_destroyed_units(attackers + defenders)

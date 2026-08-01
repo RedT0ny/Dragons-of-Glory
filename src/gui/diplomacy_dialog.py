@@ -242,6 +242,8 @@ class DiplomacyDialog(QDialog):
                             "color: #c0392b; font-size: 18px; font-weight: bold; border: 2px solid #c0392b; padding: 5px;"
                         )
 
+                        print(f"{attempt.active_side} fails to activate {country_name}")
+
                         btn_cancel.setText(self.translator.tr("dialogs.diplomacy.close", "Close"))
                         btn_cancel.setDisabled(False)
 
