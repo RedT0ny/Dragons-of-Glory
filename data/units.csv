@@ -67,7 +67,7 @@
 ;1;fleet;ogre;daltigoth;neutral;;4;0;40;ogre_fleet.jpg
 ;1;inf;pirate;saifhum;neutral;;12;0;0;pirate_inf.jpg
 ;6;fleet;pirate;saifhum;neutral;;4;0;45;pirate_fleet.jpg
-;2;inf;undead;dargaard;neutral;;10;0;8;undead_inf.jpg
+;2;cav;undead;dargaard;neutral;;10;0;8;undead_cav.jpg
 ;1;wing;dragon;black;highlord;;2;0;16;black_dragon.jpg
 ;1;wing;dragon;white;highlord;;2;0;16;white_dragon.jpg
 ;2;wing;dragon;green;highlord;;2;0;16;green_dragon.jpg
