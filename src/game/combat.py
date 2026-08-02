@@ -848,6 +848,7 @@ class NavalCombatResolver:
                 continue
             if self._roll_hits(ship, target):
                 hits[target] = hits.get(target, 0) + 1
+                print(f"Hit!")
         return hits
 
     def _collect_round_hits_advanced(self, atk_round, def_round):
@@ -873,6 +874,7 @@ class NavalCombatResolver:
             assignments[target] = assignments.get(target, 0) + 1
             if self._roll_hits(ship, target):
                 hits[target] = hits.get(target, 0) + 1
+                print(f"Hit!")
         return hits
 
     def resolve(self, withdraw_decider=None):
@@ -905,6 +907,7 @@ class NavalCombatResolver:
 
         while self.attackers and self.defenders:
             rounds += 1
+            print(f"Naval battle, round {rounds}")
             atk_round = [u for u in self.attackers if u.is_on_map]
             def_round = [u for u in self.defenders if u.is_on_map]
             if not atk_round or not def_round:
@@ -959,6 +962,7 @@ class NavalCombatResolver:
         if self._fleet_is_in_port(self.game_state, target):
             threshold -= 2
         roll = self._roll_d10()
+        print(f"*{TextFormatter.format_unit_log_string(fleet)} shoots at {TextFormatter.format_unit_log_string(target)} with a roll of {roll}")
         return roll <= max(threshold,1)
 
     def _fleet_attack_rating(self, fleet):
