@@ -847,16 +847,18 @@ class NavalCombatResolver:
         return hits
 
     def _collect_side_hits_advanced(self, side_fleets, enemy_fleets):
+        """Collect hits for a side in combat, spreading fire across targets."""
         hits = {}
         live_enemy = [u for u in enemy_fleets if u.is_on_map]
         if not live_enemy:
             return hits
         assignments = {}
         for ship in side_fleets:
+            # Sort by: assignment count (lowest first), then use standard priority
             target = min(live_enemy, key=lambda u: (
-                assignments.get(u, 0),
-                0 if u.status.name == "DEPLETED" else 1,
-                getattr(u, "combat_rating", 0),
+                assignments.get(u, 0),               # Spread fire first
+                0 if u.status.name == "DEPLETED" else 1,    # Then finish damaged
+                getattr(u, "combat_rating", 0),             # Then weakest
             ))
             assignments[target] = assignments.get(target, 0) + 1
             if self._roll_hits(ship, target):
