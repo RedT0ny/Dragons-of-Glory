@@ -145,6 +145,7 @@ class CanonicalDeploymentEntry:
 class SaveGameSpec:
     metadata: Dict[str, Any]
     world_state: Dict[str, Any]
+    config: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class MapConfigSpec:

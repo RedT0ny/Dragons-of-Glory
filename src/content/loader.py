@@ -350,9 +350,11 @@ def load_game_state(path: str) -> SaveGameSpec:
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
 
+    metadata = data.get("metadata", {}) or {}
     return SaveGameSpec(
-        metadata=data.get("metadata", {}),
-        world_state=data.get("world_state", {})
+        metadata=metadata,
+        world_state=data.get("world_state", {}),
+        config=metadata.get("config", {}) or {},
     )
 
 def load_data(file_path):

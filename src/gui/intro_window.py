@@ -8,6 +8,7 @@ from src.content.audio_manager import AudioManager
 from src.gui.config_dialog import ConfigDialog
 from src.gui.new_game_dialog import NewGameDialog
 from src.gui.volume_dialog import Ui_volumeDialog
+from src.game.controller import GameController
 
 
 def _last_dir(key):
@@ -151,17 +152,9 @@ class IntroWindow(QMainWindow):
         if files:
             file_path = files[0]
             _save_last_dir("load", file_path)
+
             config_dialog = ConfigDialog(self)
-            config_dialog.set_from_config(
-                {
-                    "highlord_ai": False,
-                    "whitestone_ai": False,
-                    "difficulty": "normal",
-                    "combat_details": "brief",
-                    "supply": "standard",
-                    "deployment": "canonical",
-                }
-            )
+            config_dialog.set_from_config(GameController.get_config_from_save(file_path))
             if not config_dialog.exec():
                 return
             player_config = config_dialog.get_config()

@@ -362,17 +362,26 @@ class CombatResolver:
 
     def _max_leader_tactical_rating(self, units):
         """ Returns the maximum tactical rating among leaders in the given units, including passengers."""
-        land_rating = max((u.tactical_rating for u in units if u.is_leader() and not u.is_wizard()), default=0)
-        magic_rating = max((u.tactical_rating for u in units if u.is_leader() and u.is_wizard()), default=0)
-        air_rating = max((
+        # Get max tactical rating among all non-wizard leaders (including passengers)
+        tactics_rating = max((
             p.tactical_rating
             for u in units
-            for p in (getattr(u, "passengers", []) or [])
-            if p.is_leader()
+            for p in ([u] + (getattr(u, "passengers", []) or []))
+            if p.is_leader() and not p.is_wizard()
         ), default=0)
-        return land_rating + magic_rating + air_rating
+
+        # Get max tactical rating among all wizard leaders (including passengers)
+        magic_rating = max((
+            p.tactical_rating
+            for u in units
+            for p in ([u] + (getattr(u, "passengers", []) or []))
+            if p.is_wizard()
+        ), default=0)
+
+        return tactics_rating + magic_rating
 
     def _resolve_taunt_for_side(self, enemy_units, is_attacking):
+        """Resolve the Kender taunt for a specific side."""
         roll_mod = -self._max_leader_tactical_rating(enemy_units)
         if is_attacking:
             loc = self._get_defender_location()
@@ -389,6 +398,7 @@ class CombatResolver:
             print(f"Kender taunt ({label}): roll={roll} mod={roll_mod:+d} -> final={final} — FAILED")
 
     def _resolve_kender_taunt(self):
+        """Resolve the Kender taunt for the combat."""
         has_kender_atk = any(
             u.race == UnitRace.KENDER and u.unit_type == UnitType.INFANTRY
             for u in self.attackers

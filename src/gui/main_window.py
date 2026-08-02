@@ -648,7 +648,7 @@ class MainWindow(QMainWindow):
         path = files[0]
         _save_last_dir("load", path)
         config_dialog = ConfigDialog(self)
-        config_dialog.set_from_config(self.controller.get_runtime_config())
+        config_dialog.set_from_config(self.controller.get_config_from_save(path))
         if not config_dialog.exec():
             return
         config = config_dialog.get_config()

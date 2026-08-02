@@ -102,6 +102,7 @@ class GameApp:
             supply=player_config.get("supply", "standard"),
             deployment=player_config.get("deployment", "canonical"),
             interception=player_config.get("interception", "disabled"),
+            naval_combat=player_config.get("naval_combat", "classic"),
         )
 
         if loading:

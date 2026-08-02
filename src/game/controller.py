@@ -12,6 +12,7 @@ from src.game.diplomacy import DiplomacyService
 from src.game.ai_baseline import BaselineAIPlayer
 from src.game.phase_manager import TurnAction, TurnEngine
 from src.content.runtime_diagnostics import RuntimeDiagnostics
+from src.content import loader
 from src.game.map import Hex
 
 
@@ -119,6 +120,11 @@ class GameController(QObject):
             "interception": self.interception,
             "naval_combat": self.naval_combat,
         }
+
+    @staticmethod
+    def get_config_from_save(path: str) -> dict:
+        """Return the runtime configuration stored in a save file for dialog pre-fill."""
+        return loader.load_game_state(path).config
 
     def apply_runtime_config(self, config: dict):
         """Apply runtime configuration to controller and game state.
