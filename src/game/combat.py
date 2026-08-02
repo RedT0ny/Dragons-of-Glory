@@ -1910,8 +1910,8 @@ class CombatService:
         if self.map.get_location(target_hex):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        # All defenders must be Wing or Cavalry
-        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) for u in defenders):
+        # All defenders must be Wing or Cavalry (or leaders)
+        if any(u.unit_type not in (UnitType.WING, UnitType.CAVALRY) and not u.is_leader() for u in defenders):
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
         # Wings in attacker prevent retreat
@@ -1925,9 +1925,25 @@ class CombatService:
         if attacker_has_cavalry and defender_has_cavalry:
             return {"applied": False, "result": None, "leader_escape_requests": []}
 
-        # Retreat all defenders
+        # Order defenders: 1) Wings (0), 2) Cavalry (1). Leaders are excluded:
+        # a wing retreat already carries every co-located leader along
+        # (or grants it an escape roll), so retreating them directly would move
+        # them a second hex. Leaders-only stacks never reach this path — they
+        # are handled by the leader-stack escape before combat.
+        def get_priority(unit):
+            if unit.is_wing():
+                return 0
+            else:
+                return 1
+
+        ordered_defenders = sorted(
+            (u for u in defenders if not u.is_leader()),
+            key=get_priority,
+        )
+
+        # Retreat all defenders in the new order
         leader_escape_requests = []
-        for unit in defenders:
+        for unit in ordered_defenders:
             leader_escape_requests.extend(
                 self._retreat_single_unit(unit, eliminate_if_no_retreat=False) or []
             )

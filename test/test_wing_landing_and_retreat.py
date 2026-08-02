@@ -197,3 +197,106 @@ def test_blocked_srw_wing_stays_to_fight():
     assert result["result"] == "-/SRW"
     assert defender.status == UnitState.ACTIVE
     assert defender.position == (4, 4)
+
+
+def _leader_unit(unit_id, allegiance, position):
+    unit = SimpleNamespace(
+        id=unit_id,
+        unit_type=UnitType.HERO,
+        allegiance=allegiance,
+        movement=4,
+        movement_points=4,
+        position=position,
+        status=UnitState.ACTIVE,
+        transport_host=None,
+        is_on_map=True,
+        is_army=lambda: False,
+        is_wing=lambda: False,
+        is_fleet=lambda: False,
+        is_citadel=lambda: False,
+        is_leader=lambda: True,
+        is_combat_unit=lambda: False,
+    )
+    return unit
+
+
+def test_leader_riding_with_wing_retreats_only_one_hex():
+    attacker = _combat_unit("infantry_1", UnitType.INFANTRY, HL, (3, 4))
+    wing = _combat_unit("wing_1", UnitType.WING, WS, (4, 4))
+    leader = _leader_unit("leader_1", WS, (4, 4))
+    target_hex = Hex.offset_to_axial(4, 4)
+
+    moves = []
+    def move_unit(unit, hex_obj):
+        unit.position = hex_obj.axial_to_offset()
+        moves.append((unit.id, unit.position))
+
+    fake_map = SimpleNamespace(
+        get_location=lambda hex_obj: None,
+        can_unit_land_on_hex=lambda unit, hex_obj: True,
+        can_stack_move_to=lambda units, hex_obj: True,
+        has_enemy_army=lambda hex_obj, allegiance: False,
+    )
+    game_state = SimpleNamespace(
+        map=fake_map,
+        units=[],
+        players={},
+        active_player=HL,
+        movement_service=SimpleNamespace(normalize_transport_state=lambda: None),
+        damage_unit=lambda damaged, mode=None: None,
+        get_units_at=lambda hex_obj: [wing, leader],
+        move_unit=move_unit,
+    )
+    service = CombatService(game_state)
+    service._get_valid_retreat_hexes = lambda unit_arg, start_hex: [start_hex.neighbors()[0]]
+
+    result = service._apply_precombat_special_retreat([attacker], [wing, leader], target_hex)
+
+    assert result["applied"] is True
+    assert wing.position == leader.position
+    origin = Hex.offset_to_axial(4, 4)
+    final = Hex.offset_to_axial(*leader.position)
+    assert origin.distance_to(final) == 1
+    assert len(moves) == 2  # wing + leader, leader must not be retreated a second hex
+
+
+def test_leaders_only_stack_is_not_retreated_by_special_retreat():
+    # Leaders-only stacks never reach this path in real combat: attackers that
+    # get here always contain a control unit, which triggers the leader-stack
+    # escape before the special retreat. Leaders are therefore never retreated
+    # directly here — only carried by a wing/cavalry.
+    attacker = _combat_unit("infantry_1", UnitType.INFANTRY, HL, (3, 4))
+    leader_a = _leader_unit("leader_a", WS, (4, 4))
+    leader_b = _leader_unit("leader_b", WS, (4, 4))
+    target_hex = Hex.offset_to_axial(4, 4)
+
+    moves = []
+    def move_unit(unit, hex_obj):
+        unit.position = hex_obj.axial_to_offset()
+        moves.append((unit.id, unit.position))
+
+    fake_map = SimpleNamespace(
+        get_location=lambda hex_obj: None,
+        can_unit_land_on_hex=lambda unit, hex_obj: True,
+        can_stack_move_to=lambda units, hex_obj: True,
+        has_enemy_army=lambda hex_obj, allegiance: False,
+    )
+    game_state = SimpleNamespace(
+        map=fake_map,
+        units=[],
+        players={},
+        active_player=HL,
+        movement_service=SimpleNamespace(normalize_transport_state=lambda: None),
+        damage_unit=lambda damaged, mode=None: None,
+        get_units_at=lambda hex_obj: [leader_a, leader_b],
+        move_unit=move_unit,
+    )
+    service = CombatService(game_state)
+    service._get_valid_retreat_hexes = lambda unit_arg, start_hex: [start_hex.neighbors()[0]]
+
+    result = service._apply_precombat_special_retreat([attacker], [leader_a, leader_b], target_hex)
+
+    assert result["applied"] is True
+    assert moves == []
+    assert leader_a.position == (4, 4)
+    assert leader_b.position == (4, 4)
