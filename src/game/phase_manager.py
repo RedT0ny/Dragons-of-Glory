@@ -75,6 +75,9 @@ class PhaseManager:
             return
 
         if self.game_state.phase == GamePhase.DEPLOYMENT:
+            # First check if active_player is HL, to process draconian production
+            self.game_state.on_finish_replacements_round_for_player(self.game_state.active_player)
+
             # If currently the non-initiative player, switch to initiative player
             # If currently the initiative player, deployment is done AND it counts as their Replacements.
 
