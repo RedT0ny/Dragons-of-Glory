@@ -24,10 +24,26 @@ def _build_tables_row(attackers, defenders, game_state):
     return row
 
 
-def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defenders, game_state=None, parent=None):
-    from PySide6.QtWidgets import QDialog, QDialogButtonBox
+def _defender_in_controlled_port(game_state, side_allegiance, defenders) -> bool:
+    """True if any defender fleet still sits in a port the side controls.
+
+    All defenders in a naval battle share the battle hex. Eliminated fleets
+    have their position cleared to (None, None) and are skipped by the guard.
+    """
     from src.content.specs import LocType
     from src.game.map import Hex
+
+    for fleet in defenders:
+        if not fleet.position or None in fleet.position:
+            continue
+        loc = game_state.map.get_location(Hex.offset_to_axial(*fleet.position))
+        if loc and loc.is_port() and loc.occupier == side_allegiance:
+            return True
+    return False
+
+
+def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defenders, game_state=None, parent=None):
+    from PySide6.QtWidgets import QDialog, QDialogButtonBox
 
     dialog = QDialog(parent)
     dialog.setWindowTitle("Naval Withdrawal")
@@ -48,13 +64,7 @@ def show_naval_withdraw_dialog(side_allegiance, round_number, attackers, defende
     layout.addWidget(tables_scroll)
 
     is_defender = bool(defenders) and defenders[0].allegiance == side_allegiance
-    defending_port = False
-    if is_defender and game_state and defenders:
-        fleet = defenders[0]
-        if fleet.position and None not in fleet.position:
-            hex_coord = Hex.offset_to_axial(*fleet.position)
-            loc = game_state.map.get_location(hex_coord)
-            defending_port = bool(loc and loc.loc_type == LocType.PORT.value and loc.occupier == side_allegiance)
+    defending_port = is_defender and _defender_in_controlled_port(game_state, side_allegiance, defenders)
 
     question = QLabel(f"Should {side_allegiance.capitalize()} withdraw all fleets and end naval combat?")
     question.setStyleSheet("font-size: 14px; margin-top: 12px;")
