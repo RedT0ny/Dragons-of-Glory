@@ -42,6 +42,7 @@ class MoveUnitsResult:
     """Result of moving units to a hex."""
     moved: List[object]
     errors: List[str]
+    messages: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -641,34 +642,43 @@ class MovementService:
                 if u.is_fleet():
                     u._maelstrom_immunity = True
 
+        # Towers of E'li: fleets entering a tower hex must stop there. Truncate
+        # the move target to the first tower hex along any moving fleet's path.
+        tower_hex = self._tower_stop_hex(units, target_hex)
+        if tower_hex is not None:
+            target_hex = tower_hex
+
         # Mixed stacks that include ground armies can legally enter enemy-fleet hexes.
         # Validate these as a stack, not unit-by-unit, to avoid false "no valid path".
+        result = None
         if len(units) > 1 and any(u.is_army() for u in units):
             ok, reason = self._can_stack_reach_target(units, target_hex)
             if not ok:
                 return MoveUnitsResult(moved=[], errors=[reason or "Selected stack cannot move there."])
-            return self._move_stack_along_path(
+            result = self._move_stack_along_path(
                 units,
                 target_hex,
                 apply_interception=self.interception_service.should_check_interception(units),
             )
+        elif not self.game_state.map.can_stack_move_to(units, target_hex):
+            result = MoveUnitsResult(moved=[], errors=["Stacking limit or enemy presence at target hex."])
+        elif self.interception_service.should_check_interception(units):
+            result = self._move_units_with_interception(units, target_hex)
+        else:
+            errors = []
+            for unit in units:
+                ok, reason = self._can_unit_reach_target(unit, target_hex)
+                if not ok:
+                    errors.append(reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move.")
 
-        if not self.game_state.map.can_stack_move_to(units, target_hex):
-            return MoveUnitsResult(moved=[], errors=["Stacking limit or enemy presence at target hex."])
+            if errors:
+                result = MoveUnitsResult(moved=[], errors=errors)
+            else:
+                result = self._execute_unit_move_batch(units, target_hex)
 
-        if self.interception_service.should_check_interception(units):
-            return self._move_units_with_interception(units, target_hex)
-
-        errors = []
-        for unit in units:
-            ok, reason = self._can_unit_reach_target(unit, target_hex)
-            if not ok:
-                errors.append(reason or f"{TextFormatter.format_unit_log_string(unit)} cannot move.")
-
-        if errors:
-            return MoveUnitsResult(moved=[], errors=errors)
-
-        return self._execute_unit_move_batch(units, target_hex)
+        if self._has_tower(target_hex):
+            self._apply_tower_arrival(units, target_hex, result)
+        return result
 
     def _execute_unit_move_batch(self, units, target_hex) -> MoveUnitsResult:
         moved = []
@@ -684,6 +694,61 @@ class MovementService:
         if moved:
             self.game_state.finalize_board_state_change()
         return MoveUnitsResult(moved=moved, errors=[])
+
+    # --- Towers of E'li ---
+
+    def _towers_of_eli(self):
+        return getattr(self.game_state, "towers_of_eli_service", None)
+
+    def _has_tower(self, hex_coord) -> bool:
+        svc = self._towers_of_eli()
+        return bool(svc and svc.is_tower_hex(hex_coord))
+
+    def _tower_stop_hex(self, units, target_hex):
+        """First tower hex a moving fleet would enter, or the tower target itself.
+
+        Returns the hex to truncate the move to, or None if no tower is crossed.
+        """
+        svc = self._towers_of_eli()
+        if svc is None or not self.game_state.map:
+            return None
+        if svc.is_tower_hex(target_hex):
+            return target_hex
+        fleets = [u for u in units if u.is_fleet() and not getattr(u, "transport_host", None)]
+        for fleet in fleets:
+            evaluation = self.evaluate_move(fleet, target_hex)
+            if not evaluation.ok:
+                continue
+            for path_hex in evaluation.path_hexes:
+                if svc.is_tower_hex(path_hex):
+                    return path_hex
+        return None
+
+    def _apply_tower_arrival(self, units, target_hex, result):
+        """Forced stop + tower shots for fleets that arrived on a tower hex.
+
+        The move is truncated to the tower hex, so the fleet stops there for the
+        shot resolution. Surviving fleets keep their remaining movement points
+        and may continue moving this turn.
+        """
+        svc = self._towers_of_eli()
+        if svc is None:
+            return
+        target_pos = target_hex.axial_to_offset()
+        for unit in result.moved:
+            if not unit.is_fleet():
+                continue
+            if getattr(unit, "position", None) != target_pos:
+                continue
+            unit.moved_this_turn = True
+
+        messages = svc.resolve_tower_shots(target_hex)
+        if messages:
+            result.messages.extend(messages)
+            for msg in messages:
+                print(msg)
+            self.game_state.finalize_board_state_change()
+        result.moved = [u for u in result.moved if u.is_on_map]
 
     def _move_units_with_interception(self, units, target_hex):
         return self._move_stack_along_path(units, target_hex, apply_interception=True)
@@ -832,11 +897,47 @@ class MovementService:
     def get_invasion_force(self, country_id, extra_units=None):
         return self.invasion_handler.get_invasion_force(country_id, extra_units=extra_units)
 
-    def _unit_can_reach_country(self, unit, from_hex, target_hexes):
-        return any(
-            neighbor.axial_to_offset() in target_hexes and self._unit_can_enter_hex(unit, from_hex, neighbor)
-            for neighbor in from_hex.neighbors()
-        )
+    def _unit_can_reach_country(self, unit, from_hex, target_hexes, traversable_hexes=None):
+        """Can ``unit`` reach a hex of ``target_hexes`` from ``from_hex``?
+
+        Directly: one of ``from_hex``'s neighbors is in ``target_hexes`` and the
+        unit can enter it. If ``traversable_hexes`` is given, the unit may also
+        march through that set of hexes, paying normal movement costs, until it
+        reaches a hex from which it can step into a target hex. Embarked units are
+        judged only by the direct check (their movement belongs to their transport).
+        """
+        if traversable_hexes is None or getattr(unit, "transport_host", None) is not None:
+            return any(
+                neighbor.axial_to_offset() in target_hexes and self._unit_can_enter_hex(unit, from_hex, neighbor)
+                for neighbor in from_hex.neighbors()
+            )
+
+        mp = self._effective_mp(unit)
+        costs = {from_hex: 0}
+        frontier = [from_hex]
+        while frontier:
+            current = frontier.pop()
+            remaining = mp - costs[current]
+            if any(
+                neighbor.axial_to_offset() in target_hexes
+                and self.game_state.map.can_unit_enter_from_hex(unit, current, neighbor, available_mp=remaining)
+                for neighbor in current.neighbors()
+            ):
+                return True
+            for neighbor in current.neighbors():
+                if neighbor not in traversable_hexes:
+                    continue
+                step = self.game_state.map.get_movement_cost(unit, current, neighbor)
+                if step is None or step == float("inf"):
+                    continue
+                new_cost = costs[current] + step
+                if new_cost > mp:
+                    continue
+                if neighbor in costs and costs[neighbor] <= new_cost:
+                    continue
+                costs[neighbor] = new_cost
+                frontier.append(neighbor)
+        return False
 
     def _unit_can_enter_hex(self, unit, from_hex, target_hex):
         carrier = getattr(unit, "transport_host", None)

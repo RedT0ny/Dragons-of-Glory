@@ -19,6 +19,7 @@ from src.game.event_system import EventSystem
 from src.game.movement import MovementService
 from src.game.supply import SupplyService
 from src.game.phase_manager import PhaseManager, CalendarService
+from src.game.towers_of_eli import TowersOfEliService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
 from src.game.overlay_maps import (
@@ -65,6 +66,7 @@ class GameState:
         self.combat_service = CombatService(self)
         self.supply_service = SupplyService(self)
         self.conquest_service = ConquestService(self)
+        self.towers_of_eli_service = TowersOfEliService(self)
         self.calendar = CalendarService()
         self.translator = Translator()
 
@@ -264,7 +266,11 @@ class GameState:
                         "conquered": bool(country.conquered),
                         "capital_id": country.capital_id,
                         "locations": {
-                            lid: {"occupier": loc.occupier, "is_capital": bool(loc.is_capital)}
+                            lid: {
+                                "occupier": loc.occupier,
+                                "is_capital": bool(loc.is_capital),
+                                "defense_destroyed": bool(getattr(loc, "defense_destroyed", False)),
+                            }
                             for lid, loc in country.locations.items()
                         },
                     }
@@ -489,6 +495,8 @@ class GameState:
                 loc.occupier = occupier if occupier in (HL, WS, NEUTRAL) else NEUTRAL
                 if "is_capital" in loc_state:
                     loc.is_capital = bool(loc_state["is_capital"])
+                if "defense_destroyed" in loc_state:
+                    loc.defense_destroyed = bool(loc_state["defense_destroyed"])
 
     def _restore_units_from_save(self, units_state, unit_runtime_state):
         if not isinstance(units_state, list):

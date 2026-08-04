@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 
+from content.tools import TextFormatter
 from src.content.constants import HL, NEUTRAL
 from src.game.map import Hex
 from src.game.unit import Unit
@@ -23,6 +24,11 @@ class InvasionHandler:
         self.game_state = movement_service.game_state
 
     def evaluate_neutral_entry(self, target_hex) -> NeutralEntryDecision:
+        """Check whether moving into ``target_hex`` would enter a neutral country.
+
+        Returns a decision telling the caller whether entry is possible and, if so,
+        whether it needs player confirmation (HL) or is blocked (Whitestone).
+        """
         col, row = target_hex.axial_to_offset()
         country = self.game_state.get_country_by_hex(col, row)
         if not country or country.allegiance != NEUTRAL:
@@ -43,93 +49,106 @@ class InvasionHandler:
         )
 
     def get_invasion_force(self, country_id, extra_units=None):
+        """Assemble the force available to invade a neutral country.
+
+        The force combines two sources:
+          * ``extra_units``: caller-supplied units (e.g. units already embarked
+            toward the country or standing on its territory); and
+          * map stacks: every Highlord control unit (army, wing or citadel) that
+            can physically move into a country hex -- whether from a border hex
+            adjacent to the country or from a friendly hex connected to one.
+
+        Returns a dict with:
+          * ``strength``: total combat rating of the force;
+          * ``units``: the units making up the force;
+          * ``border_hexes``: friendly hexes directly adjacent to the country;
+          * ``connected_hexes``: border hexes plus supporting friendly hexes;
+          * ``reason``: None when a force was found, otherwise why it could not be.
+        """
+        # Only neutral countries can be invaded.
         country = self.game_state.countries.get(country_id)
         if not country or country.allegiance != NEUTRAL:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "Country is not neutral."
-            }
+            return self._result(0, [], reason="Country is not neutral.")
 
+        # The country's territories define the hexes the invasion must reach.
         target_hexes = set(country.territories)
         if not target_hexes:
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "Country has no territory."
-            }
+            return self._result(0, [], reason="Country has no territory.")
 
-        extra_eligible = self._merge_extra_invasion_units([], extra_units, target_hexes)
+        # Caller-supplied units must pass the same eligibility checks as map stacks.
+        extra_eligible = self._eligible_extra_units(extra_units, target_hexes)
+
+        # All Highlord stacks on the map, including HL passengers on transports.
         stacks_by_hex = self._hl_stacks_with_passengers()
-        if not stacks_by_hex:
-            if extra_eligible:
-                return {
-                    "strength": self._invasion_strength(extra_eligible),
-                    "units": extra_eligible,
-                    "border_hexes": set(),
-                    "connected_hexes": set(),
-                    "reason": None,
-                }
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "No Highlord stacks available."
-            }
 
-        border_hexes = self._border_stacks_that_can_invade(stacks_by_hex, target_hexes)
+        # Border hexes = friendly stack hexes that can actually move into the country.
+        border_hexes = {
+            hex_obj
+            for hex_obj, stack_units in stacks_by_hex.items()
+            if self._stack_can_invade_from_hex(hex_obj, stack_units, target_hexes)
+        }
 
+        # If nothing can move in from the map, the extra units (e.g. an embarked
+        # force) may still be enough on their own; otherwise report why there is
+        # no force.
         if not border_hexes:
-            if extra_eligible:
-                return {
-                    "strength": self._invasion_strength(extra_eligible),
-                    "units": extra_eligible,
-                    "border_hexes": set(),
-                    "connected_hexes": set(),
-                    "reason": None,
-                }
-            return {
-                "strength": 0,
-                "units": [],
-                "border_hexes": set(),
-                "connected_hexes": set(),
-                "reason": "No eligible Highlord stacks adjacent to the border."
-            }
+            reason = (
+                "No Highlord stacks available."
+                if not stacks_by_hex
+                else "No eligible Highlord stacks adjacent to the border."
+            )
+            return self._extra_only_result(extra_eligible, reason)
 
+        # Support hexes: friendly stack hexes reachable from a border hex by
+        # marching through other friendly stack hexes. Their units can join too.
         connected_hexes = self._connected_support_hexes(border_hexes, stacks_by_hex.keys())
-        eligible_units = self._invasion_units_from_connected_hexes(connected_hexes, stacks_by_hex)
-        eligible_units = self._merge_distinct_units(eligible_units, extra_eligible)
-        strength = self._invasion_strength(eligible_units)
 
+        # Assemble the force from the connected hexes plus the extra units.
+        eligible_units = self._invasion_units_from_connected_hexes(connected_hexes, stacks_by_hex, target_hexes)
+        eligible_units = self._merge_distinct_units(eligible_units, extra_eligible)
+
+        return self._result(
+            self._invasion_strength(eligible_units),
+            eligible_units,
+            border_hexes,
+            connected_hexes,
+        )
+
+    @staticmethod
+    def _result(strength, units, border_hexes=None, connected_hexes=None, reason=None):
+        """Build the result dict returned by ``get_invasion_force``."""
         return {
             "strength": strength,
-            "units": eligible_units,
-            "border_hexes": border_hexes,
-            "connected_hexes": connected_hexes,
-            "reason": None
+            "units": units or [],
+            "border_hexes": border_hexes or set(),
+            "connected_hexes": connected_hexes or set(),
+            "reason": reason,
         }
+
+    def _extra_only_result(self, extra_eligible, failure_reason):
+        """Result when only caller-supplied extra units can invade.
+
+        Returns a successful force if extra units exist, otherwise a failure with
+        ``failure_reason``.
+        """
+        return self._result(
+            self._invasion_strength(extra_eligible),
+            extra_eligible,
+            reason=None if extra_eligible else failure_reason,
+        )
 
     @staticmethod
     def _invasion_strength(units):
-        """Calculate invasion strength based on units. Dragons count triple."""
-        total = 0
-        for unit in list(units or []):
-            rating = int(unit.combat_rating)
-            if rating <= 0:
-                continue
-            if getattr(unit, "is_dragon", lambda: False)():
-                total += rating * 3
-            else:
-                total += rating
-        return total
+        """Total invasion strength = sum of positive combat ratings."""
+        print(f"Invasion force: {TextFormatter.format_units(units)}")
+        return sum(
+            int(unit.combat_rating)
+            for unit in (units or [])
+            if int(unit.combat_rating) > 0
+        )
 
     def _hl_stacks_with_passengers(self):
-        """Collect all Highlord stacks on the map, including passengers."""
+        """Map each hex to its Highlord units, including HL passengers on transports."""
         stacks = {}
         for hex_coords, units in self.game_state.map.unit_map.items():
             stack_units = [u for u in units if u.allegiance == HL and u.is_on_map]
@@ -146,35 +165,24 @@ class InvasionHandler:
             stacks[hex_obj] = stack_with_passengers
         return stacks
 
-    def _border_stacks_that_can_invade(self, stacks_by_hex, target_hexes):
-        border_hexes = set()
-        for hex_obj, stack_units in stacks_by_hex.items():
-            if not any(neighbor.axial_to_offset() in target_hexes for neighbor in hex_obj.neighbors()):
-                continue
-            if self._stack_can_invade_from_hex(hex_obj, stack_units, target_hexes):
-                border_hexes.add(hex_obj)
-        return border_hexes
-
     def _stack_can_invade_from_hex(self, hex_obj, stack_units, target_hexes) -> bool:
-        combat_units = [u for u in stack_units if not u.is_fleet()]
-        if not combat_units:
-            return False
-        for neighbor in hex_obj.neighbors():
-            if neighbor.axial_to_offset() not in target_hexes:
-                continue
-            if not self.game_state.map.can_stack_move_to(combat_units, neighbor):
-                continue
-            if any(self.movement_service._unit_can_enter_hex(unit, hex_obj, neighbor) for unit in combat_units):
-                return True
-        return False
+        """Does any control unit in this stack have the MP to enter the country?"""
+        return any(
+            unit.is_control_unit()
+            and self.movement_service._unit_can_reach_country(unit, hex_obj, target_hexes)
+            for unit in stack_units
+        )
 
     @staticmethod
     def _connected_support_hexes(border_hexes, all_stack_hexes) -> set[Hex]:
-        remaining = set(all_stack_hexes)
+        """Flood-fill from the border hexes through other friendly stack hexes.
+
+        Returns every stack hex connected to a border hex by a chain of adjacent
+        friendly stack hexes -- those units can march in behind the front line.
+        """
+        remaining = set(all_stack_hexes) - set(border_hexes)
         connected = set(border_hexes)
         frontier = list(border_hexes)
-        for hex_obj in border_hexes:
-            remaining.discard(hex_obj)
         while frontier:
             current = frontier.pop()
             for neighbor in current.neighbors():
@@ -185,16 +193,18 @@ class InvasionHandler:
                 frontier.append(neighbor)
         return connected
 
-    def _invasion_units_from_connected_hexes(self, connected_hexes, stacks_by_hex) -> list[Unit]:
-        eligible = []
-        for hex_obj in connected_hexes:
-            for unit in stacks_by_hex.get(hex_obj, []):
-                if unit.is_fleet():
-                    continue
-                eligible.append(unit)
-        return eligible
+    def _invasion_units_from_connected_hexes(self, connected_hexes, stacks_by_hex, target_hexes) -> list[Unit]:
+        """Control units on the connected hexes that can physically enter the country."""
+        return [
+            unit
+            for hex_obj in connected_hexes
+            for unit in stacks_by_hex.get(hex_obj, [])
+            if unit.is_control_unit()
+            and self.movement_service._unit_can_reach_country(unit, hex_obj, target_hexes, connected_hexes)
+        ]
 
     def evaluate_unboard_neutral_entry(self, selected_units) -> NeutralEntryDecision:
+        """Check whether unboarding the selected units would land in a neutral country."""
         landing = self._collect_unboard_landing_units(selected_units)
         if not landing:
             return NeutralEntryDecision(is_neutral_entry=False)
@@ -234,24 +244,28 @@ class InvasionHandler:
             invasion_units=invasion_units,
         )
 
-    def _merge_extra_invasion_units(self, base_units, extra_units, target_hexes):
-        merged = list(base_units or [])
-        seen = {id(u) for u in merged}
-        for unit in list(extra_units or []):
+    def _eligible_extra_units(self, extra_units, target_hexes):
+        """Caller-supplied units that may join the invasion force.
+
+        A unit is eligible when it is a control unit and can either reach a country
+        hex on its own or be landed there from its transport.
+        """
+        eligible = []
+        seen = set()
+        for unit in (extra_units or []):
             if unit is None or id(unit) in seen:
                 continue
-            if unit.allegiance != HL:
-                continue
-            if unit.is_fleet():
+            if not unit.is_control_unit():
                 continue
             if not self._can_extra_unit_invade_target(unit, target_hexes):
                 continue
-            merged.append(unit)
+            eligible.append(unit)
             seen.add(id(unit))
-        return merged
+        return eligible
 
     @staticmethod
     def _merge_distinct_units(base_units, extra_units):
+        """Concatenate two unit lists, dropping duplicates by object identity."""
         merged = list(base_units or [])
         seen = {id(u) for u in merged}
         for unit in list(extra_units or []):
@@ -262,8 +276,10 @@ class InvasionHandler:
         return merged
 
     def _can_extra_unit_invade_target(self, unit, target_hexes):
+        """Can a caller-supplied unit reach the country on its own or by landing?"""
         carrier = getattr(unit, "transport_host", None)
         if carrier is None:
+            # On foot: already inside the country, or able to walk into it.
             if not unit.position or None in unit.position:
                 return False
             pos = tuple(unit.position)
@@ -271,6 +287,7 @@ class InvasionHandler:
                 return True
             start_hex = Hex.offset_to_axial(pos[0], pos[1])
             return self.movement_service._unit_can_reach_country(unit, start_hex, target_hexes)
+        # Embarked: the transport must be in a country hex the unit can land on.
         if not carrier.position or None in carrier.position:
             return False
         landing_hex = Hex.offset_to_axial(*carrier.position)
@@ -281,20 +298,24 @@ class InvasionHandler:
         return self.game_state.map.can_stack_move_to([unit], landing_hex)
 
     def _collect_unboard_landing_units(self, selected_units):
+        """Map country_id -> units that would land there if the selection unboards."""
         landing = {}
         for unit in selected_units or []:
             carrier = unit.transport_host
             if carrier is None:
+                # A transport: its passengers would be unboarded.
                 passengers = list(getattr(unit, "passengers", []) or [])
                 if not passengers:
                     continue
                 for passenger in passengers:
                     self._append_landing_unit(landing, passenger, unit)
                 continue
+            # A passenger: it would be unboarded from its carrier.
             self._append_landing_unit(landing, unit, carrier)
         return landing
 
     def _append_landing_unit(self, landing, passenger, carrier):
+        """Register ``passenger`` as landing in the country under ``carrier``'s hex."""
         if not carrier or not carrier.position:
             return
         if passenger.allegiance != self.game_state.active_player:

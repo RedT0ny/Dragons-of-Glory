@@ -144,6 +144,7 @@ class DiplomacyService:
 
         invader_sp = invasion_data["strength"]
         defender_sp = country.strength
+        print(f"Strength: Invader: {invader_sp} SP Defender: {defender_sp} SP")
         modifier = self._invasion_modifier(invader_sp, defender_sp)
 
         base_ws = country.alignment[0] + 2
@@ -237,7 +238,15 @@ class ConquestService:
                     and (unit.is_army() or (unit.is_wing() and map_loc.loc_type != LocType.UNDERCITY.value))
                 ):
                     map_loc.occupier = unit.allegiance
+                    self._mark_tower_destroyed_if_captured(map_loc)
                     break
+
+    def _mark_tower_destroyed_if_captured(self, map_loc):
+        """Towers of E'li: a tower is permanently destroyed once an enemy holds its hex."""
+        svc = getattr(self.game_state, "towers_of_eli_service", None)
+        if not svc or not svc.is_tower(map_loc):
+            return
+        svc.mark_tower_destroyed_if_enemy(map_loc)
 
     def _is_country_fully_occupied_by_enemy(self, country) -> bool:
         """ Returns True if all locations in the country are occupied by enemy forces, False otherwise."""

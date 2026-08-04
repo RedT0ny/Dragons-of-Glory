@@ -22,6 +22,7 @@ class Location:
         # Dynamic State
         self.occupier = NEUTRAL  # 'highlord', 'whitestone', or 'Neutral'
         self.is_capital = spec.is_capital  # Can change (Silvanesti/Qualinesti)
+        self.defense_destroyed = False  # Towers of E'li: permanently disabled once captured
 
     @property
     def loc_type(self):

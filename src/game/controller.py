@@ -1407,6 +1407,10 @@ class GameController(QObject):
             unit_name = TextFormatter.format_unit_log_string(unit)
             print(f"movement unit={unit_name} from={prev} to={now}")
 
+        if move_result.messages:
+            from src.gui.message_dialog import show_info_dialog
+            show_info_dialog("Towers of E'li", "\n".join(move_result.messages), parent=self.view.window())
+
         # Clear selection/highlights
         self.view.highlight_movement_range([])
         # Defer redraw to avoid mutating the scene while click dispatch is active.
