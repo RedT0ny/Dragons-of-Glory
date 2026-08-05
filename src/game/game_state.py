@@ -1019,6 +1019,7 @@ class GameState:
         for unit in self.units:
             unit.movement_points = getattr(unit, "movement", 0)
             unit.moved_this_turn = False
+            unit.invaded_this_turn = False
             unit._healed_this_combat_turn = False
         self.process_maelstrom_start_turn()
 
@@ -1042,6 +1043,7 @@ class GameState:
             unit.movement_points = getattr(unit, "movement", 0)
             unit.attacked_this_turn = False
             unit.moved_this_turn = False
+            unit.invaded_this_turn = False
             unit._healed_this_combat_turn = False
 
         self.event_system.check_events()

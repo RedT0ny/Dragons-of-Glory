@@ -231,6 +231,42 @@ def test_ask_naval_withdraw_shows_dialog_only_for_human_side(monkeypatch):
     assert calls == [(HL, 2)]
 
 
+def test_defender_in_controlled_port_ignores_eliminated_first_defender():
+    from types import SimpleNamespace
+
+    from src.content.specs import LocType
+    from src.gui.combat_result_widget import _defender_in_controlled_port
+
+    class PortMap(FakeMap):
+        def get_location(self, hex_coord):
+            return SimpleNamespace(loc_type=LocType.PORT.value, occupier=HL)
+
+    gs = GameState()
+    gs.map = PortMap()
+
+    eliminated = _fleet("elim", HL, 49, 26)
+    eliminated.eliminate()
+    survivor = _fleet("surv", HL, 49, 26)
+
+    # Eliminated first defender (position cleared to (None, None)) must not
+    # disable the port-withdrawal restriction while a live defender remains.
+    assert _defender_in_controlled_port(gs, HL, [eliminated, survivor]) is True
+    assert _defender_in_controlled_port(gs, HL, [eliminated]) is False
+    assert _defender_in_controlled_port(gs, WS, [survivor]) is False
+
+
+def test_defender_in_controlled_port_false_outside_port():
+    from src.gui.combat_result_widget import _defender_in_controlled_port
+
+    gs = GameState()
+    gs.map = FakeMap()  # get_location returns None -> not a port
+    survivor = _fleet("surv", HL, 49, 26)
+
+    assert _defender_in_controlled_port(gs, HL, [survivor]) is False
+    assert _defender_in_controlled_port(gs, HL, []) is False
+
+
+
 def test_interception_naval_withdraw_uses_shared_helper(monkeypatch):
     gs = GameState()
     gs.map = FakeOddsMap()

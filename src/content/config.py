@@ -8,7 +8,7 @@ import sys
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "0.52.0-beta"
+APP_VERSION = "0.52.1-beta"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

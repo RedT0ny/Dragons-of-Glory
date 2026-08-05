@@ -1349,11 +1349,17 @@ class CombatService:
             leader_stack_has_army = {leader: True for leader in leader_origins.keys()}
             leader_escape_requests = self._resolve_leader_escapes(leader_origins, leader_stack_has_army)
             result = "-/-"
+            advance_available = self._can_advance_after_combat(
+                attackers=attackers,
+                target_hex=hex_position,
+                defender_allegiances=defender_allegiances,
+                attacker_had_to_retreat=False,
+            )
             print(TextFormatter.format_combat_log(attackers, defenders, result))
             return {
                 "result": result,
                 "leader_escape_requests": leader_escape_requests or [],
-                "advance_available": False,
+                "advance_available": advance_available,
                 "combat_type": self._resolve_combat_type(attackers, defenders),
             }
 

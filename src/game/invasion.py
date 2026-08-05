@@ -169,6 +169,7 @@ class InvasionHandler:
         """Does any control unit in this stack have the MP to enter the country?"""
         return any(
             unit.is_control_unit()
+            and not getattr(unit, "invaded_this_turn", False)
             and self.movement_service._unit_can_reach_country(unit, hex_obj, target_hexes)
             for unit in stack_units
         )
@@ -200,6 +201,7 @@ class InvasionHandler:
             for hex_obj in connected_hexes
             for unit in stacks_by_hex.get(hex_obj, [])
             if unit.is_control_unit()
+            and not getattr(unit, "invaded_this_turn", False)
             and self.movement_service._unit_can_reach_country(unit, hex_obj, target_hexes, connected_hexes)
         ]
 
@@ -254,6 +256,8 @@ class InvasionHandler:
         seen = set()
         for unit in (extra_units or []):
             if unit is None or id(unit) in seen:
+                continue
+            if getattr(unit, "invaded_this_turn", False):
                 continue
             if not unit.is_control_unit():
                 continue

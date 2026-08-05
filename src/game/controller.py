@@ -1376,6 +1376,9 @@ class GameController(QObject):
         from src.gui.message_dialog import show_info_dialog
 
         invasion_data = self.movement_service.get_invasion_force(country_id, extra_units=invasion_units)
+        # Units that took part in an invasion cannot take part in another one this turn.
+        for unit in invasion_data.get("units", []):
+            unit.invaded_this_turn = True
         outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
         show_info_dialog(outcome.title, outcome.message, parent=self.view.window())
         if outcome.success and outcome.winner:

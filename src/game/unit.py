@@ -47,6 +47,7 @@ class Unit:
         self.transport_host: Optional[Unit] = None
         self.attacked_this_turn = False
         self.moved_this_turn = False
+        self.invaded_this_turn = False
 
         # Temporary effects
         self._movement_override = None
@@ -325,7 +326,8 @@ class Unit:
             # Transport host serialized as tuple (id, ordinal) if present
             "transport_host": (self.transport_host.id, self.transport_host.ordinal) if getattr(self, 'transport_host', None) else None,
             "attacked_this_turn": self.attacked_this_turn,
-            "moved_this_turn": self.moved_this_turn
+            "moved_this_turn": self.moved_this_turn,
+            "invaded_this_turn": bool(getattr(self, "invaded_this_turn", False)),
         }
 
     def load_state(self, state_data: dict):
@@ -345,6 +347,7 @@ class Unit:
         self.transport_host = None
         self.attacked_this_turn = state_data.get("attacked_this_turn", False)
         self.moved_this_turn = state_data.get("moved_this_turn", False)
+        self.invaded_this_turn = state_data.get("invaded_this_turn", False)
 
     def eliminate_carrier(self):
         # Eliminate carrier and handle passengers (leaders escape, others eliminated).
