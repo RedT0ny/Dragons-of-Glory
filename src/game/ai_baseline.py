@@ -4763,7 +4763,10 @@ class TacticalPlanner:
             target_key = (target_hex.q, target_hex.r)
             failed_targets.add(target_key)
         if resolution and resolution.get("advance_available"):
-            ctx.game_state.combat_service.advance_after_combat(attackers, target_hex)
+            if (resolution or {}).get("combat_type") == "naval":
+                ctx.game_state.combat_service.advance_fleets_after_naval(attackers, target_hex)
+            else:
+                ctx.game_state.combat_service.advance_after_combat(attackers, target_hex)
         ctx.last_action_hex = target_hex.axial_to_offset()
         self._pending_leader_escapes = all_leader_escapes
         return True

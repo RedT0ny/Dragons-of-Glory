@@ -30,7 +30,6 @@ def _defender_in_controlled_port(game_state, side_allegiance, defenders) -> bool
     All defenders in a naval battle share the battle hex. Eliminated fleets
     have their position cleared to (None, None) and are skipped by the guard.
     """
-    from src.content.specs import LocType
     from src.game.map import Hex
 
     for fleet in defenders:

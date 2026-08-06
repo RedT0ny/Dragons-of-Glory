@@ -896,7 +896,7 @@ class Board:
 
         # Fortified cities have higher army stacking limit (3)
         loc = self.get_location(target_hex)
-        if loc and loc.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.FORTRESS.value]:
+        if loc and loc.loc_type in [LocType.CITY.value, LocType.PORT.value, LocType.TEMPLE.value]:
             army_limit = 3
 
         if army_count > army_limit:
