@@ -365,6 +365,13 @@ class AnsalonMapView(QGraphicsView):
                             p1 = self.get_vertex(center, idx)
                             p2 = self.get_vertex(center, (idx + 1) % 6)
                             self.scene.addItem(HexsideItem(p1, p2, side_type.value))
+                    else:
+                        if idx in [0, 1, 2] and side_type == HexsideType.DEEP_RIVER:
+                            # Calculate vertices for this edge
+                            # Edge i connects vertex i and (i+1)%6
+                            p1 = self.get_vertex(center, idx)
+                            p2 = self.get_vertex(center, (idx + 1) % 6)
+                            self.scene.addItem(HexsideItem(p1, p2, side_type.value))
 
                 # Draw Base Hex
                 hex_item = HexagonItem(center, HEX_RADIUS, QColor(0, 0, 0, 0),

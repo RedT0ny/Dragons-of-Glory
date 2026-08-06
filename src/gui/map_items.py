@@ -149,39 +149,6 @@ class HexagonItem(QGraphicsItem):
             painter.setPen(pen)
             painter.drawPath(line_path)
 
-    def draw_deep_rivers(self, painter):
-        """Draw triangular wedges for all sea hexsides."""
-        pass_color = HEXSIDE_COLORS["deep_river"]
-
-        for direction_idx in self.pass_directions:
-            # Get the two vertices of the hexside facing the sea
-            v1 = self.points[direction_idx]
-            v2 = self.points[(direction_idx + 1) % 6]
-
-            # Calculate the center of this hexside
-            hexside_center = QPointF((v1.x() + v2.x()) / 2, (v1.y() + v2.y()) / 2)
-
-            # Vector from current center to hexside center
-            vector = QPointF(hexside_center.x() - self.center.x(),
-                             hexside_center.y() - self.center.y())
-
-            # Extend the vector to get to adjacent hex center
-            # For regular hexagons, adjacent center is 2x the distance
-            adjacent_center = QPointF(self.center.x() + 2 * vector.x(),
-                                      self.center.y() + 2 * vector.y())
-
-            # Create the line path
-            line_path = QPainterPath()
-            line_path.moveTo(self.center)
-            line_path.lineTo(hexside_center)
-            line_path.lineTo(adjacent_center)
-
-            # Draw the line
-            pen = QPen(pass_color, 8)
-            pen.setStyle(Qt.PenStyle.DotLine)
-            painter.setPen(pen)
-            painter.drawPath(line_path)
-
 class HexsideItem(QGraphicsItem):
     def __init__(self, start_pt, end_pt, side_type):
         super().__init__()

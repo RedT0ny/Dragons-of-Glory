@@ -22,7 +22,7 @@ TERRAIN_VISUALS = {
 
 HEXSIDE_COLORS = {
     "river": QColor(100, 149, 237, 200),
-    "deep_river": QColor(0, 0, 139, 255),
+    "deep_river": QColor(0, 0, 139, 75),
     "mountain": QColor(139, 69, 19, 200),
     "pass": QColor(255, 215, 0, 255),
     "bridge": QColor(255, 69, 0, 255)
