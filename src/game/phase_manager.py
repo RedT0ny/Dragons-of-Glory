@@ -169,7 +169,8 @@ class TurnAction(Enum):
     REQUEST_HUMAN_DEPLOYMENT = "request_human_deployment"
     REQUEST_HUMAN_REPLACEMENTS = "request_human_replacements"
     REQUEST_HUMAN_EVENT_DIALOG = "request_human_event_dialog"
-    REQUEST_HUMAN_ACTIVATION = "request_human_activation"
+    REQUEST_ACTIVATION = "request_activation"
+    REQUEST_INITIATIVE_OVERRIDE = "request_initiative_override"
     REQUEST_LEADER_ESCAPE = "request_leader_escape"
 
 
@@ -212,6 +213,12 @@ class TurnEngine:
 
         if current_phase == GamePhase.DEPLOYMENT:
             self._log_phase_header_once(f"Step 0: Deployment Phase - {active_player.capitalize()}")
+            initiative_mode = str(getattr(self.game_state, "initiative_mode", "classic")).strip().lower()
+            if (
+                initiative_mode == "advanced"
+                and self.game_state.get_initiative_chit_holder() is None
+            ):
+                self.game_state.set_initiative_chit(active_player)
             if is_ai:
                 deployed = self.ai_baseline.deploy_all_ready_units(active_player)
                 print(f"AI deployment complete. Deployed: {deployed}")
@@ -269,20 +276,34 @@ class TurnEngine:
                 return TurnOutcome(advanced=True)
 
             return TurnOutcome(
-                action=TurnAction.REQUEST_HUMAN_ACTIVATION,
+                action=TurnAction.REQUEST_ACTIVATION,
                 payload={"active_player": active_player},
             )
 
         if current_phase == GamePhase.INITIATIVE:
-            hl_roll = random.randint(1, 4)
-            ws_roll = random.randint(1, 4)
-            if hl_roll == ws_roll:
+            initiative_mode = str(getattr(self.game_state, "initiative_mode", "classic")).strip().lower()
+            if initiative_mode == "disabled":
                 winner = self.game_state.initiative_winner
-            elif hl_roll > ws_roll:
-                winner = HL
+                self._log_phase_header_once(f"Step 4: Initiative disabled - {winner.capitalize()} keeps it")
             else:
-                winner = WS
-            self._log_phase_header_once(f"Step 4: Initiative. Winner: {winner.capitalize()}")
+                hl_roll = random.randint(1, 4)
+                ws_roll = random.randint(1, 4)
+                if hl_roll == ws_roll:
+                    winner = self.game_state.initiative_winner
+                elif hl_roll > ws_roll:
+                    winner = HL
+                else:
+                    winner = WS
+                self._log_phase_header_once(f"Step 4: Initiative. Winner: {winner.capitalize()}")
+                if initiative_mode == "advanced":
+                    chit_holder = self.game_state.get_initiative_chit_holder()
+                    if winner != chit_holder:
+                        chit_player = self.game_state.players.get(chit_holder)
+                        if chit_player and not chit_player.is_ai:
+                            return TurnOutcome(
+                                action=TurnAction.REQUEST_INITIATIVE_OVERRIDE,
+                                payload={"winner": winner, "chit_holder": chit_holder},
+                            )
             self.game_state.set_initiative(winner)
             self.game_state.advance_phase()
             return TurnOutcome(advanced=True)

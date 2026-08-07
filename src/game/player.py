@@ -12,6 +12,7 @@ class Player:
         self.allegiance = spec.allegiance
         self.controlled_countries: Dict[str, Country] = {}
         self.is_ai = spec.is_ai
+        self.has_initiative_chit = False
 
         # Runtime Sets
         self.assets: Dict[str, Any] = {} # ID -> Asset Instance

@@ -308,6 +308,7 @@ class ConfigDialog(QDialog):
         deployment = str(config.get("deployment", "canonical")).strip().lower()
         interception = str(config.get("interception", "disabled")).strip().lower()
         naval_combat = str(config.get("naval_combat", "classic")).strip().lower()
+        initiative = str(config.get("initiative", "classic")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
@@ -328,6 +329,9 @@ class ConfigDialog(QDialog):
         nav_idx = self.ui.navComboBox.findData(naval_combat if naval_combat in {"classic", "advanced"} else "classic")
         if nav_idx >= 0:
             self.ui.navComboBox.setCurrentIndex(nav_idx)
+        init_idx = self.ui.initComboBox.findData(initiative if initiative in {"classic", "advanced", "disabled"} else "classic")
+        if init_idx >= 0:
+            self.ui.initComboBox.setCurrentIndex(init_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
         if hl_idx >= 0:
             self.ui.hlComboBox.setCurrentIndex(hl_idx)
@@ -366,6 +370,7 @@ class ConfigDialog(QDialog):
         deployment = str(self.ui.depComboBox.currentData() or "canonical")
         interception = str(self.ui.intComboBox.currentData() or "disabled")
         naval_combat = str(self.ui.navComboBox.currentData() or "classic")
+        initiative = str(self.ui.initComboBox.currentData() or "classic")
 
         return {
             "difficulty": difficulty,
@@ -374,4 +379,5 @@ class ConfigDialog(QDialog):
             "deployment": deployment,
             "interception": interception,
             "naval_combat": naval_combat,
+            "initiative": initiative,
         }

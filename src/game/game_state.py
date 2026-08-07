@@ -94,6 +94,7 @@ class GameState:
         self.deployment_mode = "canonical"
         self.interception_mode = "disabled"
         self.naval_combat = "classic"
+        self.initiative_mode = "classic"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = "knight_countries"
@@ -257,6 +258,7 @@ class GameState:
                     "deployment": self.deployment_mode,
                     "interception": self.interception_mode,
                     "naval_combat": self.naval_combat,
+                    "initiative": self.initiative_mode,
                 },
             },
             "world_state": {
@@ -288,6 +290,7 @@ class GameState:
                 "players": {
                     allegiance: {
                         "is_ai": bool(player.is_ai),
+                        "has_initiative_chit": bool(player.has_initiative_chit),
                         "assets": [
                             {
                                 "id": asset_id,
@@ -363,6 +366,7 @@ class GameState:
         self.deployment_mode = str(config.get("deployment", self.deployment_mode)).strip().lower()
         self.interception_mode = str(config.get("interception", self.interception_mode)).strip().lower()
         self.naval_combat = str(config.get("naval_combat", self.naval_combat)).strip().lower()
+        self.initiative_mode = str(config.get("initiative", self.initiative_mode)).strip().lower()
 
         self._restore_countries_from_save(world_state.get("countries", {}))
         self._restore_units_from_save(
@@ -598,6 +602,7 @@ class GameState:
             if not player or not isinstance(p_state, dict):
                 continue
             player.set_ai(bool(p_state.get("is_ai", player.is_ai)))
+            player.has_initiative_chit = bool(p_state.get("has_initiative_chit", player.has_initiative_chit))
             player.assets = {}
             for asset_data in p_state.get("assets", []) or []:
                 if not isinstance(asset_data, dict):
@@ -848,6 +853,21 @@ class GameState:
         """Called by Controller after Step 4 dice roll."""
         self.initiative_winner = winner
         self.active_player = winner # Winner goes first
+
+    def get_initiative_chit_holder(self):
+        """Returns the allegiance holding the initiative chit, or None if not assigned."""
+        for allegiance, player in self.players.items():
+            if getattr(player, "has_initiative_chit", False):
+                return allegiance
+        return None
+
+    def set_initiative_chit(self, allegiance):
+        """Moves the initiative chit to the given allegiance (clearing all others)."""
+        for player in self.players.values():
+            player.has_initiative_chit = False
+        player = self.players.get(allegiance)
+        if player:
+            player.has_initiative_chit = True
 
     def _apply_draconian_setup(self):
         """Reads dtemple config from scenario YAML and applies READY / production flags."""

@@ -103,6 +103,7 @@ class GameApp:
             deployment=player_config.get("deployment", "canonical"),
             interception=player_config.get("interception", "disabled"),
             naval_combat=player_config.get("naval_combat", "classic"),
+            initiative=player_config.get("initiative", "classic"),
         )
 
         if loading:

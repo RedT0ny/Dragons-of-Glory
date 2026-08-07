@@ -29,6 +29,7 @@ class GameController(QObject):
         deployment="canonical",
         interception="disabled",
         naval_combat="classic",
+        initiative="classic",
     ):
         """Initialize the game controller with state, view, and configuration.
         
@@ -42,6 +43,7 @@ class GameController(QObject):
             supply: Supply ruleset variant (default "standard").
             interception: Interception mode - "enabled", "disabled", or "naval" (default "disabled").
             naval_combat: Naval combat variant - "classic" or "advanced" (default "classic").
+            initiative: Initiative variant - "classic", "advanced", or "disabled" (default "classic").
         """
         super().__init__()
         self.game_state = game_state
@@ -54,12 +56,14 @@ class GameController(QObject):
         self.deployment = str(deployment).strip().lower()
         self.interception = str(interception).strip().lower()
         self.naval_combat = str(naval_combat).strip().lower()
+        self.initiative = str(initiative).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
         self.game_state.deployment_mode = self.deployment
         self.game_state.interception_mode = self.interception
         self.game_state.naval_combat = self.naval_combat
+        self.game_state.initiative_mode = self.initiative
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -119,6 +123,7 @@ class GameController(QObject):
             "deployment": self.deployment,
             "interception": self.interception,
             "naval_combat": self.naval_combat,
+            "initiative": self.initiative,
         }
 
     @staticmethod
@@ -145,12 +150,14 @@ class GameController(QObject):
         self.deployment = str(config.get("deployment", self.deployment)).strip().lower()
         self.interception = str(config.get("interception", self.interception)).strip().lower()
         self.naval_combat = str(config.get("naval_combat", self.naval_combat)).strip().lower()
+        self.initiative = str(config.get("initiative", self.initiative)).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
         self.game_state.deployment_mode = self.deployment
         self.game_state.interception_mode = self.interception
         self.game_state.naval_combat = self.naval_combat
+        self.game_state.initiative_mode = self.initiative
 
         if HL in self.game_state.players:
             self.game_state.players[HL].set_ai(hl_ai)
@@ -393,6 +400,7 @@ class GameController(QObject):
         self.deployment = str(getattr(self.game_state, "deployment_mode", "canonical"))
         self.interception = str(getattr(self.game_state, "interception_mode", "disabled"))
         self.naval_combat = str(getattr(self.game_state, "naval_combat", "classic"))
+        self.initiative = str(getattr(self.game_state, "initiative_mode", "classic"))
         self.combat_details = str(getattr(self.game_state, "combat_details", "brief"))
         self._victory_announced = False
         self.view.reset_view_for_new_map()
@@ -577,7 +585,7 @@ class GameController(QObject):
             self.game_state.advance_phase()
             return False
 
-        if action == TurnAction.REQUEST_HUMAN_ACTIVATION:
+        if action == TurnAction.REQUEST_ACTIVATION:
             from src.gui.diplomacy_dialog import DiplomacyDialog
             from PySide6.QtWidgets import QDialog
 
@@ -602,6 +610,29 @@ class GameController(QObject):
                 print("Activation attempt finished or skipped.")
             self.game_state.advance_phase()
             return False
+
+        if action == TurnAction.REQUEST_INITIATIVE_OVERRIDE:
+            self.ai_timer.stop()
+            winner = payload.get("winner")
+            chit_holder = payload.get("chit_holder", self.game_state.get_initiative_chit_holder())
+            from src.gui.message_dialog import show_question_dialog
+            take_over = show_question_dialog(
+                "Initiative Override",
+                f"{chit_holder.capitalize()} holds the initiative chit. "
+                f"Take initiative for this turn?",
+                parent=self.view.window(),
+            )
+            if take_over:
+                print(
+                    f"Initiative override: {chit_holder.capitalize()} takes initiative "
+                    f"for turn {self.game_state.turn}; chit passes to {winner.capitalize()}."
+                )
+                self.game_state.set_initiative(chit_holder)
+                self.game_state.set_initiative_chit(winner)
+            else:
+                self.game_state.set_initiative(winner)
+            self.game_state.advance_phase()
+            return True
 
         if action == TurnAction.REQUEST_LEADER_ESCAPE:
             requests = payload.get("leader_escape_requests", []) if payload else []
