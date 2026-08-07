@@ -284,7 +284,7 @@ class TurnEngine:
             initiative_mode = str(getattr(self.game_state, "initiative_mode", "classic")).strip().lower()
             if initiative_mode == "disabled":
                 winner = self.game_state.initiative_winner
-                self._log_phase_header_once(f"Step 4: Initiative disabled - {winner.capitalize()} keeps it")
+                self._log_phase_header_once(f"Step 4: Initiative disabled - {winner.capitalize()} playing first")
             else:
                 hl_roll = random.randint(1, 4)
                 ws_roll = random.randint(1, 4)

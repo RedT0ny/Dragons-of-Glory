@@ -67,6 +67,7 @@ LOG_FILE = os.path.join(LOGS_DIR, "dog.log")
 MANUAL = os.path.join(DOC_DIR, "manual.pdf")
 ADVANCED_RULES = os.path.join(DOC_DIR, "advanced_rules.pdf")
 HOUSE_RULES = os.path.join(DOC_DIR, "house_rules.pdf")
+ICON_INITIATIVE = os.path.join(ICONS_DIR, "initiative_chit.svg")
 
 # --- GUI SETTINGS ---
 HEX_RADIUS = 61.77

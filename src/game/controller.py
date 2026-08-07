@@ -3,6 +3,7 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from time import monotonic
 import shiboken6
 
+from src.content.config import ICON_INITIATIVE
 from src.gui.message_dialog import show_info_dialog
 from src.content.tools import TextFormatter
 from src.content.translator import Translator
@@ -620,6 +621,7 @@ class GameController(QObject):
                 "Initiative Override",
                 f"{chit_holder.capitalize()} holds the initiative chit. "
                 f"Take initiative for this turn?",
+                icon_path=ICON_INITIATIVE,
                 parent=self.view.window(),
             )
             if take_over:
