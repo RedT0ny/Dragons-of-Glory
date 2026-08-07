@@ -159,6 +159,20 @@ class Ui_configDialog(object):
 
         self.gridLayout_4.addWidget(self.navComboBox, 3, 1, 1, 1)
 
+        self.initLabel = QLabel(self.rulesConfig)
+        self.initLabel.setObjectName(u"initLabel")
+        self.initLabel.setFont(font)
+
+        self.gridLayout_4.addWidget(self.initLabel, 4, 0, 1, 1)
+
+        self.initComboBox = QComboBox(self.rulesConfig)
+        self.initComboBox.addItem("")
+        self.initComboBox.addItem("")
+        self.initComboBox.addItem("")
+        self.initComboBox.setObjectName(u"initComboBox")
+
+        self.gridLayout_4.addWidget(self.initComboBox, 4, 1, 1, 1)
+
         self.gridLayout.addWidget(self.rulesConfig, 1, 0, 1, 1)
 
 
@@ -207,6 +221,11 @@ class Ui_configDialog(object):
         self.navLabel.setText(QCoreApplication.translate("configDialog", u"Naval Combat", None))
         self.navComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Classic", None))
         self.navComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Advanced", None))
+
+        self.initLabel.setText(QCoreApplication.translate("configDialog", u"Initiative", None))
+        self.initComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Classic", None))
+        self.initComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Advanced", None))
+        self.initComboBox.setItemText(2, QCoreApplication.translate("configDialog", u"Disabled", None))
 
     # retranslateUi
 
@@ -259,6 +278,13 @@ class ConfigDialog(QDialog):
         self.ui.navComboBox.clear()
         self.ui.navComboBox.addItem(tr("dialogs.config.naval_classic", "Classic"), "classic")
         self.ui.navComboBox.addItem(tr("dialogs.config.naval_advanced", "Advanced"), "advanced")
+
+        self.ui.initLabel.setText(tr("dialogs.config.initiative", "Initiative"))
+
+        self.ui.initComboBox.clear()
+        self.ui.initComboBox.addItem(tr("dialogs.config.initiative_classic", "Classic"), "classic")
+        self.ui.initComboBox.addItem(tr("dialogs.config.initiative_advanced", "Advanced"), "advanced")
+        self.ui.initComboBox.addItem(tr("dialogs.config.initiative_disabled", "Disabled"), "disabled")
 
         self.ui.hlComboBox.clear()
         self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
