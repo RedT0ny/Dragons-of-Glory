@@ -9,6 +9,7 @@ from src.gui.unit_panel import AllegiancePanel
 from src.content.specs import UnitColumn
 
 class StatusTab(QWidget):
+    unit_selected = Signal(object)
     unit_double_clicked = Signal(object)
 
     def __init__(self, game_state):
@@ -33,6 +34,7 @@ class StatusTab(QWidget):
             NEUTRAL: AllegiancePanel(self.game_state, NEUTRAL, self.columns, title=NEUTRAL),
         }
         for panel in self.panels.values():
+            panel.unit_selected.connect(self.unit_selected.emit)
             panel.unit_double_clicked.connect(self.unit_double_clicked.emit)
         self.main_layout.addWidget(self.panels[WS])
         self.main_layout.addWidget(self.panels[HL])

@@ -3,7 +3,8 @@ from types import SimpleNamespace
 from time import perf_counter
 from typing import Optional, Dict, Any, Callable
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QScrollArea, QTableWidget,
-                               QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle, QGraphicsScene)
+                               QHeaderView, QTableWidgetItem, QFrame, QStyleOptionButton, QStyle,
+                               QGraphicsScene, QAbstractItemView)
 from PySide6.QtCore import Qt, Signal, QSize, QRect, QRectF
 from PySide6.QtGui import QColor, QFontDatabase, QFont, QIcon, QPainter, QPixmap
 
@@ -115,6 +116,10 @@ class UnitTable(QTableWidget):
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setSelectionMode(QTableWidget.SingleSelection)
 
+        # Scroll one row at a time
+        self.setVerticalScrollMode(QAbstractItemView.ScrollPerItem)
+        self.verticalScrollBar().setSingleStep(1)
+
         # Checkbox special handling
         if UnitColumn.CHECKBOX in self.columns_config:
             self.header_checkbox = CheckBoxHeader(Qt.Horizontal, self)
@@ -129,6 +134,16 @@ class UnitTable(QTableWidget):
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.Stretch)
             elif col != UnitColumn.CHECKBOX:
                 self.horizontalHeader().setSectionResizeMode(i, QHeaderView.ResizeToContents)
+
+    def wheelEvent(self, event):
+        """Scroll exactly one row per wheel step."""
+        bar = self.verticalScrollBar()
+        delta = event.angleDelta().y()
+        if bar.isVisible() and delta != 0 and event.pixelDelta().isNull():
+            bar.setValue(bar.value() - 1 if delta > 0 else bar.value() + 1)
+            event.accept()
+        else:
+            super().wheelEvent(event)
 
     def _get_checkbox_item(self, row):
         """Retrieve the checkbox item for the given row, if applicable.

@@ -189,6 +189,9 @@ class MainWindow(QMainWindow):
         # Connect Map Selection to Info Panel
         self.map_view.units_clicked.connect(self.info_panel.update_unit_table)
 
+        # Show selected unit details from Status tab in the Info Panel unit box
+        self.status_tab.unit_selected.connect(lambda unit: self.info_panel.update_unit_box([unit]))
+
         # Connect Hex Hover to Info Panel
         self.map_view.hex_hovered.connect(self.info_panel.update_hex_info)
 
