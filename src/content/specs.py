@@ -224,6 +224,7 @@ class HexsideType(Enum):
     DEEP_RIVER = "deep_river"
     MOUNTAIN = "mountain"
     PASS = "pass"
+    TUNNEL = "tunnel"
     BRIDGE = "bridge"
     FORD = "ford"
 

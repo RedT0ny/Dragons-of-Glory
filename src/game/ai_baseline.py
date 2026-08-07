@@ -5055,7 +5055,7 @@ class TacticalPlanner:
                 penalty += 1.0
             elif edge == HexsideType.FORD:
                 penalty += 0.7
-            elif edge == HexsideType.PASS:
+            elif edge in (HexsideType.PASS, HexsideType.TUNNEL):
                 penalty += 0.5
         return penalty
 

@@ -27,17 +27,9 @@ master_map:
       - [39, 41, NE]
       - [43, 41, E]
     pass:
-      - [4, 25, E]
-      - [5, 25, NE]
-      - [6, 24, NW]
-      - [5, 23, NE]
       - [23, 16, NW]
       - [23, 16, SE]
       - [37, 22, E]
-      - [25, 24, SW]
-      - [24, 26, NE]
-      - [24, 26, SE]
-      - [24, 26, W]
       - [35, 25, E]
       - [38, 23, SW]
       - [38, 25, NW]
@@ -46,22 +38,31 @@ master_map:
       - [37, 26, NW]
       - [37, 26, E]
       - [37, 26, W]
-      - [38, 28, NE]
-      - [38, 28, SW]
-      - [38, 28, W]
-      - [39, 26, SW]
-      - [37, 30, NE]
-      - [36, 29, NE]
-      - [36, 29, W]
-      - [35, 30, NE]
       - [38, 32, SE]
       - [20, 37, W]
       - [20, 37, E]
       - [22, 37, SW]
-      - [20, 41, E]
-      - [22, 41, SE]
-      - [22, 41, W]
-      - [22, 41, NW]
+    tunnel:
+      - [4, 25, E]    # Mount Nevermind
+      - [5, 25, NE]   # Mount Nevermind
+      - [6, 24, NW]   # Mount Nevermind
+      - [5, 23, NE]   # Mount Nevermind
+      - [25, 24, SW]  # Kaolyn
+      - [24, 26, NE]  # Kaolyn
+      - [24, 26, SE]  # Kaolyn
+      - [24, 26, W]   # Kaolyn
+      - [38, 28, NE]  # Zhakar
+      - [38, 28, SW]  # Zhakar
+      - [38, 28, W]   # Zhakar
+      - [39, 26, SW]  # Zhakar
+      - [37, 30, NE]  # Zhakar
+      - [36, 29, NE]  # Zhakar
+      - [36, 29, W]   # Zhakar
+      - [35, 30, NE]  # Zhakar
+      - [20, 41, E]   # Thorbardin
+      - [22, 41, SE]  # Thorbardin
+      - [22, 41, W]   # Thorbardin
+      - [22, 41, NW]  # Thorbardin
     deep_river:
       - [2, 25, E]
       - [2, 25, SE]

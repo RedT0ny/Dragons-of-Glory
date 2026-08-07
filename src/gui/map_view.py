@@ -353,7 +353,7 @@ class AnsalonMapView(QGraphicsView):
 
                     if side_type == HexsideType.SEA:
                         coastal_dirs.append(idx)
-                    elif side_type == HexsideType.PASS:
+                    elif side_type in(HexsideType.PASS, HexsideType.TUNNEL):
                         pass_directions.append(idx)
 
                     # 4. Draw Hexside Items (Rivers, etc)

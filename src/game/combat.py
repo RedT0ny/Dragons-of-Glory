@@ -642,6 +642,8 @@ class CombatResolver:
                 candidates.append(("crossing_ford", -3))
             elif hexside == HexsideType.PASS:
                 candidates.append(("crossing_pass", -2))
+            elif hexside == HexsideType.TUNNEL:
+                candidates.append(("crossing_tunnel", -2))
         return candidates
 
     def _resolve_worst_attacker_crossing(self, defender_hex):
@@ -651,9 +653,10 @@ class CombatResolver:
         # Apply only one crossing DRM: the harshest applicable among attackers.
         # Tie-break keeps deterministic behavior when penalties are equal.
         tie_priority = {
-            "crossing_river": 4,
-            "crossing_bridge": 3,
-            "crossing_ford": 2,
+            "crossing_river": 5,
+            "crossing_bridge": 4,
+            "crossing_ford": 3,
+            "crossing_tunnel": 2,
             "crossing_pass": 1,
         }
         return min(candidates, key=lambda item: (item[1], -tie_priority.get(item[0], 0)))

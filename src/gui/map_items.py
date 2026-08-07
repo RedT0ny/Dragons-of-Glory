@@ -117,7 +117,7 @@ class HexagonItem(QGraphicsItem):
             painter.drawPath(wedge_path)
 
     def draw_mountain_passes(self, painter):
-        """Draw triangular wedges for all sea hexsides."""
+        """Draw discontinued linear vectors for mountain passes."""
         pass_color = HEXSIDE_COLORS["pass"]
 
         for direction_idx in self.pass_directions:

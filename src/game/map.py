@@ -377,7 +377,7 @@ class Board:
         """
         raw_side = self.get_hexside(from_hex, to_hex)
         raw = raw_side.type if raw_side else None
-        if raw == HexsideType.PASS:
+        if raw in (HexsideType.PASS, HexsideType.TUNNEL):
             return raw
 
         if (
@@ -1145,7 +1145,7 @@ class Board:
         cost = 1
 
         # Mountains are impassable, unless there is a pass
-        if terrain == TerrainType.MOUNTAIN and hexside_type != HexsideType.PASS:
+        if terrain == TerrainType.MOUNTAIN and hexside_type not in (HexsideType.PASS, HexsideType.TUNNEL):
                 return float('inf')
 
         # Jungle, Glacier & Forest cost 2, unless unit has affinity (e.g. Elves/Kender and Forests, Thanoi and glaciers)
