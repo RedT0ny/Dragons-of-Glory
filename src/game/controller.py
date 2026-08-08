@@ -1267,7 +1267,7 @@ class GameController(QObject):
         if hasattr(asset, "get_equip_failure_reason"):
             reason = asset.get_equip_failure_reason(unit)
         elif hasattr(asset, "can_equip") and not asset.can_equip(unit):
-            reason = "The unit does not meet the asset requirements."
+            reason = "The unit does not meet the requirements to equip this asset."
 
         if reason:
             show_warning_dialog(
@@ -1409,8 +1409,10 @@ class GameController(QObject):
         from src.gui.message_dialog import show_info_dialog
 
         invasion_data = self.movement_service.get_invasion_force(country_id, extra_units=invasion_units)
+        units = invasion_data.get("units", [])
+        print(f"Invasion force: {TextFormatter.format_units(units)}")
         # Units that took part in an invasion cannot take part in another one this turn.
-        for unit in invasion_data.get("units", []):
+        for unit in units:
             unit.invaded_this_turn = True
         outcome = self.diplomacy_service.resolve_invasion(country_id, invasion_data)
         show_info_dialog(outcome.title, outcome.message, parent=self.view.window())

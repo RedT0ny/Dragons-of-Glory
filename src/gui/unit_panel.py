@@ -283,7 +283,7 @@ class UnitTable(QTableWidget):
         elif col_type == UnitColumn.EQUIPMENT:
             equip_str = "-"
             if hasattr(unit, 'equipment') and unit.equipment:
-                equip_str = ", ".join([a.spec.id for a in unit.equipment])
+                equip_str = ", ".join([a.display_name for a in unit.equipment])
             item.setText(equip_str)
 
         return item

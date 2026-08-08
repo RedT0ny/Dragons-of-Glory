@@ -140,7 +140,6 @@ class InvasionHandler:
     @staticmethod
     def _invasion_strength(units):
         """Total invasion strength = sum of positive combat ratings."""
-        print(f"Invasion force: {TextFormatter.format_units(units)}")
         return sum(
             int(unit.combat_rating)
             for unit in (units or [])

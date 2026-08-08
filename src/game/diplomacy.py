@@ -11,6 +11,19 @@ translator = Translator()
 
 @dataclass(frozen=True)
 class ActivationAttempt:
+    """Captures everything needed to roll a country-activation check for the active side.
+
+    Attributes:
+        country_id: The country being activated.
+        active_side: The side attempting the activation (WS or HL).
+        ws_rating: The country's Whitestone activation rate.
+        hl_rating: The country's Highlord activation rate.
+        solamnic_bonus: Extra WS activation granted by the Solamnic tower rule.
+        country_activation_bonus: Per-country modifier applied to the target rating.
+        event_activation_bonus: Event-driven modifier applied to the roll.
+        target_rating: Final effective activation rate the roll must beat.
+    """
+
     country_id: str
     active_side: str
     ws_rating: int
@@ -23,6 +36,8 @@ class ActivationAttempt:
 
 @dataclass(frozen=True)
 class ActivationRollResult:
+    """Result of a single d10 country-activation roll."""
+
     roll: int
     effective_roll: int
     bonus_applied: int
@@ -31,6 +46,8 @@ class ActivationRollResult:
 
 @dataclass(frozen=True)
 class DeploymentPlan:
+    """Instructions for the UI when new units arrive: which territory to deploy into and what message to show."""
+
     country_filter: Optional[str]
     message_title: str
     message_text: str
@@ -38,6 +55,8 @@ class DeploymentPlan:
 
 @dataclass(frozen=True)
 class InvasionOutcome:
+    """Result of a country-invasion attempt, including the winner if it succeeded."""
+
     success: bool
     title: str
     message: str
@@ -51,10 +70,16 @@ class DiplomacyService:
         self.game_state = game_state
 
     def is_country_neutral(self, country_id: str) -> bool:
+        """Returns True if the country exists and currently has neutral allegiance."""
         country = self.game_state.countries.get(country_id)
         return bool(country and country.allegiance == "neutral")
 
     def build_activation_attempt(self, country_id: str) -> ActivationAttempt | None:
+        """Gathers the activation ratings and bonuses for a country on the active side.
+
+        Returns None if the country does not exist. The WS target rating includes the
+        Solamnic bonus; the HL target does not. Country and event bonuses apply to both.
+        """
         country = self.game_state.countries.get(country_id)
         if not country:
             return None
@@ -86,6 +111,15 @@ class DiplomacyService:
         )
 
     def roll_activation(self, target_rating: int, roll_bonus: int = 0) -> ActivationRollResult:
+        """
+        Rolls a d10 for country activation and applies diplomacy bonuses.
+
+        Returns:
+        - roll: The raw d10 roll (1-10).
+        - effective_roll: The roll after applying the diplomacy bonuses, with a minimum of 1.
+        - bonus_applied: The total bonus applied to the roll.
+        - success: True if the effective_roll is below the country activation rate, otherwise False.
+        """
         roll = random.randint(1, 10)
         effective_roll = max(1, roll - int(roll_bonus or 0))
         return ActivationRollResult(
@@ -96,6 +130,7 @@ class DiplomacyService:
         )
 
     def activate_country(self, country_id: str, allegiance: str) -> bool:
+        """Sets the country's allegiance to the given side. Returns False if the country does not exist."""
         country = self.game_state.countries.get(country_id)
         if not country:
             return False
@@ -103,6 +138,12 @@ class DiplomacyService:
         return True
 
     def build_deployment_plan(self, effects: dict, active_player: str) -> DeploymentPlan:
+        """Builds deployment UI instructions from a diplomacy event's effects.
+
+        If the event declares a new alliance that has not already been activated, the country
+        is activated for the active player. When the event adds units instead, deployment is
+        unrestricted (no country filter).
+        """
         country_filter = effects.get("alliance")
         alliance_already_activated = bool(effects.get("alliance_already_activated"))
         if "alliance" in effects and not alliance_already_activated:
@@ -126,6 +167,13 @@ class DiplomacyService:
         )
 
     def resolve_invasion(self, country_id: str, invasion_data: dict) -> InvasionOutcome:
+        """Resolves a military invasion of a neutral country.
+
+        Rolls alternating WS/HL activation checks for up to 20 rounds; each round without a
+        winner raises both sides' targets by one. The invader wins on its roll, and a country
+        that holds out successfully joins no one and is left neutral. On success the country
+        is activated for the winning side and a full roll log is returned.
+        """
         country = self.game_state.countries.get(country_id)
         if not country:
             return InvasionOutcome(
@@ -198,6 +246,11 @@ class DiplomacyService:
         )
 
     def _invasion_modifier(self, invader_sp: int, defender_sp: int) -> int:
+        """Converts the invader/defender strength ratio into a check modifier for the defender side.
+
+        Higher invader SP lowers the defender's odds (more negative modifier); an outnumbered
+        invader raises them. Ratios are bucketed from -6 (crushing invader) to +6 (overwhelming
+        defender)."""
         if defender_sp <= 0: return 6
         ratio: float = invader_sp / defender_sp
         if ratio < 0.2: return -6
