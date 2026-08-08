@@ -735,7 +735,8 @@ class AllegiancePanel(QWidget):
         h = table.horizontalHeader().height()
         for r in range(table.rowCount()):
             h += table.rowHeight(r)
-        table.setFixedHeight(h + 2)
+        table.setFixedHeight(h + 2 * table.frameWidth())
+        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
     def on_table_selection(self, sender_table):
         """Handle table selection changes, enforcing exclusive selection across tables.

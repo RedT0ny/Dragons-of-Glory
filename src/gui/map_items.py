@@ -299,8 +299,11 @@ class UnitCounter(QGraphicsItem):
 
         if utype in [UnitType.WIZARD, UnitType.HIGHLORD,
                      UnitType.EMPEROR, UnitType.CITADEL,
-                     UnitType.FLEET, UnitType.CAVALRY]:
+                     UnitType.FLEET]:
             return self.unit.unit_type.value
+        if utype == UnitType.CAVALRY:
+            if urace == UnitRace.UNDEAD: return "undead"
+            else: return "cav"
         if utype in [UnitType.ADMIRAL, UnitType.GENERAL, UnitType.HERO]:
             if urace == UnitRace.SOLAMNIC:
                 return "knight"
