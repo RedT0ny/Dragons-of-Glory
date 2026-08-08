@@ -1,17 +1,18 @@
 import math
 
-from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
-from PySide6.QtGui import QPainter, QColor, QPixmap, QBrush, QMouseEvent
-from PySide6.QtCore import Qt, QPointF, QTimer, Signal
 import shiboken6
+from PySide6.QtCore import Qt, QPointF, QTimer, Signal
+from PySide6.QtGui import QPainter, QColor, QPixmap, QMouseEvent
+from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 
+from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
+                                X_OFFSET, Y_OFFSET)
 from src.content.constants import WS, HL, UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import GamePhase, HexsideType
-from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
-                                MAP_WIDTH, MAP_HEIGHT, X_OFFSET, Y_OFFSET, OVERLAY_ALPHA)
 from src.game.map import Hex
 from src.gui.map_items import HexagonItem, HexsideItem, LocationItem, UnitCounter, HexOverlayItem
+
 
 class AnsalonMapView(QGraphicsView):
     # Added Signals to notify main window

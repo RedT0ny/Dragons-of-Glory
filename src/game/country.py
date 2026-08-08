@@ -1,5 +1,5 @@
-from src.content.constants import HL, WS, NEUTRAL
-from src.content.specs import CountrySpec, LocationSpec, UnitType, LocType
+from src.content.constants import NEUTRAL, TAG_KNIGHT_COUNTRIES
+from src.content.specs import CountrySpec, LocationSpec, LocType
 
 
 class Location:
@@ -134,6 +134,10 @@ class Country:
 
     def has_tag(self, tag: str) -> bool:
         return tag in self.tags
+
+    def is_knight(self) -> bool:
+        """Alias for has_tag(TAG_KNIGHT_COUNTRIES): True for the Solamnic Knight countries."""
+        return self.has_tag(TAG_KNIGHT_COUNTRIES)
 
     @property
     def total_military_strength(self):

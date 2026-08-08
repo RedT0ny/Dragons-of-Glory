@@ -45,6 +45,9 @@ WS = "whitestone"
 HL = "highlord"
 NEUTRAL = "neutral"
 
+# --- COUNTRY TAGS (data/countries.yaml) ---
+TAG_KNIGHT_COUNTRIES = "knight_countries"
+
 # --- DRAGONFLIGHTS ---
 EVIL_DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}
 GOOD_DRAGONFLIGHTS = {"gold", "silver", "bronze", "copper", "brass"}

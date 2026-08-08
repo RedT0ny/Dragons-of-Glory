@@ -9,15 +9,14 @@ immediate effect.
 
 from typing import Any, Callable, Optional
 
-from src.content.tools import TextFormatter
-from src.content.translator import Translator
 from src.content.specs import (
     RequirementType,
     ASSET_REQUIREMENTS,
-    UnitRace,
     UnitType,
     AssetType
 )
+from src.content.tools import TextFormatter
+from src.content.translator import Translator
 
 translator = Translator()
 

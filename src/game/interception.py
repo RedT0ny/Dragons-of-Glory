@@ -1,6 +1,5 @@
 from functools import partial
 
-from src.game.unit import Unit
 from src.content.constants import HL, NEUTRAL, WS
 from src.content.specs import GamePhase, UnitRace, UnitType
 from src.game.combat_reporting import show_combat_result_popup

@@ -1,15 +1,16 @@
+import random
+import re
 from dataclasses import asdict
-from typing import Callable, Dict, List, Optional, Set, Tuple
-import random, re
+from typing import Callable, Set
+
 from src.content import loader
+from src.content.config import UNITS_DATA, COUNTRIES_DATA, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, \
+    ARTIFACTS_DATA
 from src.content.specs import *
-from src.content.config import UNITS_DATA, COUNTRIES_DATA, MAP_TERRAIN_DATA, MAP_CONFIG_DATA, EVENTS_DATA, ARTIFACTS_DATA
-from src.content.constants import HL, WS
 from src.game.country import Country
 from src.game.event import Event, Asset
 from src.game.map import Board
 from src.game.unit import Unit, Leader, Wing, Hero, Fleet, Wizard, Army, FlyingCitadel
-
 
 _RANDOM_PLACEHOLDER_RE = re.compile(r"\{random:([^{}]+)\}")
 

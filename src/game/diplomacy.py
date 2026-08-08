@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from src.content.translator import Translator
-from src.content.constants import HL, WS
+from src.content.constants import HL, WS, TAG_KNIGHT_COUNTRIES, NEUTRAL
 from src.content.specs import LocType, UnitState, UnitType
 from src.game.map import Hex
 
@@ -72,7 +72,7 @@ class DiplomacyService:
     def is_country_neutral(self, country_id: str) -> bool:
         """Returns True if the country exists and currently has neutral allegiance."""
         country = self.game_state.countries.get(country_id)
-        return bool(country and country.allegiance == "neutral")
+        return bool(country and country.allegiance == NEUTRAL)
 
     def build_activation_attempt(self, country_id: str) -> ActivationAttempt | None:
         """Gathers the activation ratings and bonuses for a country on the active side.
@@ -372,11 +372,11 @@ class ConquestService:
             return
         self._destroy_country_upon_conquest(country, conqueror)
 
-    def _enforce_conquered_fleet_replacement_rule(self):
-        """ Fleets in conquered countries must be replaced if they are in reserve and the country is conquered."""
+    def _destroy_reserve_fleets(self):
+        """ Reserve fleets in conquered countries are destroyed when the country is conquered."""
         gs = self.game_state
         any_knight_unconquered = any(
-            (not c.conquered) for c in gs._countries_with_tag(gs.tag_knight_countries)
+            (not c.conquered) for c in gs._countries_with_tag(TAG_KNIGHT_COUNTRIES)
         )
 
         for unit in gs.units:
@@ -386,7 +386,7 @@ class ConquestService:
             if not country or not country.conquered:
                 continue
 
-            is_knight_country = gs._country_has_tag(country, gs.tag_knight_countries)
+            is_knight_country = country.is_knight()
             if is_knight_country and any_knight_unconquered:
                 continue
 
@@ -400,7 +400,7 @@ class ConquestService:
         for country in gs.countries.values():
             if country.allegiance not in (HL, WS):
                 continue
-            if gs._country_has_tag(country, gs.tag_knight_countries) and country.allegiance == WS:
+            if country.is_knight() and country.allegiance == WS:
                 continue
             if self._is_country_fully_occupied_by_enemy(country):
                 conqueror = gs.get_enemy_allegiance(country.allegiance)
@@ -411,7 +411,7 @@ class ConquestService:
         """ Applies special conquest rules for the group of Solamnic Knight countries.
         If all Solamnic Knight countries are fully occupied by enemy forces, they are conquered together."""
         gs = self.game_state
-        group = [c for c in gs._countries_with_tag(gs.tag_knight_countries) if c.allegiance == WS]
+        group = [c for c in gs._countries_with_tag(TAG_KNIGHT_COUNTRIES) if c.allegiance == WS]
         if not group:
             return
         fully_occupied = all(self._is_country_fully_occupied_by_enemy(c) for c in group)
@@ -430,6 +430,6 @@ class ConquestService:
         self._update_location_occupiers()
         self._apply_standard_country_conquests()
         self._apply_solamnic_group_conquest()
-        self._enforce_conquered_fleet_replacement_rule()
+        self._destroy_reserve_fleets()
         gs.update_territory_overrides()
         gs.invalidate_overlays({"control", "territory", "supply"})

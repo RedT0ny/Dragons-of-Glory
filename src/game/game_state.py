@@ -10,7 +10,7 @@ from src.game.combat import CombatService
 from src.game.diplomacy import ConquestService
 from src.game.leader_escape import LeaderEscapeCheck, LeaderEscapeHandler
 from src.content.config import MAP_WIDTH, MAP_HEIGHT, SCENARIOS_DIR, UNITS_DATA
-from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL
+from src.content.constants import DEFAULT_MOVEMENT_POINTS, HL, WS, NEUTRAL, TAG_KNIGHT_COUNTRIES
 from src.content.specs import GamePhase, UnitState, UnitRace, LocationSpec, EventType, UnitType, LocType, TerrainType, HexsideType
 from src.content import loader, factory
 from src.game.map import Board, Hex
@@ -97,7 +97,7 @@ class GameState:
         self.initiative_mode = "classic"
 
         # Rule tags for country-specific activation logic.
-        self.tag_knight_countries = "knight_countries"
+        self.tag_knight_countries = TAG_KNIGHT_COUNTRIES
         self.tower_country_id = "tower"
         self.victory_evaluator = None
         self.game_over = False
@@ -1397,7 +1397,7 @@ class GameState:
         return bool(
             country
             and country.id != self.tower_country_id
-            and self._country_has_tag(country, self.tag_knight_countries)
+            and country.is_knight()
         )
 
     def get_ws_solamnic_activation_bonus(self) -> int:
@@ -1421,7 +1421,7 @@ class GameState:
         if (
             not country
             or country.id == self.tower_country_id
-            or not self._country_has_tag(country, self.tag_knight_countries)
+            or not country.is_knight()
         ):
             return
         if previous_allegiance != NEUTRAL:
@@ -1430,7 +1430,7 @@ class GameState:
         # "First activated" means all other linked nations are still neutral.
         any_other_already_activated = any(
             c.id != country_id and c.allegiance != NEUTRAL
-            for c in self._countries_with_tag(self.tag_knight_countries)
+            for c in self._countries_with_tag(TAG_KNIGHT_COUNTRIES)
             if c.id != self.tower_country_id
         )
         if any_other_already_activated:

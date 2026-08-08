@@ -1,10 +1,9 @@
 import re
 from typing import Optional, Tuple, List, Any
 
-from src.content.tools import TextFormatter
-from src.content.specs import LocType, UnitSpec, UnitType, UnitRace, UnitState, TerrainType, LEADER_TYPES, ARMY_TYPES
 from src.content.constants import NEUTRAL, HL, WS
-from src.content.tools import caption_id
+from src.content.specs import LocType, UnitSpec, UnitType, UnitRace, UnitState, TerrainType, LEADER_TYPES, ARMY_TYPES
+from src.content.tools import TextFormatter
 
 
 class Unit:

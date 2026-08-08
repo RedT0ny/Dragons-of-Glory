@@ -5,16 +5,14 @@ This module handles unit movement, interception, boarding/unboarding, and relate
 It includes pathfinding, cost calculations, and special rules for fleets, wings, and armies.
 """
 
-from dataclasses import dataclass, field
-from collections import defaultdict
 import random
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import List, Tuple
 
-from shiboken6.Shiboken import Object
-
+from src.content.constants import NEUTRAL
+from src.content.specs import GamePhase, LocType
 from src.content.tools import TextFormatter, debug_print
-from src.content.constants import HL, NEUTRAL, WS
-from src.content.specs import GamePhase, LocType, UnitType
 from src.game.interception import INTERCEPTION_DEFENDER_WITHDREW, InterceptionService
 from src.game.invasion import InvasionHandler
 from src.game.map import Hex, Hexside

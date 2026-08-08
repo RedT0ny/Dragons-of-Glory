@@ -130,7 +130,7 @@ class DeploymentService:
                     if (
                         unit.is_fleet()
                         and unit.allegiance == WS
-                        and self.game_state._country_has_tag(country, self.game_state.tag_knight_countries)
+                        and country.is_knight()
                         and not country.conquered
                     ):
                         candidates = list(self._get_solamnic_ports(unit.allegiance))
@@ -211,7 +211,7 @@ class DeploymentService:
         """
         coords = []
         for country in self.game_state.countries.values():
-            if not hasattr(country, "spec") or self.game_state.tag_knight_countries not in country.spec.tags:
+            if not country.is_knight():
                 continue
             if country.allegiance != allegiance:
                 continue

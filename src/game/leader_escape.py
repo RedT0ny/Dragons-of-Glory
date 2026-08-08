@@ -2,8 +2,7 @@ import random
 from dataclasses import dataclass
 from typing import Iterable, List
 
-from src.game.unit import Unit
-from src.content.specs import LocType, UnitState, UnitType
+from src.content.specs import LocType, UnitState
 
 
 @dataclass

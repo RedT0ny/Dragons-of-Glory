@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import List
 
-from src.content.tools import TextFormatter
 from src.content.constants import HL, NEUTRAL
 from src.game.map import Hex
 from src.game.unit import Unit
