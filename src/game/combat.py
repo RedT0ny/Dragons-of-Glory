@@ -1446,7 +1446,11 @@ class CombatService:
                     for u in attackers
                 )
             )
-            advance_available = outcome.get("result") == "N/NS" and has_adjacent_survivor
+            attacker_victory = (
+                outcome.get("result") == "N/NS"
+                or outcome.get("defender_withdrew", False)
+            )
+            advance_available = attacker_victory and has_adjacent_survivor
             print(f"Naval battle at ({col},{row})")
             print(TextFormatter.format_naval_log(attackers, defenders, outcome))
             return {
@@ -2276,13 +2280,17 @@ class CombatService:
 
         return moved
 
-    def advance_fleets_after_naval(self, attackers, battle_hex):
+    def advance_fleets_after_naval(self, attackers, battle_hex, chosen_units=None):
         """Move surviving attacker fleets into the vacated battle hex after a naval victory.
 
         Skips fleets already located in the battle hex, off-map fleets, and
         fleets that cannot legally enter (enemy occupation / stacking limits).
+        If chosen_units is given, only those fleets are eligible to move.
         Returns the list of fleets that moved.
         """
+        if chosen_units is not None:
+            chosen_ids = {id(u) for u in chosen_units}
+            attackers = [u for u in attackers if id(u) in chosen_ids]
         moved = []
         for fleet in attackers:
             if not fleet.is_fleet() or not fleet.is_on_map or not fleet.position:
@@ -2452,6 +2460,7 @@ class CombatClickHandler:
         self.active_leader_escape = None
         self.escape_hexes = set()
         self.pending_advance = None
+        self._pending_naval_advance = None
         self._escape_completion_callback = None
         self._escape_info_dialog = None
         self._defender_withdrawal_fleets = []
@@ -2631,6 +2640,9 @@ class CombatClickHandler:
 
                     if def_withdrew:
                         def_fleets = [u for u in enemy_on_map if u.is_fleet() and u.is_on_map]
+                        if battle_loc:
+                            from src.game.map import Hex
+                            self._pending_naval_advance = (Hex.offset_to_axial(*battle_loc), committed)
                         if leader_escape:
                             self._begin_leader_escape(
                                 leader_escape,
@@ -2894,6 +2906,7 @@ class CombatClickHandler:
             self._defender_withdrawal_battle_loc = None
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
+            self._maybe_prompt_naval_advance_after_defender_withdrawal()
             return
 
         player = self.game_state.players.get(allegiance) if allegiance else None
@@ -2921,6 +2934,7 @@ class CombatClickHandler:
         self._defender_withdrawal_battle_loc = None
         self.view.highlight_movement_range([])
         self.view.sync_with_model()
+        self._maybe_prompt_naval_advance_after_defender_withdrawal()
 
     def _get_defender_withdrawal_hexes(self, fleets, battle_location):
         from src.game.map import Hex
@@ -2966,6 +2980,7 @@ class CombatClickHandler:
         self._defender_withdrawal_battle_loc = None
         self.view.highlight_movement_range([])
         self.view.sync_with_model()
+        self._maybe_prompt_naval_advance_after_defender_withdrawal()
 
     def _handle_defender_withdrawal_click(self, target_hex):
         if self._escape_info_dialog:
@@ -3079,14 +3094,42 @@ class CombatClickHandler:
         self.view.sync_with_model()
 
     def _prompt_naval_advance(self, battle_hex, committed):
-        """Ask whether surviving attacker fleets sweep into the vacated hex."""
-        from src.gui.message_dialog import show_question_dialog
-
-        if not show_question_dialog("Naval Advance", "Advance victorious fleet(s) into the vacated hex?"):
+        """Let the human attacker choose which surviving fleets sweep into the vacated hex."""
+        candidates = self.game_state.combat_service.get_advance_candidates(committed, battle_hex)
+        if not candidates:
+            self.view.sync_with_model()
             return
-        moved = self.game_state.combat_service.advance_fleets_after_naval(committed, battle_hex)
+
+        from src.gui.advance_dialog import show_advance_dialog
+
+        chosen = show_advance_dialog(candidates, self.game_state)
+        if not chosen:
+            self.view.sync_with_model()
+            return
+        moved = self.game_state.combat_service.advance_fleets_after_naval(
+            committed, battle_hex, chosen_units=chosen,
+        )
         if moved:
             print(f"Naval advance: moved {len(moved)} fleet(s) into the vacated hex.")
             post_advance_units = list(self.game_state.map.get_units_in_hex(battle_hex.q, battle_hex.r))
             self.view.units_clicked.emit(post_advance_units)
         self.view.sync_with_model()
+
+    def _maybe_prompt_naval_advance_after_defender_withdrawal(self):
+        """After a defender naval withdrawal resolves, offer the human attacker
+        the chance to sweep surviving fleets into the vacated battle hex.
+
+        A defender withdrawal counts as an attacker victory, so the attacking
+        human player gets the same advance prompt as an outright elimination.
+        AI attackers auto-advance (handled in the AI combat path).
+        """
+        if not self._pending_naval_advance:
+            return
+        battle_hex, committed = self._pending_naval_advance
+        self._pending_naval_advance = None
+
+        attacker_player = self.game_state.get_player(self.game_state.active_player)
+        if attacker_player and not attacker_player.is_ai:
+            self._prompt_naval_advance(battle_hex, committed)
+        else:
+            self.view.sync_with_model()
