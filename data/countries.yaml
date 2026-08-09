@@ -228,6 +228,7 @@ dargaard:
   allegiance: neutral
   alignment: [-10, -10]
   strength: 100
+  tags: [event_invasion_only]
   locations:
     dargaard_keep: {loc_type: fortress, coords: [31, 13]}
   territories:
@@ -863,6 +864,7 @@ nevermind:
   allegiance: neutral
   alignment: [-10, -10]
   strength: 100
+  tags: [event_invasion_only]
   locations:
     mount_nevermind: {loc_type: undercity, coords: [6, 22]}
   territories:

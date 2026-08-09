@@ -182,7 +182,7 @@ def _run_one_game(
                 continue
 
             if current_phase == GamePhase.ACTIVATION:
-                if game_state.has_neutral_countries():
+                if game_state.has_diplomacy_targets():
                     success, _country_id = ai.perform_activation(active_player)
                     if success:
                         activations_succeeded += 1

@@ -261,8 +261,8 @@ class TurnEngine:
 
         if current_phase == GamePhase.ACTIVATION:
             self._log_phase_header_once(f"Step 3: Activation - {active_player.capitalize()}")
-            if not self.game_state.has_neutral_countries():
-                print("No neutral countries remain. Skipping Activation phase.")
+            if not self.game_state.has_diplomacy_targets():
+                print("No diplomatically activatable neutral countries remain. Skipping Activation phase.")
                 self.game_state.advance_phase()
                 return TurnOutcome(advanced=True)
 

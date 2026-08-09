@@ -77,11 +77,15 @@ class DiplomacyService:
     def build_activation_attempt(self, country_id: str) -> ActivationAttempt | None:
         """Gathers the activation ratings and bonuses for a country on the active side.
 
-        Returns None if the country does not exist. The WS target rating includes the
-        Solamnic bonus; the HL target does not. Country and event bonuses apply to both.
+        Returns None if the country does not exist or is tagged TAG_EVENT_INVASION_ONLY
+        (such countries can only join a side via an event or a military invasion, never
+        the diplomacy roll). The WS target rating includes the Solamnic bonus; the HL
+        target does not. Country and event bonuses apply to both.
         """
         country = self.game_state.countries.get(country_id)
         if not country:
+            return None
+        if getattr(country, "is_event_invasion_only", lambda: False)():
             return None
 
         active_side = self.game_state.active_player

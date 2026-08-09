@@ -16,9 +16,17 @@ class DiplomacyMapView(AnsalonMapView):
         super().__init__(game_state, parent, overlay_alpha)
 
     def should_draw_country(self, country_id):
-        """Returns neutral countries to be drawn"""
+        """Returns neutral countries to be drawn.
+
+        Countries that can only be activated via an event or invasion (tagged
+        event_invasion_only) are excluded so they cannot be selected for a roll.
+        """
         country = self.game_state.countries.get(country_id)
-        return bool(country and country.allegiance == "neutral")
+        return bool(
+            country
+            and country.allegiance == "neutral"
+            and not country.is_event_invasion_only()
+        )
 
     def mousePressEvent(self, event):
         """Emits country ID on click if neutral"""

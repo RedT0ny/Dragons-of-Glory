@@ -47,6 +47,8 @@ NEUTRAL = "neutral"
 
 # --- COUNTRY TAGS (data/countries.yaml) ---
 TAG_KNIGHT_COUNTRIES = "knight_countries"
+# Countries that can only join a side via an event or a military invasion (never the diplomacy roll).
+TAG_EVENT_INVASION_ONLY = "event_invasion_only"
 
 # --- DRAGONFLIGHTS ---
 EVIL_DRAGONFLIGHTS = {"red", "blue", "green", "black", "white"}

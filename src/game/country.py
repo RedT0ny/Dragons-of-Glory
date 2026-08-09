@@ -1,4 +1,4 @@
-from src.content.constants import NEUTRAL, TAG_KNIGHT_COUNTRIES
+from src.content.constants import NEUTRAL, TAG_KNIGHT_COUNTRIES, TAG_EVENT_INVASION_ONLY
 from src.content.specs import CountrySpec, LocationSpec, LocType
 
 
@@ -138,6 +138,11 @@ class Country:
     def is_knight(self) -> bool:
         """Alias for has_tag(TAG_KNIGHT_COUNTRIES): True for the Solamnic Knight countries."""
         return self.has_tag(TAG_KNIGHT_COUNTRIES)
+
+    def is_event_invasion_only(self) -> bool:
+        """Alias for has_tag(TAG_EVENT_INVASION_ONLY): True for countries (e.g. Dargaard,
+        Mount Nevermind) that can only join a side via an event or a military invasion."""
+        return self.has_tag(TAG_EVENT_INVASION_ONLY)
 
     @property
     def total_military_strength(self):

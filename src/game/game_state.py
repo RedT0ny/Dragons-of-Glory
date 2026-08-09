@@ -1088,6 +1088,17 @@ class GameState:
     def has_neutral_countries(self) -> bool:
         return any(country.allegiance == NEUTRAL for country in self.countries.values())
 
+    def has_diplomacy_targets(self) -> bool:
+        """True if at least one neutral country can be activated via the diplomacy roll.
+
+        Countries tagged TAG_EVENT_INVASION_ONLY (e.g. Dargaard, Mount Nevermind) can only
+        join a side through an event or a military invasion, so they do not count as targets.
+        """
+        return any(
+            country.allegiance == NEUTRAL and not country.is_event_invasion_only()
+            for country in self.countries.values()
+        )
+
     def add_activation_bonus(self, allegiance: str, amount: int):
         if allegiance not in self.activation_bonuses:
             return
