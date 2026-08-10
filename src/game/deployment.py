@@ -21,18 +21,19 @@ class DeploymentService:
         """
         Deployment: Any coastal hex or port.
         Replacements: Only ports.
+
+        Candidates are already restricted to the unit's own country's locations
+        (see ``get_valid_deployment_hexes``), so the hex is not required to lie
+        inside the declared territory — a country's port location outside its
+        territory (e.g. Silvamori for Silvanesti) is still a valid fleet hex.
         """
         hex_coords = hex_obj.axial_to_offset()
 
-        # 1. Must be in country
-        if not country.is_hex_in_country(*hex_coords):
-            return False
-
-        # 2. Check Phase logic
+        # Check Phase logic
         if self.game_state.phase == GamePhase.REPLACEMENTS:
             # Check if hex has a port
             for loc in country.locations.values():
-                if loc.coords == hex_coords and loc.loc_type == "port":
+                if loc.coords == hex_coords and loc.is_port():
                     return True
             return False
 
@@ -40,7 +41,7 @@ class DeploymentService:
         if self.game_state.map.is_coastal(hex_obj):
             return True
         for loc in country.locations.values():
-            if loc.coords == hex_coords and loc.loc_type == "port":
+            if loc.coords == hex_coords and loc.is_port():
                 return True
         return False
 
@@ -190,7 +191,7 @@ class DeploymentService:
         if self.game_state.map.is_coastal(hex_obj):
             return True
         loc = self.game_state.map.get_location(hex_obj)
-        return bool(loc and loc.loc_type == LocType.PORT.value)
+        return bool(loc and loc.is_port())
 
     def _can_use_location_for_deployment(self, country, location, allegiance: str) -> bool:
         """
@@ -218,7 +219,7 @@ class DeploymentService:
             if country.conquered:
                 continue
             for loc in country.locations.values():
-                if loc.loc_type == LocType.PORT.value and self._can_use_location_for_deployment(country, loc, allegiance):
+                if loc.is_port() and self._can_use_location_for_deployment(country, loc, allegiance):
                     coords.append(loc.coords)
         return coords
 

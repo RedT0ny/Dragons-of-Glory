@@ -195,6 +195,7 @@ class InterceptionService:
                     context="interception",
                     target_hex=moving_hex,
                 )
+                self._complete_leader_escapes(resolution)
                 if resolution.get("defender_withdrew"):
                     for unit in air_defenders:
                         unit.movement_points = 0
@@ -215,6 +216,25 @@ class InterceptionService:
                 interceptor.river_hexside = state.get("river_hexside", None)
 
         return status
+
+    def _complete_leader_escapes(self, resolution):
+        """Finish pending leader escapes produced by interception combat.
+
+        ``CombatService.resolve_combat`` returns ``leader_escape_requests`` for
+        human-controlled leaders whose stacks (e.g. fleets they were boarded on)
+        were eliminated during the interception. The requests are routed to the
+        single shared ``LeaderEscapeHandler.complete_escapes`` entry point (the
+        same one used during combat): a single nearest friendly stack is placed
+        directly, a modal chooser is only shown when several friendly stacks are
+        tied at the same distance, and a leader with no destination is destroyed.
+        """
+        requests = (resolution or {}).get("leader_escape_requests", []) or []
+        if not requests:
+            return
+        self.game_state._get_leader_escape_handler().complete_escapes(
+            requests,
+            note="after interception",
+        )
 
     def find_interceptor_attack_hex_for_stack(self, interceptors, moving_hex, origin_hex):
         """Picks the best adjacent hex from which the interceptors can attack.

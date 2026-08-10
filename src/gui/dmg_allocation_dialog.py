@@ -53,7 +53,7 @@ class DamageAllocationDialog(QDialog):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
 
-        self.table = InteractiveUnitTable([UnitColumn.ICON, UnitColumn.NAME, UnitColumn.STATUS], parent=self)
+        self.table = InteractiveUnitTable([UnitColumn.ICON, UnitColumn.NAME, UnitColumn.STATUS, UnitColumn.POS], parent=self)
         self.table.set_units(self.units, self.game_state)
         self.table.set_allocation_data(self.allocations, self.max_per_unit)
         self.table.setMaximumHeight(400)

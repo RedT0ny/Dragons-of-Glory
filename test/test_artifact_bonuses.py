@@ -97,7 +97,9 @@ def test_country_diplomacy_bonus_affects_activation_target_rating():
     gs = GameState()
     gs.active_player = HL
     gs.countries = {
-        "thorbardin": SimpleNamespace(id="thorbardin", allegiance=NEUTRAL, alignment=(2, 4))
+        "thorbardin": SimpleNamespace(
+            id="thorbardin", allegiance=NEUTRAL, alignment=(2, 4), is_knight=lambda: False
+        )
     }
     leader = Leader(_leader_spec(allegiance=HL))
     leader.status = UnitState.ACTIVE
@@ -108,6 +110,7 @@ def test_country_diplomacy_bonus_affects_activation_target_rating():
     hammer.owner = owner
     hammer.assigned_to = leader
     leader.equipment.append(hammer)
+    gs.players = {HL: owner}
     gs.units = [leader]
 
     assert gs.get_country_activation_bonus(HL, "thorbardin") == 1
@@ -117,7 +120,7 @@ def test_country_diplomacy_bonus_affects_activation_target_rating():
     assert attempt is not None
     assert attempt.target_rating == 5
 
-    leader.status = UnitState.DESTROYED
+    leader.destroy()
     assert gs.get_country_activation_bonus(HL, "thorbardin") == 0
 
 

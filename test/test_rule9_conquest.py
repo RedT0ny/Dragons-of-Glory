@@ -50,6 +50,9 @@ class FakeUnit:
     def is_army(self):
         return self.unit_type in (UnitType.INFANTRY, UnitType.CAVALRY)
 
+    def is_fleet(self):
+        return self.unit_type == UnitType.FLEET
+
     def is_leader(self):
         return self._is_leader
 
@@ -188,3 +191,41 @@ def test_replacements_respect_conquered_locations_and_allow_conqueror_use():
     hl_stateless = FakeUnit(None, HL, UnitType.INFANTRY, UnitState.READY, (None, None))
     hl_hexes = service.get_valid_deployment_hexes(hl_stateless, allow_territory_wide=False)
     assert (9, 9) in hl_hexes
+
+
+def test_replacements_fleet_can_deploy_to_own_country_port_outside_territory():
+    """A country's port location whose hex falls outside its declared territory
+    (e.g. Silvamori for Silvanesti) is still a valid fleet replacement hex.
+
+    Ground units only pass a terrain check, so they could already deploy there;
+    fleets were rejected because is_valid_fleet_deployment required the hex to be
+    inside the country's territory list."""
+    gs = GameState()
+    gs.map = FakeMap()
+    gs.phase = GamePhase.REPLACEMENTS
+    gs.active_player = WS
+    gs.players = {WS: SimpleNamespace(spec=SimpleNamespace(country_deployment=False))}
+    service = DeploymentService(gs)
+
+    spec = CountrySpec(
+        id="silvanesti",
+        capital_id="silvanost",
+        strength=10,
+        allegiance=WS,
+        alignment=(0, 0),
+        color="#000000",
+        locations=[
+            LocationSpec(id="silvanost", loc_type="port", coords=(10, 10), is_capital=True),
+            LocationSpec(id="silvamori", loc_type="port", coords=(1, 1)),
+        ],
+        territories=[(10, 10)],
+        tags=[],
+    )
+    country = Country(spec)
+    gs.countries = {"silvanesti": country}
+    _register_country_locations(gs, country)
+
+    fleet = FakeUnit("silvanesti", WS, UnitType.FLEET, UnitState.READY, (None, None))
+    hexes = service.get_valid_deployment_hexes(fleet, allow_territory_wide=False)
+    assert (1, 1) in hexes
+    assert (10, 10) in hexes

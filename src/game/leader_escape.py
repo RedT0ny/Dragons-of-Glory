@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Iterable, List
 
 from src.content.specs import LocType, UnitState
+from src.content.tools import TextFormatter
 
 
 @dataclass
@@ -87,6 +88,86 @@ class LeaderEscapeHandler:
             self.game_state.combat_service.cleanup_destroyed_units(destroyed)
 
         return requests
+
+    def complete_escapes(self, requests, prompt_chooser=None, note="after combat"):
+        """Resolve pending leader escape requests through the single shared entry point.
+
+        Both combat (``CombatClickHandler``) and movement-phase interceptions
+        (``InterceptionService``) route their ``LeaderEscapeRequest`` lists here.
+        Each request's ``options`` are the nearest friendly stacks (all tied at
+        the same minimum distance): a single option is placed directly; when
+        several friendly stacks are tied, a human player picks through
+        ``prompt_chooser`` (a modal destination dialog by default) and AI
+        leaders are auto-picked. Cancelling falls back to
+        ``choose_escape_destination``; a leader with no destination is
+        destroyed rather than left stranded.
+        """
+        requests = list(requests or [])
+        if not requests:
+            return
+        destroyed = []
+        for request in requests:
+            leader = getattr(request, "leader", None)
+            if not leader:
+                continue
+            options = list(getattr(request, "options", []) or [])
+            destination = None
+            if options:
+                if len(options) == 1:
+                    destination = options[0]
+                elif self._is_ai_allegiance(getattr(leader, "allegiance", None)):
+                    destination = self.choose_escape_destination(leader, options)
+                else:
+                    chooser = prompt_chooser or self._prompt_human_escape_destination
+                    destination = chooser(leader, options)
+                if destination is None:
+                    destination = self.choose_escape_destination(leader, options)
+            if destination is None:
+                self.game_state.damage_unit(leader, mode="destroy")
+                destroyed.append(leader)
+                print(
+                    f"Leader {TextFormatter.format_unit_log_string(leader)} destroyed: "
+                    "no escape destination available."
+                )
+                continue
+            if hasattr(leader, "_tactical_rating_override"):
+                leader._tactical_rating_override = 0
+            self._place_leader(leader, destination)
+            print(
+                f"Leader {TextFormatter.format_unit_log_string(leader)} escaped to "
+                f"{destination.axial_to_offset()} {note}."
+            )
+        if destroyed:
+            self.game_state.combat_service.cleanup_destroyed_units(destroyed)
+        self.game_state.finalize_board_state_change()
+
+    def _prompt_human_escape_destination(self, leader, options):
+        """Let a human player pick the escape destination for a leader."""
+        from PySide6.QtWidgets import QApplication, QInputDialog
+
+        option_labels = [self._describe_escape_option(hex_obj) for hex_obj in options]
+        app = QApplication.instance()
+        parent = app.activeWindow() if app else None
+        choice, ok = QInputDialog.getItem(
+            parent,
+            "Leader Escape",
+            f"Select a destination for {TextFormatter.format_unit_log_string(leader)} to escape to:",
+            option_labels,
+            0,
+            False,
+        )
+        if not ok or not choice:
+            return None
+        try:
+            return options[option_labels.index(choice)]
+        except ValueError:
+            return None
+
+    def _describe_escape_option(self, hex_obj):
+        col, row = hex_obj.axial_to_offset()
+        units = self.game_state.map.get_units_in_hex(hex_obj.q, hex_obj.r)
+        names = TextFormatter.format_units([u for u in units if u.is_on_map])
+        return f"({col}, {row}) - {names}"
 
     def choose_escape_destination(self, leader, options):
         """

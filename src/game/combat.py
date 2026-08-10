@@ -2456,12 +2456,8 @@ class CombatClickHandler:
         self.game_state = game_state
         self.view = view
         self.attackers = []
-        self.leader_escape_queue = []
-        self.active_leader_escape = None
-        self.escape_hexes = set()
         self.pending_advance = None
         self._pending_naval_advance = None
-        self._escape_completion_callback = None
         self._escape_info_dialog = None
         self._defender_withdrawal_fleets = []
         self._defender_withdrawal_hexes = set()
@@ -2473,10 +2469,6 @@ class CombatClickHandler:
         # 2) validating common targets
         # 3) confirming and executing combat
         # 4) post-combat leader escape / advance prompts
-        if self.active_leader_escape:
-            self._handle_leader_escape_click(target_hex)
-            return
-
         if self._defender_withdrawal_fleets:
             self._handle_defender_withdrawal_click(target_hex)
             return
@@ -2690,8 +2682,7 @@ class CombatClickHandler:
 
     def reset_selection(self):
         self.attackers = []
-        if not self.active_leader_escape:
-            self.view.highlight_movement_range([])
+        self.view.highlight_movement_range([])
         self.view.units_clicked.emit([])
 
     def calculate_common_targets(self, attackers):
@@ -2994,74 +2985,23 @@ class CombatClickHandler:
         self._complete_defender_withdrawal(dest_hex)
 
     def _begin_leader_escape(self, leader_escape_requests, completion_callback=None):
-        self.leader_escape_queue = list(leader_escape_requests)
-        self._escape_completion_callback = completion_callback
-        self._activate_next_leader_escape()
+        """Resolve leader escapes through the single shared entry point.
 
-    def _activate_next_leader_escape(self):
-        if not self.leader_escape_queue:
-            self.active_leader_escape = None
-            self.escape_hexes = set()
-            if self._escape_info_dialog:
-                self._escape_info_dialog.close()
-                self._escape_info_dialog = None
-            self.view.highlight_movement_range([])
-            callback = self._escape_completion_callback
-            self._escape_completion_callback = None
-            if callback:
-                callback()
-            else:
-                self._prompt_advance_after_combat()
-            return
-
-        self.active_leader_escape = self.leader_escape_queue.pop(0)
-        leader = getattr(self.active_leader_escape, "leader", None)
-        options = list(getattr(self.active_leader_escape, "options", []) or [])
-        player = self.game_state.get_player(getattr(leader, "allegiance", None)) if leader else None
-        if leader and options and player and player.is_ai:
-            # AI escapes resolve immediately; humans get a highlighted choice set.
-            destination = self.game_state._get_leader_escape_handler().choose_escape_destination(leader, options)
-            if destination:
-                self.game_state.move_unit(leader, destination)
-                print(f"Leader {caption_id(leader.id)} escaped to {destination.axial_to_offset()} (AI).")
-            self.active_leader_escape = None
-            self.escape_hexes = set()
-            self.view.sync_with_model()
-            self._activate_next_leader_escape()
-            return
-
-        self.escape_hexes = {h.axial_to_offset() for h in self.active_leader_escape.options}
-        self.view.highlight_movement_range(list(self.escape_hexes))
-        from src.gui.message_dialog import MessageDialog
-        from src.content.config import ICONS_DIR
-        from PySide6.QtCore import Qt
-        self._escape_info_dialog = MessageDialog(
-            "Leader Escape",
-            f"Select a friendly stack for {self.active_leader_escape.leader.id} to escape.",
+        The requests come from ``CombatService.resolve_combat`` (human leaders
+        whose stacks were eliminated). A single nearest friendly stack is placed
+        directly; a modal chooser is only shown when several friendly stacks are
+        tied at the same distance (see ``LeaderEscapeHandler.complete_escapes``).
+        """
+        self.game_state._get_leader_escape_handler().complete_escapes(
+            leader_escape_requests,
+            note="after combat",
         )
-        icon_path = os.path.join(ICONS_DIR, "info.svg")
-        if os.path.exists(icon_path):
-            self._escape_info_dialog.set_icon(icon_path)
-        self._escape_info_dialog.setWindowModality(Qt.NonModal)
-        self._escape_info_dialog.show()
-
-    def _handle_leader_escape_click(self, target_hex):
-        if self._escape_info_dialog:
-            self._escape_info_dialog.close()
-            self._escape_info_dialog = None
-        clicked_offset = target_hex.axial_to_offset()
-        if clicked_offset not in self.escape_hexes:
-            return
-
-        leader = self.active_leader_escape.leader
-        self.game_state.move_unit(leader, target_hex)
-        leader._tactical_rating_override = 0
-        print(f"Leader {caption_id(leader.id)} escaped to {clicked_offset}.")
-
-        self.active_leader_escape = None
-        self.escape_hexes = set()
+        self.view.highlight_movement_range([])
         self.view.sync_with_model()
-        self._activate_next_leader_escape()
+        if completion_callback:
+            completion_callback()
+        else:
+            self._prompt_advance_after_combat()
 
     def _prompt_advance_after_combat(self):
         if not self.pending_advance:

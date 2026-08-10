@@ -425,6 +425,325 @@ def test_maybe_apply_interception_reports_defender_withdrawal(monkeypatch):
     assert d.movement_points == 0
 
 
+def test_interception_completes_human_leader_escape(monkeypatch):
+    """Regression: a human leader aboard an intercepted fleet that is eliminated
+    must be placed at the nearest friendly stack instead of being left ACTIVE
+    with no position after the interception resolves. With a single nearest
+    option the placement happens without showing any chooser dialog."""
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+    dest_hex = Hex.offset_to_axial(6, 4)
+
+    resolution = {
+        "result": "NS/NS",
+        "leader_escape_requests": [LeaderEscapeRequest(leader=leader, options=[dest_hex])],
+    }
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return resolution
+
+    prompt_calls = []
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler._prompt_human_escape_destination",
+        lambda self, leader_, options: prompt_calls.append(len(options)) or options[0],
+    )
+
+    svc = InterceptionService(gs, gs.movement_service, None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert leader.position == (6, 4)
+    assert leader.status == UnitState.ACTIVE
+    assert prompt_calls == []
+
+
+def test_interception_prompts_human_leader_escape_when_tied_options(monkeypatch):
+    """When several friendly stacks are tied at the same nearest distance, the
+    human player is asked to choose the escape destination and the selection is
+    honored."""
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+    chosen_hex = Hex.offset_to_axial(7, 4)
+
+    resolution = {
+        "result": "NS/NS",
+        "leader_escape_requests": [
+            LeaderEscapeRequest(
+                leader=leader,
+                options=[Hex.offset_to_axial(6, 4), chosen_hex],
+            )
+        ],
+    }
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return resolution
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler._prompt_human_escape_destination",
+        lambda self, leader_, options: chosen_hex if Hex.offset_to_axial(7, 4) in options else options[0],
+    )
+
+    svc = InterceptionService(gs, gs.movement_service, None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert leader.position == (7, 4)
+    assert leader.status == UnitState.ACTIVE
+
+
+def test_interception_falls_back_to_auto_destination_on_cancel(monkeypatch):
+    """Regression: when the human cancels the escape chooser on a tie, the
+    leader falls back to the nearest friendly stack instead of being stranded."""
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+    fallback_hex = Hex.offset_to_axial(7, 4)
+
+    resolution = {
+        "result": "NS/NS",
+        "leader_escape_requests": [
+            LeaderEscapeRequest(
+                leader=leader,
+                options=[Hex.offset_to_axial(6, 4), Hex.offset_to_axial(7, 4)],
+            )
+        ],
+    }
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return resolution
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler._prompt_human_escape_destination",
+        lambda self, leader_, options: None,
+    )
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler.choose_escape_destination",
+        lambda self, leader_, options: fallback_hex,
+    )
+
+    svc = InterceptionService(gs, gs.movement_service, None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert leader.position == (7, 4)
+    assert leader.status == UnitState.ACTIVE
+
+
+def test_interception_destroys_leader_without_escape_destination(monkeypatch):
+    """Regression: when no escape destination exists, the leader is destroyed
+    rather than left ACTIVE without a position."""
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    a = _fleet("a", HL, 4, 4, cr=6)
+    d = _fleet("d", WS, 5, 4, cr=3)
+    gs.map.add_unit_to_spatial_map(a)
+    gs.map.add_unit_to_spatial_map(d)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+
+    resolution = {
+        "result": "NS/NS",
+        "leader_escape_requests": [LeaderEscapeRequest(leader=leader, options=[])],
+    }
+
+    def _fake_resolve(self, attackers, target_hex, **kwargs):
+        return resolution
+
+    monkeypatch.setattr(CombatService, "resolve_combat", _fake_resolve)
+    monkeypatch.setattr(
+        "src.game.interception.show_combat_result_popup",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(gs, "damage_unit", lambda unit, mode="deplete": unit.destroy())
+
+    svc = InterceptionService(gs, gs.movement_service, None)
+    monkeypatch.setattr(
+        svc, "find_interceptor_attack_hex_for_stack", lambda *args: Hex.offset_to_axial(5, 4)
+    )
+
+    svc.resolve_interception_attack([a], [d], Hex(4, 4), (4, 4))
+
+    assert leader.status == UnitState.DESTROYED
+
+
+class _StubView:
+    def __init__(self):
+        self.highlight_calls = []
+        self.sync_calls = 0
+
+    def highlight_movement_range(self, hexes):
+        self.highlight_calls.append(hexes)
+
+    def sync_with_model(self):
+        self.sync_calls += 1
+
+
+def test_combat_leader_escape_uses_shared_entry_point_single_option(monkeypatch):
+    """Combat routes leader escapes through the same single entry point:
+    a single nearest friendly stack is placed directly without a chooser."""
+    from src.game.combat import CombatClickHandler
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+    dest_hex = Hex.offset_to_axial(6, 4)
+
+    view = _StubView()
+    handler = CombatClickHandler(gs, view)
+    prompt_calls = []
+
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler._prompt_human_escape_destination",
+        lambda self, leader_, options: prompt_calls.append(len(options)) or options[0],
+    )
+
+    completed = []
+    handler._begin_leader_escape(
+        [LeaderEscapeRequest(leader=leader, options=[dest_hex])],
+        completion_callback=lambda: completed.append(True),
+    )
+
+    assert leader.position == (6, 4)
+    assert leader.status == UnitState.ACTIVE
+    assert prompt_calls == []
+    assert completed == [True]
+
+
+def test_combat_leader_escape_uses_shared_entry_point_on_tie(monkeypatch):
+    """Combat leader escapes also honor the chooser when several friendly
+    stacks are tied at the same nearest distance."""
+    from src.game.combat import CombatClickHandler
+    from src.game.leader_escape import LeaderEscapeRequest
+
+    gs = GameState()
+    gs.map = FakeOddsMap()
+    gs.players[HL] = _StubPlayer(is_ai=True)
+    gs.players[WS] = _StubPlayer(is_ai=False)
+
+    leader = DummyUnit(
+        unit_id="gunthar",
+        unit_type=UnitType.GENERAL,
+        allegiance=WS,
+        position=(None, None),
+    )
+    chosen_hex = Hex.offset_to_axial(7, 4)
+
+    view = _StubView()
+    handler = CombatClickHandler(gs, view)
+
+    monkeypatch.setattr(gs, "finalize_board_state_change", lambda: None)
+    monkeypatch.setattr(
+        "src.game.leader_escape.LeaderEscapeHandler._prompt_human_escape_destination",
+        lambda self, leader_, options: chosen_hex if chosen_hex in options else options[0],
+    )
+
+    completed = []
+    handler._begin_leader_escape(
+        [LeaderEscapeRequest(leader=leader, options=[Hex.offset_to_axial(6, 4), chosen_hex])],
+        completion_callback=lambda: completed.append(True),
+    )
+
+    assert leader.position == (7, 4)
+    assert leader.status == UnitState.ACTIVE
+    assert completed == [True]
+
+
 def test_admiral_or_wizard_tactical_rating_adds_to_fleet_attack():
     gs = GameState()
     gs.map = FakeMap()
