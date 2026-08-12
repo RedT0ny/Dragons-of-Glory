@@ -107,6 +107,7 @@ class GameController(QObject):
         self._replacements_refresh_queued = False
         self._pending_phase_advance_after_deployment = False
         self._startup_loading_dialog = None
+        self._turn_tick_queued = False  # Guard against double-scheduling process_game_turn
 
     def get_runtime_config(self):
         """Return current runtime configuration for saving/restoring.
@@ -179,6 +180,25 @@ class GameController(QObject):
         callback_name = getattr(callback, "__name__", callback.__class__.__name__)
         QTimer.singleShot(1, lambda: self._run_deferred_if_current(epoch, callback, callback_name))
 
+    def _schedule_turn_tick(self):
+        """Queue a single process_game_turn, coalescing redundant requests.
+
+        The turn engine must never be ticked twice from the same queue state:
+        e.g. after a load/new-game both _after_state_reload and
+        resume_after_startup_loading requested a tick, and the loading dialog
+        pumps the event loop (QApplication.processEvents) between them, which
+        could otherwise process the same phase twice (e.g. two strategic
+        events drawn for one player).
+        """
+        if self._turn_tick_queued:
+            return
+        self._turn_tick_queued = True
+        self._schedule_deferred(self._run_turn_tick)
+
+    def _run_turn_tick(self):
+        self._turn_tick_queued = False
+        self.process_game_turn()
+
     def _is_human_interactive_turn(self) -> bool:
         """
         True only when the active side is human and the phase expects direct input.
@@ -220,6 +240,7 @@ class GameController(QObject):
         """
         self.ai_timer.stop()
         self._deferred_epoch += 1
+        self._turn_tick_queued = False
         self._processing_automatic_phases = False
         self._end_phase_transition_pending = False
         self._last_end_phase_request_at = 0.0
@@ -372,7 +393,7 @@ class GameController(QObject):
 
     def resume_after_startup_loading(self):
         """Resume turn processing after a startup/load dialog has been handed off."""
-        self._schedule_deferred(self.process_game_turn)
+        self._schedule_turn_tick()
 
     def start_new_game(self, scenario_spec):
         """
@@ -396,7 +417,12 @@ class GameController(QObject):
         self._after_state_reload()
 
     def _after_state_reload(self):
-        """Refresh view widgets after scenario/save load and resume turn processing."""
+        """Refresh view widgets after scenario/save load.
+
+        Does not resume turn processing itself; the caller must invoke
+        resume_after_startup_loading() afterwards so the single turn tick
+        runs with the startup/load dialog registered.
+        """
         self.supply = str(getattr(self.game_state, "supply", "standard"))
         self.deployment = str(getattr(self.game_state, "deployment_mode", "canonical"))
         self.interception = str(getattr(self.game_state, "interception_mode", "disabled"))
@@ -415,8 +441,6 @@ class GameController(QObject):
             main_window.status_tab.refresh()
         if hasattr(main_window, "assets_tab"):
             main_window.assets_tab.refresh()
-
-        self._schedule_deferred(self.process_game_turn)
 
     def check_active_player(self):
         """Checks if the loop should continue running automatically."""
@@ -503,7 +527,7 @@ class GameController(QObject):
             if state_before[0] in {GamePhase.ACTIVATION, GamePhase.COMBAT} and self.game_state.phase != state_before[0]:
                 self._refresh_minimap_allegiance()
             if state_after != state_before and not self.game_state.phase_manager.should_auto_advance():
-                self._schedule_deferred(self.process_game_turn)
+                self._schedule_turn_tick()
         finally:
             self._processing_turn_tick = False
             if self._startup_loading_dialog:
@@ -824,7 +848,7 @@ class GameController(QObject):
         # This ensures that if the next state is also Human-controlled (e.g., P2 Replacements),
         # the UI (Dialogs) for that player will be initialized.
         # Use QTimer.singleShot to avoid potential recursion issues
-        self._schedule_deferred(self.process_game_turn)
+        self._schedule_turn_tick()
 
     def execute_simple_ai_logic(self, side):
         """Execute basic AI movement logic for the given side.
@@ -942,7 +966,7 @@ class GameController(QObject):
 
     def _resume_ai_after_escape(self):
         """Resume AI turn processing after leader escape UI completes."""
-        self._schedule_deferred(self.process_game_turn)
+        self._schedule_turn_tick()
 
     def reset_combat_selection(self):
         """Clear any combat selection and target highlights."""
@@ -1373,7 +1397,7 @@ class GameController(QObject):
             if self._pending_phase_advance_after_deployment:
                 self._pending_phase_advance_after_deployment = False
                 self.game_state.advance_phase()
-                self._schedule_deferred(self.process_game_turn)
+                self._schedule_turn_tick()
             return
 
         if self._is_replacements_dialog_visible():
@@ -1394,7 +1418,7 @@ class GameController(QObject):
         self.connect_map_view_signals()
         self.check_active_player()
         if self.game_state.current_player and self.game_state.current_player.is_ai:
-            self._schedule_deferred(self.process_game_turn)
+            self._schedule_turn_tick()
 
     def _attempt_invasion(self, country_id, invasion_units=None):
         """Attempt to invade a neutral country and resolve the invasion.
