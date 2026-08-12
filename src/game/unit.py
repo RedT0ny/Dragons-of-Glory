@@ -260,6 +260,9 @@ class Unit:
 
     def eliminate(self):
         """Apply elimination rules by unit type."""
+        for asset in list(getattr(self, "equipment", []) or []):
+            if hasattr(asset, "destroy"):
+                asset.destroy()
         if self.is_carrier():
             self.eliminate_carrier()
 
