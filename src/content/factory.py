@@ -190,6 +190,8 @@ class ScenarioBuilder:
         map_config = loader.load_map_config(MAP_CONFIG_DATA)
         game_state.map.populate_hexsides(map_config.hexsides)
         game_state.map.populate_fleet_barriers(map_config.fleet_barriers)
+        game_state.map.winter_region = map_config.winter or {}
+        game_state.map.weather = game_state.winter_service
 
         # Populate Locations (Special + Country)
         special_locations = map_config.special_locations

@@ -337,7 +337,8 @@ def load_map_config(path: str) -> MapConfigSpec:
         terrain_types=data.get("terrain_types", []),
         hexsides=data.get("hexsides", {}),
         special_locations=special_locs,
-        fleet_barriers=data.get("fleet_barriers", [])
+        fleet_barriers=data.get("fleet_barriers", []),
+        winter=data.get("winter", {}) or {},
     )
 
 def load_game_state(path: str) -> SaveGameSpec:

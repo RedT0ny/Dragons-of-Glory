@@ -631,16 +631,19 @@ class CombatResolver:
                 continue
 
             hexside = self.game_state.map.get_effective_hexside(attacker_hex, defender_hex)
+            winter = getattr(self.game_state, "winter_service", None)
+            frozen = bool(winter and winter.is_frozen_hexside(attacker_hex, defender_hex))
+            pass_blocked = bool(winter and winter.is_pass_blocked(attacker_hex, defender_hex))
             if hexside in (
                 HexsideType.RIVER,
                 HexsideType.DEEP_RIVER,
-            ):
+            ) and not frozen:
                 candidates.append(("crossing_river", -4))
             elif hexside == HexsideType.BRIDGE:
                 candidates.append(("crossing_bridge", -4))
             elif hexside == HexsideType.FORD:
                 candidates.append(("crossing_ford", -3))
-            elif hexside == HexsideType.PASS:
+            elif hexside == HexsideType.PASS and not pass_blocked:
                 candidates.append(("crossing_pass", -2))
             elif hexside == HexsideType.TUNNEL:
                 candidates.append(("crossing_tunnel", -2))

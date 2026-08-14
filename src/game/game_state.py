@@ -20,6 +20,7 @@ from src.game.movement import MovementService
 from src.game.supply import SupplyService
 from src.game.phase_manager import PhaseManager, CalendarService
 from src.game.towers_of_eli import TowersOfEliService
+from src.game.winter_service import WinterService
 from src.game.victory import VictoryConditionEvaluator
 from src.game import board_analysis
 from src.game.overlay_maps import (
@@ -67,6 +68,7 @@ class GameState:
         self.supply_service = SupplyService(self)
         self.conquest_service = ConquestService(self)
         self.towers_of_eli_service = TowersOfEliService(self)
+        self.winter_service = WinterService(self)
         self.calendar = CalendarService()
         self.translator = Translator()
 
@@ -944,8 +946,8 @@ class GameState:
         # 1. Sink
         if roll == 1:
             result["effect"] = "sink"
-            self.damage_unit(unit, mode="destroy")
-            msg = f"Maelstrom Effect (Roll {roll}): Ship {unit_id} destroyed!"
+            self.damage_unit(unit, mode="eliminate")
+            msg = f"Maelstrom Effect (Roll {roll}): Ship {unit_id} sunk!"
             print(msg)
             from src.gui.message_dialog import show_maelstrom_dialog
             show_maelstrom_dialog("Maelstrom", msg)
@@ -1036,8 +1038,20 @@ class GameState:
         self.clear_activation_bonuses()
 
     def prepare_for_movement_phase(self):
+        winter = getattr(self, "winter_service", None)
         for unit in self.units:
-            unit.movement_points = getattr(unit, "movement", 0)
+            mp = getattr(unit, "movement", 0)
+            # Winter: wings in the winter region have their MP halved (min 1).
+            if (
+                winter is not None
+                and unit.is_wing()
+                and unit.is_on_map
+                and unit.position
+                and None not in unit.position
+                and winter.is_affected_hex(Hex.offset_to_axial(*unit.position))
+            ):
+                mp = max(1, mp // 2)
+            unit.movement_points = mp
             unit.moved_this_turn = False
             unit.invaded_this_turn = False
             unit._healed_this_combat_turn = False

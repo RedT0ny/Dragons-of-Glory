@@ -157,6 +157,7 @@ class MapConfigSpec:
     hexsides: Dict[str, List[Any]]
     special_locations: List[LocationSpec]
     fleet_barriers: List[List[int]]
+    winter: Dict[str, Any] = field(default_factory=dict)
 
 @dataclass
 class AssetSpec:

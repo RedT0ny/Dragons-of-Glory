@@ -630,6 +630,15 @@ class MovementService:
             deduped.append(unit)
         units = deduped
 
+        # Winter: fleets moving inside the winter region risk breaking through
+        # the ice. Sunk fleets are removed from the move before validation.
+        sunk_fleets, winter_messages = self._apply_winter_fleet_hazards(units)
+        if sunk_fleets:
+            sunk_ids = {id(u) for u in sunk_fleets}
+            units = [u for u in units if id(u) not in sunk_ids]
+        if not units:
+            return MoveUnitsResult(moved=[], errors=[], messages=winter_messages)
+
         # Felura grants maelstrom immunity to the entire stack
         stack_immune = any(
             any(getattr(p, "id", "") == "felura" for p in getattr(u, "passengers", []))
@@ -677,6 +686,51 @@ class MovementService:
         if self._has_tower(target_hex):
             self._apply_tower_arrival(units, target_hex, result)
         return result
+
+    # --- Winter weather ---
+
+    def _apply_winter_fleet_hazards(self, units):
+        """Ice-breakage rolls for fleets moving inside the winter region.
+
+        Every fleet that tries to move during a winter turn rolls a d6; on a 1
+        the ice gives way and the fleet sinks (eliminated, with normal
+        leader-escape processing for any passengers). Returns (sunk_fleets,
+        messages).
+        """
+        winter = getattr(self.game_state, "winter_service", None)
+        if winter is None or not winter.is_winter():
+            return [], []
+        sunk = []
+        messages = []
+        for unit in list(units):
+            if not unit.is_fleet():
+                continue
+            if getattr(unit, "transport_host", None) is not None:
+                continue
+            if not unit.position or None in unit.position:
+                continue
+            start_hex = Hex.offset_to_axial(*unit.position)
+            if not winter.is_winter_zone(start_hex):
+                continue
+            unit_name = TextFormatter.format_unit_log_string(unit)
+            if random.randint(1, 6) == 1:
+                self._sink_fleet_in_ice(unit)
+                sunk.append(unit)
+                messages.append(f"Winter ice breaks under {unit_name} — fleet sunk.")
+            else:
+                debug_print(f"{unit_name} braves the winter ice.")
+        return sunk, messages
+
+    def _sink_fleet_in_ice(self, fleet):
+        """Eliminate a fleet lost to winter ice, resolving leader escapes."""
+        self.game_state.damage_unit(fleet, mode="eliminate")
+        pending = getattr(fleet, "_pending_leader_escapes", None)
+        if pending:
+            self.game_state._get_leader_escape_handler().handle_leader_escapes(
+                pending,
+                auto_resolve_ai=True,
+            )
+            fleet._pending_leader_escapes = None
 
     def _execute_unit_move_batch(self, units, target_hex) -> MoveUnitsResult:
         moved = []

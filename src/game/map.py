@@ -121,6 +121,19 @@ class Board:
         self.unit_map = defaultdict(list)
         self.locations = {} # (q, r) -> Location
         self.fleet_barriers = set()  # Hexside keys where fleet movement is blocked
+        self.winter_region = {}  # Winter weather bounding box from map_config.yaml
+        self.weather = None  # WinterService instance (set by the scenario builder)
+
+    def _weather(self):
+        return getattr(self, "weather", None)
+
+    def _is_frozen_hexside(self, from_hex, to_hex):
+        weather = self._weather()
+        return bool(weather and weather.is_frozen_hexside(from_hex, to_hex))
+
+    def _is_pass_blocked(self, from_hex, to_hex):
+        weather = self._weather()
+        return bool(weather and weather.is_pass_blocked(from_hex, to_hex))
 
     def populate_terrain(self, terrain_data: dict):
         """
@@ -558,6 +571,9 @@ class Board:
                     continue
                 edge = self.get_effective_hexside(current_hex, next_hex)
                 if edge == HexsideType.DEEP_RIVER:
+                    # Winter: frozen deep rivers cannot be entered by fleets.
+                    if self._is_frozen_hexside(current_hex, next_hex):
+                        continue
                     next_side = self.get_hexside_key(current_hex, next_hex)
                     if not self._fleet_can_enter_river_hexside(unit, next_side):
                         continue
@@ -598,6 +614,9 @@ class Board:
                     continue
                 edge = self.get_effective_hexside(endpoint, next_hex)
                 if edge != HexsideType.DEEP_RIVER:
+                    continue
+                # Winter: frozen deep rivers cannot be entered by fleets.
+                if self._is_frozen_hexside(endpoint, next_hex):
                     continue
                 next_side = self.get_hexside_key(endpoint, next_hex)
                 if next_side == river_hexside:
@@ -992,7 +1011,15 @@ class Board:
             if self.has_enemy_army(neighbor, unit.allegiance):
                 hexside = self.get_effective_hexside(hex_coord, neighbor)
                 # "Armies are never considered adjacent if separated by mountain or deep river"
-                blocked = hexside in (HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER)
+                blocked = False
+                if hexside == HexsideType.MOUNTAIN:
+                    blocked = True
+                elif hexside == HexsideType.DEEP_RIVER:
+                    # Winter: a frozen deep river no longer blocks adjacency.
+                    blocked = not self._is_frozen_hexside(hex_coord, neighbor)
+                elif hexside == HexsideType.PASS:
+                    # Winter: a snowed-in pass blocks adjacency.
+                    blocked = self._is_pass_blocked(hex_coord, neighbor)
                 if not blocked:
                     return True
         return False
@@ -1031,6 +1058,12 @@ class Board:
             return False
 
         hexside_type = self.get_effective_hexside(from_hex, to_hex)
+        # Winter: a snowed-in pass is impassable to ground units.
+        if hexside_type == HexsideType.PASS and self._is_pass_blocked(from_hex, to_hex):
+            return False
+        # Winter: a frozen deep river is crossable at plain cost.
+        if self._is_frozen_hexside(from_hex, to_hex):
+            return True
         if hexside_type in (HexsideType.SEA, HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER):
             return False
         return True
@@ -1063,6 +1096,9 @@ class Board:
         # 3. Check River Movement & Stacking
         # "Only two ships may be stacked in a river hexside."
         if self.get_effective_hexside(from_hex, to_hex) == HexsideType.DEEP_RIVER:
+            # Winter: frozen deep rivers cannot be entered by fleets.
+            if self._is_frozen_hexside(from_hex, to_hex):
+                return float('inf')
             river_side = self.get_hexside_key(from_hex, to_hex)
             if self._hexside_has_enemy_ship(river_side, unit):
                 return float('inf')
@@ -1141,6 +1177,10 @@ class Board:
         if terrain in forbidden_terrain:
             return float('inf')
 
+        # Winter: mountain passes are snowed in and impassable to ground units.
+        if self._is_pass_blocked(from_hex, to_hex):
+            return float('inf')
+
         # Calculate Costs
         cost = 1
 
@@ -1154,11 +1194,13 @@ class Board:
                 cost += 1
 
         # Rule 5: Hexside Barriers
-        if hexside_type in (HexsideType.SEA, HexsideType.DEEP_RIVER):
-            return float('inf')
+        # Winter: frozen rivers are crossable at plain cost (no ford penalty).
+        if not self._is_frozen_hexside(from_hex, to_hex):
+            if hexside_type in (HexsideType.SEA, HexsideType.DEEP_RIVER):
+                return float('inf')
 
-        if hexside_type == HexsideType.RIVER:
-            cost += 1
+            if hexside_type == HexsideType.RIVER:
+                cost += 1
 
         if hexside_type == HexsideType.MOUNTAIN:
             # Affinity override: Dwarves/Ogres often have 'mountain' affinity in CSV

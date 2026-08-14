@@ -93,7 +93,15 @@ class SupplyService:
             return False
 
         hexside = self.gs.map.get_effective_hexside(from_hex, to_hex)
-        if hexside in {HexsideType.MOUNTAIN, HexsideType.DEEP_RIVER, HexsideType.SEA}:
+        if hexside in (HexsideType.MOUNTAIN, HexsideType.SEA):
+            return False
+
+        # Winter: a frozen deep river is crossable for supply; a snowed-in
+        # pass is not.
+        winter = getattr(self.gs, "winter_service", None)
+        if hexside == HexsideType.DEEP_RIVER and not (winter and winter.is_frozen_hexside(from_hex, to_hex)):
+            return False
+        if hexside == HexsideType.PASS and (winter and winter.is_pass_blocked(from_hex, to_hex)):
             return False
 
         if self.gs.map.has_enemy_army(to_hex, allegiance):

@@ -1471,7 +1471,7 @@ class GameController(QObject):
 
         if move_result.messages:
             from src.gui.message_dialog import show_info_dialog
-            show_info_dialog("Towers of E'li", "\n".join(move_result.messages), parent=self.view.window())
+            show_info_dialog("Movement", "\n".join(move_result.messages), parent=self.view.window())
 
         # Clear selection/highlights
         self.view.highlight_movement_range([])

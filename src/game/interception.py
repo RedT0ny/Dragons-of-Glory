@@ -75,7 +75,17 @@ class InterceptionService:
         origin_offset, interceptors = self.rng.choice(in_range_groups)
         dist = Hex.offset_to_axial(*origin_offset).distance_to(current_hex)
 
-        spot_chance = 0.50 if dist == 2 else 1.0
+        # Winter: snow and storms reduce spotting inside the winter region.
+        winter = getattr(self.game_state, "winter_service", None)
+        in_winter = bool(
+            winter
+            and winter.is_affected_hex(current_hex)
+            and winter.is_affected_hex(Hex.offset_to_axial(*origin_offset))
+        )
+        if in_winter:
+            spot_chance = 0.5 if dist == 1 else 0.0
+        else:
+            spot_chance = 0.50 if dist == 2 else 1.0
         if self.rng.random() >= spot_chance:
             return False
 

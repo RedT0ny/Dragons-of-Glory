@@ -1010,3 +1010,12 @@ master_map:
       - { id: "pax_tharkas", coords: [22, 38] }
       - { id: "winston_tower", coords: [58, 7] }
       - { id: "wayreth", coords: [18, 40] }
+
+  # Winter weather region (master-map offset coordinates).
+  # Hexes OUTSIDE this bounding box never experience winter weather
+  # (far south jungles and far eastern waters stay ice-free).
+  winter:
+    min_col: 0
+    max_col: 57
+    min_row: 0
+    max_row: 39
