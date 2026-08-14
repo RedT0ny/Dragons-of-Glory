@@ -31,6 +31,7 @@ class GameController(QObject):
         interception="disabled",
         naval_combat="classic",
         initiative="classic",
+        winter="disabled",
     ):
         """Initialize the game controller with state, view, and configuration.
         
@@ -45,6 +46,7 @@ class GameController(QObject):
             interception: Interception mode - "enabled", "disabled", or "naval" (default "disabled").
             naval_combat: Naval combat variant - "classic" or "advanced" (default "classic").
             initiative: Initiative variant - "classic", "advanced", or "disabled" (default "classic").
+            winter: Winter rules variant - "enabled" or "disabled" (default "disabled").
         """
         super().__init__()
         self.game_state = game_state
@@ -58,6 +60,7 @@ class GameController(QObject):
         self.interception = str(interception).strip().lower()
         self.naval_combat = str(naval_combat).strip().lower()
         self.initiative = str(initiative).strip().lower()
+        self.winter = str(winter).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
@@ -65,6 +68,7 @@ class GameController(QObject):
         self.game_state.interception_mode = self.interception
         self.game_state.naval_combat = self.naval_combat
         self.game_state.initiative_mode = self.initiative
+        self.game_state.winter_rules = self.winter
 
         # Apply AI configuration to Players directly
         if HL in self.game_state.players:
@@ -126,6 +130,7 @@ class GameController(QObject):
             "interception": self.interception,
             "naval_combat": self.naval_combat,
             "initiative": self.initiative,
+            "winter": self.winter,
         }
 
     @staticmethod
@@ -153,6 +158,7 @@ class GameController(QObject):
         self.interception = str(config.get("interception", self.interception)).strip().lower()
         self.naval_combat = str(config.get("naval_combat", self.naval_combat)).strip().lower()
         self.initiative = str(config.get("initiative", self.initiative)).strip().lower()
+        self.winter = str(config.get("winter", self.winter)).strip().lower()
         self.game_state.difficulty = self.difficulty
         self.game_state.combat_details = self.combat_details
         self.game_state.supply = self.supply
@@ -160,6 +166,7 @@ class GameController(QObject):
         self.game_state.interception_mode = self.interception
         self.game_state.naval_combat = self.naval_combat
         self.game_state.initiative_mode = self.initiative
+        self.game_state.winter_rules = self.winter
 
         if HL in self.game_state.players:
             self.game_state.players[HL].set_ai(hl_ai)
@@ -428,6 +435,7 @@ class GameController(QObject):
         self.interception = str(getattr(self.game_state, "interception_mode", "disabled"))
         self.naval_combat = str(getattr(self.game_state, "naval_combat", "classic"))
         self.initiative = str(getattr(self.game_state, "initiative_mode", "classic"))
+        self.winter = str(getattr(self.game_state, "winter_rules", "disabled"))
         self.combat_details = str(getattr(self.game_state, "combat_details", "brief"))
         self._victory_announced = False
         self.view.reset_view_for_new_map()

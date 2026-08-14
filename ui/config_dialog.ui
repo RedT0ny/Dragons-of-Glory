@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>330</width>
-    <height>361</height>
+    <height>500</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -195,21 +195,135 @@
         </property>
        </widget>
       </item>
-      <item row="1" column="1">
-       <widget class="QComboBox" name="depComboBox">
-        <item>
-         <property name="text">
-          <string>Canonical</string>
+       <item row="1" column="1">
+        <widget class="QComboBox" name="depComboBox">
+         <item>
+          <property name="text">
+           <string>Canonical</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Manual</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="intLabel">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
          </property>
-        </item>
-        <item>
          <property name="text">
-          <string>Manual</string>
+          <string>Interception</string>
          </property>
-        </item>
-       </widget>
-      </item>
-     </layout>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QComboBox" name="intComboBox">
+         <item>
+          <property name="text">
+           <string>Enabled</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Disabled</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Naval only</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <widget class="QLabel" name="navLabel">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Naval Combat</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="1">
+        <widget class="QComboBox" name="navComboBox">
+         <item>
+          <property name="text">
+           <string>Classic</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Advanced</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="initLabel">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Initiative</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <widget class="QComboBox" name="initComboBox">
+         <item>
+          <property name="text">
+           <string>Classic</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Advanced</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Disabled</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="winterLabel">
+         <property name="font">
+          <font>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string>Winter</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1">
+        <widget class="QComboBox" name="winterComboBox">
+         <item>
+          <property name="text">
+           <string>Disabled</string>
+          </property>
+         </item>
+         <item>
+          <property name="text">
+           <string>Enabled</string>
+          </property>
+         </item>
+        </widget>
+       </item>
+      </layout>
     </widget>
    </item>
   </layout>

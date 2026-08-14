@@ -24,7 +24,7 @@ class Ui_configDialog(object):
     def setupUi(self, configDialog):
         if not configDialog.objectName():
             configDialog.setObjectName(u"configDialog")
-        configDialog.resize(330, 361)
+        configDialog.resize(330, 500)
         self.gridLayout = QGridLayout(configDialog)
         self.gridLayout.setObjectName(u"gridLayout")
         self.buttonBox = QDialogButtonBox(configDialog)
@@ -173,6 +173,18 @@ class Ui_configDialog(object):
 
         self.gridLayout_4.addWidget(self.initComboBox, 4, 1, 1, 1)
 
+        self.winterLabel = QLabel(self.rulesConfig)
+        self.winterLabel.setObjectName(u"winterLabel")
+        self.winterLabel.setFont(font)
+
+        self.gridLayout_4.addWidget(self.winterLabel, 5, 0, 1, 1)
+
+        self.winterComboBox = QComboBox(self.rulesConfig)
+        self.winterComboBox.addItem("")
+        self.winterComboBox.addItem("")
+        self.winterComboBox.setObjectName(u"winterComboBox")
+
+        self.gridLayout_4.addWidget(self.winterComboBox, 5, 1, 1, 1)
         self.gridLayout.addWidget(self.rulesConfig, 1, 0, 1, 1)
 
 
@@ -226,6 +238,10 @@ class Ui_configDialog(object):
         self.initComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Classic", None))
         self.initComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Advanced", None))
         self.initComboBox.setItemText(2, QCoreApplication.translate("configDialog", u"Disabled", None))
+
+        self.winterLabel.setText(QCoreApplication.translate("configDialog", u"Winter", None))
+        self.winterComboBox.setItemText(0, QCoreApplication.translate("configDialog", u"Disabled", None))
+        self.winterComboBox.setItemText(1, QCoreApplication.translate("configDialog", u"Enabled", None))
 
     # retranslateUi
 
@@ -286,6 +302,11 @@ class ConfigDialog(QDialog):
         self.ui.initComboBox.addItem(tr("dialogs.config.initiative_advanced", "Advanced"), "advanced")
         self.ui.initComboBox.addItem(tr("dialogs.config.initiative_disabled", "Disabled"), "disabled")
 
+        self.ui.winterLabel.setText(tr("dialogs.config.winter", "Winter"))
+        self.ui.winterComboBox.clear()
+        self.ui.winterComboBox.addItem(tr("dialogs.config.winter_disabled", "Disabled"), "disabled")
+        self.ui.winterComboBox.addItem(tr("dialogs.config.winter_enabled", "Enabled"), "enabled")
+
         self.ui.hlComboBox.clear()
         self.ui.hlComboBox.addItem(tr("dialogs.config.human", "Human"), "human")
         self.ui.hlComboBox.addItem(tr("dialogs.config.ai", "AI"), "ai")
@@ -309,6 +330,7 @@ class ConfigDialog(QDialog):
         interception = str(config.get("interception", "disabled")).strip().lower()
         naval_combat = str(config.get("naval_combat", "classic")).strip().lower()
         initiative = str(config.get("initiative", "classic")).strip().lower()
+        winter = str(config.get("winter", "disabled")).strip().lower()
         hl_is_ai = bool(config.get("highlord_ai", False))
         ws_is_ai = bool(config.get("whitestone_ai", False))
         diff_idx = self.ui.diffComboBox.findData(difficulty if difficulty in {"easy", "normal", "hard"} else "normal")
@@ -332,6 +354,9 @@ class ConfigDialog(QDialog):
         init_idx = self.ui.initComboBox.findData(initiative if initiative in {"classic", "advanced", "disabled"} else "classic")
         if init_idx >= 0:
             self.ui.initComboBox.setCurrentIndex(init_idx)
+        winter_idx = self.ui.winterComboBox.findData(winter if winter in {"enabled", "disabled"} else "disabled")
+        if winter_idx >= 0:
+            self.ui.winterComboBox.setCurrentIndex(winter_idx)
         hl_idx = self.ui.hlComboBox.findData("ai" if hl_is_ai else "human")
         if hl_idx >= 0:
             self.ui.hlComboBox.setCurrentIndex(hl_idx)
@@ -371,6 +396,7 @@ class ConfigDialog(QDialog):
         interception = str(self.ui.intComboBox.currentData() or "disabled")
         naval_combat = str(self.ui.navComboBox.currentData() or "classic")
         initiative = str(self.ui.initComboBox.currentData() or "classic")
+        winter = str(self.ui.winterComboBox.currentData() or "disabled")
 
         return {
             "difficulty": difficulty,
@@ -380,4 +406,5 @@ class ConfigDialog(QDialog):
             "interception": interception,
             "naval_combat": naval_combat,
             "initiative": initiative,
+            "winter": winter,
         }

@@ -1,8 +1,10 @@
 """
 Winter weather rules (winter campaign turns).
 
-Calendar turns whose period is "Winter" (every 5th turn) trigger seasonal rules
-inside the map's winter region:
+Winter rules are governed by the ``rulesConfig`` "Winter" option
+(``game_state.winter_rules``): only when it is ``"enabled"`` do the rules apply.
+When enabled, calendar turns whose period is "Winter" (every 5th turn) trigger
+seasonal rules inside the map's winter region:
 
 - **Fleet survival**: every fleet that moves (or tries to move) inside the winter
   region rolls a d6; on a 1 the ice breaks and the fleet sinks (eliminated, with
@@ -49,9 +51,17 @@ class WinterService:
     # --- Season ---
 
     def is_winter(self) -> bool:
-        """True when the current calendar turn is a winter turn."""
+        """True when winter rules are enabled AND the current turn is a winter turn.
+
+        The optional rules "Winter" config option (``game_state.winter_rules``)
+        gates the whole system: when it is not ``"enabled"`` no winter mechanics
+        apply.  ``override_winter`` (the test hook) takes precedence.
+        """
         if self._forced_winter is not None:
             return self._forced_winter
+        rules = str(getattr(self.game_state, "winter_rules", "disabled")).strip().lower()
+        if rules != "enabled":
+            return False
         calendar = getattr(self.game_state, "calendar", None)
         turn = getattr(self.game_state, "turn", None)
         if calendar is None or not turn:

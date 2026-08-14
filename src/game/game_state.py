@@ -97,6 +97,7 @@ class GameState:
         self.interception_mode = "disabled"
         self.naval_combat = "classic"
         self.initiative_mode = "classic"
+        self.winter_rules = "disabled"
 
         # Rule tags for country-specific activation logic.
         self.tag_knight_countries = TAG_KNIGHT_COUNTRIES
@@ -261,6 +262,7 @@ class GameState:
                     "interception": self.interception_mode,
                     "naval_combat": self.naval_combat,
                     "initiative": self.initiative_mode,
+                    "winter": self.winter_rules,
                 },
             },
             "world_state": {
@@ -369,6 +371,7 @@ class GameState:
         self.interception_mode = str(config.get("interception", self.interception_mode)).strip().lower()
         self.naval_combat = str(config.get("naval_combat", self.naval_combat)).strip().lower()
         self.initiative_mode = str(config.get("initiative", self.initiative_mode)).strip().lower()
+        self.winter_rules = str(config.get("winter", self.winter_rules)).strip().lower()
 
         self._restore_countries_from_save(world_state.get("countries", {}))
         self._restore_units_from_save(
