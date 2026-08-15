@@ -3,7 +3,8 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QS
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtCore import QUrl, Qt, Signal, QSettings
-from src.content.config import APP_NAME, SAVEGAME_DIR, INTRO_VIDEO
+from PySide6.QtGui import QFontDatabase
+from src.content.config import APP_NAME, SAVEGAME_DIR, INTRO_VIDEO, LIBRA_FONT
 from src.content.audio_manager import AudioManager
 from src.gui.config_dialog import ConfigDialog
 from src.gui.new_game_dialog import NewGameDialog
@@ -74,6 +75,11 @@ class IntroWindow(QMainWindow):
         self.setup_ui()
 
     def setup_ui(self):
+        # Register the bundled Libra font so the menu renders correctly even
+        # when the font is not installed system-wide. Once registered, the
+        # 'Libra' family used by the stylesheet below resolves to the asset.
+        QFontDatabase.addApplicationFont(LIBRA_FONT)
+
         main_layout = QVBoxLayout(self.overlay_widget)
         main_layout.setContentsMargins(100, 100, 100, 100)
 

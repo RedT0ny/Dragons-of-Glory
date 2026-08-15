@@ -10,7 +10,7 @@ ws_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +2 bonus in your activation roll.
   picture: "ws_diplomacy.jpg"
-  turn: 3
+  turn: 1
   allegiance: "whitestone"
   effects: { activation_bonus: 2 }
   max_occurrences: 5
@@ -23,7 +23,7 @@ ws_minor_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "ws_minor_diplomacy.jpg"
-  turn: 2
+  turn: 1
   allegiance: "whitestone"
   effects: { activation_bonus: 1 }
   max_occurrences: 5
@@ -36,7 +36,7 @@ hl_minor_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "hl_minor_diplomacy.jpg"
-  turn: 6
+  turn: 1
   allegiance: "highlord"
   effects: { activation_bonus: 1 }
   max_occurrences: 5
@@ -234,7 +234,7 @@ hl_diplomacy:
     This turn, your efforts to secure new subjects to your cause are successful. You receive a +2 bonus in your 
     activation roll.
   picture: "hl_diplomacy.jpg"
-  turn: 5
+  turn: 1
   allegiance: "highlord"
   effects: { activation_bonus: 2 }
   max_occurrences: 5
