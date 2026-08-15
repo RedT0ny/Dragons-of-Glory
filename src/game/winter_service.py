@@ -22,15 +22,18 @@ seasonal rules inside the map's winter region:
   can be spotted, at 50% (non-winter: 100% adjacent / 50% at distance 2).
 
 The winter region is defined in ``data/map_config.yaml`` under
-``master_map.winter`` as a bounding box in master-map offset coordinates::
+``master_map.winter`` as a bounding box in master-map offset coordinates.
+The box is the *winter-free* region — hexes inside it never experience
+winter weather::
 
     winter:
-      min_col: 0
-      max_col: 57
+      min_col: 40
+      max_col: 64
       min_row: 0
-      max_row: 39
+      max_row: 35
 
-Hexes outside the box (far south / far east) never experience winter weather.
+So hexes outside the box (the far west and the entire southern strip)
+suffer winter effects during winter turns.
 """
 
 from src.content.specs import HexsideType
@@ -82,7 +85,12 @@ class WinterService:
         return getattr(board, "winter_region", None) or {}
 
     def is_winter_zone(self, hex_coord) -> bool:
-        """True if the hex lies inside the winter region (geometry only)."""
+        """True if the hex lies inside the winter region (geometry only).
+
+        The ``master_map.winter`` bounding box is the *winter-free* region:
+        hexes inside the box never experience winter weather, so hexes outside
+        the box are the winter zone.
+        """
         if hex_coord is None:
             return False
         cfg = self._winter_config()
@@ -104,11 +112,14 @@ class WinterService:
             except (TypeError, ValueError):
                 return default
 
+        if not cfg:
+            return True
         min_col = _bound("min_col", -10**9)
         max_col = _bound("max_col", 10**9)
         min_row = _bound("min_row", -10**9)
         max_row = _bound("max_row", 10**9)
-        return min_col <= col <= max_col and min_row <= row <= max_row
+        in_box = min_col <= col <= max_col and min_row <= row <= max_row
+        return not in_box
 
     def is_affected_hex(self, hex_coord) -> bool:
         """True when it is winter AND the hex is inside the winter region."""

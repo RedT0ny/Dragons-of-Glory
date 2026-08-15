@@ -179,6 +179,8 @@ class Asset:
     @staticmethod
     def _format_requirement_failure(req_type, req_value) -> str:
         """Build a readable message for a failed equip requirement."""
+        if isinstance(req_value, (list, tuple)):
+            req_value = " or ".join(str(v) for v in req_value)
         if req_type == RequirementType.RACE.value:
             return f"Unit race does not match requirement '{req_value}'."
         if req_type == RequirementType.TRAIT.value:
@@ -212,11 +214,17 @@ class Asset:
             return hasattr(unit, 'allegiance') and unit.allegiance == required_allegiance
 
         elif req_type == RequirementType.UNIT_TYPE.value:
-            if req_value == "leader":
-                return unit.is_leader()
-            if req_value == "army":
-                return unit.is_army()
-            return hasattr(unit, 'unit_type') and unit.unit_type.value == req_value
+            values = req_value if isinstance(req_value, (list, tuple)) else [req_value]
+            for v in values:
+                if v == "leader":
+                    if unit.is_leader():
+                        return True
+                elif v == "army":
+                    if unit.is_army():
+                        return True
+                elif hasattr(unit, 'unit_type') and unit.unit_type and unit.unit_type.value == v:
+                    return True
+            return False
 
         elif req_type == RequirementType.ITEM.value:
             return hasattr(unit, 'equipment') and any(item.id == req_value for item in unit.equipment)

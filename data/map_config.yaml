@@ -1012,10 +1012,10 @@ master_map:
       - { id: "wayreth", coords: [18, 40] }
 
   # Winter weather region (master-map offset coordinates).
-  # Hexes OUTSIDE this bounding box never experience winter weather
-  # (far south jungles and far eastern waters stay ice-free).
+  # Hexes INSIDE this bounding box never experience winter weather
+  # (Nordmaar jungles and Blood Sea of Istar waters and Isles stay ice-free).
   winter:
-    min_col: 0
-    max_col: 57
+    min_col: 40
+    max_col: 64
     min_row: 0
-    max_row: 39
+    max_row: 35

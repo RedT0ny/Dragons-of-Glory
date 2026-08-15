@@ -57,8 +57,7 @@ dragonarmor:
   picture: "dragonarmor.jpg"
   effect: "+1 Tactical Rating. Armor bonus."
   requirements:
-    - { type: "allegiance", value: "highlord" }
-    - { type: "unit_type", value: "leader" }
+    - { type: "unit_type", value: "highlord" }
   bonus:
     tactical_rating: 1
     other: "armor"

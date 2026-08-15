@@ -13,7 +13,7 @@ ws_diplomacy:
   turn: 3
   allegiance: "whitestone"
   effects: { activation_bonus: 2 }
-  max_occurrences: 2
+  max_occurrences: 5
 
 ws_minor_diplomacy:
   type: "diplomacy"
@@ -26,7 +26,7 @@ ws_minor_diplomacy:
   turn: 2
   allegiance: "whitestone"
   effects: { activation_bonus: 1 }
-  max_occurrences: 3
+  max_occurrences: 5
 
 hl_minor_diplomacy:
   type: "diplomacy"
@@ -36,10 +36,10 @@ hl_minor_diplomacy:
     
     This turn, your efforts to secure a vital ally are successful. You receive a +1 bonus in your activation roll.
   picture: "hl_minor_diplomacy.jpg"
-  turn: 5
+  turn: 6
   allegiance: "highlord"
   effects: { activation_bonus: 1 }
-  max_occurrences: 3
+  max_occurrences: 5
 
 blue_crystal_staff:
   type: "artifact"
@@ -207,7 +207,7 @@ dragon_orb:
     
     You have obtained a Dragon Orb!
   picture: "orb_found.jpg"
-  turn: 4
+  turn: 10
   effects: { grant_asset: "dragon_orb" }
 
 disks_of_mishakal:
@@ -237,7 +237,7 @@ hl_diplomacy:
   turn: 10
   allegiance: "highlord"
   effects: { activation_bonus: 2 }
-  max_occurrences: 2
+  max_occurrences: 5
 
 whitestone_council:
   type: "diplomacy"
@@ -277,7 +277,7 @@ gnome_tech:
     
     Mount Nevermind has joined the war. A Gnome Tech artifact has been acquired!
   picture: "gnomes.jpg"
-  turn: 10
+  turn: 15
   effects:
     grant_asset: "gnome_tech"
     alliance: "nevermind"
@@ -331,8 +331,23 @@ soths_legions:
     Lord Soth swears allegiance to the highlord of the Blue Dragonflight.
   picture: "soths_oath.jpg"
   allegiance: "highlord"
-  turn: 16
+  turn: 18
   effects: { alliance: "dargaard" }
+
+temptation_of_verminaard:
+    type: "artifact"
+    description: >
+      Its dark fire coursed up Verminaard's clutching hand, raced through his wrist and forearm in rivulets of purple 
+      flame. Verminaard writhed in the pulsing flames, his grimace turning slowly to a dark, unholy leer as he broke the 
+      mace free.
+      Aglaca shouted and sprang towards Verminaard, but Judyth's strong grip held him back.
+      'There is nothing you can do,' she urged. 'He is in the hands of a Goddess.'
+      
+      Verminaard has been granted the Nightbringer, the unholy mace of Takhisis!
+    picture: "temptation_verminaard.jpg"
+    turn: 12
+    allegiance: "highlord"
+    effects: { grant_asset: "nightbringer" }
 
 wyrmslayer:
   type: "artifact"
