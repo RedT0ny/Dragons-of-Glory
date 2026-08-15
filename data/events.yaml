@@ -234,7 +234,7 @@ hl_diplomacy:
     This turn, your efforts to secure new subjects to your cause are successful. You receive a +2 bonus in your 
     activation roll.
   picture: "hl_diplomacy.jpg"
-  turn: 10
+  turn: 5
   allegiance: "highlord"
   effects: { activation_bonus: 2 }
   max_occurrences: 5

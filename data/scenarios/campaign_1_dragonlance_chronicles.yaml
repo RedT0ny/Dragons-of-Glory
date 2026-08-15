@@ -344,7 +344,7 @@ scenario:
         - unit_id: "coastlund_human_inf_2"
           position: [19, 16]
         - unit_id: "coastlund_human_inf_3"
-          position: [24, 22]
+          position: [22, 23]
         - unit_id: "coastlund_solamnic_cav"
           position: [22, 23]
         - unit_id: "lord_hargoth"
@@ -381,6 +381,14 @@ scenario:
           position: [16, 20]
         - unit_id: "hylo_kender_inf_6"
           position: [16, 18]
+        - unit_id: "kothas_minotaur_inf_1"
+          position: [61, 16]
+        - unit_id: "kothas_minotaur_inf_2"
+          position: [61, 16]
+        - unit_id: "kothas_minotaur_inf_3"
+          position: [61, 16]
+        - unit_id: "kothas_minotaur_inf_4"
+          position: [61, 17]
         - unit_id: "loraliee"
           position: [16, 19]
         - unit_id: "mercadior"
@@ -399,6 +407,10 @@ scenario:
           position: [13, 18]
         - unit_id: "nergoth_solamnic_inf_3"
           position: [13, 18]
+        - unit_id: "nevermind_gnome_inf_1"
+          position: [6, 22]
+        - unit_id: "nevermind_gnome_inf_2"
+          position: [6, 22]
         - unit_id: "qualinesti_elf_inf_1"
           position: [21, 37]
         - unit_id: "qualinesti_elf_inf_2"
@@ -452,9 +464,9 @@ scenario:
         - unit_id: "aurik"
           position: [23, 16]
         - unit_id: "solanthus_solamnic_cav_1"
-          position: [22, 23]
+          position: [24, 22]
         - unit_id: "solanthus_solamnic_cav_2"
-          position: [22, 23]
+          position: [24, 22]
         - unit_id: "solanthus_solamnic_inf_1"
           position: [25, 22]
         - unit_id: "solanthus_solamnic_inf_2"
@@ -478,7 +490,7 @@ scenario:
         - unit_id: "tower_human_inf_2"
           position: [23, 16]
         - unit_id: "tower_human_inf_3"
-          position: [23, 16]
+          position: [23, 17]
 
       countries:
         coastlund: all
