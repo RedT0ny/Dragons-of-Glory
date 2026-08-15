@@ -1021,7 +1021,7 @@ class MovementService:
         messages = []
 
         # Separate carriers, armies, leaders
-        carriers = [u for u in selected_units if u.is_fleet() or getattr(u, 'passengers', None) is not None]
+        carriers = [u for u in selected_units if u.is_carrier()]
         armies = [u for u in selected_units if u.is_army()]
         leaders = [u for u in selected_units if u.is_leader()]
 

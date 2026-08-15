@@ -457,13 +457,15 @@ class Wing(Unit):
             return False
 
         # Dragons: 1 Leader (Color/Race matching)
-        if self.race == UnitRace.DRAGON:
+        if self.is_dragon():
             if not unit.is_leader() or len(self.passengers) >= 1:
                 return False
 
             if self.allegiance == HL:
                 # An evil (allegiance highlord) dragon Wing can transport one Leader of UnitType HIGHLORD or EMPEROR.
-                if unit.unit_type not in (UnitType.HIGHLORD, UnitType.EMPEROR):
+                if unit.unit_type == UnitType.EMPEROR:
+                    return True
+                elif unit.unit_type not in (UnitType.HIGHLORD, UnitType.WIZARD):
                     return False
                 # The units transported (passengers) must be either of the same dragonflight
                 # as that of the dragon, or landless (e.g. Wizards, Emperor).
