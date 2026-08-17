@@ -1,7 +1,7 @@
 import os
 
 from PySide6.QtWidgets import (QFrame, QVBoxLayout, QLabel, QGridLayout, QPushButton, QHeaderView, QGraphicsView,
-                               QSizePolicy)
+                               QSizePolicy, QScrollArea, QWidget)
 from PySide6.QtCore import Qt, Signal, Slot, QSize, QPointF
 from PySide6.QtGui import QIcon, QColor, QPixmap, QFontDatabase, QFont
 
@@ -63,6 +63,51 @@ class MiniMapView(AnsalonMapView):
         self.set_overlay("territory")
 
 
+class _ImageLabel(QLabel):
+    """QLabel that centres its pixmap and re-scales it on resize, keeping aspect ratio."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._original_pixmap = None
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet("border: 1px solid black; background-color: grey;")
+        self.setMaximumSize(280, 280)
+        self.setMinimumSize(150, 150)
+
+    def sizeHint(self):
+        return self.maximumSize()
+
+    def setPixmap(self, pixmap):
+        if isinstance(pixmap, QPixmap) and not pixmap.isNull():
+            self._original_pixmap = pixmap
+            self._refresh_scaled()
+        else:
+            self._original_pixmap = None
+            super().setPixmap(pixmap)
+
+    def clear(self):
+        self._original_pixmap = None
+        super().clear()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._refresh_scaled()
+
+    def _refresh_scaled(self):
+        if (
+            self._original_pixmap
+            and not self._original_pixmap.isNull()
+            and self.width() > 0
+            and self.height() > 0
+        ):
+            scaled = self._original_pixmap.scaled(
+                self.size(),
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            super().setPixmap(scaled)
+
+
 class InfoPanel(QFrame):
     """The right-side panel for Unit and Hex info."""
     board_clicked = Signal()
@@ -72,16 +117,39 @@ class InfoPanel(QFrame):
     minimap_clicked = Signal(QPointF)
 
     def __init__(self, parent=None, game_state=None):
-        """Sets up right panel with mini‑map and controls"""
+        """Sets up right panel with mini-map and controls"""
         super().__init__(parent)
         self.game_state = game_state
         self.setFixedWidth(350)
         self.setFrameStyle(QFrame.StyledPanel | QFrame.Sunken)
         self._minimap_refresh_queued = False
+        self._minimap_collapsed = False
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
+        # Outer layout – TurnPanel will be inserted at index 0 by MainWindow
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(8, 8, 8, 8)
+        outer_layout.setSpacing(8)
+
+        # Scroll area for all content below the turn panel
+        self._scroll_area = QScrollArea()
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        scroll_content = QWidget()
+        layout = QVBoxLayout(scroll_content)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
+
+        # Mini-map toggle button
+        self._minimap_toggle = QPushButton("▼ Mini-Map")
+        self._minimap_toggle.setCheckable(True)
+        self._minimap_toggle.setChecked(True)
+        self._minimap_toggle.setStyleSheet(
+            "QPushButton { text-align: left; font-weight: bold; padding: 2px 6px; }"
+        )
+        self._minimap_toggle.clicked.connect(self._toggle_minimap)
+        layout.addWidget(self._minimap_toggle)
 
         # Mini-map
         self.mini_map = MiniMapView(self.game_state)
@@ -110,30 +178,30 @@ class InfoPanel(QFrame):
                 btn.clicked.connect(self.board_clicked.emit)
             btn_grid.addWidget(btn, i // 3, i % 3)
         layout.addLayout(btn_grid)
-        
+
         # Selection Info
         self.selection_label = QLabel("Terrain (col, row)\nLocation (if any)")
         self.selection_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         self.selection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.selection_label.setWordWrap(False)
+        self.selection_label.setMaximumHeight(50)
         layout.addWidget(self.selection_label)
 
         # Unit Info Frame
         self.unit_box = QFrame()
         self.unit_box.setFrameStyle(QFrame.Box)
-        self.unit_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.unit_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         unit_layout = QVBoxLayout(self.unit_box)
 
         # 1. Picture
-        self.lbl_unit_img = QLabel()
-        self.lbl_unit_img.setFixedSize(280, 280)
-        self.lbl_unit_img.setStyleSheet("border: 1px solid black; background-color: grey;")
-        self.lbl_unit_img.setScaledContents(True)
-        unit_layout.addWidget(self.lbl_unit_img, alignment=Qt.AlignCenter)
+        self.lbl_unit_img = _ImageLabel()
+        unit_layout.addWidget(self.lbl_unit_img, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # 2. Name (Libra Font)
         self.lbl_unit_name = QLabel("No Unit Selected")
-        self.lbl_unit_name.setAlignment(Qt.AlignCenter)
+        self.lbl_unit_name.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._setup_libra_font()
+        self.lbl_unit_name.setMaximumHeight(50)
         unit_layout.addWidget(self.lbl_unit_name)
 
         # 3. Stats Grid
@@ -171,9 +239,6 @@ class InfoPanel(QFrame):
         unit_layout.addLayout(stats_grid)
         layout.addWidget(self.unit_box)
 
-        # Unit Info table
-        #layout.addWidget(QLabel("Selected Units Stack:"))
-
         # Use reusable UnitTable
         self.units_table = UnitTable([
             UnitColumn.CHECKBOX,
@@ -182,13 +247,17 @@ class InfoPanel(QFrame):
             UnitColumn.RATING,
             UnitColumn.MOVE
         ])
-        self.units_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.units_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.units_table.setMinimumHeight(100)
+        #self.units_table.setMaximumHeight(300)
         self.units_table.itemChanged.connect(self.on_item_changed)
         self.selection_changed.connect(self.update_unit_box)
 
         layout.addWidget(self.units_table)
-        #layout.addStretch()
+
+        # Finalize scroll area
+        self._scroll_area.setWidget(scroll_content)
+        outer_layout.addWidget(self._scroll_area, 1)
 
         self.current_units = []
         self._passenger_unit_ids = set()
@@ -199,6 +268,12 @@ class InfoPanel(QFrame):
 
         # Initial update
         self.update_unit_box([])
+
+    def _toggle_minimap(self, checked):
+        """Toggle minimap visibility when the collapsible header is clicked."""
+        self._minimap_collapsed = not checked
+        self.mini_map.setVisible(checked)
+        self._minimap_toggle.setText("▶ Mini-Map" if not checked else "▼ Mini-Map")
 
     def refresh(self):
         """Manually refreshes the panel content (minimap, etc)."""
@@ -242,7 +317,11 @@ class InfoPanel(QFrame):
             img_path = os.path.join(IMAGES_DIR, "army.jpg")
 
         if os.path.exists(img_path):
-            self.lbl_unit_img.setPixmap(QPixmap(img_path))
+            pix = QPixmap(img_path)
+            if not pix.isNull():
+                self.lbl_unit_img.setPixmap(pix)
+            else:
+                self.lbl_unit_img.setText("Img Not Found")
         else:
             self.lbl_unit_img.setText("Img Not Found")
 

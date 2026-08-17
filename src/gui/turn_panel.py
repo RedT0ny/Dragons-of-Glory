@@ -101,8 +101,9 @@ class TurnPanel(QFrame):
         super().__init__(parent)
         self._ui = Ui_turn_panel()
         self._ui.setupUi(self)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.setFixedHeight(100)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.setMinimumHeight(80)
+        self.setMaximumHeight(120)
         self.sideLbl = self._ui.sideLbl
         self.turnLbl = self._ui.turnLbl
         self.calendarLbl = self._ui.calendarLbl
