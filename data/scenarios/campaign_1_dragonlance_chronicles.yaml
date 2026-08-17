@@ -56,7 +56,7 @@ scenario:
         - unit_id: "blode_ogre_inf_1"
           position: [36, 32]
         - unit_id: "blode_ogre_inf_2"
-          position: [22, 36]
+          position: [23, 36]
         - unit_id: "blode_ogre_inf_3"
           position: [21, 35]
         - unit_id: "blode_ogre_inf_4"
@@ -78,9 +78,9 @@ scenario:
         - unit_id: "blodehelm_human_inf_1"
           position: [33, 37]
         - unit_id: "blodehelm_human_inf_2"
-          position: [23, 34]
+          position: [26, 27]
         - unit_id: "blodehelm_human_inf_3"
-          position: [22, 34]
+          position: [26, 27]
         - unit_id: "blodehelm_human_inf_4"
           position: [34, 34]
         - unit_id: "wilhelm"
@@ -88,7 +88,7 @@ scenario:
         - unit_id: "dtemple_draconian_inf_1"
           position: [38, 22]
         - unit_id: "dtemple_draconian_inf_10"
-          position: [22, 35]
+          position: [22, 36]
         - unit_id: "dtemple_draconian_inf_11"
           position: [24, 17]
         - unit_id: "dtemple_draconian_inf_12"
@@ -118,7 +118,7 @@ scenario:
         - unit_id: "icereach_thanoi_inf_1"
           position: [28, 52]
         - unit_id: "icereach_thanoi_inf_2"
-          position: [28, 52]
+          position: [27, 52]
         - unit_id: "guugar"
           position: [25, 16]
         - unit_id: "kern_ogre_inf_1"
@@ -145,6 +145,18 @@ scenario:
           position: [49, 27]
         - unit_id: "sharuk"
           position: [50, 28]
+        - unit_id: "kothas_minotaur_inf_1"
+          position: [61, 16]
+        - unit_id: "kothas_minotaur_inf_2"
+          position: [34, 12]
+        - unit_id: "kothas_minotaur_inf_3"
+          position: [34, 12]
+        - unit_id: "kothas_minotaur_inf_4"
+          position: [29, 22]
+        - unit_id: "kothas_minotaur_fleet_1"
+          position: [34, 12]
+        - unit_id: "kothas_minotaur_fleet_2"
+          position: [34, 12]
         - unit_id: "lemish_human_cav_1"
           position: [25, 30]
         - unit_id: "lemish_human_cav_2"
@@ -184,7 +196,7 @@ scenario:
         - unit_id: "taman_human_inf_2"
           position: [22, 36]
         - unit_id: "taman_human_inf_3"
-          position: [22, 36]
+          position: [29, 22]
         - unit_id: "taman_human_inf_4"
           position: [50, 30]
         - unit_id: "taman_human_inf_5"
@@ -196,11 +208,11 @@ scenario:
         - unit_id: "taman_human_inf_8"
           position: [28, 20]
         - unit_id: "blackmaw"
-          position: [23, 36]
+          position: [28, 21]
         - unit_id: "throt_goblin_inf_1"
           position: [32, 18]
         - unit_id: "throt_goblin_inf_2"
-          position: [23, 36]
+          position: [22, 36]
         - unit_id: "throt_goblin_inf_3"
           position: [23, 36]
         - unit_id: "throt_goblin_inf_4"
@@ -266,7 +278,11 @@ scenario:
         kern: all
         khur: all
         lemish: all
-        kothas: null
+        kothas:
+          units_by_type:
+            inf: 4
+            fleet: 2
+            admiral: 1
         nightlund: null
         nordmaar: null
         sanction: all
@@ -381,14 +397,6 @@ scenario:
           position: [16, 20]
         - unit_id: "hylo_kender_inf_6"
           position: [16, 18]
-        - unit_id: "kothas_minotaur_inf_1"
-          position: [61, 16]
-        - unit_id: "kothas_minotaur_inf_2"
-          position: [61, 16]
-        - unit_id: "kothas_minotaur_inf_3"
-          position: [61, 16]
-        - unit_id: "kothas_minotaur_inf_4"
-          position: [61, 17]
         - unit_id: "loraliee"
           position: [16, 19]
         - unit_id: "mercadior"
@@ -407,10 +415,6 @@ scenario:
           position: [13, 18]
         - unit_id: "nergoth_solamnic_inf_3"
           position: [13, 18]
-        - unit_id: "nevermind_gnome_inf_1"
-          position: [6, 22]
-        - unit_id: "nevermind_gnome_inf_2"
-          position: [6, 22]
         - unit_id: "qualinesti_elf_inf_1"
           position: [21, 37]
         - unit_id: "qualinesti_elf_inf_2"

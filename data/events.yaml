@@ -101,8 +101,7 @@ hammer_of_kharas:
     
     Whitestone finds the Hammer of Kharas!
   picture: "arman_kharas.jpg"
-  allegiance: "whitestone"
-  turn: 8
+  turn: 10
   effects:
     grant_asset: "hammer_of_kharas"
 
@@ -333,6 +332,20 @@ soths_legions:
   allegiance: "highlord"
   turn: 18
   effects: { alliance: "dargaard" }
+
+staff_of_magius:
+  type: "artifact"
+  description: >
+    'But then I foresee little joy for anyone in Ansalon. I did compensate for what you deem my cruelty, however.'
+    'I never said...'
+    'You didn't need to, my friend. I know how you feel. I have given Raistlin the Staff of Magius, one of our most 
+    powerful artifacts. Though it will be a long time before he knows its true power.'
+    Antimodes was bitter, refusing to be mollified. 'And now you have your sword...'
+        
+    The Staff of Magius has been bestowed to a powerful wizard.
+  picture: "staff_released.jpg"
+  turn: 8
+  effects: { grant_asset: "staff_of_magius" }
 
 temptation_of_verminaard:
     type: "artifact"

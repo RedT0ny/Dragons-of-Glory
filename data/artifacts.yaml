@@ -197,10 +197,10 @@ staff_of_magius:
     This staff is said to have been created and wielded by the great war-wizard Magius, whose magic was instrumental 
     in aiding Huma in defeating the Queen of Darkness.
   picture: "staff_of_magius.jpg"
-  effect: "+2 Tactical Rating. Wizards only."
+  effect: "+1 Tactical Rating. Wizards only."
   requirements:
     - { type: "unit_type", value: "wizard" }
-  bonus: { tactical_rating: 2 }
+  bonus: { tactical_rating: 1 }
 
 wyrmslayer:
   type: "artifact"
