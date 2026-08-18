@@ -244,6 +244,30 @@ class MainWindow(QMainWindow):
             event.accept()
             return
 
+        if event.key() == Qt.Key_B and not event.modifiers():
+            if hasattr(self, 'info_panel'):
+                self.info_panel.board_clicked.emit()
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_U and not event.modifiers():
+            if hasattr(self, 'info_panel'):
+                self.info_panel.use_clicked.emit()
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_P and not event.modifiers():
+            if hasattr(self, 'info_panel'):
+                self.info_panel.prev_clicked.emit()
+            event.accept()
+            return
+
+        if event.key() == Qt.Key_N and not event.modifiers():
+            if hasattr(self, 'info_panel'):
+                self.info_panel.next_clicked.emit()
+            event.accept()
+            return
+
         if event.key() == Qt.Key_W:
             self.map_view.verticalScrollBar().setValue(
                 self.map_view.verticalScrollBar().value() - scroll_step
@@ -525,6 +549,13 @@ class MainWindow(QMainWindow):
         # Board/Unboard action (only active in Movement phase)
         if hasattr(self.info_panel, 'board_clicked'):
             self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
+        # Placeholder actions (no controller handler yet)
+        if hasattr(self.info_panel, 'use_clicked'):
+            self.info_panel.use_clicked.connect(getattr(controller, 'on_use_button_clicked', lambda: None))
+        if hasattr(self.info_panel, 'prev_clicked'):
+            self.info_panel.prev_clicked.connect(getattr(controller, 'on_prev_button_clicked', lambda: None))
+        if hasattr(self.info_panel, 'next_clicked'):
+            self.info_panel.next_clicked.connect(getattr(controller, 'on_next_button_clicked', lambda: None))
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.units_clicked.connect(controller.on_map_units_clicked)
         if hasattr(self.map_view, "depleted_stack_clicked"):

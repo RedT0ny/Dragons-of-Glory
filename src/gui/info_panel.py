@@ -113,6 +113,9 @@ class InfoPanel(QFrame):
     board_clicked = Signal()
     undo_clicked = Signal()
     end_phase_clicked = Signal()
+    use_clicked = Signal()
+    prev_clicked = Signal()
+    next_clicked = Signal()
     selection_changed = Signal(list)
     minimap_clicked = Signal(QPointF)
 
@@ -164,6 +167,9 @@ class InfoPanel(QFrame):
         self.btn_board = None
         self.btn_undo = None
         self.btn_end_phase = None
+        self.btn_use = None
+        self.btn_prev = None
+        self.btn_next = None
         for i, name in enumerate(btns):
             btn = QPushButton(name)
             if name == "End Phase":
@@ -176,6 +182,15 @@ class InfoPanel(QFrame):
                 # Expose board button signal for controller
                 self.btn_board = btn
                 btn.clicked.connect(self.board_clicked.emit)
+            if name == "Use":
+                self.btn_use = btn
+                btn.clicked.connect(self.use_clicked.emit)
+            if name == "Prev":
+                self.btn_prev = btn
+                btn.clicked.connect(self.prev_clicked.emit)
+            if name == "Next":
+                self.btn_next = btn
+                btn.clicked.connect(self.next_clicked.emit)
             btn_grid.addWidget(btn, i // 3, i % 3)
         layout.addLayout(btn_grid)
 
