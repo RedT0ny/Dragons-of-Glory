@@ -1,9 +1,9 @@
 import os
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QSizePolicy, QFileDialog, QDialog, QGraphicsScene, QGraphicsView
+from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QPushButton, QSizePolicy, QFileDialog, QDialog, QGraphicsScene, QGraphicsView, QApplication
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QGraphicsVideoItem
 from PySide6.QtCore import QUrl, Qt, Signal, QSettings
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QScreen
 from src.content.config import APP_NAME, SAVEGAME_DIR, INTRO_VIDEO, LIBRA_FONT
 from src.content.audio_manager import AudioManager
 from src.gui.config_dialog import ConfigDialog
@@ -32,19 +32,36 @@ class IntroWindow(QMainWindow):
     # Signal emitted when a save file and runtime configuration are selected
     ready_to_load = Signal(str, dict) # (file_path, player_config)
 
+    # Design resolution (the "ideal" size this UI was built for).
+    _DESIGN_W = 1600
+    _DESIGN_H = 1080
+
     def __init__(self, translator):
         super().__init__()
         self.translator = translator
         self.setWindowTitle(APP_NAME)
 
-        # Fixed intro presentation size.
-        self.setFixedSize(1600, 1080)
+        # Scale the window to fit the primary screen while keeping the design
+        # aspect ratio.  This handles small monitors and OS-level DPI scaling.
+        screen: QScreen = QApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            avail_w, avail_h = geo.width(), geo.height()
+        else:
+            avail_w, avail_h = self._DESIGN_W, self._DESIGN_H
+
+        scale = min(avail_w / self._DESIGN_W, avail_h / self._DESIGN_H, 1.0)
+        self._win_w = int(self._DESIGN_W * scale)
+        self._win_h = int(self._DESIGN_H * scale)
+        self._margin = int(100 * scale)
+
+        self.setFixedSize(self._win_w, self._win_h)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
         self.video_view = QGraphicsView(self.central_widget)
-        self.video_view.setGeometry(0, 0, 1600, 1080)
+        self.video_view.setGeometry(0, 0, self._win_w, self._win_h)
         self.video_view.setFrameShape(QGraphicsView.NoFrame)
         self.video_view.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.video_view.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -59,7 +76,7 @@ class IntroWindow(QMainWindow):
         self.video_view.fitInView(self.video_item, Qt.IgnoreAspectRatio)
 
         self.overlay_widget = QWidget(self.central_widget)
-        self.overlay_widget.setGeometry(0, 0, 1600, 1080)
+        self.overlay_widget.setGeometry(0, 0, self._win_w, self._win_h)
         self.overlay_widget.setAttribute(Qt.WA_TranslucentBackground, True)
 
         self.video_player = QMediaPlayer(self)
@@ -81,12 +98,12 @@ class IntroWindow(QMainWindow):
         QFontDatabase.addApplicationFont(LIBRA_FONT)
 
         main_layout = QVBoxLayout(self.overlay_widget)
-        main_layout.setContentsMargins(100, 100, 100, 100)
+        main_layout.setContentsMargins(self._margin, self._margin, self._margin, self._margin)
 
         main_layout.addStretch()
 
         menu_container = QVBoxLayout()
-        menu_container.setSpacing(20)
+        menu_container.setSpacing(int(20 * (self._win_w / self._DESIGN_W)))
 
         options = [
             ("menu_continue", self.on_continue),
@@ -95,21 +112,22 @@ class IntroWindow(QMainWindow):
             ("menu_quit", self.on_quit)
         ]
 
-        style = """
-            QPushButton {
+        font_size = int(48 * (self._win_w / self._DESIGN_W))
+        style = f"""
+            QPushButton {{
                 background-color: transparent;
                 color: #D4AF37; /* Classic Gold */
                 font-family: 'Libra';
-                font-size: 48px;
+                font-size: {font_size}px;
                 text-align: left;
                 border: none;
                     padding: 5px 15px; /* Adds space for the shadow background */
                     border-radius: 5px;  /* Softens the edges of the shadow */
-                }
-                QPushButton:hover {
+                }}
+                QPushButton:hover {{
                     color: #FFD700; /* Bright Gold on hover */
                     background-color: rgba(0, 0, 0, 150); /* Dark semi-transparent shadow */
-                }
+                }}
         """
 
         for key, callback in options:
