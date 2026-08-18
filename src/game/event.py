@@ -63,6 +63,11 @@ class Event:
         """Mark this event as inactive so it will not trigger again."""
         self.is_active = False
 
+    @property
+    def display_name(self) -> str:
+        """Human-readable event name from the locale files."""
+        return translator.get_event_name(self.id)
+
 
 class Asset:
     """An in-game asset that can be equipped to a unit or consumed.

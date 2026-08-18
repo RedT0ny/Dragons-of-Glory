@@ -46,6 +46,10 @@ class Translator:
         """Returns the translated name of the asset."""
         return self.translations.get('assets', {}).get(asset_id, asset_id)
 
+    def get_event_name(self, event_id: str) -> str:
+        """Returns the translated name of the event."""
+        return self.translations.get('events', {}).get(event_id, event_id)
+
     def get_capital_name(self, capital_id: str) -> str:
         """Returns the translated name of the capital city."""
         return self.translations.get('capitals', {}).get(capital_id, capital_id)

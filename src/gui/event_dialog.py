@@ -127,7 +127,7 @@ class EventDialog(QDialog, Ui_event_dialog):
             return
 
         # Title
-        title = self.event.spec.id.replace("_", " ").title()
+        title = self.event.display_name
         self.setWindowTitle(
             self.translator.tr(
                 "dialogs.event.strategic_title",

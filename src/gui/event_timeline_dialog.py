@@ -38,10 +38,12 @@ def _palette_color(widget, role, alpha=255):
 
 
 def _events_to_dicts(event_specs: Dict[str, EventSpec]) -> List[dict]:
+    from src.game.event import translator as event_translator
     events = []
     for eid, spec in event_specs.items():
         events.append({
             "id": spec.id,
+            "display_name": event_translator.get_event_name(spec.id),
             "turn": spec.turn or 0,
             "type": spec.event_type,
             "allegiance": spec.allegiance or "none",
@@ -58,11 +60,12 @@ def _events_to_dicts(event_specs: Dict[str, EventSpec]) -> List[dict]:
 class EventDetailDialog(QDialog):
     def __init__(self, event, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(event["id"].replace("_", " ").title())
+        event_name = event["display_name"]
+        self.setWindowTitle(event_name)
         self.resize(700, 500)
         layout = QVBoxLayout(self)
 
-        title = QLabel(event["id"].replace("_", " ").title())
+        title = QLabel(event_name)
         title_font = QFont()
         title_font.setPointSize(20)
         title_font.setBold(True)
@@ -135,7 +138,7 @@ class TimelineWidget(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         outer.addWidget(scroll)
 
         container = QWidget()
@@ -267,7 +270,7 @@ class TimelineWidget(QWidget):
 
         layout.addLayout(header)
 
-        name = QLabel(event["id"].replace("_", " ").title())
+        name = QLabel(event["display_name"])
         name.setWordWrap(True)
         name_font = QFont()
         name_font.setPointSize(11)
@@ -301,7 +304,8 @@ class TimelineWidget(QWidget):
 class EventTimelineDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Event Timeline")
+        self.translator = Translator()
+        self.setWindowTitle(self.translator.tr("dialogs.event.timeline_title", "Event Timeline"))
         self.resize(1100, 700)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
