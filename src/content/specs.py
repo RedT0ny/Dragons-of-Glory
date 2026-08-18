@@ -338,6 +338,7 @@ class HexDirection(Enum):
     NORTH_WEST = 5
 
 class RequirementType(Enum):
+    COUNTRY = "country"
     RACE = "race"
     TRAIT = "trait"
     ITEM = "item"

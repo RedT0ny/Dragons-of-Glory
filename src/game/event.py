@@ -216,7 +216,7 @@ class Asset:
 
         elif req_type == RequirementType.ALLEGIANCE.value:
             required_allegiance = ASSET_REQUIREMENTS["allegiance_requirements"].get(req_value)
-            return hasattr(unit, 'allegiance') and unit.allegiance == required_allegiance
+            return unit.allegiance == required_allegiance
 
         elif req_type == RequirementType.UNIT_TYPE.value:
             values = req_value if isinstance(req_value, (list, tuple)) else [req_value]
@@ -229,6 +229,13 @@ class Asset:
                         return True
                 elif hasattr(unit, 'unit_type') and unit.unit_type and unit.unit_type.value == v:
                     return True
+            return False
+
+        elif req_type == RequirementType.COUNTRY.value:
+            if hasattr(unit, 'land') and unit.land == req_value:
+                return True
+            elif unit.spec.dragonflight == req_value:
+                return True
             return False
 
         elif req_type == RequirementType.ITEM.value:

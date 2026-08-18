@@ -55,11 +55,10 @@ dragonarmor:
     Each suit of dragonarmor is specifically crafted to fit a specific individual, and is presented as a 
     token of prestige to officers.
   picture: "dragonarmor.jpg"
-  effect: "+1 Tactical Rating. Armor bonus."
+  effect: "Armor bonus (-1 DRM when defending)."
   requirements:
     - { type: "unit_type", value: "highlord" }
   bonus:
-    tactical_rating: 1
     other: "armor"
 
 dragonlance:
@@ -68,7 +67,7 @@ dragonlance:
     First created during the Third Dragon War, dragonlances are weapons created for the express purpose of killing 
     dragons. The lances are as effective as a normal lance against most opponents. Against dragons, they are devastating.
   picture: "dragonlance.svg"
-  effect: "+1 Combat Rating. Dragon slayer (doubles Combat Rating vs dragons)."
+  effect: "x2 Combat Rating. Dragon slayer (negates enemy dragon drm bonus)."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "army" }
@@ -130,7 +129,6 @@ hammer_of_kharas:
   picture: "hammer_of_kharas.jpg"
   effect: "+1 Tactical Rating. +1 diplomacy with Kaolyn, Thorbardin and Zhakar."
   requirements:
-    - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "leader" }
   bonus:
     tactical_rating: 1
@@ -156,10 +154,11 @@ nightbringer:
     heavy mace with a black oaken handle and the head of solid, blackened steel. The mace emanates evil, even when 
     it is not being wielded.
   picture: "nightbringer.jpg"
-  effect: "+2 Tactical Rating. Highlords only."
+  effect: "+1 Tactical Rating. Red Wing Highlords only."
   requirements:
     - { type: "unit_type", value: "highlord" }
-  bonus: { tactical_rating: 2 }
+    - { type: "country", value: "red" }
+  bonus: { tactical_rating: 1 }
 
 plate_of_solamnus:
   type: "artifact"
@@ -170,12 +169,11 @@ plate_of_solamnus:
     forged since that time, at least according to the records of the Knights of Solamnia, who have tried to keep 
     track of every suit they have discovered.
   picture: "solamnus_plate.jpg"
-  effect: "+1 Tactical Rating. Armor bonus."
+  effect: "Armor bonus (-1 DRM when defending)."
   requirements:
     - { type: "unit_type", value: "leader" }
     - { type: "race", value: "solamnic" }
   bonus:
-    tactical_rating: 1
     other: "armor"
 
 silver_arm:
@@ -210,9 +208,11 @@ wyrmslayer:
     Forged by the Silvanesti during the Age of Dreams for use in the early Dragon Wars. It was famously wielded by 
     the elven hero Kith-Kanan during the Kinslayer War and later buried with him in Pax Tharkas.
   picture: "wyrmslayer.jpg"
-  effect: "+2 Tactical Rating. Elven leaders only."
+  effect: "+1 Tactical Rating. Dragon Slayer. Elven leaders only."
   requirements:
     - { type: "allegiance", value: "whitestone" }
     - { type: "unit_type", value: "leader" }
     - { type: "race", value: "elf" }
-  bonus: { tactical_rating: 2 }
+  bonus:
+    tactical_rating: 1
+    other: "dragon_slayer"
