@@ -112,6 +112,8 @@ class GameController(QObject):
         self._pending_phase_advance_after_deployment = False
         self._startup_loading_dialog = None
         self._turn_tick_queued = False  # Guard against double-scheduling process_game_turn
+        self._cycle_index = -1
+        self._cycle_index = -1
 
     def get_runtime_config(self):
         """Return current runtime configuration for saving/restoring.
@@ -255,6 +257,7 @@ class GameController(QObject):
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
         self.maelstrom_warning_hexes = set()
+        self._cycle_index = -1
         self.movement_service.clear_movement_undo()
         if self.replacements_dialog and shiboken6.isValid(self.replacements_dialog):
             self.replacements_dialog.close()
@@ -819,6 +822,7 @@ class GameController(QObject):
             self.selected_units_for_movement = []
             self.neutral_warning_hexes = set()
             self.maelstrom_warning_hexes = set()
+            self._cycle_index = -1
             self.view.highlight_movement_range([])
             self.view.sync_with_model()
             self._refresh_info_panel()
@@ -843,6 +847,7 @@ class GameController(QObject):
         self.selected_units_for_movement = []
         self.neutral_warning_hexes = set()
         self.maelstrom_warning_hexes = set()
+        self._cycle_index = -1
         self.movement_service.clear_movement_undo()
         def _deferred_end_phase_view_update():
             self.view.highlight_movement_range([])
@@ -1492,17 +1497,81 @@ class GameController(QObject):
         self.neutral_warning_hexes = set()
         self.maelstrom_warning_hexes = set()
 
+    def _get_cyclable_stacks(self):
+        """Return hex stacks containing active player units that haven't acted yet.
+
+        Returns:
+            list: Tuples of (col, row, units_at_hex) sorted by position,
+                  where at least one unit belongs to the active player and
+                  has not moved (Movement phase) or attacked (Combat phase).
+        """
+        active = self.game_state.active_player
+        if not active:
+            return []
+        phase = self.game_state.phase
+        stacks = []
+        for (q, r), units_at_hex in self.game_state.map.unit_map.items():
+            eligible = [
+                u for u in units_at_hex
+                if u.allegiance == active and u.is_on_map
+            ]
+            if not eligible:
+                continue
+            if phase == GamePhase.MOVEMENT:
+                if not any(not u.moved_this_turn for u in eligible):
+                    continue
+            elif phase == GamePhase.COMBAT:
+                if not any(not u.attacked_this_turn for u in eligible):
+                    continue
+            else:
+                continue
+            stacks.append((q, r, eligible))
+        stacks.sort(key=lambda t: (t[1], t[0]))
+        return stacks
+
+    def _navigate_to_stack(self, col, row, units):
+        """Center the map on the given hex and emit units_clicked to populate the info panel.
+
+        Args:
+            col: Column offset coordinate of the hex.
+            row: Row offset coordinate of the hex.
+            units: List of units at that hex to display.
+        """
+        center = self.view.get_hex_center(col, row)
+        self.view.centerOn(center)
+        self.view.units_clicked.emit(units)
+
     def on_prev_button_clicked(self):
-        """Handle Prev button click to select the previous unit."""
+        """Handle Prev button click to cycle to the previous unmoved/unattacked stack."""
         if not self._is_human_interactive_turn():
             return
-        pass
+        stacks = self._get_cyclable_stacks()
+        if not stacks:
+            return
+        if self._cycle_index < 0 or self._cycle_index >= len(stacks):
+            self._cycle_index = len(stacks) - 1
+        else:
+            self._cycle_index -= 1
+            if self._cycle_index < 0:
+                self._cycle_index = len(stacks) - 1
+        col, row, units = stacks[self._cycle_index]
+        self._navigate_to_stack(col, row, units)
 
     def on_next_button_clicked(self):
-        """Handle Next button click to select the next unit."""
+        """Handle Next button click to cycle to the next unmoved/unattacked stack."""
         if not self._is_human_interactive_turn():
             return
-        pass
+        stacks = self._get_cyclable_stacks()
+        if not stacks:
+            return
+        if self._cycle_index < 0 or self._cycle_index >= len(stacks):
+            self._cycle_index = 0
+        else:
+            self._cycle_index += 1
+            if self._cycle_index >= len(stacks):
+                self._cycle_index = 0
+        col, row, units = stacks[self._cycle_index]
+        self._navigate_to_stack(col, row, units)
 
     def on_use_button_clicked(self):
         """Handle Use button click to use the selected unit's special ability or equipped item."""
