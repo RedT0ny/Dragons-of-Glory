@@ -547,15 +547,12 @@ class MainWindow(QMainWindow):
         self.info_panel.selection_changed.connect(controller.on_unit_selection_changed)
         self.info_panel.undo_clicked.connect(controller.on_undo_clicked)
         # Board/Unboard action (only active in Movement phase)
-        if hasattr(self.info_panel, 'board_clicked'):
-            self.info_panel.board_clicked.connect(getattr(controller, 'on_board_button_clicked', lambda: None))
+        self.info_panel.board_clicked.connect(controller.on_board_button_clicked)
         # Placeholder actions (no controller handler yet)
-        if hasattr(self.info_panel, 'use_clicked'):
-            self.info_panel.use_clicked.connect(getattr(controller, 'on_use_button_clicked', lambda: None))
-        if hasattr(self.info_panel, 'prev_clicked'):
-            self.info_panel.prev_clicked.connect(getattr(controller, 'on_prev_button_clicked', lambda: None))
-        if hasattr(self.info_panel, 'next_clicked'):
-            self.info_panel.next_clicked.connect(getattr(controller, 'on_next_button_clicked', lambda: None))
+        self.info_panel.use_clicked.connect(controller.on_use_button_clicked)
+        self.info_panel.prev_clicked.connect(controller.on_prev_button_clicked)
+        self.info_panel.next_clicked.connect(controller.on_next_button_clicked)
+        # Connect map interactions to controller
         self.map_view.hex_clicked.connect(controller.on_hex_clicked)
         self.map_view.units_clicked.connect(controller.on_map_units_clicked)
         if hasattr(self.map_view, "depleted_stack_clicked"):

@@ -1492,6 +1492,24 @@ class GameController(QObject):
         self.neutral_warning_hexes = set()
         self.maelstrom_warning_hexes = set()
 
+    def on_prev_button_clicked(self):
+        """Handle Prev button click to select the previous unit."""
+        if not self._is_human_interactive_turn():
+            return
+        pass
+
+    def on_next_button_clicked(self):
+        """Handle Next button click to select the next unit."""
+        if not self._is_human_interactive_turn():
+            return
+        pass
+
+    def on_use_button_clicked(self):
+        """Handle Use button click to use the selected unit's special ability or equipped item."""
+        if not self._is_human_interactive_turn():
+            return
+        pass
+
     def on_undo_clicked(self):
         """Handle undo button click during movement phase to undo last movement."""
         if not self._is_human_interactive_turn():
