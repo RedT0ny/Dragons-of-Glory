@@ -151,7 +151,7 @@ class EventSystem:
         """
         Draws an event for the given allegiance based on triggers and probability.
         """
-        # 1. Check for Auto-Triggers (Highest priority)
+        # 1. Fill in the event pool based on allegiance and occurrence limits.
         candidates = []
         for event in self.game_state.strategic_event_pool:
             if event.id in self.game_state.completed_event_ids:

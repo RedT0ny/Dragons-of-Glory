@@ -248,6 +248,27 @@ class Unit:
     def is_draconid(self) -> bool:
         return self.race == UnitRace.DRACONIAN or self.is_dragon()
 
+    # --- Equipment queries ---
+
+    def get_equipment(self, asset_id: str):
+        """Returns the asset with the given base_id equipped by this unit, or None."""
+        for asset in getattr(self, "equipment", []) or []:
+            if getattr(asset, "base_id", None) == asset_id:
+                return asset
+        return None
+
+    def get_equipment_with_bonus(self, bonus_name: str):
+        """Returns the first asset whose bonus.other matches *bonus_name*, or None."""
+        for asset in getattr(self, "equipment", []) or []:
+            bonus = getattr(asset, "bonus", None)
+            if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
+                return asset
+        return None
+
+    def has_bonus(self, bonus_name: str) -> bool:
+        """True if any equipped asset has bonus.other equal to *bonus_name*."""
+        return self.get_equipment_with_bonus(bonus_name) is not None
+
     # --- State Logic ---
 
     def activate(self):
@@ -333,6 +354,7 @@ class Unit:
         }
 
     def load_state(self, state_data: dict):
+        """Load the unit state from a dictionary, used when loading a saved game."""
         pos = state_data.get("position")
         self.position = tuple(pos) if pos else (None, None)
 
@@ -352,7 +374,7 @@ class Unit:
         self.invaded_this_turn = state_data.get("invaded_this_turn", False)
 
     def eliminate_carrier(self):
-        # Eliminate carrier and handle passengers (leaders escape, others eliminated).
+        """Eliminate carrier and handle passengers (leaders escape, others eliminated)."""
         from src.game.leader_escape import LeaderEscapeCheck
 
         passengers = list(self.passengers)
@@ -505,6 +527,7 @@ class FlyingCitadel(Unit):
         return -2
 
 class Hero(Unit):
+    """Placeholder for future Hero unit type. Currently behaves like a standard Unit."""
     def __init__(self, spec: UnitSpec, ordinal: int = 1):
         super().__init__(spec, ordinal)
 

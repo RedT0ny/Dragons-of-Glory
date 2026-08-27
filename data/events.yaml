@@ -263,7 +263,7 @@ flying_citadel:
     
     An ominous Flying Citadel joins the Dragon Highlord's forces.
   picture: "rising_citadel.jpg"
-  turn: 22
+  turn: 21
   allegiance: "highlord"
   effects: { add_units: "citadel" }
 

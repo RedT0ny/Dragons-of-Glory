@@ -74,7 +74,7 @@ def activate_dragon_orb(attackers, defenders, consume_asset_fn, damage_unit_fn, 
         for unit in friendly:
             if not (hasattr(unit, "is_leader") and unit.is_leader() and unit.is_on_map):
                 continue
-            orb = _get_equipped_asset(unit, "dragon_orb")
+            orb = unit.get_equipment("dragon_orb")
             if orb:
                 orb_users.append((unit, orb))
 
@@ -132,7 +132,7 @@ def activate_gnome_tech(
         for unit in friendly:
             if not unit.is_army() and unit.is_on_map:
                 continue
-            found = _get_equipped_asset_with_other(unit, "gnome_tech")
+            found = unit.get_equipment_with_bonus("gnome_tech")
             if found is None:
                 continue
             carrier = unit
@@ -167,25 +167,6 @@ def activate_gnome_tech(
             )
 
     return drm_bonus, logs
-
-
-def _get_equipped_asset(unit, asset_id: str):
-    """Returns the asset with the given ID equipped by the unit, or None if not found."""
-    for asset in getattr(unit, "equipment", []) or []:
-        if getattr(asset, "base_id", None) == asset_id:
-            return asset
-    return None
-
-
-def _get_equipped_asset_with_other(unit, bonus_name: str):
-    """
-    Returns the first asset equipped by the unit that has a bonus.other matching the given name, or None if not found.
-    """
-    for asset in getattr(unit, "equipment", []) or []:
-        bonus = getattr(asset, "bonus", None)
-        if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
-            return asset
-    return None
 
 
 class CombatResolver:
@@ -463,10 +444,10 @@ class CombatResolver:
         )
         add_part("defender_dragons", -defender_dragon_bonus)
 
-        # ARMOR: defender stack forces attacker -1 DRM
-        if self._defender_has_other_bonus("armor"):
-            add_part("defender_armor", -1)
-            self._consume_other_bonus_if_needed(self.defenders, "armor")
+        # DEFENSE BONUS: defender stack forces attacker -1 DRM. Not used atm.
+        if self._defender_has_other_bonus("defense"):
+            add_part("defense_bonus", -1)
+            self._consume_other_bonus_if_needed(self.defenders, "defense")
 
         # CAVALRY (+1 attacker only, not vs location/forest/jungle)
         cavalry_blocked = bool(defender_location) or defender_terrain in (TerrainType.FOREST, TerrainType.JUNGLE)
@@ -513,6 +494,7 @@ class CombatResolver:
         return drm
 
     def _get_defender_hex(self):
+        ''' Returns the AXIAL coordinates of the defender hex, or None if not found.'''
         if not self.game_state or not self.game_state.map:
             return None
         for unit in self.defenders:
@@ -526,6 +508,7 @@ class CombatResolver:
         return None
 
     def _get_defender_location(self):
+        ''' Returns the Location object of the defender hex, or None if not found.'''
         # Citadel-vs-WS special case can suppress defender location benefits.
         if self._citadel_attack_strips_ws_defender_bonuses():
             return None
@@ -581,14 +564,11 @@ class CombatResolver:
             return TerrainType.GRASSLAND
         return self.terrain_type
 
-    def _unit_has_other_bonus(self, unit, bonus_name):
-        return _get_equipped_asset_with_other(unit, bonus_name) is not None
-
     def _defender_has_other_bonus(self, bonus_name):
         for unit in self.defenders:
             if not unit.is_on_map:
                 continue
-            if self._unit_has_other_bonus(unit, bonus_name):
+            if unit.has_bonus(bonus_name):
                 return True
         return False
 
@@ -598,7 +578,7 @@ class CombatResolver:
         if not callable(self._consume_asset_fn):
             return
         for unit in units:
-            asset = _get_equipped_asset_with_other(unit, bonus_name)
+            asset = unit.get_equipment_with_bonus(bonus_name)
             if asset is None:
                 continue
             if not getattr(asset, "is_consumable", False):
@@ -695,6 +675,7 @@ class CombatResolver:
         return bonus
 
     def _get_affected_armies(self, units):
+        """ Returns a list of units that are affected by combat results (i.e., armies on the map)."""
         affected = []
         for unit in units:
             if not unit.is_on_map:
@@ -832,6 +813,7 @@ class NavalCombatResolver:
 
     @staticmethod
     def _fleet_is_in_port(game_state, fleet):
+        """Check if a fleet is in a friendly port location."""
         if not fleet.position or None in fleet.position:
             return False
         hex_coord = Hex.offset_to_axial(*fleet.position)
@@ -1665,7 +1647,7 @@ class CombatService:
                 continue
             if getattr(unit, "_healed_this_combat_turn", False):
                 continue
-            healing_asset = self._get_equipped_other_bonus_asset(unit, "healing")
+            healing_asset = unit.get_equipment_with_bonus("healing")
             if healing_asset is None:
                 continue
             unit.status = UnitState.ACTIVE
@@ -1676,13 +1658,6 @@ class CombatService:
                 logs.append(f"Healing asset consumed: {healing_asset.id} on {TextFormatter.format_unit_log_string(unit)}.")
         return logs
 
-    def _get_equipped_other_bonus_asset(self, unit, bonus_name):
-        for asset in getattr(unit, "equipment", []) or []:
-            bonus = getattr(asset, "bonus", None)
-            if isinstance(bonus, dict) and bonus.get("other") == bonus_name:
-                return asset
-        return None
-
     def _resolve_leader_revives(self, units, leader_origins):
         requests = []
         for leader in units:
@@ -1690,7 +1665,7 @@ class CombatService:
                 continue
             if leader.status != UnitState.DESTROYED:
                 continue
-            revive_asset = self._get_equipped_other_bonus_asset(leader, "revive")
+            revive_asset = leader.get_equipment_with_bonus("revive")
             if revive_asset is None:
                 continue
             origin_hex = leader_origins.get(leader)
@@ -2847,6 +2822,7 @@ class CombatClickHandler:
                 self.game_state.move_unit(unit, retreat_hex)
 
     def _begin_defender_withdrawal(self, defending_fleets, battle_location):
+        """Begin the defender withdrawal phase."""
         self._defender_withdrawal_fleets = list(defending_fleets)
         self._defender_withdrawal_battle_loc = battle_location
         self._defender_withdrawal_hexes = self._get_defender_withdrawal_hexes(defending_fleets, battle_location)
@@ -2931,6 +2907,7 @@ class CombatClickHandler:
         self._maybe_prompt_naval_advance_after_defender_withdrawal()
 
     def _get_defender_withdrawal_hexes(self, fleets, battle_location):
+        """Return a set of (col, row) tuples for valid hexes where the defender fleets can withdraw."""
         from src.game.map import Hex
         hexes = set()
         for fleet in fleets:
@@ -2958,6 +2935,7 @@ class CombatClickHandler:
         return hexes
 
     def _complete_defender_withdrawal(self, dest_hex):
+        """Move the defender fleets to the chosen hex and resolve any maelstroms."""
         from src.game.map import Hex
         for fleet in self._defender_withdrawal_fleets:
             if fleet.is_on_map:
@@ -2977,6 +2955,8 @@ class CombatClickHandler:
         self._maybe_prompt_naval_advance_after_defender_withdrawal()
 
     def _handle_defender_withdrawal_click(self, target_hex):
+        """Handle a click during the defender withdrawal phase.
+        If the clicked hex is a valid withdrawal hex, move the fleets there."""
         if self._escape_info_dialog:
             self._escape_info_dialog.close()
             self._escape_info_dialog = None
@@ -3007,6 +2987,7 @@ class CombatClickHandler:
             self._prompt_advance_after_combat()
 
     def _prompt_advance_after_combat(self):
+        """Prompt the human attacker to advance into a vacated hex after combat."""
         if not self.pending_advance:
             return
 

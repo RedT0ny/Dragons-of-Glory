@@ -26,6 +26,7 @@ class LeaderEscapeCheck:
 
 
 class LeaderEscapeHandler:
+    """Handles the logic for leader escape attempts."""
     def __init__(self, game_state, roll_d6_fn=None):
         self.game_state = game_state
         self._roll_d6 = roll_d6_fn or (lambda: random.randint(1, 6))
@@ -51,6 +52,8 @@ class LeaderEscapeHandler:
 
             if getattr(check, "roll_required", True):
                 roll = self._roll_d6()
+                if leader.has_bonus("armor"):
+                    roll += 1
                 if roll <= 3:
                     self.game_state.damage_unit(leader, mode="destroy")
                     destroyed.append(leader)
