@@ -73,13 +73,11 @@ class AssetDetails(QFrame):
         self.desc_field = QTextEdit()
         self.desc_field.setReadOnly(True)
         self.desc_field.setPlaceholderText("Asset Description")
-        #self.desc_field.setMaximumHeight(80)
         right_col.addWidget(self.desc_field)
 
         # Increase font size
         font = self.bonus_field.font()  # Get default font
         font.setPointSize(font.pointSize() + 6)  # Increase by 4 points
-        # or font.setPointSize(14)  # Set specific size
         self.bonus_field.setFont(font)
         self.desc_field.setFont(font)
 
@@ -122,7 +120,7 @@ class AssetDetails(QFrame):
             bonus_str = ", ".join([f"{k}: {v}" for k,v in asset.bonus.items()])
         else:
             bonus_str = str(asset.bonus)
-        self.bonus_field.setText(bonus_str)
+        self.bonus_field.setText(bonus_str.capitalize().replace('_', ' '))
 
         # Picture Border Color
         border_color = "gold" # Default Artifact

@@ -480,9 +480,9 @@ class VictoryConditionEvaluator:
 
     def _matches_unit_types(self, unit: Any, unit_filter: set[str]) -> bool:
         if "units" in unit_filter:
-            is_army = hasattr(unit, "is_army") and unit.is_army()
-            is_wing = getattr(unit, "unit_type", None) == UnitType.WING
-            is_fleet = getattr(unit, "unit_type", None) == UnitType.FLEET
+            is_army = unit.is_army()
+            is_wing = unit.is_wing()
+            is_fleet = unit.is_fleet()
             if is_army or is_wing or is_fleet:
                 return True
 

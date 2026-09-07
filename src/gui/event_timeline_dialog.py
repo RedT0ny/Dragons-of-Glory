@@ -17,10 +17,6 @@ ALLEGIANCE_COLORS = {
     "whitestone": QColor("#2b7be4"),
     "highlord":   QColor("#d43d3d"),
 }
-ALLEGIANCE_LABELS = {
-    "whitestone": "Whitestone",
-    "highlord":   "Highlord",
-}
 TYPE_COLORS = {
     "diplomacy": QColor("#4caf50"),
     "artifact":  QColor("#ff9800"),
@@ -84,7 +80,7 @@ class EventDetailDialog(QDialog):
         if event["allegiance"] != "none":
             ali = event["allegiance"]
             c = ALLEGIANCE_COLORS.get(ali) or QColor(_palette_color(self, QPalette.Mid))
-            ali_label = QLabel(f"Allegiance: {ALLEGIANCE_LABELS.get(ali, ali)}")
+            ali_label = QLabel(f"Allegiance: {ali.capitalize()}")
             ali_label.setStyleSheet(f"font-size: 14px; color: {c.name()}; font-weight: bold;")
             meta.addWidget(ali_label)
         meta.addStretch()
@@ -101,12 +97,12 @@ class EventDetailDialog(QDialog):
 
         desc = QTextEdit()
         desc.setReadOnly(True)
-        desc.setHtml(f"<p style='font-size:14px; line-height:1.6;'>{event['description'].replace(chr(10), '<br>')}</p>")
+        desc.setHtml(f"<p style='font-size:14px;'>{event['description'].replace(chr(10), '<br>')}</p>")
         layout.addWidget(desc)
 
         effects_text = ", ".join(f"{k}: {v}" for k, v in event["effects"].items())
         if effects_text:
-            eff = QLabel(f"Effects: {effects_text}")
+            eff = QLabel(f"Effects: {effects_text.capitalize().replace('_', ' ')}")
             eff.setStyleSheet("font-size: 13px; font-style: italic;")
             layout.addWidget(eff)
 
@@ -287,7 +283,9 @@ class TimelineWidget(QWidget):
         preview.setFixedHeight(36)
         layout.addWidget(preview)
 
-        effects_text = ", ".join(str(v) for v in event["effects"].values())
+        effects_keys = ", ".join(event["effects"].keys())
+        effects_values = ", ".join(str(v) for v in event["effects"].values())
+        effects_text = f"{effects_keys.capitalize().replace('_', ' ')}: {effects_values.capitalize().replace('_', ' ')}"
         if effects_text:
             eff = QLabel(f"\u2192 {effects_text}")
             eff.setStyleSheet("font-size: 11px;")
