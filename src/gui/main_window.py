@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtGui import QAction, QCloseEvent, QFontMetrics
 from PySide6.QtCore import Qt, Slot, QObject, Signal, QTimer, QSettings
 
-from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, HOUSE_RULES, LOGS_DIR
+from src.content.config import APP_NAME, MANUAL, SAVEGAME_DIR, ADVANCED_RULES, HOUSE_RULES, LOGS_DIR, WIKI_HTML
 from src.content.tools import debug_print, set_debug_log_path, close_debug_log
 from src.gui.manual_viewer import Ui_ManualViewer
 from src.gui.map_view import AnsalonMapView
@@ -423,6 +423,7 @@ class MainWindow(QMainWindow):
 
         # --- Help Menu ---
         help_menu = menubar.addMenu("&Help")
+
         manual_action = QAction("&Manual", self)
         manual_action.triggered.connect(self.on_manual_clicked)
         help_menu.addAction(manual_action)
@@ -435,6 +436,9 @@ class MainWindow(QMainWindow):
 
         help_menu.addSeparator()
 
+        wiki_action = QAction("DOG &Wiki", self)
+        wiki_action.triggered.connect(self.on_wiki_clicked)
+        help_menu.addAction(wiki_action)
         event_timeline_action = QAction("&Event Timeline", self)
         event_timeline_action.triggered.connect(self.on_event_timeline_clicked)
         help_menu.addAction(event_timeline_action)
@@ -480,6 +484,13 @@ class MainWindow(QMainWindow):
             webbrowser.open(HOUSE_RULES)
         except Exception as e:
             print(f"Error opening house rules: {e}")
+
+    def on_wiki_clicked(self):
+        """Opens the HTML game wiki in the system's default browser."""
+        try:
+            webbrowser.open(WIKI_HTML)
+        except Exception as e:
+            print(f"Error opening wiki: {e}")
 
     def on_event_timeline_clicked(self):
         """Opens the event timeline dialog."""

@@ -8,7 +8,7 @@ import sys
 DEBUG = False
 DEFAULT_LANG = "en"
 APP_NAME = "Dragons of Glory"
-APP_VERSION = "0.55.3-beta"
+APP_VERSION = "0.56.0-beta"
 
 # --- PATHS ---
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -38,14 +38,15 @@ def _user_data_dir():
 USER_DATA_DIR = _user_data_dir()
 
 DATA_DIR = os.path.join(BASE_DIR, "data")
-LOGS_DIR = os.path.join(USER_DATA_DIR, "logs")
-LOCALE_DIR = os.path.join(DATA_DIR, "locale")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 AUDIO_DIR = os.path.join(ASSETS_DIR, "audio")
 DOC_DIR = os.path.join(ASSETS_DIR, "doc")
 FONTS_DIR = os.path.join(ASSETS_DIR, "font")
+HTML_DIR = os.path.join(ASSETS_DIR, "html")
 ICONS_DIR = os.path.join(ASSETS_DIR, "icon")
 IMAGES_DIR = os.path.join(ASSETS_DIR, "img")
+LOCALE_DIR = os.path.join(DATA_DIR, "locale")
+LOGS_DIR = os.path.join(USER_DATA_DIR, "logs")
 SCENARIOS_DIR = os.path.join(DATA_DIR, "scenarios")
 SAVEGAME_DIR = os.path.join(USER_DATA_DIR, "saves")
 VIDEOS_DIR = os.path.join(ASSETS_DIR, "video")
@@ -67,6 +68,9 @@ LOG_FILE = os.path.join(LOGS_DIR, "dog.log")
 MANUAL = os.path.join(DOC_DIR, "manual.pdf")
 ADVANCED_RULES = os.path.join(DOC_DIR, "advanced_rules.pdf")
 HOUSE_RULES = os.path.join(DOC_DIR, "house_rules.pdf")
+WIKI_HTML = os.path.join(ASSETS_DIR, "html", "wiki.html")
+WIKI_CSS = os.path.join(HTML_DIR, "wiki.css")
+WIKI_JS = os.path.join(HTML_DIR, "wiki.js")
 ICON_INITIATIVE = os.path.join(ICONS_DIR, "initiative_chit.svg")
 
 # --- GUI SETTINGS ---
