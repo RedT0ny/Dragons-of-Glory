@@ -80,6 +80,7 @@ def caption_id(unit_id: str):
     return id_text.capitalize()
 
 def debug_print(message):
+    """Print a debug message to the console and/or a log file. Uses the DEBUG flag."""
     if _debug_log_file is not None:
         try:
             _debug_log_file.write(f"{message}\n")
@@ -157,6 +158,7 @@ class TextFormatter:
         return str(target_hex)
 
     def format_victory_conditions(self, victory_block: dict[str, Any] | None) -> str:
+        """ Format a victory conditions block into a human-readable string."""
         if not isinstance(victory_block, dict):
             return ""
 
@@ -174,6 +176,7 @@ class TextFormatter:
         return "\n".join(line for line in lines if line).strip()
 
     def _format_minor(self, minor_label: str, minor: Any) -> list[str]:
+        """ Format the minor victory conditions into a list of strings."""
         if not isinstance(minor, dict) or "conditions" not in minor:
             return [f"{minor_label}: {self._format_node(minor)}"]
 
@@ -193,6 +196,7 @@ class TextFormatter:
         return lines
 
     def _format_node(self, node: Any) -> str:
+        """ Recursively format a node in the victory conditions tree into a string."""
         if isinstance(node, dict):
             if "all" in node:
                 return self._join_group(node.get("all", []), op_key="all")
@@ -204,6 +208,7 @@ class TextFormatter:
         return str(node)
 
     def _join_group(self, nodes: list[Any], op_key: str) -> str:
+        """ Join a group of nodes with the specified operator (all/any) into a single string."""
         pieces = [self._format_node(n) for n in nodes if n is not None]
         pieces = [p for p in pieces if p]
         if not pieces:
@@ -214,6 +219,7 @@ class TextFormatter:
         return f"({f' {op} '.join(pieces)})"
 
     def _format_leaf(self, node: dict[str, Any]) -> str:
+        """ Format a leaf node in the victory conditions tree into a string based on its type and parameters."""
         node_type = str(node.get("type", "unknown"))
         by_turn = node.get("by_turn")
 
@@ -267,6 +273,7 @@ class TextFormatter:
         return str(node)
 
     def _format_unit_score_leaf(self, node: dict[str, Any], node_type: str) -> str:
+        """ Format a leaf node related to unit score conditions into a string."""
         country = node.get("country")
         unit_types = self._unit_types_label(node.get("unit_types"))
         min_points = int(node.get("min_points", 0) or 0)
@@ -311,12 +318,14 @@ class TextFormatter:
         return self._with_deadline(text, by_turn)
 
     def _with_deadline(self, text: str, by_turn: Any) -> str:
+        """ Append a deadline to the text if by_turn is specified."""
         if by_turn is None:
             return text
         suffix = self._tr("victory.labels.by_turn", "by turn {turn}").format(turn=by_turn)
         return f"{text} ({suffix})"
 
     def _format_hexes(self, values: Any) -> str:
+        """ Format a list of hex coordinates into a string representation."""
         if not isinstance(values, list) or not values:
             return "[]"
         pairs = []
@@ -326,6 +335,7 @@ class TextFormatter:
         return ", ".join(pairs) if pairs else "[]"
 
     def _unit_types_label(self, raw: Any) -> str:
+        """ Format a list of unit types into a human-readable string."""
         if isinstance(raw, list):
             tokens = [str(v).strip().lower() for v in raw]
         elif raw is None:
@@ -347,6 +357,7 @@ class TextFormatter:
         return ", ".join(out)
 
     def _country_name(self, country_id: Any) -> str:
+        """ Get the localized name of a country based on its ID."""
         key = str(country_id or "").strip().lower()
         if not key:
             return ""
@@ -355,6 +366,7 @@ class TextFormatter:
         return key
 
     def _location_name(self, location_id: Any) -> str:
+        """ Get the localized name of a location based on its ID."""
         key = str(location_id or "").strip().lower()
         if not key:
             return ""

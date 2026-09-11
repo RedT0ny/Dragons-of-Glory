@@ -762,9 +762,12 @@ class WikiGen:
             cap_bits.append(f'<li><b>{self.lbl("Territories", "Territorios")}</b> {len(c["territories"])}</li>')
 
         units_here = self.units_by_land.get(cid, [])
-        unit_links = " · ".join(self.link_unit(u) for u in units_here)
+        unit_items = "".join(
+            f'<li>{self.link_unit(u)} <span class="qty">x{u["quantity"]}</span></li>'
+            for u in units_here
+        )
         units_html = f'<p class="links"><b>{self.lbl("Units", "Unidades")} ({sum(u["quantity"] for u in units_here)}):</b></p>' \
-                     f'<ul class="kv">{ "".join(f"<li>{u}</li>" for u in self._chunk_links(unit_links)) }</ul>' if unit_links else ""
+                     f'<ul class="kv">{unit_items}</ul>' if unit_items else ""
 
         event_links = " · ".join(self.link("event", eid, self.L("events", eid, eid)) for eid in sorted(set(self.events_by_country.get(cid, []))))
         events_html = f'<p class="links"><b>{self.lbl("Related events", "Eventos relacionados")}:</b></p>' \

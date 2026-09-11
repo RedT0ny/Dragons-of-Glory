@@ -47,7 +47,8 @@ main { padding: 16px 18px 40px; max-width: 1500px; margin: 0 auto; }
 .badge-neutral { background: rgba(154,163,184,.15); color: var(--muted); }
 .badge-dragon { background: rgba(216,178,92,.12); color: var(--gold); border-color: rgba(216,178,92,.35); }
 .meta { margin: 0; color: var(--muted); font-size: 13px; }
-.meta a, .links a { color: var(--ws); text-decoration: none; border-bottom: 1px dotted rgba(126,200,227,.4); }
+a { color: var(--ws); text-decoration: none; border-bottom: 1px dotted rgba(126,200,227,.4); }
+.meta a, .links a { color: var(--ws); }
 .meta a:hover, .links a:hover { color: var(--gold); }
 .stats, .kv { margin: 2px 0 0; padding: 0; list-style: none; }
 .stats li, .kv li { font-size: 13px; padding: 2px 0; border-bottom: 1px dotted var(--line); }
