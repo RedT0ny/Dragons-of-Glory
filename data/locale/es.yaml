@@ -493,3 +493,253 @@ unit_names:
   topus: "Topus"
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
+
+# El manual navegable de la pestaña "Reglas" de la wiki (estructura en scripts/wiki_manual.py).
+manual:
+  intro: "Un resumen navegable de las reglas, generado a partir de los datos y el código del propio juego. Los manuales clásicos - los mismos documentos que pueden abrirse desde el menú Ayuda del juego (Ayuda → Manual / Reglas avanzadas / Reglas de la casa) - se enlazan a continuación."
+  overview:
+    title: "Introducción"
+    what_is:
+      title: "¿Qué es Dragons of Glory?"
+      p1: "Dragons of Glory es un juego de estrategia por turnos ambientado en el mundo de Krynn, en el continente de Ansalon, durante la Guerra de la Lanza. Modelado sobre el clásico juego de guerra de Dragonlance, simplifica las reglas de mesa: cada país, ejército, flota, dragón y héroe se muestra sobre un único mapa hexagonal de Ansalon, y cada turno de campaña sigue una secuencia fija de fases."
+      p2: "Dos alianzas compiten por el control del continente: la Alianza del Saber de los pueblos libres y los ejércitos de los señores del dragón del Dragón. Los países neutrales y menores se unen a un bando mediante la diplomacia, la conquista o los eventos especiales."
+      bullets:
+        - "Una campaña abarca los años 348–353 de la Era del Desaliento (el turno 1 es el 348)."
+        - "Los eventos estratégicos se roban cada cinco turnos: los turnos 5, 10, 15, 20, 25 y 30, que son también los turnos de invierno."
+        - "Cada unidad tiene un valor de combate (VC), una asignación de movimiento y, en el caso de los líderes, un valor táctico (VT)."
+    how_to_read:
+      title: "Cómo leer este manual"
+      p1: "Esta pestaña es un prontuario de reglas generado a partir de los datos y el código del propio juego. Espeja los mismos puntos de entrada que la wiki: países, unidades, artefactos, eventos y los interruptores de opción del juego."
+      p2: "Los enlaces de color saltan a la entrada correspondiente en las demás pestañas. Cualquier elemento marcado con el conmutador EN/ES de la esquina superior derecha se muestra en uno u otro idioma."
+      warn:
+        title: "Una nota sobre los manuales"
+        text: "Los manuales clásicos en PDF incluidos con el juego (Manual, Reglas avanzadas, Reglas de la casa) siguen disponibles desde el menú Ayuda del juego y están enlazados al pie de esta pestaña. Los capítulos siguientes son un resumen original de las reglas del juego de ordenador tal y como están implementadas."
+  turn:
+    title: "El turno de campaña"
+    phases:
+      title: "Secuencia del turno"
+      p1: "Cada turno de campaña sigue este orden. Los bandos se alternan en el movimiento y el combate."
+      steps:
+        - "Despliegue — Despliega las unidades al inicio del tablero (ocurre solo una vez)."
+        - "Reemplazos — Reconstruye unidades destruidas y mermadas, despliega unidades de refuerzo; actúa primero el perdedor de la iniciativa. El bando del Señor del Dragón realiza aquí además su paso de producción de dracónidos."
+        - "Eventos estratégicos — se roban los eventos (cada cinco turnos)."
+        - "Activación — los países determinan qué bando apoyan este turno; se aplican las bonificaciones diplomáticas."
+        - "Iniciativa — cada bando tira 1d4; el ganador decide qué bando actúa primero."
+        - "Movimiento y combate — el primer bando mueve y resuelve sus combates, y después hace lo propio el segundo."
+        - "Suministro — en el modo avanzado, las unidades que no puedan trazar suministro sufren desgaste."
+        - "Final del turno — se comprueban las condiciones de victoria y avanza el calendario."
+      warn:
+        title: "Primer turno"
+        text: "El turno 1 es especial: ambos pasos de despliegue actúan como pasos de reposición y se salta directamente al Movimiento, omitiendo los eventos, la activación y la iniciativa."
+    calendar:
+      title: "Calendario y turnos estratégicos"
+      p1: "El calendario de campaña abarca los años 348–353 (treinta turnos). Los eventos estratégicos y el invierno llegan juntos cada cinco turnos: 5, 10, 15, 20, 25 y 30."
+    initiative:
+      title: "Iniciativa"
+      p1: "Durante la fase de iniciativa cada bando tira un d4. Un empate mantiene al ganador anterior. El ganador decide qué bando ejecuta primero el movimiento y el combate."
+      bullets:
+        - "Clásica: una tirada simple de d4 decide el ganador."
+        - "Avanzada: el poseedor de la ficha de iniciativa puede anular la tirada (un jugador humano)."
+        - "Desactivada: el ganador es fijo (no se tiran dados)."
+    replacements:
+      title: "Reemplazos"
+      p1: "Durante la fase de Reemplazos, los jugadores pueden combinar unidades reducidas y desplegar unidades desde la reserva. El perdedor de la iniciativa resuelve sus reemplazos primero."
+      p2: "Por cada dos ejércitos de la misma combinación de color (nacionalidad) en su reserva de reemplazo, un jugador puede inmediatamente desplegar uno de esos dos ejércitos, el otro es destruido."
+      p3: "Si dos ejércitos reducidos de la misma nacionalidad están apilados juntos en un hexágono durante el paso de Reemplazo, pueden combinarse en uno solo a plena fuerza. El otro ejército vuelve a la reserva, y es inmediatamente elegible para combinar con otros reemplazos."
+      p4: "Un reemplazo puede ser desplegado únicamente en un hexágono de ciudad o fortaleza desocupado de su país."
+      p5: "Los dragones, grifos y pegasos nunca pueden ser reemplazados ni combinados a plena fuerza, son eliminados directamente."
+  countries:
+    title: "Países y diplomacia"
+    powers:
+      title: "Los poderes de Ansalon"
+      p1: "El mapa contiene 44 países. Cada uno tiene un valor de fuerza (el tamaño de las fuerzas que puede reunir) y una alineación: un par de modificadores que indican cuán favorable es hacia el Saber y hacia el Señor del Dragón."
+      bullets:
+        - "Los poderes pro-Saber incluyen [[country:qualinesti]], [[country:palanthas]], [[country:silvanesti]], [[country:nergoth]], [[country:goodlund]], [[country:sancrist]] y [[country:hylo]]."
+        - "Los países de caballeros solámnicos — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] y [[country:vingaard]] — reciben una bonificación especial de activación pro-Saber."
+        - "Los poderes pro-Señor del Dragón incluyen [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] y [[country:tarsis]]."
+    activation:
+      title: "Activación y alineación"
+      p1: "Cuando un bando se acerca a un país neutral, ese país puede unirse mediante una tirada de diplomacia. La tirada se modifica por la alineación del país hacia cada bando; los países de caballeros de Solamnia reciben además una bonificación pro-Saber adicional."
+      p2: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los minotauros de [[country:nevermind]] están marcados como 'solo invasión por evento' y solo pueden unirse a un bando mediante un evento o por las armas."
+    conquest:
+      title: "Conquista"
+      p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
+      p2: "Si un país es conquistado, sus ejércitos quedan eliminados permanentemente."
+      warn:
+        title: "Invasión de neutrales"
+        text: "El Señor del Dragón puede invadir países neutrales. El bando de la Piedra Blanca no puede invadir países neutrales."
+  units:
+    title: "Unidades y líderes"
+    types:
+      title: "Tipos de unidad"
+      p1: "Las unidades se organizan en cuatro grandes familias: ejércitos, flotas, dragones y líderes."
+      bullets:
+        - "Ejércitos — infantería y caballería con un valor de combate (VC) y una asignación de movimiento."
+        - "Líderes — generales, almirantes, magos, emperadores y señores del dragón aportan modificadores de combate por su valor táctico (VT); si son eliminados intentan escapar."
+        - "Dragones — alas de los diez vuelos de dragones: cinco cromáticos sirven al Señor del Dragón, cinco metálicos vuelan para el Saber."
+        - "Flotas — barcos de guerra que transportan ejércitos, dominan los mares y libran batallas navales."
+        - "Magos — unidades de apoyo que se mueven libremente por el mapa y lanzan magia."
+        - "Ciudadelas — guarniciones fortificadas (Hoplon/Ciudadela) que se defienden con un valor de defensa y deben ser asaltadas con las reglas de asedio."
+    ratings:
+      title: "Valores"
+      p1: "El valor de combate (VC) se usa para calcular las probabilidades de combate y las tiradas de impacto del combate naval. El valor táctico (VT) se suma a la tirada de combate cuando un líder está presente en la batalla."
+      p2: "Toda unidad gasta puntos de movimiento para moverse; la asignación por defecto es de 5 puntos. Los magos se mueven sin gastar puntos. Las unidades con afinidad de terreno ignoran el coste de movimiento de ese terreno."
+    statuses:
+      title: "Estados de las unidades"
+      bullets:
+        - "ACTIVA — a plena fuerza sobre el mapa."
+        - "MERMADA — reducida tras una batalla."
+        - "RESERVA — a la espera en la reserva, fuera del mapa."
+        - "DESTRUIDA — perdida para siempre (su equipo se pierde y no vuelve a la reserva)."
+        - "LISTA — disponible para despliegue."
+      warn:
+        title: "Apilado"
+        text: "Ningún hexágono puede contener más de dos unidades en ningún momento."
+  movement:
+    title: "Movimiento y transporte"
+    movement_points:
+      title: "Puntos de movimiento y terreno"
+      p1: "Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y las fronteras malas cuestan más."
+      bullets:
+        - "Los hexágonos de océano, desierto, pantano, glaciar y maremoto son intransitables para las tropas terrestres."
+        - "Las montañas solo se atraviesan por un paso o una frontera de túnel, y los combates de montaña solo pueden declararse a través de una frontera de paso."
+        - "Las fronteras de río cuestan +1 punto de movimiento (cruzan gratis cuando el río se hiela en invierno)."
+        - "La afinidad de terreno exime del coste del terreno correspondiente."
+    transport:
+      title: "Transporte marítimo"
+      p1: "Una flota en el mismo hexágono puede llevar un ejército a bordo. Las unidades embarcadas no pueden moverse por su cuenta durante el resto del turno y abandonan el mapa espacial hasta que desembarcan."
+      p2: "Si la flota embarca fuera de un puerto, su asignación de movimiento se reduce a la mitad (mínimo la mitad de su asignación). El desembarco coloca al ejército de nuevo en un hexágono costero o un puerto."
+  combat:
+    title: "Combate"
+    land_combat:
+      title: "Combate terrestre y probabilidades"
+      p1: "Cuando una unidad entra en un hexágono con una fuerza enemiga (o ataca a través de una frontera de paso), se resuelve el combate. La fuerza de combate total del atacante se compara con la del defensor para producir una relación de combate, expresada de 1:3 a 6:1."
+      bullets:
+        - "Las relaciones por encima de 6:1 se limitan a 6:1; las inferiores a 1:3 se tratan como 1:3."
+        - "Las murallas, fortalezas y bombardas modifican la relación antes de tirar los dados."
+        - "Los líderes, ejércitos, dragones y artefactos pueden sumar cada uno un modificador de tirada (DRM)."
+    crt:
+      title: "La tabla de resultados de combate"
+      p1: "Se tira un d10 ajustado por el DRM (limitado entre −5 y +16); el resultado ajustado cruza la tabla en la columna de relación actual. Los resultados se imprimen atacante/defensor, p. ej. E/1, DR/− o −/DR."
+      table:
+        headers: ["Código", "Significado"]
+        rows:
+          - ["−", "Sin efecto en ese bando."]
+          - ["R (retirada)", "Los supervivientes de ese bando se retiran: R fuerza una retirada de un hexágono, 2R de dos (obligatoria en montañas, desiertos o a través de pasos)."]
+          - ["D (mermar)", "Todas las unidades afectadas de ese bando descienden un paso: ACTIVA → MERMADA."]
+          - ["1, 2 (pasos)", "Pérdidas de pasos de combate; el número se aplica como pasos de merma adicionales."]
+          - ["E (eliminar)", "Todas las unidades afectadas de ese bando son eliminadas. Los líderes pueden intentar escapar."]
+      p2: "Tras el combate, los atacantes supervivientes pueden avanzar a un hexágono desocupado, y un bando victorioso puede conquistar el hexágono al final de la fase de combate. El apliñamiento siempre se respeta."
+    dragon_combat:
+      title: "Duelos de dragones y supremacía aérea"
+      p1: "Antes de una batalla terrestre, los dragones de cada bando libran un duelo de supremacía aérea. Cada dragón tira un dado por punto de combate y cada resultado de 4 o más es un impacto: los impactos reducen al objetivo ACTIVO → MERMADO → DESTRUIDO."
+      p2: "El duelo transcurre en rondas hasta que un bando es eliminado, ambos se retiran o se llega a veinte rondas. Entre ronda y ronda, los jugadores pueden retirar sus dragones; las alas retiradas se trasladan a un hexágono aleatorio."
+    naval_combat:
+      title: "Combate naval"
+      p1: "Las flotas combaten en rondas simultáneas. Cada flota operativa tira un d10 y logra un impacto con un resultado igual o inferior a su valor de ataque. Los impactos se aplican paso a paso: ACTIVA → MERMADA → RESERVA, y un bando puede retirarse del combate."
+    siege:
+      title: "Asedios y Torres"
+      p1: "Las ciudadelas y fortalezas se defienden con un valor de defensa. Un asaltante puede bombardear antes del asalto; los modificadores de fortaleza desplazan las probabilidades de combate o la tirada a favor del defensor."
+      p2: "Las Torres de Eli vigilan las aproximaciones marítimas: cada torre dispara dos veces por turno, acierta con un d10 igual o inferior a 4 y reduce la integridad de la flota ACTIVA → MERMADA → RESERVA. Las torres neutrales disparan contra cualquier flota invasora; una vez activada, una torre controlada solo dispara contra los enemigos."
+  winter:
+    title: "Invierno y suministro"
+    winter:
+      title: "Invierno"
+      p1: "Cada cinco turnos el invierno azota Ansalon — salvo en la región 'libre de invierno' del mapa (columnas 40–64, filas 0–35), donde se conserva el movimiento normal."
+      bullets:
+        - "Ríos helados: las fronteras de río no cuestan movimiento extra, y los ríos profundos bloquean la entrada de flotas."
+        - "Pasos nevados: los pasos de montaña se vuelven intransitables para las unidades terrestres."
+        - "Las alas de dragones reducen a la mitad su asignación de movimiento (mínimo 1)."
+        - "Supervivencia de las flotas: las flotas en aguas expuestas tiran un d6 cada invierno; un 1 arriesga daños por hielo y obliga a comprobar la huida del líder."
+    supply:
+      title: "Suministro"
+      p1: "El sistema de suministro funciona en modo Estándar o Avanzado, seleccionado en las opciones del juego."
+      bullets:
+        - "Estándar: los hexágonos costeros y los puertos están siempre abastecidos."
+        - "Avanzado: las unidades pueden, además, trazar suministro por tierra hasta el país propietario o su capital."
+        - "Las unidades que no puedan trazar suministro sufren desgaste (pérdidas de pasos) durante la fase de suministro."
+  naval:
+    title: "Operaciones navales"
+    interception:
+      title: "Intercepción"
+      p1: "Las flotas que aún no han reaccionado pueden interceptar el movimiento enemigo. En condiciones normales, una intercepción adyacente siempre tiene éxito (distancia 1) y una intercepción a distancia 2 tiene éxito la mitad de las veces (50%)."
+      bullets:
+        - "El invierno restringe las intercepciones a distancia 1 con un 50%."
+        - "Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada)."
+    invasion:
+      title: "Invasión anfibia"
+      p1: "Las reglas de invasión naval permiten a un bando desembarcar ejércitos en las costas enemigas mediante flotas. Los desembarcos se limitan a hexágonos costeros y puertos, y los ejércitos desembarcados deben respetar el límite de dos unidades por hexágono."
+  artifacts:
+    title: "Artefactos y héroes"
+    artifacts:
+      title: "Referencia rápida de artefactos"
+      p1: "Los artefactos los portan líderes y ejércitos. La lista completa con descripciones está en la pestaña Artefactos; la tabla siguiente resume sus efectos mecánicos."
+      table:
+        headers: ["Artefacto", "Efecto"]
+        rows:
+          - ["[[artifact:dragonlance]]", "Duplica el valor de combate de un ejército del Saber y otorga matadragones (anula la bonificación de DRM del dragón enemigo)."]
+          - ["[[artifact:dragon_orb]]", "Contra dragones o dracónidos: el portador tira 1d6 contra el VT del líder. Un fallo destruye líder y orbe; un éxito destruye todos los dragones opuestos."]
+          - ["[[artifact:crown_of_power]]", "Otorga al Señor del Dragón el mando de todos los vuelos cromáticos y +1 VT."]
+          - ["[[artifact:silver_arm]]", "+2 al valor de combate de un ejército del Saber."]
+          - ["[[artifact:staff_of_magius]]", "+1 al valor táctico, usable por magos."]
+          - ["[[artifact:blue_crystal_staff]]", "+1 VT; puede resucitar a un líder muerto una vez, y después se pierde."]
+          - ["[[artifact:disks_of_mishakal]]", "+1 VC; una vez por batalla, cura a un ejército mermado de vuelta a ACTIVO."]
+          - ["[[artifact:medallion_of_faith]]", "Cura a una unidad mermada pero se destruye en el proceso."]
+          - ["[[artifact:gnome_tech]]", "Dos dados precombate: la cara más alta se convierte en el DRM; un doble significa −6 y el artilugio se destruye."]
+          - ["[[artifact:dragonarmor]]", "+1 a las tiradas de huida del líder."]
+          - ["[[artifact:plate_of_solamnus]]", "+1 a las tiradas de huida del líder para los líderes solámnicos."]
+          - ["[[artifact:hammer_of_kharas]]", "+1 VT y +1 de diplomacia con Kaolyn, Thorbardin y Zhakar."]
+          - ["[[artifact:nightbringer]]", "+1 VT, usable por los señores del dragón del Ala Roja."]
+          - ["[[artifact:wyrmslayer]]", "+1 VT y matadragones, para líderes élficos."]
+          - ["[[artifact:dragonmetal]]", "El recurso necesario para forjar Lanzas de Dragón."]
+    heroes:
+      title: "Líderes eliminados"
+      p1: "Los líderes eliminados en batalla intentan escapar. La tirada mejora con equipo como la armadura de dragón y la Placa de Solamnia (+1). Los que escapan vuelven fuera del mapa para reaparecer más tarde; el resto se pierde con su equipo."
+      warn:
+        title: "Equipo perdido"
+        text: "El equipo que porte un líder definitivamente perdido se destruye y no vuelve a la reserva."
+  events:
+    title: "Eventos estratégicos"
+    how_they_work:
+      title: "Cómo funcionan los eventos"
+      p1: "Los eventos estratégicos se disparan durante la fase de eventos estratégicos de cada quinto turno. Cada evento define un disparador (o 'siempre'), un número máximo de ocurrencias y un efecto, y muchos pertenecen a una alineación."
+      bullets:
+        - "Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego)."
+        - "Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]]."
+        - "Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]]."
+      p2: "El catálogo completo, con efectos e imágenes, está en la pestaña Eventos."
+  victory:
+    title: "Victoria"
+    victory:
+      title: "Condiciones de victoria"
+      p1: "La victoria se mide con puntos menores: controlar países, ciudades, fortalezas y objetivos concede puntos a un bando. Cada escenario define sus propias condiciones de victoria — los umbrales para la victoria mayor o menor — y la partida termina cuando un bando los alcanza al final de un turno."
+      p2: "Las victorias de país único y los objetivos de fortaleza son habituales: reduce el cuartel general enemigo o la Torre de la Reina Oscura, mantén un conjunto fijo de objetivos o simplemente supera en puntos al oponente cuando acaba el calendario."
+  options:
+    title: "Dificultad y reglas de la casa"
+    options:
+      title: "Opciones del juego"
+      p1: "El diálogo de Opciones (pestaña Reglas de la configuración de partida) ajusta las reglas a tu gusto:"
+      table:
+        headers: ["Opción", "Elecciones"]
+        rows:
+          - ["Despliegue", "Despliegue canónico o manual de las fuerzas iniciales."]
+          - ["Intercepción", "Intercepción naval activada, desactivada o solo naval."]
+          - ["Combate naval", "Reglas navales clásicas o avanzadas."]
+          - ["Iniciativa", "Clásica, avanzada (ficha de iniciativa) o desactivada."]
+          - ["Invierno", "Activado o desactivado."]
+          - ["Dificultad", "Fija la postura de la IA y sus bonificaciones."]
+  scenarios:
+    title: "Escenarios y campañas"
+    scenarios:
+      title: "Escenarios disponibles"
+      p1: "Se incluyen dos campañas y siete escenarios independientes. Cada uno define su propio subconjunto del mapa, turno inicial y final, fuerzas de partida, eventos activos y condiciones de victoria."
+      bullets:
+        - "Campaña: La Guerra de la Lanza — la campaña completa de 348–353."
+        - "Campaña: Crónicas de la Dragonlance — una campaña que sigue la historia de Dragonlance."
+        - "Escenario: La Caída de Silvanesti."
+        - "Escenario: La Llanura de Solamnia."
+        - "Escenario: Los Kenders Atacan."
+        - "Escenario: El Asedio de Kalaman."
+        - "Escenario: Invasión de Abanasinia."
+        - "Escenario: Piratas del Maremoto."
+        - "Escenario: Batalla por Neraka."

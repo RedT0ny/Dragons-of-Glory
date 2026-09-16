@@ -40,11 +40,12 @@
       sec.classList.toggle("active", sec.id === tabId);
     });
     applySearch();
+    manualScrollspy();
   }
 
   function activeSectionId() {
     var active = document.querySelector("section.tab.active");
-    return active ? active.id : "tab-units";
+    return active ? active.id : "tab-rules";
   }
 
   function applySearch() {
@@ -87,9 +88,25 @@
     }
   }
 
+  function manualScrollspy() {
+    var links = Array.prototype.slice.call(document.querySelectorAll(".m-toc-link"));
+    if (!links.length) return;
+    var rulesActive = document.getElementById("tab-rules").classList.contains("active");
+    var pos = window.scrollY + 150;
+    var current = null;
+    if (rulesActive) {
+      links.forEach(function (l) {
+        var sec = document.getElementById(l.dataset.sec);
+        if (sec && sec.offsetTop <= pos) current = l.dataset.sec;
+      });
+    }
+    links.forEach(function (l) { l.classList.toggle("active", l.dataset.sec === current); });
+  }
+
   tabButtons.forEach(function (btn) {
     btn.addEventListener("click", function () { setTab(btn.dataset.tab); });
   });
+  window.addEventListener("scroll", manualScrollspy, { passive: true });
   searchInput.addEventListener("input", applySearch);
   searchInput.addEventListener("search", applySearch);
   langBtn.addEventListener("click", function () {
@@ -110,7 +127,7 @@
     if (m) goto(m[1], m[2]);
   }
   window.addEventListener("hashchange", routeFromHash);
-  setTab("tab-units");
+  setTab("tab-rules");
   setLang(currentLang);
   routeFromHash();
 })();

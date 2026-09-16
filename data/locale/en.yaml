@@ -140,7 +140,7 @@ countries:
     adjective: "Southlund"
   taman:
     name: "Taman Busuk"
-    adjective: "Taman Busuk"
+    adjective: "Nerakan"
   tarsis:
     name: "Tarsis"
     adjective: "Tarsis"
@@ -493,3 +493,253 @@ unit_names:
   topus: "Topus"
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
+
+# The wiki "Rules" tab navigable manual (structure in scripts/wiki_manual.py).
+manual:
+  intro: "A navigable summary of the game rules, generated from the game's own data and code. The classic rulebooks - the same documents that can be opened from the in-game Help menu (Help → Manual / Advanced Rules / House Rules) - are linked below."
+  overview:
+    title: "Introduction"
+    what_is:
+      title: "What is Dragons of Glory?"
+      p1: "Dragons of Glory is a turn-based strategy game set in the world of Krynn, on the continent of Ansalon, during the War of the Lance. Modelled on the classic Dragonlance war game, it streamlines the tabletop rules: every country, army, fleet, dragon and hero is shown on a single hex map of Ansalon, and each campaign turn follows a fixed sequence of phases."
+      p2: "Two allegiances compete for control of the continent: the Whitestone Alliance of the free peoples and the armies of the Dragon Highlords. Neutral and minor powers join a side through diplomacy, conquest or special events."
+      bullets:
+        - "The complete War of the Lance campaign covers the years 348–353 of the Age of Despair (turn 1 = March/April 348)."
+        - "Strategic events are drawn every turn."
+        - "Each unit has a combat rating (CR), a movement allowance and, for leaders, a tactical rating (TR)."
+    how_to_read:
+      title: "How to read this manual"
+      p1: "This tab is a rule primer generated from the game's own data and code. It mirrors the same entry points as the wiki: countries, units, artifacts, events and the game's option switches."
+      p2: "Coloured links jump to the matching entry in the other tabs. Anything flagged with the EN/ES toggle at the top right is shown in either language."
+      warn:
+        title: "A note on the rulebooks"
+        text: "The classic PDF rulebooks shipped with the game (Manual, Advanced Rules, House Rules) remain available from the in-game Help menu and are linked at the bottom of this tab. The chapters below are an original summary of the computer game's rules as implemented."
+  turn:
+    title: "The Battle Turn"
+    phases:
+      title: "Turn sequence"
+      p1: "Each battle turn follows this order. Player sides alternate in movement and combat."
+      steps:
+        - "Initial Deployment - Happens only once. Each side deploys its starting units on the map."
+        - "Replacements — Rebuild destroyed and depleted units and deploy replacements; the loser of the initiative acts first. Draconian production also happens here."
+        - "Strategic Events — event cards are drawn."
+        - "Activation — Starting with the player who just drew the Strategic Event counter, each player can attempt to Activate a neutral nation of his choice by rolling 1d10."
+        - "Initiative — each side rolls 1d4; the winner acts first. In case of a tie, the previous winner keeps the initiative."
+        - "Movement & Combat — the first side moves and resolves its combats, then the second side does the same."
+        - "Supply (Advanced only) — Units out of supply suffer attrition."
+        - "End of turn — victory conditions are checked and the calendar advances."
+      warn:
+        title: "First turn"
+        text: "Turn 1 is special: both deployment steps act as replacement steps and play jumps straight to Movement, skipping events, activation and initiative."
+    calendar:
+      title: "Calendar and strategic turns"
+      p1: "The campaign calendar spans the years 348–353 (thirty turns)."
+    initiative:
+      title: "Initiative"
+      p1: "In the initiative phase, it is decided which player acts first. The winner of the initiative roll may move and fight first, and also draws the first Strategic Event counter."
+      bullets:
+        - "Classic: The winner is decided by a plain d4 roll. In case of a tie, the previous winner keeps the initiative."
+        - "Advanced: The player that does not have the initiative at the start of the game receives an initiative chit. The holder of the initiative chit may override the roll, handing the chit to the other player."
+        - "Disabled: Player order is fixed for the campaign/scenario (no dice are rolled)."
+    replacements:
+      title: "Replacements"
+      p1: "During the Replacement step, players can combine depleted units and deploy units from the reserve. The loser of the initiative resolves their replacements first."
+      p2: "For every two armies of the same color combination (nationality) in their replacement pool, a player can immediately bring one of those armies back into play. The other army is destroyed."
+      p3: "In addition, if two depleted armies of the same nationality are stacked together in a hex during the Replacement Step, one of these armies can be placed in the Replacement Pool, and the other rebuilt to full strength. The army placed in the pool is immediately eligible to be used for additional replacements."
+      p4: "An army that is returned to play must be placed in any unoccupied city or fortress hex of its country."
+      p5: "Dragons, griffons and pegasi can never be replaced or rebuilt to full strength. If armies of these types are lost, they are permanently out of the game."
+  countries:
+    title: "Countries & Diplomacy"
+    powers:
+      title: "The powers of Ansalon"
+      p1: "The map contains 44 countries. Each one has a strength rating (the size of the forces it can field) and an alignment: a pair of modifiers telling how favourable it is to Whitestone and to the Highlord."
+      bullets:
+        - "Whitestone-leaning powers include the Elven nations of [[country:qualinesti]] and [[country:silvanesti]], [[country:nergoth]], [[country:palanthas]] and the kender nations of [[country:hylo]] and [[country:goodlund]]."
+        - "The Solamnic knight countries — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] and [[country:vingaard]] — receive a special Whitestone activation bonus."
+        - "Highlord-leaning powers include [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] and [[country:tarsis]]."
+    activation:
+      title: "Activation and allegiance"
+      p1: "When a side approaches a neutral country, that country may join through a diplomacy roll. The roll is modified by the country's alignment toward each side; the knight-countries of Solamnia receive an additional Whitestone bonus."
+      p2: "Two countries cannot be turned by diplomacy alone: [[country:dargaard]] and the minotaurs of [[country:nevermind]] are tagged 'event invasion only' and can only join a side through an event or by force."
+    conquest:
+      title: "Conquest"
+      p1: "A country is conquered as soon as all fortified cities and fortresses in the country have been captured by enemy armies."
+      p2: "Armies are permanently removed from the game if their country is conquered."
+      warn:
+        title: "Neutral invasion"
+        text: "The Highlord may invade neutral countries. The Whitestone side cannot invade neutral countries."
+  units:
+    title: "Units & Leaders"
+    types:
+      title: "Unit types"
+      p1: "Units are organised into four broad families: armies, fleets, dragons and leaders."
+      bullets:
+        - "Armies — infantry and cavalry with a combat rating (CR) and a movement allowance."
+        - "Leaders — generals, admirals, wizards, emperors and Highlords provide tactical rating (TR) combat modifiers; eliminated leaders attempt to escape."
+        - "Dragons — wings of the ten dragonflights: five chromatic serve the Highlord, five metallic fly for Whitestone."
+        - "Fleets — warships that transport armies, control the seas and fight naval battles."
+        - "Wizards — support units that move freely across the map and cast magic."
+        - "Citadels — fortified garrisons (Hoplon/Citadel) that defend with a defence rating and must be assaulted with siege rules."
+    ratings:
+      title: "Ratings"
+      p1: "Combat rating (CR) is used to compute combat odds and to-hit rolls in naval combat. Tactical rating (TR) adds to the combat die roll when a leader is present in battle."
+      p2: "Every unit pays movement points to move; the default movement allowance is 5 points. Wizards move without spending points. Units with a terrain affinity ignore the movement cost of that terrain."
+    statuses:
+      title: "Unit statuses"
+      bullets:
+        - "ACTIVE — at full strength on the map."
+        - "DEPLETED — reduced after a battle; rebuilt during the replacements phase."
+        - "RESERVE — waiting in the replacement pool, off the map."
+        - "DESTROYED — permanently lost (its equipment is gone and does not return to the pool)."
+        - "READY — available for deployment."
+      warn:
+        title: "Stacking"
+        text: "No more than two units may occupy the same hex at any time."
+  movement:
+    title: "Movement & Transport"
+    movement_points:
+      title: "Movement points and terrain"
+      p1: "Ground units spend their movement allowance to enter hexes. In open terrain a hex costs 1 point; difficult terrain and bad borders cost more."
+      bullets:
+        - "Ocean, desert, swamp, glacier and maelstrom hexes are impassable to ground troops."
+        - "Mountains are only entered through a pass or a tunnel border, and mountain combats can only be declared across a pass border."
+        - "River borders cost +1 movement point (they are free to cross when frozen in winter)."
+        - "Terrain affinity waives the cost of the matching terrain."
+    transport:
+      title: "Sea transport"
+      p1: "A fleet in the same hex may carry an army as a passenger. Boarded units cannot move on their own for the rest of the turn and leave the spatial map until they disembark."
+      p2: "If the fleet boards outside a port its movement allowance is halved (minimum half of its allowance). Unloading places the army back on a coastal hex or port."
+  combat:
+    title: "Combat"
+    land_combat:
+      title: "Land combat and odds"
+      p1: "When a unit enters a hex containing an enemy force (or attacks across a pass border), combat is resolved. The attacker's total combat strength is compared to the defender's to produce a combat ratio (odds), expressed from 1:3 up to 6:1."
+      bullets:
+        - "Odds beyond 6:1 are capped at 6:1; odds below 1:3 are treated as 1:3."
+        - "Walls, fortresses and bombards modify the ratio before the dice are rolled."
+        - "Leaders, armies, dragons and artefacts can each add a die-roll modifier (DRM)."
+    crt:
+      title: "The combat-results table"
+      p1: "A d10 is rolled and adjusted by the DRM (clamped between -5 and +16); the adjusted roll crosses the combat-results table at the current odds column. Results are printed attacker/defender — e.g. E/1, DR/- or -/DR."
+      table:
+        headers: ["Code", "Meaning"]
+        rows:
+          - ["-", "No effect on that side."]
+          - ["R (retreat)", "Survivors of that side retreat: R forces a one-hex retreat, 2R a two-hex retreat (mandatory in the mountains, deserts or across passes)."]
+          - ["D (deplete)", "All affected units of that side step down: ACTIVE → DEPLETED."]
+          - ["1, 2 (steps)", "Combat step losses; the number is applied as additional depletion steps."]
+          - ["E (eliminate)", "All affected units of that side are eliminated. Leaders may attempt to escape."]
+      p2: "After combat, surviving attackers may advance into a vacated hex, and a victorious side may conquer the hex at the end of the combat phase. Stacking is always enforced."
+    dragon_combat:
+      title: "Dragon duels and air supremacy"
+      p1: "Before a land battle, each side's dragons fight an air-supremacy duel. Every dragon rolls one die per combat point and each roll of 4 or more scores a hit: hits step the target down ACTIVE → DEPLETED → DESTROYED."
+      p2: "The duel runs in rounds until one side is eliminated, both sides withdraw, or twenty rounds are fought. Players may withdraw their dragons between rounds; withdrawn wings relocate to a random hex."
+    naval_combat:
+      title: "Naval combat"
+      p1: "Fleets fight in simultaneous rounds. Each operational fleet rolls a d10 and scores a hit on a roll equal to or below its attack rating. Hits are applied step by step: ACTIVE → DEPLETED → RESERVE, and a side may withdraw from the battle."
+    siege:
+      title: "Sieges and Towers"
+      p1: "Citadels and fortresses defend with a defence rating. A besieging army may bombard before assaulting; fortress modifiers shift the combat odds or the die roll in the defender's favour."
+      p2: "The Towers of Eli guard the sea approaches: each tower fires twice a turn, hits on a d10 roll of 4 or less and steps down fleet integrity ACTIVE → DEPLETED → RESERVE. Neutral towers fire on any invading fleet; once activated, an allegiance-controlled tower only fires against enemies."
+  winter:
+    title: "Winter & Supply"
+    winter:
+      title: "Winter"
+      p1: "Every five turns winter grips Ansalon — except inside the 'winter-free' region of the map (columns 40–64, rows 0–35), where normal movement is preserved."
+      bullets:
+        - "Frozen rivers: river borders cost no extra movement, and deep rivers block fleet entry."
+        - "Snow-blocked passes: mountain passes become impassable to ground units."
+        - "Dragon wings halve their movement allowance (minimum 1)."
+        - "Fleet survival: fleets in exposed waters roll a d6 each winter; a roll of 1 risks ice damage and forces a leader-escape check."
+    supply:
+      title: "Supply"
+      p1: "The supply system runs in Standard or Advanced mode, selected in the game options."
+      bullets:
+        - "Standard: coastal hexes and ports are always in supply."
+        - "Advanced: units may additionally trace inland supply to the owning country or its capital."
+        - "Units that cannot trace supply suffer attrition (step losses) during the supply phase."
+  naval:
+    title: "Naval Operations"
+    interception:
+      title: "Interception"
+      p1: "Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%)."
+      bullets:
+        - "Winter restricts interceptions to distance 1 at 50%."
+        - "Interception rules can be toggled in the game options (Naval interception on / off)."
+    invasion:
+      title: "Amphibious invasion"
+      p1: "The Naval-invasion rules let a side land armies on enemy coasts through fleets. Landings are limited to coastal hexes and ports, and disembarking armies must respect the two-units-per-hex limit."
+  artifacts:
+    title: "Artifacts & Heroes"
+    artifacts:
+      title: "Artifact quick reference"
+      p1: "Artefacts are wielded by leaders and armies. The complete list with descriptions is in the Artifacts tab; the table below summarises their mechanical effects."
+      table:
+        headers: ["Artifact", "Effect"]
+        rows:
+          - ["[[artifact:dragonlance]]", "Doubles a Whitestone army's combat rating and grants dragon-slaying (negates the enemy dragon DRM bonus)."]
+          - ["[[artifact:dragon_orb]]", "Against dragons or draconians: the wielder rolls 1d6 against the leader's TR. A failed roll destroys leader and orb; a success destroys every opposing dragon."]
+          - ["[[artifact:crown_of_power]]", "Grants the Highlord command over all chromatic dragonflights and +1 TR."]
+          - ["[[artifact:silver_arm]]", "+2 combat rating for a Whitestone army."]
+          - ["[[artifact:staff_of_magius]]", "+1 tactical rating, usable by wizards."]
+          - ["[[artifact:blue_crystal_staff]]", "+1 TR; can revive a dead leader once, and is then lost."]
+          - ["[[artifact:disks_of_mishakal]]", "+1 CR; once per battle heals a depleted army back to ACTIVE."]
+          - ["[[artifact:medallion_of_faith]]", "Heals a depleted unit but is destroyed in the process."]
+          - ["[[artifact:gnome_tech]]", "Two pre-combat dice: the higher face becomes the DRM; doubles mean −6 and the device is destroyed."]
+          - ["[[artifact:dragonarmor]]", "+1 to leader-escape rolls."]
+          - ["[[artifact:plate_of_solamnus]]", "+1 to leader-escape rolls for Solamnic leaders."]
+          - ["[[artifact:hammer_of_kharas]]", "+1 TR and +1 diplomacy with Kaolyn, Thorbardin and Zhakar."]
+          - ["[[artifact:nightbringer]]", "+1 TR, usable by the Red Wing Highlords."]
+          - ["[[artifact:wyrmslayer]]", "+1 TR and dragon-slaying, for elven leaders."]
+          - ["[[artifact:dragonmetal]]", "The resource required to forge Dragonlances."]
+    heroes:
+      title: "Eliminated leaders"
+      p1: "Leaders eliminated in battle roll an escape attempt. The roll is improved by equipment such as the dragonarmor and the Plate of Solamnus (+1). Leaders that escape return off-map for later redeployment; the rest are lost with their equipment."
+      warn:
+        title: "Lost equipment"
+        text: "Equipment carried by a truly lost leader is destroyed and does not return to the pool."
+  events:
+    title: "Strategic Events"
+    how_they_work:
+      title: "How events work"
+      p1: "Strategic events fire during the strategic-events phase of every fifth turn. Each event defines a trigger (or 'always'), a maximum number of occurrences, and an effect, and many belong to one allegiance."
+      bullets:
+        - "Types: BONUS (diplomacy, combat or activation bonus), UNITS (reinforcements), BANNER (a country joins the cause) and ARTIFACT (a new artifact enters play)."
+        - "Diplomacy events grant activation bonuses, e.g. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] and [[event:hl_minor_diplomacy]]."
+        - "Artifact events put the war-winning relics into play, from the [[event:dragonlance_forged]] to the [[event:dragon_orb]]."
+      p2: "The full catalogue, with effects and pictures, is in the Events tab."
+  victory:
+    title: "Victory"
+    victory:
+      title: "Victory conditions"
+      p1: "Victory is measured with minor points: controlling countries, cities, fortresses and objectives grants points to a side. Each scenario defines its own victory conditions — the thresholds for a major or minor victory — and the game ends when a side reaches them at the end of a turn."
+      p2: "Single-country victories and fortress goals are common: reduce the enemy's headquarters or the Tower of the Dark Queen, hold a fixed set of objectives, or simply out-score the opponent when the calendar ends."
+  options:
+    title: "Difficulty & House Rules"
+    options:
+      title: "Game options"
+      p1: "The Options dialog (Rules tab of the game setup) tunes the rules to your taste:"
+      table:
+        headers: ["Option", "Choices"]
+        rows:
+          - ["Deployment", "Canonical or manual deployment of starting forces."]
+          - ["Interception", "Naval interception on, off, or naval-only."]
+          - ["Naval combat", "Classic or advanced naval rules."]
+          - ["Initiative", "Classic, advanced (initiative chit) or disabled."]
+          - ["Winter", "Enabled or disabled."]
+          - ["Difficulty", "Sets the AI stance and its bonuses."]
+  scenarios:
+    title: "Scenarios & Campaigns"
+    scenarios:
+      title: "Available scenarios"
+      p1: "Two campaigns and seven stand-alone scenarios are shipped with the game. Each defines its own map subset, start and end turn, starting forces, active events and victory conditions."
+      bullets:
+        - "Campaign: War of the Lance — the full 348–353 campaign."
+        - "Campaign: Dragonlance Chronicles — a campaign following the Dragonlance story."
+        - "Scenario: Fall of Silvanesti."
+        - "Scenario: Solamnic Plain."
+        - "Scenario: Kender Strike."
+        - "Scenario: Siege of Kalaman."
+        - "Scenario: Invasion of Abanasinia."
+        - "Scenario: Pirates of the Maelstrom."
+        - "Scenario: Battle for Neraka."

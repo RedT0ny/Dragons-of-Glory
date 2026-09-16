@@ -41,9 +41,13 @@ from src.content.config import (
     ARTIFACTS_DATA,
     UNITS_DATA,
     COUNTRIES_DATA,
+    CRT_DATA,
+    CALENDAR_DATA,
     LOCALE_DIR,
 )
 from src.content.constants import DRAGONFLIGHTS
+
+from wiki_manual import MANUAL_SECTIONS
 
 
 def _slugify(s: str) -> str:
@@ -52,6 +56,9 @@ def _slugify(s: str) -> str:
 
 def _esc(s) -> str:
     return html.escape(str(s), quote=True)
+
+
+_MANUAL_LINK_RE = re.compile(r"\[\[([a-z_]+):([\w_-]+)\]\]")
 
 
 def _load_locale(lang: str) -> dict:
@@ -827,16 +834,241 @@ class WikiGen:
             f'</div></article>'
         )
 
+    # --- rules manual --------------------------------------------------------------------
+    def _manual_locale(self, *path):
+        """Fetch a (en, es) value pair from the 'manual' locale namespace."""
+        return (_get(self.en, "manual", *path, default=None),
+                _get(self.es, "manual", *path, default=None))
+
+    def _manual_title(self, sec_id, sub_id=None):
+        path = (sec_id,) if sub_id is None else (sec_id, sub_id)
+        en, es = self._manual_locale(*path, "title")
+        if not en and not es:
+            print(f"WARNING: missing manual title for manual.{'.'.join(path)}", file=sys.stderr)
+            return f"<code>{sec_id if sub_id is None else sub_id}</code>"
+        return l10n_span(en, es)
+
+    def _manual_link(self, kind, tid):
+        if kind in ("country", "group"):
+            label = self.L("countries", tid, tid)
+        elif kind == "artifact":
+            label = self.L("assets", tid, tid)
+        elif kind == "event":
+            label = self.L("events", tid, tid)
+        elif kind == "unit":
+            label = self.L("unit_names", tid, tid)
+        else:
+            label = self.lbl(tid, tid)
+        return (f'<a class="l-x" data-goto="{_esc(kind)}/{_esc(tid)}" '
+                f'href="#{_esc(kind)}/{_esc(tid)}">{label}</a>')
+
+    def _manual_rich(self, en, es):
+        """Render a bilingual string, honouring [[kind:id]] markers."""
+        ep = _MANUAL_LINK_RE.split(en or "")
+        sp = _MANUAL_LINK_RE.split(es or "")
+        out = []
+        i = 0
+        while i < len(ep):
+            te = ep[i]
+            ts = sp[i] if i < len(sp) else ep[i]
+            if te or ts:
+                out.append(l10n_span(te, ts))
+            i += 1
+            if i >= len(ep):
+                break
+            kind, tid = ep[i], ep[i + 1]
+            out.append(self._manual_link(kind, tid))
+            i += 2
+        return "".join(out)
+
+    def _manual_crt(self):
+        """Render the Combat Results Table grid straight from data/crt.csv."""
+        try:
+            with open(CRT_DATA, encoding="utf-8") as f:
+                rows = [[c.strip() for c in rec] for rec in csv.reader(f, delimiter=";")]
+        except OSError as e:
+            print(f"WARNING: could not read CRT data: {e}", file=sys.stderr)
+            return ""
+        if not rows:
+            print("WARNING: CRT data file is empty", file=sys.stderr)
+            return ""
+        thead = []
+        for idx, c in enumerate(rows[0]):
+            thead.append(f"<th>{l10n_span('Roll', 'Tirada') if idx == 0 else _esc(c)}</th>")
+        body = []
+        for rec in rows[1:]:
+            body.append("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in rec) + "</tr>")
+        return ('<div class="tblwrap"><table class="mtable crt"><thead><tr>'
+                + "".join(thead) + "</tr></thead><tbody>" + "".join(body)
+                + "</tbody></table></div>")
+
+    def _manual_calendar(self):
+        """Render the campaign calendar straight from data/calendar.csv."""
+        try:
+            with open(CALENDAR_DATA, encoding="utf-8") as f:
+                rows = [[c.strip() for c in rec] for rec in csv.reader(f, delimiter=";")]
+        except OSError as e:
+            print(f"WARNING: could not read calendar data: {e}", file=sys.stderr)
+            return ""
+        if not rows:
+            print("WARNING: calendar data file is empty", file=sys.stderr)
+            return ""
+        headers = (l10n_span("Turn", "Turno"), l10n_span("Period", "Periodo"),
+                   l10n_span("Year", "Año"))
+        thead = "".join(f"<th>{h}</th>" for h in headers)
+        body = []
+        for rec in rows[1:]:
+            if len(rec) < 3:
+                continue
+            winter = rec[1].lower() == "winter"
+            cls = ' class="winter"' if winter else ""
+            body.append(f"<tr{cls}>" + "".join(f"<td>{_esc(c)}</td>" for c in rec[:3]) + "</tr>")
+        return ('<div class="tblwrap"><table class="mtable cal"><thead><tr>'
+                + thead + "</tr></thead><tbody>" + "".join(body)
+                + "</tbody></table></div>")
+
+    def _manual_alignment(self):
+        """Render the country alignment table from data/countries.yaml."""
+        items = []
+        for cid in sorted(self.countries.keys(),
+                          key=lambda c: self._name("countries", c, c).lower()):
+            c = self.countries[cid]
+            name = self._manual_link("country", cid)
+            strength = c["strength"] or "—"
+            ws, hl = c["alignment"][:2] if len(c["alignment"]) >= 2 else (0, 0)
+            items.append(
+                f'<tr><td>{name}</td><td>{strength}</td>'
+                f'<td>{ws:+d}</td><td>{hl:+d}</td></tr>'
+            )
+        thead = "".join(
+            f"<th>{h}</th>" for h in (l10n_span("Country", "Nación"),
+                                      l10n_span("Strength", "Poder Militar"),
+                                      l10n_span("WS", "PB"), l10n_span("HL", "SD"))
+        )
+        return ('<div class="tblwrap"><table class="mtable align"><thead><tr>'
+                + thead + "</tr></thead><tbody>" + "".join(items)
+                + "</tbody></table></div>")
+
+    def _manual_block(self, sec_id, sub_id, b):
+        t = b.get("t", "p")
+        if t == "crt":
+            return self._manual_crt()
+        if t == "calendar":
+            return self._manual_calendar()
+        if t == "align":
+            return self._manual_alignment()
+        key = b.get("key", "")
+        en, es = self._manual_locale(sec_id, sub_id, key)
+        if en is None and es is None:
+            print(f"WARNING: missing manual locale key manual.{sec_id}.{sub_id}.{key}", file=sys.stderr)
+            return ""
+        t = b.get("t", "p")
+        if t == "p":
+            return f'<p class="mp">{self._manual_rich(en, es)}</p>'
+        if t in ("ul", "ol"):
+            en_items = en if isinstance(en, list) else []
+            es_items = es if isinstance(es, list) else []
+            tag = "ul" if t == "ul" else "ol"
+            items = []
+            for idx, item_en in enumerate(en_items):
+                item_es = es_items[idx] if idx < len(es_items) else item_en
+                items.append(f"<li>{self._manual_rich(item_en, item_es)}</li>")
+            return f'<{tag} class="ml">{"".join(items)}</{tag}>'
+        if t == "warn":
+            en_d = en if isinstance(en, dict) else {}
+            es_d = es if isinstance(es, dict) else {}
+            head = ""
+            et = en_d.get("title") or ""
+            st = es_d.get("title") or et
+            if et:
+                head = f'<div class="m-warn-title">{l10n_span(et, st)}</div>'
+            return f'<div class="m-warn">{head}{self._manual_rich(en_d.get("text", ""), es_d.get("text", ""))}</div>'
+        if t == "tbl":
+            en_d = en if isinstance(en, dict) else {}
+            es_d = es if isinstance(es, dict) else {}
+            hed = []
+            en_h = en_d.get("headers") or []
+            es_h = es_d.get("headers") or []
+            for idx, hen in enumerate(en_h):
+                hes = es_h[idx] if idx < len(es_h) else hen
+                hed.append(f"<th>{l10n_span(hen, hes)}</th>")
+            rows_html = []
+            en_rows = en_d.get("rows") or []
+            es_rows = es_d.get("rows") or []
+            for ridx, erow in enumerate(en_rows):
+                es_row = es_rows[ridx] if ridx < len(es_rows) else erow
+                cells = []
+                for cidx, cen in enumerate(erow):
+                    ces = es_row[cidx] if isinstance(es_row, list) and cidx < len(es_row) else cen
+                    cells.append(f"<td>{self._manual_rich(cen, ces)}</td>")
+                rows_html.append("<tr>" + "".join(cells) + "</tr>")
+            body = "".join(rows_html)
+            return (f'<div class="tblwrap"><table class="mtable"><thead><tr>{"".join(hed)}</tr></thead>'
+                    f'<tbody>{body}</tbody></table></div>')
+        return ""
+
+    def _manual_pager(self, sec_id):
+        idx = next(i for i, s in enumerate(MANUAL_SECTIONS) if s["id"] == sec_id)
+        prev_sec = MANUAL_SECTIONS[idx - 1] if idx > 0 else None
+        next_sec = MANUAL_SECTIONS[idx + 1] if idx < len(MANUAL_SECTIONS) - 1 else None
+        nav = ['<div class="m-pager">']
+        if prev_sec:
+            nav.append(f'<a class="m-page" href="#m-{prev_sec["id"]}" rel="prev">&larr; '
+                       f'{self._manual_title(prev_sec["id"])}</a>')
+        else:
+            nav.append('<span></span>')
+        if next_sec:
+            nav.append(f'<a class="m-page" href="#m-{next_sec["id"]}" rel="next">'
+                       f'{self._manual_title(next_sec["id"])} &rarr;</a>')
+        elif prev_sec:
+            nav.append('<span></span>')
+        nav.append("</div>")
+        return "\n".join(nav)
+
+    def _manual_toc(self):
+        h = ['<nav class="m-toc" aria-label="Manual sections">']
+        for sec in MANUAL_SECTIONS:
+            sec_id = f'm-{sec["id"]}'
+            h.append(f'<a class="m-toc-link" href="#{sec_id}" data-sec="{sec_id}">'
+                     f'{self._manual_title(sec["id"])}</a>')
+        h.append("</nav>")
+        return "\n".join(h)
+
+    def _manual_body(self):
+        h = []
+        for sec in MANUAL_SECTIONS:
+            sec_id = sec["id"]
+            h.append(f'<section class="m-sec" id="m-{sec_id}">')
+            h.append(f'<h4 class="m-title">{self._manual_title(sec_id)}</h4>')
+            for sub_id, blocks in sec["subsections"].items():
+                h.append(f'<article class="m-sub" id="ms-{sub_id}">')
+                h.append(f'<h5 class="m-subtitle">{self._manual_title(sec_id, sub_id)}</h5>')
+                for blk in blocks:
+                    h.append(self._manual_block(sec_id, sub_id, blk))
+                h.append("</article>")
+            h.append(self._manual_pager(sec_id))
+            h.append("</section>")
+        return "\n".join(h)
+
     def _rules_tab(self):
         h = []
         h.append(self._section_open("tab-rules", self.lbl("Rules", "Reglas"), 0))
         h.append('<div class="rules-panel">')
         h.append(f'<h3>{self.lbl("Game Rules", "Reglas del juego")}</h3>')
-        intro_en = ("The official rulebooks, same documents that can be opened from the in-game "
-                    "Help menu (Help → Manual / Advanced Rules / House Rules).")
-        intro_es = ("Los manuales oficiales, los mismos documentos que pueden abrirse desde el menú "
-                    "Ayuda del juego (Ayuda → Manual / Reglas avanzadas / Reglas de la casa).")
-        h.append(f'<p class="desc">{l10n_span(intro_en, intro_es)}</p>')
+        intro_en, intro_es = self._manual_locale("intro")
+        if intro_en or intro_es:
+            h.append(f'<p class="desc">{l10n_span(intro_en, intro_es)}</p>')
+        h.append('<div class="manual">')
+        h.append('<aside class="manual-toc">')
+        h.append(f'<div class="m-toc-title">{self.lbl("Table of Contents", "Índice")}</div>')
+        h.append(self._manual_toc())
+        h.append('</aside>')
+        h.append('<div class="manual-body">')
+        h.append(self._manual_body())
+        h.append('</div>')
+        h.append('</div>')
+        h.append('<div class="manual-appendix">')
+        h.append(f'<h4>{self.lbl("Official Rulebooks", "Manuales oficiales")}</h4>')
         pdfs = [
             ("manual.pdf", self.lbl("Manual", "Manual"),
              self.lbl("The complete game manual.", "El manual completo del juego.")),
@@ -864,6 +1096,7 @@ class WikiGen:
                    "conmutador EN/ES.")
         h.append(f'<p class="note desc">{l10n_span(note_en, note_es)}</p>')
         h.append('</div>')
+        h.append('</div>')
         h.append('</section>')
         return "\n".join(h)
 
@@ -889,7 +1122,7 @@ class WikiGen:
             "bonuses": len(self.bonuses_index),
         }
         tabs = []
-        for key in ("units", "artifacts", "events", "countries", "bonuses", "rules"):
+        for key in ("rules", "units", "artifacts", "events", "countries", "bonuses"):
             en, es = self.SECTION_LABELS[key]
             n = tab_count.get(key)
             label = l10n_span(f"{en} ({n})" if n else en, f"{es} ({n})" if n else es)
