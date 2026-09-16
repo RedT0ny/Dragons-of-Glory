@@ -522,7 +522,7 @@ manual:
       steps:
         - "Despliegue — Despliega las unidades al inicio del tablero (ocurre solo una vez)."
         - "Reemplazos — Reconstruye unidades destruidas y mermadas, despliega unidades de refuerzo; actúa primero el perdedor de la iniciativa. El bando del Señor del Dragón realiza aquí además su paso de producción de dracónidos."
-        - "Eventos estratégicos — se roban los eventos (cada cinco turnos)."
+        - "Eventos estratégicos — se descubren los eventos."
         - "Activación — los países determinan qué bando apoyan este turno; se aplican las bonificaciones diplomáticas."
         - "Iniciativa — cada bando tira 1d4; el ganador decide qué bando actúa primero."
         - "Movimiento y combate — el primer bando mueve y resuelve sus combates, y después hace lo propio el segundo."
@@ -533,17 +533,17 @@ manual:
         text: "El turno 1 es especial: ambos pasos de despliegue actúan como pasos de reposición y se salta directamente al Movimiento, omitiendo los eventos, la activación y la iniciativa."
     calendar:
       title: "Calendario y turnos estratégicos"
-      p1: "El calendario de campaña abarca los años 348–353 (treinta turnos). Los eventos estratégicos y el invierno llegan juntos cada cinco turnos: 5, 10, 15, 20, 25 y 30."
+      p1: "El calendario de campaña abarca los años 348–353 (treinta turnos)."
     initiative:
       title: "Iniciativa"
-      p1: "Durante la fase de iniciativa cada bando tira un d4. Un empate mantiene al ganador anterior. El ganador decide qué bando ejecuta primero el movimiento y el combate."
+      p1: "Durante la fase de iniciativa cada bando tira un d4. Un empate mantiene al ganador anterior. El ganador ejecuta primero el movimiento y el combate."
       bullets:
         - "Clásica: una tirada simple de d4 decide el ganador."
         - "Avanzada: el poseedor de la ficha de iniciativa puede anular la tirada (un jugador humano)."
         - "Desactivada: el ganador es fijo (no se tiran dados)."
     replacements:
       title: "Reemplazos"
-      p1: "Durante la fase de Reemplazos, los jugadores pueden combinar unidades reducidas y desplegar unidades desde la reserva. El perdedor de la iniciativa resuelve sus reemplazos primero."
+      p1: "Durante la fase de Reemplazos, los jugadores pueden combinar unidades reducidas y desplegar unidades desde la reserva. El jugador sin la iniciativa resuelve sus reemplazos primero."
       p2: "Por cada dos ejércitos de la misma combinación de color (nacionalidad) en su reserva de reemplazo, un jugador puede inmediatamente desplegar uno de esos dos ejércitos, el otro es destruido."
       p3: "Si dos ejércitos reducidos de la misma nacionalidad están apilados juntos en un hexágono durante el paso de Reemplazo, pueden combinarse en uno solo a plena fuerza. El otro ejército vuelve a la reserva, y es inmediatamente elegible para combinar con otros reemplazos."
       p4: "Un reemplazo puede ser desplegado únicamente en un hexágono de ciudad o fortaleza desocupado de su país."
@@ -560,7 +560,7 @@ manual:
     activation:
       title: "Activación y alineación"
       p1: "Cuando un bando se acerca a un país neutral, ese país puede unirse mediante una tirada de diplomacia. La tirada se modifica por la alineación del país hacia cada bando; los países de caballeros de Solamnia reciben además una bonificación pro-Saber adicional."
-      p2: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los minotauros de [[country:nevermind]] están marcados como 'solo invasión por evento' y solo pueden unirse a un bando mediante un evento o por las armas."
+      p2: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
     conquest:
       title: "Conquista"
       p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
@@ -579,7 +579,7 @@ manual:
         - "Dragones — alas de los diez vuelos de dragones: cinco cromáticos sirven al Señor del Dragón, cinco metálicos vuelan para el Saber."
         - "Flotas — barcos de guerra que transportan ejércitos, dominan los mares y libran batallas navales."
         - "Magos — unidades de apoyo que se mueven libremente por el mapa y lanzan magia."
-        - "Ciudadelas — guarniciones fortificadas (Hoplon/Ciudadela) que se defienden con un valor de defensa y deben ser asaltadas con las reglas de asedio."
+        - "Ciudadelas — ciudadelas volantes que pueden transportar varias unidades y proporcionan defensas similares a una ciudad fortificada."
     ratings:
       title: "Valores"
       p1: "El valor de combate (VC) se usa para calcular las probabilidades de combate y las tiradas de impacto del combate naval. El valor táctico (VT) se suma a la tirada de combate cuando un líder está presente en la batalla."

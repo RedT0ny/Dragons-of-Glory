@@ -521,9 +521,9 @@ manual:
       p1: "Each battle turn follows this order. Player sides alternate in movement and combat."
       steps:
         - "Initial Deployment - Happens only once. Each side deploys its starting units on the map."
-        - "Replacements — Rebuild destroyed and depleted units and deploy replacements; the loser of the initiative acts first. Draconian production also happens here."
+        - "Replacements — Rebuild destroyed and depleted units and deploy replacements; the player without the initiative acts first. Draconian production also happens here."
         - "Strategic Events — event cards are drawn."
-        - "Activation — Starting with the player who just drew the Strategic Event counter, each player can attempt to Activate a neutral nation of his choice by rolling 1d10."
+        - "Activation — Starting with the player without the initiative, each player can attempt to Activate a neutral nation of his choice by rolling 1d10."
         - "Initiative — each side rolls 1d4; the winner acts first. In case of a tie, the previous winner keeps the initiative."
         - "Movement & Combat — the first side moves and resolves its combats, then the second side does the same."
         - "Supply (Advanced only) — Units out of supply suffer attrition."
@@ -543,7 +543,7 @@ manual:
         - "Disabled: Player order is fixed for the campaign/scenario (no dice are rolled)."
     replacements:
       title: "Replacements"
-      p1: "During the Replacement step, players can combine depleted units and deploy units from the reserve. The loser of the initiative resolves their replacements first."
+      p1: "During the Replacement step, players can combine depleted units and deploy units from the reserve. The player without the initiative resolves their replacements first."
       p2: "For every two armies of the same color combination (nationality) in their replacement pool, a player can immediately bring one of those armies back into play. The other army is destroyed."
       p3: "In addition, if two depleted armies of the same nationality are stacked together in a hex during the Replacement Step, one of these armies can be placed in the Replacement Pool, and the other rebuilt to full strength. The army placed in the pool is immediately eligible to be used for additional replacements."
       p4: "An army that is returned to play must be placed in any unoccupied city or fortress hex of its country."
@@ -559,8 +559,9 @@ manual:
         - "Highlord-leaning powers include [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] and [[country:tarsis]]."
     activation:
       title: "Activation and allegiance"
-      p1: "When a side approaches a neutral country, that country may join through a diplomacy roll. The roll is modified by the country's alignment toward each side; the knight-countries of Solamnia receive an additional Whitestone bonus."
-      p2: "Two countries cannot be turned by diplomacy alone: [[country:dargaard]] and the minotaurs of [[country:nevermind]] are tagged 'event invasion only' and can only join a side through an event or by force."
+      p1: "During the Activation Step of each Turn, each player may choose one neutral nation and attempt to Activate it as an ally by rolling 1d10. The player without the initiative rolls first."
+      p2: "Activation is successful if the roll is equal to or less than the nation's alignment rating for that side. The player may add any modifiers from events, leaders or artifacts to the roll."
+      p3: "Two countries cannot be turned by diplomacy alone: [[country:dargaard]] and the gnomes of [[country:nevermind]] can only join a side through an event or by force."
     conquest:
       title: "Conquest"
       p1: "A country is conquered as soon as all fortified cities and fortresses in the country have been captured by enemy armies."
@@ -579,7 +580,7 @@ manual:
         - "Dragons — wings of the ten dragonflights: five chromatic serve the Highlord, five metallic fly for Whitestone."
         - "Fleets — warships that transport armies, control the seas and fight naval battles."
         - "Wizards — support units that move freely across the map and cast magic."
-        - "Citadels — fortified garrisons (Hoplon/Citadel) that defend with a defence rating and must be assaulted with siege rules."
+        - "Citadels — Magical floating citadels that can transport several armies and provide the same bonus as a fortified city."
     ratings:
       title: "Ratings"
       p1: "Combat rating (CR) is used to compute combat odds and to-hit rolls in naval combat. Tactical rating (TR) adds to the combat die roll when a leader is present in battle."
@@ -625,8 +626,8 @@ manual:
         headers: ["Code", "Meaning"]
         rows:
           - ["-", "No effect on that side."]
-          - ["R (retreat)", "Survivors of that side retreat: R forces a one-hex retreat, 2R a two-hex retreat (mandatory in the mountains, deserts or across passes)."]
-          - ["D (deplete)", "All affected units of that side step down: ACTIVE → DEPLETED."]
+          - ["R (retreat)", "Survivors of that side retreat."]
+          - ["D (deplete)", "All affected units of that side are depleted. If any of them are already depleted, they are eliminated and sent to the reserves."]
           - ["1, 2 (steps)", "Combat step losses; the number is applied as additional depletion steps."]
           - ["E (eliminate)", "All affected units of that side are eliminated. Leaders may attempt to escape."]
       p2: "After combat, surviving attackers may advance into a vacated hex, and a victorious side may conquer the hex at the end of the combat phase. Stacking is always enforced."
