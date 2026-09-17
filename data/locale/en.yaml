@@ -494,6 +494,18 @@ unit_names:
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
 
+terrain:
+  grassland: "Grassland"
+  steppe: "Steppe"
+  forest: "Forest"
+  jungle: "Jungle"
+  glacier: "Glacier"
+  mountain: "Mountain"
+  ocean: "Ocean"
+  desert: "Desert"
+  swamp: "Swamp"
+  maelstrom: "Maelstrom"
+
 # The wiki "Rules" tab navigable manual (structure in scripts/wiki_manual.py).
 manual:
   intro: "A navigable summary of the game rules, generated from the game's own data and code. The classic rulebooks - the same documents that can be opened from the in-game Help menu (Help → Manual / Advanced Rules / House Rules) - are linked below."
@@ -588,11 +600,11 @@ manual:
     statuses:
       title: "Unit statuses"
       bullets:
-        - "ACTIVE — at full strength on the map."
-        - "DEPLETED — reduced after a battle; rebuilt during the replacements phase."
-        - "RESERVE — waiting in the replacement pool, off the map."
-        - "DESTROYED — permanently lost (its equipment is gone and does not return to the pool)."
-        - "READY — available for deployment."
+        - "Active — at full strength on the map."
+        - "Depleted — at reduced strength on the map."
+        - "Reserve — waiting in the replacement pool, off the map."
+        - "Destroyed — permanently lost (its equipment is gone and does not return to the pool)."
+        - "Ready — available for deployment."
       warn:
         title: "Stacking"
         text: "No more than two units may occupy the same hex at any time."
@@ -606,6 +618,7 @@ manual:
         - "Mountains are only entered through a pass or a tunnel border, and mountain combats can only be declared across a pass border."
         - "River borders cost +1 movement point (they are free to cross when frozen in winter)."
         - "Terrain affinity waives the cost of the matching terrain."
+      legend: "The table shows the cost for a ground unit with no terrain affinity. Forest, jungle and glacier cost 2 points, or 1 with the matching affinity (*). Mountains are entered only through a pass or a tunnel border; in winter snow blocks the passes and mountains become impassable (**), except inside the winter-free region of the map."
     transport:
       title: "Sea transport"
       p1: "A fleet in the same hex may carry an army as a passenger. Boarded units cannot move on their own for the rest of the turn and leave the spatial map until they disembark."

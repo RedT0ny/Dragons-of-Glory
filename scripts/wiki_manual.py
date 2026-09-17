@@ -87,6 +87,7 @@ MANUAL_SECTIONS = [
             "activation": [
                 {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
             ],
             "conquest": [
                 {"t": "p", "key": "p1"},
@@ -118,6 +119,8 @@ MANUAL_SECTIONS = [
             "movement_points": [
                 {"t": "p", "key": "p1"},
                 {"t": "ul", "key": "bullets"},
+                {"t": "terrain"},
+                {"t": "p", "key": "legend"},
             ],
             "transport": [
                 {"t": "p", "key": "p1"},

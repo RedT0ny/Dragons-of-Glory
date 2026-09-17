@@ -61,6 +61,26 @@ def _esc(s) -> str:
 _MANUAL_LINK_RE = re.compile(r"\[\[([a-z_]+):([\w_-]+)\]\]")
 
 
+# Ground movement cost by terrain (standard / winter), rendered with a terrain
+# thumbnail from assets/img/<key>.png. Costs mirror src/game/map.py
+# _get_ground_movement_cost: 1 point for open terrain, forest/jungle/glacier
+# cost 2 (suffix "*" in the rendered table), mountains are only reachable
+# through a pass/tunnel border and become impassable in winter when snow blocks
+# the passes ("—" = impassable to ground troops).
+TERRAIN_ROWS = (
+    ("grassland", "1", "1"),
+    ("steppe", "1", "1"),
+    ("forest", "2*", "2*"),
+    ("jungle", "2*", "2*"),
+    ("glacier", "2*", "2*"),
+    ("mountain", "—**", "—**"),
+    ("ocean", "—", "—"),
+    ("desert", "—", "—"),
+    ("swamp", "—", "—"),
+    ("maelstrom", "—", "—"),
+)
+
+
 def _load_locale(lang: str) -> dict:
     path = os.path.join(LOCALE_DIR, f"{lang}.yaml")
     with open(path, "r", encoding="utf-8") as fh:
@@ -949,6 +969,30 @@ class WikiGen:
                 + thead + "</tr></thead><tbody>" + "".join(items)
                 + "</tbody></table></div>")
 
+    def _manual_terrain(self):
+        """Ground movement cost per terrain (standard/winter) with terrain images."""
+        thead = "".join(
+            f"<th>{h}</th>" for h in (l10n_span("Hex", "Hexágono"),
+                                      l10n_span("Terrain", "Terreno"),
+                                      l10n_span("Cost", "Coste"),
+                                      l10n_span("Cost in winter", "Coste en invierno"))
+        )
+        body = []
+        for key, std, win in TERRAIN_ROWS:
+            name = self.L("terrain", key, key.title())
+            if std == "—" and win == "—":
+                cls = ' class="impassable"'
+            else:
+                cls = ""
+            body.append(
+                f'<tr{cls}><td><img class="hex" src="../img/{key}.png" '
+                f'alt="{_esc(key.title())}" loading="lazy"></td><td>{name}</td>'
+                f"<td>{_esc(std)}</td><td>{_esc(win)}</td></tr>"
+            )
+        return ('<div class="tblwrap"><table class="mtable terr"><thead><tr>'
+                + thead + "</tr></thead><tbody>" + "".join(body)
+                + "</tbody></table></div>")
+
     def _manual_block(self, sec_id, sub_id, b):
         t = b.get("t", "p")
         if t == "crt":
@@ -957,6 +1001,8 @@ class WikiGen:
             return self._manual_calendar()
         if t == "align":
             return self._manual_alignment()
+        if t == "terrain":
+            return self._manual_terrain()
         key = b.get("key", "")
         en, es = self._manual_locale(sec_id, sub_id, key)
         if en is None and es is None:

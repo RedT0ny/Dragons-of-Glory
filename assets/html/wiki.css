@@ -104,6 +104,11 @@ a { color: var(--ws); text-decoration: none; border-bottom: 1px dotted rgba(126,
 .mtable.cal tr.winter td { background: rgba(120,170,220,.12); }
 .mtable.align td:first-child { white-space: nowrap; }
 .mtable.align td:nth-child(n+3) { text-align: center; }
+.mtable.terr td:first-child { text-align: center; white-space: nowrap; }
+.mtable.terr td:nth-child(n+3) { text-align: center; white-space: nowrap; }
+.mtable.terr .hex { width: 36px; height: 36px; object-fit: cover; border-radius: 6px;
+  display: block; margin: 0 auto; border: 1px solid rgba(255,255,255,.2); }
+.mtable.terr tr.impassable td { color: var(--muted); }
 .m-pager { display: flex; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 8px;
   border-top: 1px solid var(--line); }
 .m-page { color: var(--gold); border-bottom: none; font-size: 14px; }

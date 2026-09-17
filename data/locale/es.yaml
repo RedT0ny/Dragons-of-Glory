@@ -494,6 +494,18 @@ unit_names:
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
 
+terrain:
+  grassland: "Pradera"
+  steppe: "Estepa"
+  forest: "Bosque"
+  jungle: "Selva"
+  glacier: "Glaciar"
+  mountain: "Montaña"
+  ocean: "Océano"
+  desert: "Desierto"
+  swamp: "Pantano"
+  maelstrom: "Remolino"
+
 # El manual navegable de la pestaña "Reglas" de la wiki (estructura en scripts/wiki_manual.py).
 manual:
   intro: "Un resumen navegable de las reglas, generado a partir de los datos y el código del propio juego. Los manuales clásicos - los mismos documentos que pueden abrirse desde el menú Ayuda del juego (Ayuda → Manual / Reglas avanzadas / Reglas de la casa) - se enlazan a continuación."
@@ -515,10 +527,10 @@ manual:
         title: "Una nota sobre los manuales"
         text: "Los manuales clásicos en PDF incluidos con el juego (Manual, Reglas avanzadas, Reglas de la casa) siguen disponibles desde el menú Ayuda del juego y están enlazados al pie de esta pestaña. Los capítulos siguientes son un resumen original de las reglas del juego de ordenador tal y como están implementadas."
   turn:
-    title: "El turno de campaña"
+    title: "El turno de batalla"
     phases:
       title: "Secuencia del turno"
-      p1: "Cada turno de campaña sigue este orden. Los bandos se alternan en el movimiento y el combate."
+      p1: "Cada turno de batalla sigue este orden. Los bandos se alternan en el movimiento y el combate."
       steps:
         - "Despliegue — Despliega las unidades al inicio del tablero (ocurre solo una vez)."
         - "Reemplazos — Reconstruye unidades destruidas y mermadas, despliega unidades de refuerzo; actúa primero el perdedor de la iniciativa. El bando del Señor del Dragón realiza aquí además su paso de producción de dracónidos."
@@ -559,8 +571,9 @@ manual:
         - "Los poderes pro-Señor del Dragón incluyen [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] y [[country:tarsis]]."
     activation:
       title: "Activación y alineación"
-      p1: "Cuando un bando se acerca a un país neutral, ese país puede unirse mediante una tirada de diplomacia. La tirada se modifica por la alineación del país hacia cada bando; los países de caballeros de Solamnia reciben además una bonificación pro-Saber adicional."
-      p2: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
+      p1: "Durante el paso de Activación de cada turno, cada jugador puede elegir una nación neutral e intentar activarla como aliada tirando 1d10. El jugador sin la iniciativa tira primero."
+      p2: "La activación tiene éxito si la tirada es igual o menor que el índice de alineación de la nación hacia ese bando. El jugador puede sumar a la tirada los modificadores de eventos, líderes o artefactos."
+      p3: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
     conquest:
       title: "Conquista"
       p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
@@ -587,11 +600,11 @@ manual:
     statuses:
       title: "Estados de las unidades"
       bullets:
-        - "ACTIVA — a plena fuerza sobre el mapa."
-        - "MERMADA — reducida tras una batalla."
-        - "RESERVA — a la espera en la reserva, fuera del mapa."
-        - "DESTRUIDA — perdida para siempre (su equipo se pierde y no vuelve a la reserva)."
-        - "LISTA — disponible para despliegue."
+        - "Activa — a plena fuerza en el mapa."
+        - "Mermada — reducida, en el mapa."
+        - "Reserva — a la espera en la reserva, fuera del mapa."
+        - "Destruida — perdida para siempre (su equipo se pierde y no vuelve a la reserva)."
+        - "Lista — disponible para despliegue."
       warn:
         title: "Apilado"
         text: "Ningún hexágono puede contener más de dos unidades en ningún momento."
@@ -605,6 +618,7 @@ manual:
         - "Las montañas solo se atraviesan por un paso o una frontera de túnel, y los combates de montaña solo pueden declararse a través de una frontera de paso."
         - "Las fronteras de río cuestan +1 punto de movimiento (cruzan gratis cuando el río se hiela en invierno)."
         - "La afinidad de terreno exime del coste del terreno correspondiente."
+      legend: "La tabla muestra el coste para una unidad terrestre sin afinidad de terreno. Bosque, selva y glaciar cuestan 2 puntos, o 1 con la afinidad correspondiente (*). Las montañas solo se atraviesan por un paso o frontera de túnel; en invierno la nieve bloquea los pasos y las montañas son intransitables (**), salvo dentro de la región libre de invierno del mapa."
     transport:
       title: "Transporte marítimo"
       p1: "Una flota en el mismo hexágono puede llevar un ejército a bordo. Las unidades embarcadas no pueden moverse por su cuenta durante el resto del turno y abandonan el mapa espacial hasta que desembarcan."
