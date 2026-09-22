@@ -79,15 +79,12 @@ Design overview:
 
 TODO:
 
-- Add Dragon #170's Advanced Rules in "settings" - Intercept and supply done, winter turns missing.
 - I18n (Partially)
-- YAML viewer to show lists of events and artifacts (for the help menu/encyclopedia).
 
 TODO BUGFIX:
 
 - Fix map subset not working correctly (use full map for now).
 - Avoid garrisons (units that cannot move) being boarded onto ships.
-- AI not deploying units created by events until next replacements phase.
 
 Notes:
 
@@ -124,4 +121,3 @@ events in the game_state list:
 if game_state events list is empty, skip event phase and show a placeholder.
 Disable not only end phase button during AI turn, but also pressing enter key. Activate it in the strategic events turn
 of the player only.
-

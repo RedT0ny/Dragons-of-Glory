@@ -3,6 +3,23 @@ import os
 from src.content.tools import to_roman
 from src.content.config import LOCALE_DIR, DEFAULT_LANG
 
+_shared_translator = None
+
+
+def get_translator() -> "Translator":
+    """Return the application-wide Translator, lazily created if not set."""
+    global _shared_translator
+    if _shared_translator is None:
+        _shared_translator = Translator()
+    return _shared_translator
+
+
+def set_translator(translator: "Translator") -> None:
+    """Set the application-wide Translator used by modules with no direct access."""
+    global _shared_translator
+    _shared_translator = translator
+
+
 class Translator:
     def __init__(self, lang_code=DEFAULT_LANG):
         self.lang_code = lang_code
@@ -41,6 +58,32 @@ class Translator:
     def get_country_name(self, country_id: str) -> str:
         """Returns the translated name of the country."""
         return self.translations.get('countries', {}).get(country_id, {}).get('name', country_id)
+
+    def get_country_adjective(self, country_id: str) -> str:
+        """Returns the translated adjective of the country, falling back to its name.
+
+        Returns an empty string when the country is unknown.
+        """
+        node = self.translations.get('countries', {}).get(country_id, {})
+        if not isinstance(node, dict):
+            return ""
+        return node.get('adjective') or node.get('name', "")
+
+    def get_race_name(self, race_id: str) -> str:
+        """Returns the translated singular name of the race, or an empty string."""
+        return self.translations.get('races', {}).get(race_id, {}).get('name', "")
+
+    def get_race_plural_name(self, race_id: str) -> str:
+        """Returns the translated plural name of the race, or an empty string."""
+        return self.translations.get('races', {}).get(race_id, {}).get('plural', "")
+
+    def get_race_adjective(self, race_id: str) -> str:
+        """Returns the translated adjective of the race, or an empty string."""
+        return self.translations.get('races', {}).get(race_id, {}).get('adjective', "")
+
+    def get_unit_type_name(self, type_id: str) -> str:
+        """Returns the translated name of the unit type, or an empty string."""
+        return self.translations.get('unit_types', {}).get(type_id, {}).get('name', "")
 
     def get_asset_name(self, asset_id: str) -> str:
         """Returns the translated name of the asset."""

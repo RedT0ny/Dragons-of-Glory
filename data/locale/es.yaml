@@ -20,7 +20,7 @@ countries:
     adjective: "Blode"
   blodehelm:
     name: "Yelmo de Blode"
-    adjective: "Yelmo de Blode"
+    adjective: "del Yelmo"
   blue:
     name: "Ala Azul"
     adjective: "Azul"
@@ -38,7 +38,7 @@ countries:
     adjective: "Cobrizo"
   daltigoth:
     name: "Daltigoth"
-    adjective: "Daltigothiano"
+    adjective: "Daltigothiana"
   dargaard:
     name: "Dargaard"
     adjective: "Dargaard"
@@ -59,7 +59,7 @@ countries:
     adjective: "Verde"
   haltigoth:
     name: "Haltigoth"
-    adjective: "Haltigothiano"
+    adjective: "Haltigothiana"
   hinterlund:
     name: "Hinterlund"
     adjective: "Hinterlund"
@@ -68,7 +68,7 @@ countries:
     adjective: "Hylo"
   icereach:
     name: "Muro de Hielo"
-    adjective: "Muro de Hielo"
+    adjective: "Bárbara"
   kaolyn:
     name: "Kaolyn"
     adjective: "Kaolyn"
@@ -125,7 +125,7 @@ countries:
     adjective: "Schallsea"
   sikket:
     name: "Sikk'et Hul"
-    adjective: "Sikk'et Hul"
+    adjective: "Sikk'et"
   silvanesti:
     name: "Silvanesti"
     adjective: "Silvanesti"
@@ -140,7 +140,7 @@ countries:
     adjective: "Southlund"
   taman:
     name: "Taman Busuk"
-    adjective: "Taman Busuk"
+    adjective: "Neraka"
   tarsis:
     name: "Tarsis"
     adjective: "Tarsis"
@@ -155,7 +155,7 @@ countries:
     adjective: "Throt"
   tower:
     name: "Torre del Sumo Sacerdote"
-    adjective: "Torre del Sumo Sacerdote"
+    adjective: "Torre"
   vingaard:
     name: "Vingaard"
     adjective: "Vingaard"
@@ -169,7 +169,7 @@ races:
   draconian:
     name: "Draconiano"
     plural: "Draconianos"
-    adjective: "Draconiano"
+    adjective: "Draconiana"
   dragon:
     name: "Dragón"
     plural: "Dragones"
@@ -177,11 +177,11 @@ races:
   dwarf:
     name: "Enano"
     plural: "Enanos"
-    adjective: "Enano"
+    adjective: "Enanil"
   elf:
     name: "Elfo"
     plural: "Elfos"
-    adjective: "Élfico"
+    adjective: "Élfica"
   goblin:
     name: "Goblin"
     plural: "Goblins"
@@ -193,7 +193,7 @@ races:
   human:
     name: "Humano"
     plural: "Humanos"
-    adjective: "Humano"
+    adjective: "Humana"
   kender:
     name: "Kender"
     plural: "Kenders"
@@ -205,7 +205,7 @@ races:
   ogre:
     name: "Ogro"
     plural: "Ogros"
-    adjective: "Ogro"
+    adjective: "Ogra"
   pegasus:
     name: "Pegaso"
     plural: "Pegasos"
@@ -217,7 +217,7 @@ races:
   solamnic:
     name: "Solámnico"
     plural: "Caballeros"
-    adjective: "Solámnico"
+    adjective: "Solámnica"
   thanoi:
     name: "Thanoi"
     plural: "Thanois"
@@ -225,7 +225,7 @@ races:
   undead:
     name: "No-Muerto"
     plural: "No-Muertos"
-    adjective: "No-Muerto"
+    adjective: "No-Muerta"
 assets:
     blue_crystal_staff: "Vara de Cristal Azul"
     crown_of_power: "Corona de Poder"
@@ -234,10 +234,10 @@ assets:
     dragonarmor: "Armadura de Señor del Dragón"
     dragonlance: "Dragonlance"
     dragonmetal: "Dragonmetal"
-    gnome_tech: "Gnome Tech"
+    gnome_tech: "Tecnología Gnómica"
     hammer_of_kharas: "Mazo de Kharas"
     medallion_of_faith: "Medallón de la Fe"
-    nightbringer: "Nightbringer"
+    nightbringer: "Medianoche"
     plate_of_solamnus: "Armadura de Solamnus"
     silver_arm: "Brazo de Plata de Ergoth"
     staff_of_magius: "Bastón de Mago"

@@ -10,7 +10,7 @@ from src.gui.intro_window import IntroWindow
 from src.gui.loading_dialog import LoadingDialog
 from src.game.game_state import GameState
 from src.content.audio_manager import AudioManager
-from src.content.translator import Translator
+from src.content.translator import Translator, set_translator
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.game.controller import GameController
 
@@ -48,6 +48,7 @@ class GameApp:
 
         # Initialize the Translator
         self.translator = Translator(lang_code=lang_code)
+        set_translator(self.translator)
 
         # Set organization/application for QSettings placement
         QCoreApplication.setOrganizationName("DragonsOfGlory")

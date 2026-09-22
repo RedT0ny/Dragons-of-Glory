@@ -40,7 +40,45 @@ def to_roman(n: int):
             n -= value
     return result
 
-def caption_id(unit_id: str):
+def _resolve_translator(translator=None):
+    """Return the given translator, or the shared one when available."""
+    if translator is not None:
+        return translator
+    try:
+        from src.content.translator import get_translator
+        return get_translator()
+    except Exception:
+        return None
+
+
+def _country_label(translator, token: str) -> str:
+    """Localized adjective for a country/land slug (e.g. 'taman' -> 'Nerakan')."""
+    if translator is not None and hasattr(translator, "get_country_adjective"):
+        label = translator.get_country_adjective(token)
+        if label:
+            return label
+    return token.capitalize() if token else ""
+
+
+def _race_label(translator, token: str) -> str:
+    """Localized adjective for a race slug (e.g. 'draconian' -> 'Draconian')."""
+    if translator is not None and hasattr(translator, "get_race_adjective"):
+        label = translator.get_race_adjective(token)
+        if label:
+            return label
+    return token.capitalize() if token else ""
+
+
+def _type_label(translator, token: str) -> str:
+    """Localized name for a unit type slug (e.g. 'inf' -> 'Infantry')."""
+    if translator is not None and hasattr(translator, "get_unit_type_name"):
+        label = translator.get_unit_type_name(token)
+        if label:
+            return label
+    return token.capitalize() if token else ""
+
+
+def caption_id(unit_id: str, translator=None):
     """Transform a unit ID string according to the specified rules.
 
     Example: 'kern_ogre_inf_1' → 'I Kern'
@@ -48,10 +86,12 @@ def caption_id(unit_id: str):
 
     Args:
         unit_id: The original unit ID string
+        translator: Optional Translator used to localize country/race labels
 
     Returns:
         Transformed string according to the rules
     """
+    t = _resolve_translator(translator)
     id_text = f"{unit_id}"
 
     if '_' in id_text:
@@ -59,16 +99,10 @@ def caption_id(unit_id: str):
         if parts[-1].isdigit():
             if parts[0] == 'dtemple':
                 # If it's a Draconian
-                parts[0] = parts[1]
-            elif parts[0] == 'taman':
-                parts[0] = 'Neraka'
-            elif parts[0] == 'nergoth':
-                parts[0] = "N.Ergoth"
-            elif parts[0] == 'sikket':
-                parts[0] = "Sikk'et"
-            elif parts[0] == 'thank':
-                parts[0] = 'Than-Khal'
-            return f"{to_roman(int(parts[-1]))} {parts[0].capitalize()}"
+                label = _race_label(t, parts[1])
+            else:
+                label = _country_label(t, parts[0])
+            return f"{to_roman(int(parts[-1]))} {label}".rstrip()
         elif len(parts) > 2:
             # If more than 2 parts and no number at end, return first part capitalized
             return parts[0].capitalize()
@@ -101,25 +135,26 @@ class TextFormatter:
         self._tdata = getattr(translator, "translations", {}) or {}
 
     @staticmethod
-    def format_units(units: Iterable[object]) -> str:
-        return ", ".join(TextFormatter.format_unit_log_string(u) for u in units) if units else "-"
+    def format_units(units: Iterable[object], translator=None) -> str:
+        return ", ".join(TextFormatter.format_unit_log_string(u, translator) for u in units) if units else "-"
 
     @staticmethod
-    def format_combat_log(attackers, defenders, result):
-        attacker_names = TextFormatter.format_units(attackers)
-        defender_names = TextFormatter.format_units(defenders)
+    def format_combat_log(attackers, defenders, result, translator=None):
+        attacker_names = TextFormatter.format_units(attackers, translator)
+        defender_names = TextFormatter.format_units(defenders, translator)
         return f"Combat result {result}: \nAttackers [{attacker_names}] \nvs \nDefenders [{defender_names}]"
 
     @staticmethod
-    def format_naval_log(attackers, defenders, outcome):
-        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in attackers if u.is_fleet())
-        defender_names = ", ".join(TextFormatter.format_unit_log_string(u) for u in defenders if u.is_fleet())
+    def format_naval_log(attackers, defenders, outcome, translator=None):
+        attacker_names = ", ".join(TextFormatter.format_unit_log_string(u, translator) for u in attackers if u.is_fleet())
+        defender_names = ", ".join(TextFormatter.format_unit_log_string(u, translator) for u in defenders if u.is_fleet())
         rounds = outcome.get("rounds", 0)
         result = outcome.get("result", "-/-")
         return f"Naval combat {result} after {rounds} rounds: Attackers [{attacker_names}] vs Defenders [{defender_names}]"
 
     @staticmethod
-    def format_unit_log_string(unit):
+    def format_unit_log_string(unit, translator=None):
+        t = _resolve_translator(translator)
         ordinal = getattr(unit, "ordinal", None) if not unit.is_leader() else None
         id_text = getattr(unit, "id", "Unknown")
 
@@ -130,16 +165,13 @@ class TextFormatter:
             if ordinal:
                 if parts[0] == 'dtemple':
                     # If it's a Draconian
-                    return f"{to_roman(ordinal)} {parts[1].capitalize()}"
-                elif parts[0] == 'taman':
-                    parts[0] = 'Neraka'
-                elif parts[0] == 'nergoth':
-                    parts[0] = 'N.Ergoth'
-                elif parts[0] == 'sikket':
-                    parts[0] = "Sikk'et Hul"
-                elif parts[0] == 'thank':
-                    parts[0] = 'Than-Khal'
-                return f"{to_roman(ordinal)} {' '.join(p.capitalize() for p in parts[0:3])}"
+                    return f"{to_roman(ordinal)} {_race_label(t, parts[1])}"
+                tokens = [_country_label(t, parts[0])]
+                if len(parts) > 1:
+                    tokens.append(_race_label(t, parts[1]))
+                if len(parts) > 2:
+                    tokens.append(_type_label(t, parts[2]))
+                return f"{to_roman(ordinal)} {' '.join(x for x in tokens if x)}"
             # If underscores but no ordinal, return the capitalized name
             return " ".join(p.capitalize() for p in parts[0:])
 

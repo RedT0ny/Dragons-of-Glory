@@ -92,7 +92,7 @@ countries:
     adjective: "Mithas"
   nergoth:
     name: "Northern Ergoth"
-    adjective: "Northern Ergothian"
+    adjective: "N.Ergoth"
   nevermind:
     name: "Mount Nevermind"
     adjective: "Nevermind"
@@ -152,7 +152,7 @@ countries:
     adjective: "Thorbardin"
   tower:
     name: "High Clerist Tower"
-    adjective: "High Clerist Tower"
+    adjective: "Tower"
   throt:
     name: "Throt"
     adjective: "Throt"
