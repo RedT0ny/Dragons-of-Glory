@@ -20,6 +20,32 @@ def set_translator(translator: "Translator") -> None:
     _shared_translator = translator
 
 
+class _UnitField:
+    """A template token with several render forms, chosen via the format spec.
+
+    - ``{land}``         → name form (e.g. "Silvanesti")
+    - ``{land:adjective}`` → adjective/gentilicio form (e.g. "Nerakan")
+    - ``{land:prep}``    → prepositional form (prep + adjective, e.g. "de Neraka")
+    """
+
+    __slots__ = ("name", "adjective", "prep")
+
+    def __init__(self, name="", adjective="", prep=""):
+        self.name = name
+        self.adjective = adjective
+        self.prep = prep
+
+    def __format__(self, spec: str) -> str:
+        if spec == "adjective":
+            return self.adjective or self.name
+        if spec == "prep":
+            return f"{self.prep} {self.adjective}".strip() if self.adjective else ""
+        return self.name
+
+    def __bool__(self) -> bool:
+        return bool(self.name)
+
+
 class Translator:
     def __init__(self, lang_code=DEFAULT_LANG):
         self.lang_code = lang_code
@@ -37,23 +63,88 @@ class Translator:
             return yaml.safe_load(f)
 
     def format_unit_name(self, unit, mode='log'):
-        ordinal_roman = to_roman(unit.ordinal)
-        
-        # If the unit's ID exists in our 'unit_names' translation table, it's a named unit.
-        # Otherwise, it's a generic unit.
-        named_display = self.translations.get('unit_names', {}).get(unit.id)
-        
-        if named_display:
-            template = self.translations['units'][f'{mode}_format_named']
-            return template.format(ordinal=ordinal_roman, name=named_display)
+        """Build a localized unit label using the per-language templates in
+        ``units``: ``{mode}_format_generic`` by default, overridden by
+        ``{mode}_format_flight`` for dragon wings, or ``{mode}_format_named``
+        for hand-authored names.
+
+        ``unit`` may be a real Unit (fields come from its spec) or a proxy
+        object exposing ``id``/``ordinal``/``is_leader`` with ``spec=None``
+        (fields are then parsed from the id tokens, as the counters do).
+
+        Returns ``None`` when no template applies or the template fails to
+        render, so callers can fall back to a legacy formatter.
+        """
+        fields = self._unit_fields(unit)
+        named = self.translations.get('unit_names', {}).get(getattr(unit, "id", ""))
+        section = self.translations.get('units', {})
+        key = "log" if mode == "log" else "counter"
+
+        if named:
+            template = section.get(f'{key}_format_named')
+            if template is None:
+                return None
+            fields["name"] = _UnitField(named)
+            fields["ordinal"] = _UnitField()
+            return self._render_template(template, fields)
+
+        type_tok = fields.get("_type", "")
+        race_tok = fields.get("_race", "")
+        if type_tok == "wing" and race_tok == "dragon":
+            template = section.get(f'{key}_format_flight')
         else:
-            template = self.translations['units'][f'{mode}_format_generic']
-            return template.format(
-                ordinal=ordinal_roman,
-                land=self.get_country_name(unit.land) if unit.land else "",
-                race=self.translations.get('races', {}).get(unit.race, {}).get('name', unit.race),
-                type=self.translations.get('unit_types', {}).get(unit.unit_type, {}).get('name', unit.unit_type)
-            ).strip().replace("  ", " ")
+            template = None
+        if template is None:
+            template = section.get(f'{key}_format_generic')
+        if template is None:
+            return None
+        if unit.is_leader():
+            fields["ordinal"] = _UnitField()
+        return self._render_template(template, fields)
+
+    def _render_template(self, template: str, fields: dict):
+        try:
+            return template.format_map(fields).replace("  ", " ").strip()
+        except (KeyError, ValueError):
+            return None
+
+    def _unit_fields(self, unit) -> dict:
+        """Extract the template fields from a unit (spec-based, or id-parsed)."""
+        spec = getattr(unit, "spec", None)
+        if spec is not None:
+            land_token = getattr(unit, "land", None) or getattr(spec, "dragonflight", None) or ""
+            race_token = getattr(spec, "race", "") or ""
+            type_token = getattr(spec, "unit_type", "") or ""
+        else:
+            parts = str(getattr(unit, "id", "")).split("_")
+            land_token = parts[0] if parts else ""
+            race_token = parts[1] if len(parts) > 1 else ""
+            type_token = parts[2] if len(parts) > 2 else ""
+        return {
+            "ordinal": _UnitField(to_roman(getattr(unit, "ordinal", None)) if getattr(unit, "ordinal", None) else ""),
+            "name": _UnitField(),
+            "land": self._locale_field(land_token, "countries"),
+            "race": self._locale_field(race_token, "races"),
+            "type": self._locale_field(type_token, "unit_types"),
+            "_type": type_token,
+            "_race": race_token,
+        }
+
+    def _locale_field(self, token: str, table: str) -> _UnitField:
+        """Resolve a slug token into a localizable field for the given table."""
+        node = (self.translations.get(table, {}) or {}).get(token, {})
+        if not isinstance(node, dict):
+            node = {}
+        name = node.get("name") or ""
+        adjective = node.get("adjective") or ""
+        if not name:
+            name = token.capitalize() if token else ""
+        if not adjective:
+            adjective = name
+        prep = node.get("prep") if isinstance(node.get("prep"), str) else None
+        if prep is None:
+            prep = (self.translations.get("units", {}) or {}).get("genitive_preposition", "de")
+        return _UnitField(name, adjective, prep)
 
     def get_country_name(self, country_id: str) -> str:
         """Returns the translated name of the country."""

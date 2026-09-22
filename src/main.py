@@ -42,7 +42,8 @@ class GameApp:
             user_locale = locale.getlocale()[0]
 
         # Extract the first two letters (e.g., 'en', 'es') or default to 'en'
-        lang_code = user_locale[:2] if user_locale else 'en'
+        lang_code = 'en' # - For debugging in my environment, I want to force English. In production, uncomment the next line.
+        # lang_code = user_locale[:2] if user_locale else 'en'
 
         print(f"Locale '{lang_code}' detected for translations.")
 

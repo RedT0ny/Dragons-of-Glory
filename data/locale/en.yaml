@@ -38,13 +38,13 @@ countries:
     adjective: "Copper"
   daltigoth:
     name: "Daltigoth"
-    adjective: "Daltigothian"
+    adjective: "Daltigoth"
   dargaard:
     name: "Dargaard"
     adjective: "Dargaard"
   dtemple:
     name: "Dark Temple"
-    adjective: "Dark Temple"
+    adjective: "Temple"
   estwilde:
     name: "Estwilde"
     adjective: "Estwilde"
@@ -59,7 +59,7 @@ countries:
     adjective: "Green"
   haltigoth:
     name: "Haltigoth"
-    adjective: "Haltigothian"
+    adjective: "Haltigoth"
   hinterlund:
     name: "Hinterlund"
     adjective: "Hinterlund"
@@ -125,7 +125,7 @@ countries:
     adjective: "Schallsea"
   sikket:
     name: "Sikk'et Hul"
-    adjective: "Sikk'et Hul"
+    adjective: "Sikk'et"
   silvanesti:
     name: "Silvanesti"
     adjective: "Silvanesti"
@@ -186,6 +186,10 @@ races:
     name: "Goblin"
     plural: "Goblins"
     adjective: "Goblin"
+  gnome:
+    name: "Gnome"
+    plural: "Gnomes"
+    adjective: "Gnomish"
   griffon:
     name: "Griffon"
     plural: "Griffons"
@@ -198,6 +202,10 @@ races:
     name: "Kender"
     plural: "Kenders"
     adjective: "Kender"
+  magic:
+    name: "Flying"
+    plural: "Flying"
+    adjective: "Flying"
   minotaur:
     name: "Minotaur"
     plural: "Minotaurs"
@@ -416,15 +424,16 @@ victory:
     survive_unit_score: "Survive with friendly {unit_types}{country_part} for at least {min_points} points"
     escape_unit_score: "Escape to {hexes} with friendly {unit_types}{country_part} for at least {min_points} points"
 units:
-  log_format_generic: "{ordinal} {land} {race} {type}"
+  log_format_generic: "{ordinal} {land:adjective} {race} {type}"
+  log_format_flight: "{ordinal} {land:name}"
   log_format_named: "{ordinal} {name}"
-  counter_format_generic: "{ordinal} {land}"
-  counter_format_named: "{ordinal} {name}"
 unit_types:
   admiral:
     name: "Admiral"
   cav:
     name: "Cavalry"
+  citadel:
+    name: "Citadel"
   emperor:
     name: "Emperor"
   highlord:

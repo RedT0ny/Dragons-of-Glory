@@ -68,6 +68,13 @@ def _race_label(translator, token: str) -> str:
             return label
     return token.capitalize() if token else ""
 
+def _race_plural_label(translator, token: str) -> str:
+    """Localized plural name for a race slug (e.g. 'draconian' -> 'Draconians')."""
+    if translator is not None and hasattr(translator, "get_race_plural_name"):
+        label = translator.get_race_plural_name(token)
+        if label:
+            return label
+    return token.capitalize() + "s" if token else ""
 
 def _type_label(translator, token: str) -> str:
     """Localized name for a unit type slug (e.g. 'inf' -> 'Infantry')."""
@@ -99,13 +106,13 @@ def caption_id(unit_id: str, translator=None):
         if parts[-1].isdigit():
             if parts[0] == 'dtemple':
                 # If it's a Draconian
-                label = _race_label(t, parts[1])
+                label = _race_plural_label(t, parts[1])
             else:
                 label = _country_label(t, parts[0])
             return f"{to_roman(int(parts[-1]))} {label}".rstrip()
         elif len(parts) > 2:
             # If more than 2 parts and no number at end, return first part capitalized
-            return parts[0].capitalize()
+            return _country_label(t, parts[0])
         # If underscores but parts[-1] is not a digit, return first letter of parts[0]
         # capitalized and followed by a dot, a space, and parts[1] capitalized
         return f"{parts[0][0].capitalize()}. {parts[1].capitalize()}"
@@ -158,14 +165,23 @@ class TextFormatter:
         ordinal = getattr(unit, "ordinal", None) if not unit.is_leader() else None
         id_text = getattr(unit, "id", "Unknown")
 
-        # id_text: For units e.g. taman_human_inf_1
+        # Generic numbered units render through the per-language template.
+        # dtemple units are labeled by race, not by country, so they use the
+        # legacy path below.
+        if ordinal and '_' in id_text and id_text.split('_')[0] != 'dtemple':
+            if t is not None and hasattr(t, "format_unit_name"):
+                rendered = t.format_unit_name(unit, mode="log")
+                if rendered is not None:
+                    return rendered
+
+        # Legacy fallback: id_text e.g. taman_human_inf_1
         if '_' in id_text:
             parts = id_text.split('_') # In the example: ["taman","human","inf",1]
 
             if ordinal:
                 if parts[0] == 'dtemple':
                     # If it's a Draconian
-                    return f"{to_roman(ordinal)} {_race_label(t, parts[1])}"
+                    return f"{to_roman(ordinal)} {_race_plural_label(t, parts[1])}"
                 tokens = [_country_label(t, parts[0])]
                 if len(parts) > 1:
                     tokens.append(_race_label(t, parts[1]))

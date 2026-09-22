@@ -14,31 +14,31 @@ countries:
     adjective: "Balifor"
   black:
     name: "Ala Negra"
-    adjective: "Negro"
+    adjective: "Negra"
   blode:
     name: "Blode"
     adjective: "Blode"
   blodehelm:
     name: "Yelmo de Blode"
-    adjective: "del Yelmo"
+    adjective: "Yelmo"
   blue:
     name: "Ala Azul"
     adjective: "Azul"
   brass:
     name: "Ala de Latón"
-    adjective: "de Latón"
+    adjective: "Latón"
   bronze:
     name: "Ala de Bronce"
-    adjective: "Broncíneo"
+    adjective: "Bronce"
   coastlund:
     name: "Coastlund"
     adjective: "Coastlund"
   copper:
     name: "Ala de Cobre"
-    adjective: "Cobrizo"
+    adjective: "Cobre"
   daltigoth:
     name: "Daltigoth"
-    adjective: "Daltigothiana"
+    adjective: "Daltigoth"
   dargaard:
     name: "Dargaard"
     adjective: "Dargaard"
@@ -50,7 +50,7 @@ countries:
     adjective: "Estwilde"
   gold:
     name: "Ala Dorada"
-    adjective: "Dorado"
+    adjective: "Oro"
   goodlund:
     name: "Goodlund"
     adjective: "Goodlund"
@@ -59,7 +59,7 @@ countries:
     adjective: "Verde"
   haltigoth:
     name: "Haltigoth"
-    adjective: "Haltigothiana"
+    adjective: "Haltigoth"
   hinterlund:
     name: "Hinterlund"
     adjective: "Hinterlund"
@@ -68,7 +68,7 @@ countries:
     adjective: "Hylo"
   icereach:
     name: "Muro de Hielo"
-    adjective: "Bárbara"
+    adjective: "Hielo"
   kaolyn:
     name: "Kaolyn"
     adjective: "Kaolyn"
@@ -92,10 +92,10 @@ countries:
     adjective: "Mithas"
   nergoth:
     name: "Ergoth del Norte"
-    adjective: "Norergothiano"
+    adjective: "N.Ergoth"
   nevermind:
     name: "Monte Noimporta"
-    adjective: "Noimporta"
+    adjective: "M.Noimporta"
   nightlund:
     name: "Nightlund"
     adjective: "Nightlund"
@@ -110,7 +110,7 @@ countries:
     adjective: "Qualinesti"
   red:
     name: "Ala Roja"
-    adjective: "Rojo"
+    adjective: "Roja"
   saifhum:
     name: "Saifhum"
     adjective: "Saifhum"
@@ -130,8 +130,8 @@ countries:
     name: "Silvanesti"
     adjective: "Silvanesti"
   silver:
-    name: "Ala de Plata"
-    adjective: "Plateado"
+    name: "Ala Plateada"
+    adjective: "Plata"
   solanthus:
     name: "Solanthus"
     adjective: "Solanthus"
@@ -161,7 +161,7 @@ countries:
     adjective: "Vingaard"
   white:
     name: "Ala Blanca"
-    adjective: "Blanco"
+    adjective: "Blanca"
   zhakar:
     name: "Zhakar"
     adjective: "Zhakar"
@@ -182,6 +182,10 @@ races:
     name: "Elfo"
     plural: "Elfos"
     adjective: "Élfica"
+  gnome:
+    name: "Gnomo"
+    plural: "Gnomos"
+    adjective: "Gnómica"
   goblin:
     name: "Goblin"
     plural: "Goblins"
@@ -198,6 +202,10 @@ races:
     name: "Kender"
     plural: "Kenders"
     adjective: "Kender"
+  magic:
+    name: "Volante"
+    plural: "Volantes"
+    adjective: "Volante"
   minotaur:
     name: "Minotauro"
     plural: "Minotauros"
@@ -416,15 +424,17 @@ victory:
     survive_unit_score: "Resistir al menos {min_points} puntos con {unit_types}{country_part}"
     escape_unit_score: "Escapar a {hexes} con al menos {min_points} puntos {unit_types}{country_part}"
 units:
-  log_format_generic: "{ordinal} {type} {race:adjective} de {land}"
+  genitive_preposition: "de"
+  log_format_generic: "{ordinal} {type} {race:adjective} {land:prep}"
+  log_format_flight: "{ordinal} {land:name}"
   log_format_named: "{ordinal} {name}"
-  counter_format_generic: "{ordinal} {land}"
-  counter_format_named: "{ordinal} {name}"
 unit_types:
   admiral:
     name: "Almirante"
   cav:
-    name: "Caballería"
+    name: "Cab."
+  citadel:
+    name: "Ciudadela"
   emperor:
     name: "Emperador"
   highlord:
@@ -432,7 +442,7 @@ unit_types:
   hero:
     name: "Héroe"
   inf:
-    name: "Infantería"
+    name: "Inf."
   wiz:
     name: "Mago"
   wing:
