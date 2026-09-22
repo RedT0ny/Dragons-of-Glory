@@ -164,15 +164,18 @@ class TextFormatter:
         t = _resolve_translator(translator)
         ordinal = getattr(unit, "ordinal", None) if not unit.is_leader() else None
         id_text = getattr(unit, "id", "Unknown")
+        named = bool((getattr(t, "translations", {}) or {}).get("unit_names", {}).get(id_text)) if t is not None else False
 
-        # Generic numbered units render through the per-language template.
+        # Generic numbered units render through the per-language template;
+        # named units (heroes, leaders) render from their ``unit_names`` key.
         # dtemple units are labeled by race, not by country, so they use the
         # legacy path below.
-        if ordinal and '_' in id_text and id_text.split('_')[0] != 'dtemple':
-            if t is not None and hasattr(t, "format_unit_name"):
-                rendered = t.format_unit_name(unit, mode="log")
-                if rendered is not None:
-                    return rendered
+        can_template = t is not None and hasattr(t, "format_unit_name")
+        generic_ok = ordinal and '_' in id_text and id_text.split('_')[0] != 'dtemple'
+        if can_template and (generic_ok or named):
+            rendered = t.format_unit_name(unit, mode="log")
+            if rendered is not None:
+                return rendered
 
         # Legacy fallback: id_text e.g. taman_human_inf_1
         if '_' in id_text:
