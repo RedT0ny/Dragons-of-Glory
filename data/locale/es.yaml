@@ -580,27 +580,34 @@ manual:
         - "Los países de caballeros solámnicos — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] y [[country:vingaard]] — reciben una bonificación especial de activación pro-Saber."
         - "Los poderes pro-Señor del Dragón incluyen [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] y [[country:tarsis]]."
     activation:
-      title: "Activación y alineación"
+      title: "Activación de países neutrales"
       p1: "Durante el paso de Activación de cada turno, cada jugador puede elegir una nación neutral e intentar activarla como aliada tirando 1d10. El jugador sin la iniciativa tira primero."
       p2: "La activación tiene éxito si la tirada es igual o menor que el índice de alineación de la nación hacia ese bando. El jugador puede sumar a la tirada los modificadores de eventos, líderes o artefactos."
       p3: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
+    invasion:
+      title: "Invasión"
+      p1: "Highlord player can invade neutral countries. A country may only be invaded if the Highlord has land and air combat strength that is adjacent to the nation’s border and has the movement ability to move into the invaded country."
+      p2: "For purposes of being adjacent, any friendly stack that is next to the enemy border, any friendly stack that is adjacent to another friendly stack that is on the border, or any friendly stack that can trace a line of adjacent friendly stacks to one that is on the border, can be counted."
+      p3: "Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn."
+      p4: "Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:."
+      p5: "On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side."
     conquest:
       title: "Conquista"
       p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
       p2: "Si un país es conquistado, sus ejércitos quedan eliminados permanentemente."
       warn:
-        title: "Invasión de neutrales"
-        text: "El Señor del Dragón puede invadir países neutrales. El bando de la Piedra Blanca no puede invadir países neutrales."
+        title: "Países especiales"
+        text: "[[country:dargaard]] y [[country:nevermind]] sólo pueden ser activados mediante un evento o como resultado de una invasión."
   units:
-    title: "Unidades y líderes"
+    title: "Unidades"
     types:
       title: "Tipos de unidad"
-      p1: "Las unidades se organizan en cuatro grandes familias: ejércitos, flotas, dragones y líderes."
+      p1: "Las unidades se organizan en cuatro grandes grupos: ejércitos, flotas, alas y líderes."
       bullets:
         - "Ejércitos — infantería y caballería con un valor de combate (VC) y una asignación de movimiento."
-        - "Líderes — generales, almirantes, magos, emperadores y señores del dragón aportan modificadores de combate por su valor táctico (VT); si son eliminados intentan escapar."
-        - "Dragones — alas de los diez vuelos de dragones: cinco cromáticos sirven al Señor del Dragón, cinco metálicos vuelan para el Saber."
         - "Flotas — barcos de guerra que transportan ejércitos, dominan los mares y libran batallas navales."
+        - "Alas — unidades voladoras (dragones, grifos y pegasos) que luchan en el aire y se mueven libremente por el mapa."
+        - "Líderes — generales, almirantes, magos, emperadores y señores del dragón aportan modificadores de combate por su valor táctico (VT); si son eliminados intentan escapar."
         - "Magos — unidades de apoyo que se mueven libremente por el mapa y lanzan magia."
         - "Ciudadelas — ciudadelas volantes que pueden transportar varias unidades y proporcionan defensas similares a una ciudad fortificada."
     ratings:

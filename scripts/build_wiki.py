@@ -38,6 +38,7 @@ from src.content.config import (
     WIKI_JS,
     HTML_DIR,
     EVENTS_DATA,
+    INVASION_ODDS_DATA,
     ARTIFACTS_DATA,
     UNITS_DATA,
     COUNTRIES_DATA,
@@ -922,6 +923,27 @@ class WikiGen:
                 + "".join(thead) + "</tr></thead><tbody>" + "".join(body)
                 + "</tbody></table></div>")
 
+    def _manual_invasion_odds(self ):
+        """Render the Invasion Odds Table grid straight from data/invasion_odds.csv."""
+        try:
+            with open(INVASION_ODDS_DATA, encoding="utf-8") as f:
+                rows = [[c.strip() for c in rec] for rec in csv.reader(f, delimiter=";")]
+        except OSError as e:
+            print(f"WARNING: could not read invasion odds data: {e}", file=sys.stderr)
+            return ""
+        if not rows:
+            print("WARNING: invasion odds data file is empty", file=sys.stderr)
+            return ""
+        thead = []
+        for idx, c in enumerate(rows[0]):
+            thead.append(f"<th>{l10n_span('Odds:', 'Ratio:') if idx == 0 else _esc(c)}</th>")
+        body = []
+        for rec in rows[1:]:
+            body.append("<tr>" + "".join(f"<td>{_esc(c)}</td>" for c in rec) + "</tr>")
+        return ('<div class="tblwrap"><table class="mtable invodds"><thead><tr>'
+                + "".join(thead) + "</tr></thead><tbody>" + "".join(body)
+                + "</tbody></table></div>")
+
     def _manual_calendar(self):
         """Render the campaign calendar straight from data/calendar.csv."""
         try:
@@ -1001,6 +1023,8 @@ class WikiGen:
             return self._manual_calendar()
         if t == "align":
             return self._manual_alignment()
+        if t == "invasion_odds":
+            return self._manual_invasion_odds()
         if t == "terrain":
             return self._manual_terrain()
         key = b.get("key", "")

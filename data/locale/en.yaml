@@ -572,35 +572,42 @@ manual:
   countries:
     title: "Countries & Diplomacy"
     powers:
-      title: "The powers of Ansalon"
+      title: "The Nations of Ansalon"
       p1: "The map contains 44 countries. Each one has a strength rating (the size of the forces it can field) and an alignment: a pair of modifiers telling how favourable it is to Whitestone and to the Highlord."
       bullets:
         - "Whitestone-leaning powers include the Elven nations of [[country:qualinesti]] and [[country:silvanesti]], [[country:nergoth]], [[country:palanthas]] and the kender nations of [[country:hylo]] and [[country:goodlund]]."
         - "The Solamnic knight countries — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] and [[country:vingaard]] — receive a special Whitestone activation bonus."
         - "Highlord-leaning powers include [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] and [[country:tarsis]]."
     activation:
-      title: "Activation and allegiance"
+      title: "Country Activation"
       p1: "During the Activation Step of each Turn, each player may choose one neutral nation and attempt to Activate it as an ally by rolling 1d10. The player without the initiative rolls first."
       p2: "Activation is successful if the roll is equal to or less than the nation's alignment rating for that side. The player may add any modifiers from events, leaders or artifacts to the roll."
-      p3: "Two countries cannot be turned by diplomacy alone: [[country:dargaard]] and the gnomes of [[country:nevermind]] can only join a side through an event or by force."
+      p3: "When a player successfully activates a nation, they may deploy that country's units within the nation's borders."
+    invasion:
+      title: "Invasion"
+      p1: "Highlord player can invade neutral countries. A country may only be invaded if the Highlord has land and air combat strength that is adjacent to the nation’s border and has the movement ability to move into the invaded country."
+      p2: "For purposes of being adjacent, any friendly stack that is next to the enemy border, any friendly stack that is adjacent to another friendly stack that is on the border, or any friendly stack that can trace a line of adjacent friendly stacks to one that is on the border, can be counted."
+      p3: "Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn."
+      p4: "Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:."
+      p5: "On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side."
     conquest:
       title: "Conquest"
-      p1: "A country is conquered as soon as all fortified cities and fortresses in the country have been captured by enemy armies."
+      p1: "A country is conquered as soon as all fortified cities and fortresses in the country have been captured by enemy armies. A location is considered captured if it is occupied by an enemy army at the end of the combat phase. Captured locations can be used for deployment of conqueror's units."
       p2: "Armies are permanently removed from the game if their country is conquered."
       warn:
-        title: "Neutral invasion"
-        text: "The Highlord may invade neutral countries. The Whitestone side cannot invade neutral countries."
+        title: "Special countries"
+        text: "[[country:dargaard]] and [[country:nevermind]] can only be activated through an event or by invasion."
   units:
-    title: "Units & Leaders"
+    title: "Units"
     types:
       title: "Unit types"
-      p1: "Units are organised into four broad families: armies, fleets, dragons and leaders."
+      p1: "Units are organised into four broad families: armies, fleets, wings and leaders."
       bullets:
         - "Armies — infantry and cavalry with a combat rating (CR) and a movement allowance."
-        - "Leaders — generals, admirals, wizards, emperors and Highlords provide tactical rating (TR) combat modifiers; eliminated leaders attempt to escape."
-        - "Dragons — wings of the ten dragonflights: five chromatic serve the Highlord, five metallic fly for Whitestone."
         - "Fleets — warships that transport armies, control the seas and fight naval battles."
-        - "Wizards — support units that move freely across the map and cast magic."
+        - "Wings — Flying units (dragons, griffons and pegasi) that fight in the air and move freely across the map."
+        - "Leaders — generals, admirals, wizards, emperors and Highlords provide tactical rating (TR) combat modifiers; eliminated leaders attempt to escape."
+        - "Wizards — A special type of leader support units that move freely across the map and cast magic."
         - "Citadels — Magical floating citadels that can transport several armies and provide the same bonus as a fortified city."
     ratings:
       title: "Ratings"

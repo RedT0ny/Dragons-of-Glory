@@ -89,6 +89,14 @@ MANUAL_SECTIONS = [
                 {"t": "p", "key": "p2"},
                 {"t": "p", "key": "p3"},
             ],
+            "invasion": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
+                {"t": "p", "key": "p4"},
+                {"t": "invasion_odds"},
+                {"t": "p", "key": "p5"},
+            ],
             "conquest": [
                 {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
