@@ -96,6 +96,7 @@ MANUAL_SECTIONS = [
                 {"t": "p", "key": "p4"},
                 {"t": "invasion_odds"},
                 {"t": "p", "key": "p5"},
+                {"t": "warn", "key": "warn"},
             ],
             "conquest": [
                 {"t": "p", "key": "p1"},
@@ -124,11 +125,28 @@ MANUAL_SECTIONS = [
     {
         "id": "movement",
         "subsections": {
-            "movement_points": [
+            "land_movement": [
                 {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
+            ],
+            "terrain_effects": [
+                {"t": "p", "key": "p1"},
                 {"t": "terrain"},
                 {"t": "p", "key": "legend"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "air_movement": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+            ],
+            "sea_movement": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+            ],
+            "interception": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
+                {"t": "ul", "key": "bullets"},
             ],
             "transport": [
                 {"t": "p", "key": "p1"},
@@ -172,18 +190,6 @@ MANUAL_SECTIONS = [
             "supply": [
                 {"t": "p", "key": "p1"},
                 {"t": "ul", "key": "bullets"},
-            ],
-        },
-    },
-    {
-        "id": "naval",
-        "subsections": {
-            "interception": [
-                {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
-            ],
-            "invasion": [
-                {"t": "p", "key": "p1"},
             ],
         },
     },

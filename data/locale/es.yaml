@@ -574,7 +574,7 @@ manual:
     title: "Países y diplomacia"
     powers:
       title: "Los poderes de Ansalon"
-      p1: "El mapa contiene 44 países. Cada uno tiene un valor de fuerza (el tamaño de las fuerzas que puede reunir) y una alineación: un par de modificadores que indican cuán favorable es hacia el Saber y hacia el Señor del Dragón."
+      p1: "El mapa contiene 44 países. Cada uno tiene un valor de fuerza (el tamaño de las fuerzas que puede reunir) y un alineamiento que indica su predisposición hacia la Piedra Blanca o el Señor del Dragón."
       bullets:
         - "Los poderes pro-Saber incluyen [[country:qualinesti]], [[country:palanthas]], [[country:silvanesti]], [[country:nergoth]], [[country:goodlund]], [[country:sancrist]] y [[country:hylo]]."
         - "Los países de caballeros solámnicos — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] y [[country:vingaard]] — reciben una bonificación especial de activación pro-Saber."
@@ -586,11 +586,14 @@ manual:
       p3: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
     invasion:
       title: "Invasión"
-      p1: "Highlord player can invade neutral countries. A country may only be invaded if the Highlord has land and air combat strength that is adjacent to the nation’s border and has the movement ability to move into the invaded country."
-      p2: "For purposes of being adjacent, any friendly stack that is next to the enemy border, any friendly stack that is adjacent to another friendly stack that is on the border, or any friendly stack that can trace a line of adjacent friendly stacks to one that is on the border, can be counted."
+      p1: "El jugador del Señor del Dragón puede invadir países neutrales. Un país solo puede ser invadido si el Señor del Dragón tiene tropas con movimiento restante adyacentes a su frontera."
+      p2: "Para efectos de ser adyacente, se cuenta cualquier tropa adyacente a la frontera enemiga, cualquier tropa adyacente a otra tropa en la frontera, o cualquier tropa que pueda trazar una línea de tropas adyacentes hasta una que esté en la frontera."
       p3: "Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn."
       p4: "Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:."
       p5: "On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side."
+      warn:
+        title: "Ejemplo:"
+        text: "El Señor del Dragón quiere invadir Khur, que tiene una fuerza militar de 24. El paso de Neraka sólo permite unidades con potencia máxima de 16 junto a la frontera (2x unidades de fuerza 6 y 2x dragones de fuerza 2). Sin embargo, junto a este hexágono hay otro con 2 unidades de fuerza 6. Esto hace un total de 28 (ratio 1:1), así que la invasión recibe un bono de +0 a la tirada de activatión. Primera tirada: WS activation is a 3 (+2) = 5, HL activation is a 6. Second rolloff: WS 3 (+2+1) = 6, HL 6 (+1) =7. Third rolloff: WS 3 (+2+1+1) = 7, HL 6 (+1+1) = 8. Etc."
     conquest:
       title: "Conquista"
       p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
@@ -627,15 +630,42 @@ manual:
         text: "Ningún hexágono puede contener más de dos unidades en ningún momento."
   movement:
     title: "Movimiento y transporte"
-    movement_points:
-      title: "Puntos de movimiento y terreno"
+    land_movement:
+      title: "Movimiento terrestre"
       p1: "Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y las fronteras malas cuestan más."
+    terrain_effects:
+      title: "Efectos del terreno en el movimiento"
+      p1: "Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y los cruces cuestan más."
+      legend: "La tabla muestra el coste para una unidad terrestre sin afinidad de terreno."
       bullets:
-        - "Los hexágonos de océano, desierto, pantano, glaciar y maremoto son intransitables para las tropas terrestres."
-        - "Las montañas solo se atraviesan por un paso o una frontera de túnel, y los combates de montaña solo pueden declararse a través de una frontera de paso."
-        - "Las fronteras de río cuestan +1 punto de movimiento (cruzan gratis cuando el río se hiela en invierno)."
-        - "La afinidad de terreno exime del coste del terreno correspondiente."
-      legend: "La tabla muestra el coste para una unidad terrestre sin afinidad de terreno. Bosque, selva y glaciar cuestan 2 puntos, o 1 con la afinidad correspondiente (*). Las montañas solo se atraviesan por un paso o frontera de túnel; en invierno la nieve bloquea los pasos y las montañas son intransitables (**), salvo dentro de la región libre de invierno del mapa."
+        - "(-): Los hexágonos de mar, desierto, pantano y remolino son impasables para las unidades terrestres."
+        - "(X) Ninguna unidad puede entrar o volar sobre hexágonos de desierto, excepto las Ciudadelas Volantes."
+        - "(*) Entrar en o moverse por glaciares, bosques y junglas cuesta +1 punto de movimiento."
+        - "(**) Las montañas son infranqueables, salvo por túneles o pasos de montaña."
+        - "Los ríos profundos son impasables para las unidades terrestres, excepto por puentes o vados. Se congelan en invierno y pueden cruzarse libremente (si se utilizan las reglas de invierno)."
+        - "Los demás ríos cuestan +1 punto de movimiento para cruzar. Se congelan en invierno y pueden cruzarse libremente."
+        - "La afinidad de terreno exime del coste del terreno correspondiente. P.ej: Ogros y enanos en montañas, elfos y kenders en bosques, o thanoi en glaciares."
+    air_movement:
+      title: "Movimiento aéreo"
+      p1: "Las unidades voladoras (dragones, grifos y pegasos) se mueven libremente por el mapa, ignorando los costes de terreno. No pueden entrar en hexágonos enemigos a menos que estén atacando."
+      p2: "A Wing must begin and end its movement over a land (including coastal) hex, but it can fly over sea hexes. It costs one extra Movement Point for a Wing to fly over a mountain hexside. Citadels are not affected by these restrictions."
+    sea_movement:
+      title: "Movimiento marítimo"
+      p1: "Las flotas se mueven por el mapa gastando puntos de movimiento. Cada hexágono cuesta un número de puntos para entrar. Las flotas no pueden moverse a través de hexágonos enemigos. Las flotas no tienen que moverse a menos que el jugador quiera moverlas. No tienen que usar todos sus Puntos de Movimiento si se mueven."
+      p2: "Una flota no puede entrar en un hexágono o lado de hexágono que contenga una flota enemiga. Una flota no puede moverse a un hexágono (o lado de hexágono) que contenga un ejército enemigo. Un ejército puede moverse a un hexágono que contenga una flota enemiga. La flota no es destruida, sino que se mueve al hexágono (o lado de hexágono) más cercano que no contenga un ejército enemigo. Un jugador puede apilar cualquier número de sus flotas en un hexágono de mar abierto o costero."
+    interception:
+      title: "Interception"
+      p1: "Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%)."
+      p2: "When, during a Movement Phase, a player moves his air armies or ships into a hex that is two or fewer hexes from an enemy air army or ship, the enemy air army or ship can attempt to intercept the moving air army or ship.
+       In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%). 
+       If the attempt is unsuccessful, the moving player continues his move normally.
+       If the interception is successful, the moving player stops moving until the interception attack is resolved. The intercepting air army or ship immediately moves by the shortest possible path to a hex next to the moving player's air army or ship. The air
+       army or ship that intercepted must then attack the intercepted counter, or stack of counters. All normal combat rules apply.
+       After the interception attack is made, surviving intercepted units continue moving, and the intercepting units immediately return to the hex from which they started."
+      p3: "Ships can attempt to intercept enemy ships only. Wings can attempt to intercept enemy wings, or enemy ships. Each non-moving unit can make only one interception attempt, regardless of its success, during the opponent's Movement Step. A moving unit can possibly be intercepted many times, but each attempt must be made by a different non-moving counter or stack. If several ships or air armies are stacked in a hex together, they can make an interception together. Notes:"
+      bullets:
+        - "El invierno restringe las intercepciones a distancia 1 con un 50%."
+        - "Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada)."
     transport:
       title: "Transporte marítimo"
       p1: "Una flota en el mismo hexágono puede llevar un ejército a bordo. Las unidades embarcadas no pueden moverse por su cuenta durante el resto del turno y abandonan el mapa espacial hasta que desembarcan."
@@ -689,17 +719,6 @@ manual:
         - "Estándar: los hexágonos costeros y los puertos están siempre abastecidos."
         - "Avanzado: las unidades pueden, además, trazar suministro por tierra hasta el país propietario o su capital."
         - "Las unidades que no puedan trazar suministro sufren desgaste (pérdidas de pasos) durante la fase de suministro."
-  naval:
-    title: "Operaciones navales"
-    interception:
-      title: "Intercepción"
-      p1: "Las flotas que aún no han reaccionado pueden interceptar el movimiento enemigo. En condiciones normales, una intercepción adyacente siempre tiene éxito (distancia 1) y una intercepción a distancia 2 tiene éxito la mitad de las veces (50%)."
-      bullets:
-        - "El invierno restringe las intercepciones a distancia 1 con un 50%."
-        - "Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada)."
-    invasion:
-      title: "Invasión anfibia"
-      p1: "Las reglas de invasión naval permiten a un bando desembarcar ejércitos en las costas enemigas mediante flotas. Los desembarcos se limitan a hexágonos costeros y puertos, y los ejércitos desembarcados deben respetar el límite de dos unidades por hexágono."
   artifacts:
     title: "Artefactos y héroes"
     artifacts:

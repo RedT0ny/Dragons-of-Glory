@@ -590,6 +590,10 @@ manual:
       p3: "Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn."
       p4: "Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:."
       p5: "On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side."
+      warn:
+        title: "Example:"
+        text: "the HL wants to invade Khur, which has 24 SP. The pass of Neraka only allows a maximum of 16 SP to stack next to the border (2x SP 6 units and 2x SP 2 Dragons). However, adjacent to this stack is another stack with 2x SP 6 units. This 
+makes a total of 28 SP (odds 1:1), so the invasion is done with a +0 to the activation roll. First rolloff: WS activation is a 3 (+2) = 5, HL activation is a 6. Second rolloff: WS 3 (+2+1) = 6, HL 6 (+1) =7. Third rolloff: WS 3 (+2+1+1) = 7, HL 6 (+1+1) = 8. Etc."
     conquest:
       title: "Conquest"
       p1: "A country is conquered as soon as all fortified cities and fortresses in the country have been captured by enemy armies. A location is considered captured if it is occupied by an enemy army at the end of the combat phase. Captured locations can be used for deployment of conqueror's units."
@@ -626,17 +630,45 @@ manual:
         text: "No more than two units may occupy the same hex at any time."
   movement:
     title: "Movement & Transport"
-    movement_points:
-      title: "Movement points and terrain"
-      p1: "Ground units spend their movement allowance to enter hexes. In open terrain a hex costs 1 point; difficult terrain and bad borders cost more."
+    land_movement:
+      title: "Land movement"
+      p1: "Armies and leaders move across the map by spending movement points. Each hex costs a number of points to enter. Units may not move through enemy hexes. Armies do not have to move unless the player wants to move them. They do not have to use all of their Movement Points if they move."
+    terrain_effects:
+      title: "Terrain effects on movement"
+      p1: "Ground units spend their movement allowance to enter hexes. In open terrain a hex costs 1 point; difficult terrain and transitions cost more. The extra costs for moving into or through certain types of terrain are listed below. All ground armies, except those with certain terrain affinities, must pay these costs."
+      legend: "The table shows the cost for a ground unit with no terrain affinity."
       bullets:
-        - "Ocean, desert, swamp, glacier and maelstrom hexes are impassable to ground troops."
-        - "Mountains are only entered through a pass or a tunnel border, and mountain combats can only be declared across a pass border."
-        - "River borders cost +1 movement point (they are free to cross when frozen in winter)."
-        - "Terrain affinity waives the cost of the matching terrain."
-      legend: "The table shows the cost for a ground unit with no terrain affinity. Forest, jungle and glacier cost 2 points, or 1 with the matching affinity (*). Mountains are entered only through a pass or a tunnel border; in winter snow blocks the passes and mountains become impassable (**), except inside the winter-free region of the map."
+        - "(-): Ocean, swamp, and maelstrom hexes are impassable to ground troops."
+        - "(X) Except Flying Citadels, No armies of any type can enter or fly over desert hexes."
+        - "(*) Glaciers, Forests and jungles cost +1 movement point to enter or move through."
+        - "(**) Mountains are impassable, except through tunnels or mountain passes. Wings have a +1 movement point cost to enter or move through mountains."
+        - "Deep rivers are impassable to ground units, except through bridges or fords. They are frozen in winter and can be crossed freely."
+        - "Rivers cost +1 movement point to cross. They are frozen in winter and can be crossed freely."
+        - "Terrain affinity waives the cost of the matching terrain. E.g: Ogres and dwarves in mountains, elves and kenders in forests, or thanoi in glaciers."
+    air_movement:
+      title: "Air movement"
+      p1: "Wings (dragons, griffons and pegasi) as well as Flying Citadels, can fly. These units pay 1 Movement Point to enter any hex, and can cross almost all types of terrain. They cannot enter a hex containing enemy armies, however. They do not have to stop when they move next to an enemy army."
+      p2: "A Wing must begin and end its movement over a land (including coastal) hex, but it can fly over sea hexes. It costs one extra Movement Point for a Wing to fly over a mountain hexside. Citadels are not affected by these restrictions."
+    sea_movement:
+      title: "Sea movement"
+      p1: "The movement allowance of a fleet equals the number of hexes that the ships can move during Step 5 of a Turn on the open sea (or in coastal hexes). Ships can also move up major rivers. When moving on a river, however, the ship counts hexsides moved along, 
+not hexes entered."
+      p2: "A ship cannot enter a hex or hexside containing an enemy ship. A ship cannot move into a hex (or hexside of a hex) containing an enemy army. An army may move into a hex containing an enemy ship. The ship is not destroyed, but is moved to the nearest hex (or hexside of a hex) that does not contain an enemy army. A player may stack any number of his ships in an open sea or coastal hex."
+    interception:
+      title: "Interception"
+      p1: "Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%)."
+      p2: "When, during a Movement Phase, a player moves his air armies or ships into a hex that is two or fewer hexes from an enemy air army or ship, the enemy air army or ship can attempt to intercept the moving air army or ship.
+       In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%). 
+       If the attempt is unsuccessful, the moving player continues his move normally.
+       If the interception is successful, the moving player stops moving until the interception attack is resolved. The intercepting air army or ship immediately moves by the shortest possible path to a hex next to the moving player's air army or ship. The air
+       army or ship that intercepted must then attack the intercepted counter, or stack of counters. All normal combat rules apply.
+       After the interception attack is made, surviving intercepted units continue moving, and the intercepting units immediately return to the hex from which they started."
+      p3: "Ships can attempt to intercept enemy ships only. Wings can attempt to intercept enemy wings, or enemy ships. Each non-moving unit can make only one interception attempt, regardless of its success, during the opponent's Movement Step. A moving unit can possibly be intercepted many times, but each attempt must be made by a different non-moving counter or stack. If several ships or air armies are stacked in a hex together, they can make an interception together. Notes:"
+      bullets:
+        - "Winter restricts interceptions to distance 1 at 50%."
+        - "Interception rules can be toggled in the game options (Naval interception on / off)."
     transport:
-      title: "Sea transport"
+      title: "Sea and air transport"
       p1: "A fleet in the same hex may carry an army as a passenger. Boarded units cannot move on their own for the rest of the turn and leave the spatial map until they disembark."
       p2: "If the fleet boards outside a port its movement allowance is halved (minimum half of its allowance). Unloading places the army back on a coastal hex or port."
   combat:
@@ -688,17 +720,6 @@ manual:
         - "Standard: coastal hexes and ports are always in supply."
         - "Advanced: units may additionally trace inland supply to the owning country or its capital."
         - "Units that cannot trace supply suffer attrition (step losses) during the supply phase."
-  naval:
-    title: "Naval Operations"
-    interception:
-      title: "Interception"
-      p1: "Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%)."
-      bullets:
-        - "Winter restricts interceptions to distance 1 at 50%."
-        - "Interception rules can be toggled in the game options (Naval interception on / off)."
-    invasion:
-      title: "Amphibious invasion"
-      p1: "The Naval-invasion rules let a side land armies on enemy coasts through fleets. Landings are limited to coastal hexes and ports, and disembarking armies must respect the two-units-per-hex limit."
   artifacts:
     title: "Artifacts & Heroes"
     artifacts:

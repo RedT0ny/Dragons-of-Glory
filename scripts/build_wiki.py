@@ -76,7 +76,7 @@ TERRAIN_ROWS = (
     ("glacier", "2*", "2*"),
     ("mountain", "—**", "—**"),
     ("ocean", "—", "—"),
-    ("desert", "—", "—"),
+    ("desert", "X", "X"),
     ("swamp", "—", "—"),
     ("maelstrom", "—", "—"),
 )
