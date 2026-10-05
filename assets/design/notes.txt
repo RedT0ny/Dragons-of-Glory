@@ -1,0 +1,68 @@
+events in the scenario yaml:
+
+if active_events [{ event_id : int(times) }] remove them from the game_state list of active events or reduce the number of possible occurrences by times.
+if active_events: [{ event_id : all }] remove all possible occurrences of event_id from the game_state list.
+if possible_events [{ event_id : int(times)}] add to the game_state event list only the ones in this list.
+if possible_events: null remove all possible events from the game_state list.
+if possible_events not defined, add all events to the game_state list.
+
+events in the event.yaml:
+
+if max_occurrences not indicated or = 1, the event can only be triggered once.
+if max_occurrences is 0, the event can never be triggered.
+if max_occurrences is > 0, the event can be triggered up to max_occurrences times.
+if max_occurrences is < 0, the event can be triggered an infinite number of times.
+
+events in the game_state list:
+
+if game_state events list is empty, skip event phase and show a placeholder.
+
+How to deal with pre-requisites? List of pre_req_ids in the player dataclass.
+
+Fix another bug: garrisons (armies with 0 mp total) shall not be able to board a carrier.
+Either check whether the unit trying to board has 0 mp, or check if the unit has a max of 0 mp.
+
+
+
+What is the reason of
+    def _is_unit_on_map(self, unit):
+        return bool(unit.is_on_map and unit.position and None not in unit.position)
+The method `_is_unit_on_map` is designed to check whether a given unit is currently present on the game map. It does this by evaluating three conditions:
+1. `unit.is_on_map`: This checks if the unit is flagged as being on the map. If this attribute is `True`, it indicates that the unit is intended to be on the map.
+2. `unit.position`: This checks if the unit has a defined position. If the position attribute is not `None`, it means the unit has a specific location on the map.
+3. `None not in unit.position`: This checks that the position attribute does not contain any `None` values. This ensures that the unit's position is fully defined and valid.
+But then, what do we need unit.is_on_map for? If we already check if the unit has a defined position and that it does not contain any `None` values, the `unit.is_on_map` attribute may seem redundant. However, it serves as an additional safeguard to explicitly indicate whether the unit is intended to be on the map, regardless of its position. This can be useful in scenarios where a unit might have a valid position but is not actively participating in the game (e.g., it could be in a reserve state or temporarily removed from play). Therefore, while the position checks are important for validating the unit's location, `unit.is_on_map` provides a clear and explicit flag for the unit's status on the map.
+And cannot we just check if the unit has a defined position and that it does not contain any `None` values? Yes, we could rely solely on the position checks to determine if a unit is on the map. However, using `unit.is_on_map` adds clarity and explicitness to the code. It allows developers to quickly understand the intended state of the unit without having to infer it from its position alone. This can improve code readability and maintainability, especially in complex game logic where units may have various states and conditions affecting their presence on the map.
+
+In ai_baseline, the survival probability is the right way, but is it necessary to reimplement the CRT calculations when they are already implemented in the combat module? It would be more efficient and maintainable to leverage the existing CRT calculations from the combat module rather than reimplementing them in the ai_baseline. This approach reduces code duplication, minimizes potential bugs, and ensures consistency in how combat outcomes are calculated across different parts of the game. By using the established CRT logic, you can focus on integrating it into the AI's decision-making process without having to worry about discrepancies or errors that might arise from a separate implementation.
+
+Can you first add debug logging for human player movements.
+Second, use the learnings to improve the AI player: Human player used a three-pronged advance, battling weaker enemies in battles with very high odds to destroy them and clear the way to the target, that would allow for an approach from different angles to siege the capture target, maximizing drm and combat strength. Likewise, all leaders are moved independently of their stacks to other stacks in first combat line.
+
+When a human player chooses an enemy stack, highlight its reachable squares (even if the player cannot move it).
+
+Add naval combat advanced rules.
+Avoid already produced draconians from being destroyed when the temple is conquered. Check timing of draconian production.
+Implement defense of Towers of E'li
+
+- An Asset() cannot be unassigned if the unit has moved or attacked this turn.
+- When trying to assign an asset to a unit, the game should prompt the player with a question_dialog to ensure they understand the consequences of their action.
+- The message should read: "Assign (asset) to (unit)? Note: This cannot be undone."
+- In case the asset cannot be assigned to the unit, a warning_dialog shall pop-up to the player, with a message indicating that the assignment is not possible, and the reason.
+- When a unit carrying an Asset is destroyed, the Asset is destroyed.
+- If an army carrying an Asset is merged with another army, the Asset is transferred to the new army. If both armies have an asset, the asset of the second army is unassigned (returned to the player's asset pool).
+
+
+
+The Silvanesti Elves guard the entrance to the Thon-Thalas River with the Towers of E'li. west_eli (44,45) and east_eli (45,45). Any enemy ship entering either hex must stop, and it can be targeted with two shots each at a 4
+or less in a 1d10. This is done before the ships can continue their movement.
+If the towers are enemy occupied, then that part of the defense is considered destroyed and a shot is lost for each.
+Optionally: The defense remains destroyed even if the towers are recaptured later by their original owner.
+
+For purposes of being adjacent, any friendly stack that is next to the enemy border, any friendly stack that is adjacent to another friendly stack that is on the border, or any friendly stack that can trace a line of
+adjacent friendly stacks to one that is on the border, can be counted.
+Additionally, any passengers of carriers that are inside the country can be counted.
+
+Silvamori no ships can be produced.
+Leaders should not get dialog when they only have one escape option.
+Add pos to damage allocation dialog.
