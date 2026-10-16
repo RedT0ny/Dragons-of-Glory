@@ -39,6 +39,23 @@ main { padding: 16px 18px 40px; max-width: 1500px; margin: 0 auto; }
 .card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .card-title { margin: 0; font-size: 17px; color: var(--gold); }
 .qty { color: var(--muted); font-size: 13px; font-weight: normal; }
+/* --- unit counters (mirror the on-map chit) --- */
+.counter-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.counter { position: relative; display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 5px;
+  background: var(--c, #888); border: 1.5px solid #000; vertical-align: middle;
+  box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.counter.ws { border-color: #fff; }
+.counter-icon { display: block; width: 20px; height: 20px; }
+.card-title.has-counter { display: flex; align-items: center; gap: 8px; }
+.kv li.unit-row { display: flex; align-items: center; gap: 6px; }
+/* Future: combat/movement stats in the chit corners (see UnitCounter.paint). */
+.c-stats { position: absolute; inset: 0; pointer-events: none;
+  font: bold 8px/1 Georgia, 'Times New Roman', serif; }
+.c-rating { position: absolute; left: 2px; bottom: 1px; }
+.c-move { position: absolute; right: 2px; bottom: 1px; }
+.counter.ws .c-stats { color: #fff; }
+.counter:not(.ws) .c-stats { color: #000; }
 .badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--panel2);
   border: 1px solid var(--line); color: var(--muted); letter-spacing: .4px; }

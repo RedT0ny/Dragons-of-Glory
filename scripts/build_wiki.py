@@ -24,6 +24,7 @@ import html
 import os
 import re
 import sys
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 
 import yaml
@@ -32,6 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.content.config import (
     IMAGES_DIR,
+    ICONS_DIR,
     DOC_DIR,
     WIKI_HTML,
     WIKI_CSS,
@@ -46,7 +48,7 @@ from src.content.config import (
     CALENDAR_DATA,
     LOCALE_DIR,
 )
-from src.content.constants import DRAGONFLIGHTS
+from src.content.constants import DRAGONFLIGHTS, EVIL_DRAGONFLIGHTS, WS
 
 from wiki_manual import MANUAL_SECTIONS
 
@@ -60,6 +62,123 @@ def _esc(s) -> str:
 
 
 _MANUAL_LINK_RE = re.compile(r"\[\[([a-z_]+):([\w_-]+)\]\]")
+
+
+# --- unit counter icons ---------------------------------------------------------
+# The on-map unit chit (UnitCounter in src/gui/map_items.py) is the country colour
+# with one black (or white, for Whitestone) silhouette lifted out of the shared
+# sprite assets/icon/units.svg. The wiki draws the same chit next to every unit so
+# a reader can match a wiki entry to the piece they see on the board.
+#
+# Each icon lives at a fixed place inside units.svg, so we crop it with an SVG
+# <symbol viewBox="x y w h">. The bounds below come from QSvgRenderer's
+# boundsOnElement(); they are inlined because this script must stay stdlib-only
+# (no PySide6). To refresh them after editing units.svg, run:
+#   python -c "import os;os.environ.setdefault('QT_QPA_PLATFORM','offscreen');\
+#   from PySide6.QtSvg import QSvgRenderer;r=QSvgRenderer(r'assets/icon/units.svg');\
+#   [print(i, r.boundsOnElement(i)) for i in YOUR_IDS if r.elementExists(i)]"
+UNITS_SVG = os.path.join(ICONS_DIR, "units.svg")
+
+# element id -> (x, y, w, h) in units.svg user units
+_ICON_VIEWBOX = {
+    "cav": (29.8, 16.173, 6.539, 6.548),
+    "citadel": (15.084, 44.429, 6.781, 11.363),
+    "draconian": (44.675, 0.834, 5.98, 6.563),
+    "dwarf": (2.147, 0.652, 3.463, 6.927),
+    "dwarflord": (72.817, 61.309, 7.918, 8.105),
+    "elf": (14.657, 0.0, 7.633, 8.231),
+    "elflord": (1.01, 61.728, 5.738, 7.43),
+    "emperor": (0.0, 46.157, 7.758, 7.907),
+    "evil_dragon": (14.695, 16.539, 7.558, 5.816),
+    "fleet": (29.04, 30.959, 8.059, 7.641),
+    "gnome": (43.96, 61.81, 7.408, 7.265),
+    "goblin": (2.899, 30.881, 1.959, 7.796),
+    "good_dragon": (14.128, 31.766, 8.692, 6.026),
+    "griffon": (59.031, 0.77, 6.457, 6.691),
+    "highlord": (71.672, 31.337, 10.366, 6.884),
+    "inf": (59.348, 14.864, 5.823, 9.167),
+    "kender": (45.843, 15.512, 3.644, 7.871),
+    "knight": (30.367, 61.625, 5.404, 7.635),
+    "laurana": (58.392, 46.399, 7.735, 7.424),
+    "leader": (56.947, 31.668, 10.626, 6.221),
+    "minotaur": (29.69, 0.109, 6.759, 8.013),
+    "noicon": (73.849, 0.825, 6.013, 6.58),
+    "ogre": (44.544, 31.493, 6.241, 6.572),
+    "pegasus": (0.035, 16.062, 7.688, 6.77),
+    "pirate": (58.749, 61.893, 7.021, 7.1),
+    "soth": (73.894, 46.536, 5.922, 7.15),
+    "thanoi": (43.696, 45.95, 7.937, 8.321),
+    "undead": (16.182, 62.474, 4.583, 5.936),
+    "wizard": (73.126, 16.07, 7.459, 6.755),
+}
+
+# UnitTypes that pick their icon straight from the type, whatever the race.
+_ICON_TYPE_FIRST = frozenset({"wizard", "highlord", "emperor", "citadel", "fleet"})
+_ICON_LEADER_TYPES = frozenset({"admiral", "general", "hero"})
+_ICON_SOLE_NAMES = frozenset({"soth", "laurana"})
+
+_SVG_NS = "http://www.w3.org/2000/svg"
+# Keep the default (unprefixed) SVG namespace so extracted icons serialise as
+# plain <path .../> instead of <ns0:path .../>.
+ET.register_namespace("", _SVG_NS)
+
+
+def _sanitize_icon(el):
+    """Strip editor-only leftovers from an icon extracted out of units.svg.
+
+    Drops ids (so the two chit variants do not duplicate them), unresolvable
+    filter references (units.svg points elflord at a ``shadow-1`` that is never
+    defined) and Inkscape/Sodipodi metadata, none of which affect rendering.
+    """
+    for node in el.iter():
+        for key in list(node.attrib):
+            if key == "id":
+                del node.attrib[key]
+            elif key == "filter":
+                del node.attrib[key]
+            elif key.startswith("{") and not key.startswith("{" + _SVG_NS + "}"):
+                del node.attrib[key]
+            elif key == "style":
+                style = re.sub(r"(?:^|;)\s*filter\s*:\s*url\([^)]*\)", "", node.attrib[key]).strip("; ")
+                if style:
+                    node.attrib[key] = style
+                else:
+                    del node.attrib[key]
+    return el
+
+
+def unit_icon_id(u) -> str:
+    """Return the units.svg element id for a wiki unit.
+
+    String-only replica of UnitCounter._get_element_id (src/gui/map_items.py):
+    the wiki keeps unit_type/race as plain CSV strings instead of UnitType /
+    UnitRace enums, so this mirrors the same decision tree with strings.
+    """
+    utype = u.get("unit_type")
+    race = u.get("race")
+    uid = u.get("raw_id")
+
+    if utype in _ICON_TYPE_FIRST:
+        return utype
+    if utype == "cav":
+        return "undead" if race == "undead" else "cav"
+    if utype in _ICON_LEADER_TYPES:
+        if race == "solamnic":
+            return "knight"
+        if uid in _ICON_SOLE_NAMES:
+            return uid
+        if race == "elf":
+            return "elflord"
+        if race == "dwarf":
+            return "dwarflord"
+        return "leader"
+    if race == "dragon":
+        return "evil_dragon" if u.get("dragonflight") in EVIL_DRAGONFLIGHTS else "good_dragon"
+    if race in ("human", "solamnic") and utype:
+        return utype
+    if race:
+        return race
+    return "noicon"
 
 
 # Ground movement cost by terrain (standard / winter), rendered with a terrain
@@ -324,6 +443,9 @@ class WikiGen:
             if land:
                 self.units_by_land[land].append(u)
 
+        # Icons the counters need, so the sprite only embeds what is used.
+        self._used_icon_ids = {unit_icon_id(u) for u in self.units} | {"noicon"}
+
         # Reverse indexes for cross-links -------------------------------------------------
         self.events_by_asset = defaultdict(list)     # granted asset id -> events
         self.events_by_country = defaultdict(list)   # alliance/requirement country -> events
@@ -457,12 +579,88 @@ class WikiGen:
         en, es = self.ALLEGIANCE_LABELS.get(alleg, (alleg.title(), alleg.title()))
         return self.badge(l10n_span(en, es), kind=alleg)
 
+    # --- unit counters -----------------------------------------------------------------
+    def unit_color(self, u):
+        """Country colour of a unit's chit.
+
+        Mirrors MapView.draw_unit_at_pos (src/gui/map_view.py): use the country
+        colour when the unit has a land, otherwise the blue/red allegiance tint.
+        """
+        cid = u.get("country")
+        if cid and cid in self.countries:
+            return self.countries[cid].get("color") or "#888888"
+        return "#0000ff" if u.get("allegiance") == WS else "#ff0000"
+
+    def _unit_label_text(self, u):
+        """Plain-text label for a unit, used as the counter's tooltip/access name."""
+        if u["named"]:
+            return self._name("unit_names", u["raw_id"], u["raw_id"].replace("_", " ").title())
+        race = self._name("races", u["race"], u["race"] or "")
+        kind = (self._name("unit_types", u["unit_type"], "") or u["unit_type"] or "").title()
+        return f"{race} {kind}".strip()
+
+    def counter_html(self, u):
+        """A small chit that mirrors the on-map UnitCounter for this unit.
+
+        Country colour background, a white border and white icon for Whitestone
+        (black otherwise), and the silhouette lifted from assets/icon/units.svg.
+        """
+        eid = unit_icon_id(u)
+        if eid not in _ICON_VIEWBOX:
+            eid = "noicon"
+        light = u.get("allegiance") == WS
+        symbol = f"ucl-{eid}" if light else f"uc-{eid}"
+        cls = "counter ws" if light else "counter"
+        return (
+            f'<span class="{cls}" style="--c:{_esc(self.unit_color(u))}"'
+            f' title="{_esc(self._unit_label_text(u))}">'
+            f'<svg class="counter-icon" viewBox="0 0 100 100" aria-hidden="true" focusable="false">'
+            f'<use href="#{symbol}" width="100" height="100"/></svg>'
+            f'</span>'
+        )
+
+    def _counter_sprite(self):
+        """A hidden inline <svg> holding one <symbol> per unit icon.
+
+        Each icon is cropped out of units.svg with its precomputed viewBox, in a
+        normal (black) variant `uc-<id>` and a light (white) variant `ucl-<id>`.
+        Counters reference them with <use href="#uc-...">, so the whole sprite is
+        embedded once no matter how many counters the page uses.
+        """
+        try:
+            root = ET.parse(UNITS_SVG).getroot()
+        except Exception:
+            return ""
+        index = {el.get("id"): el for el in root.iter() if el.get("id")}
+
+        chunks = []
+        for eid in sorted(self._used_icon_ids):
+            el = index.get(eid)
+            vb = _ICON_VIEWBOX.get(eid)
+            if el is None or vb is None:
+                continue
+            raw = ET.tostring(_sanitize_icon(el), encoding="unicode")
+            # Same recolouring as UnitCounter.get_light_renderer (src/gui/map_items.py).
+            light = raw.replace("#000000", "#ffffff").replace("#000", "#fff")
+            vbtxt = "%g %g %g %g" % vb
+            chunks.append(f'<symbol id="uc-{eid}" viewBox="{vbtxt}">{raw}</symbol>')
+            chunks.append(f'<symbol id="ucl-{eid}" viewBox="{vbtxt}">{light}</symbol>')
+
+        if not chunks:
+            return ""
+        return (
+            '<svg class="counter-sprite" aria-hidden="true" focusable="false" '
+            'xmlns="http://www.w3.org/2000/svg" width="0" height="0">'
+            + "".join(chunks) + "</svg>"
+        )
+
     def build(self, inline=False):
         self.inline = bool(inline)
         parts = []
         parts.append(self._head())
         parts.append(self._header())
         parts.append('<main>')
+        parts.append(self._counter_sprite())
         parts.append(self._units_tab())
         parts.append(self._artifacts_tab())
         parts.append(self._events_tab())
@@ -564,7 +762,7 @@ class WikiGen:
             f'<article class="card unit" id="unit-card-{_esc(u["slug"])}" data-search="{_esc(search.lower())}">'
             f'{self.img(u["picture"], "army.jpg")}'
             f'<div class="card-body">'
-            f'<h4 class="card-title">{u["name_html"]} {qty}</h4>'
+            f'<h4 class="card-title has-counter">{self.counter_html(u)}{u["name_html"]} {qty}</h4>'
             f'<div class="badges">{self.allegiance_badge(u["allegiance"])}{type_badge}{race_badge}</div>'
             f'<p class="meta">{" · ".join(meta) if meta else ""}</p>'
             f'{stats}'
@@ -791,7 +989,7 @@ class WikiGen:
 
         units_here = self.units_by_land.get(cid, [])
         unit_items = "".join(
-            f'<li>{self.link_unit(u)} <span class="qty">x{u["quantity"]}</span></li>'
+            f'<li class="unit-row">{self.counter_html(u)}{self.link_unit(u)} <span class="qty">x{u["quantity"]}</span></li>'
             for u in units_here
         )
         units_html = f'<p class="links"><b>{self.lbl("Units", "Unidades")} ({sum(u["quantity"] for u in units_here)}):</b></p>' \
@@ -994,7 +1192,7 @@ class WikiGen:
     def _manual_terrain(self):
         """Ground movement cost per terrain (standard/winter) with terrain images."""
         thead = "".join(
-            f"<th>{h}</th>" for h in (l10n_span("Hex", "Hexágono"),
+            f"<th>{h}</th>" for h in (l10n_span("Hex/side", "Hexágono/Borde"),
                                       l10n_span("Terrain", "Terreno"),
                                       l10n_span("Cost", "Coste"),
                                       l10n_span("Cost in winter", "Coste en invierno"))
