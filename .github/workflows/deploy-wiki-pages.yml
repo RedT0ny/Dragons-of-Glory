@@ -1,0 +1,72 @@
+name: Deploy Wiki to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'data/**'
+      - 'scripts/build_wiki.py'
+      - 'scripts/wiki_manual.py'
+      - 'assets/html/**'
+      - 'assets/img/**'
+      - 'assets/doc/**'
+      - 'assets/icon/units.svg'
+      - 'src/content/config.py'
+      - 'src/content/constants.py'
+      - '.github/workflows/deploy-wiki-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build dependency
+        run: pip install pyyaml==6.0.3
+
+      - name: Build wiki HTML from game data
+        run: python scripts/build_wiki.py
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v6
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/wiki
+          cp assets/html/wiki.html _site/wiki/index.html
+          cp assets/html/wiki.css assets/html/wiki.js _site/wiki/
+          cp -r assets/img _site/img
+          cp -r assets/doc _site/doc
+          printf '%s\n' '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=wiki/"></head><body><a href="wiki/">Dragons of Glory Wiki</a></body></html>' > _site/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -6,7 +6,8 @@ from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QGraphicsItem
 
 from src.content.config import (DEBUG, LOCATION_SIZE, ICONS_DIR, UNIT_SIZE)
-from src.content.constants import WS, TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS, EVIL_DRAGONFLIGHTS, NEUTRAL
+from src.content.constants import WS, EVIL_DRAGONFLIGHTS, NEUTRAL
+from src.content.style import TERRAIN_VISUALS, HEXSIDE_COLORS, UI_COLORS
 from src.content.specs import UnitType, UnitRace, UnitState
 from src.content.tools import caption_id
 

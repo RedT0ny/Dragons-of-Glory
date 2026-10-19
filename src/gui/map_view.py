@@ -7,7 +7,8 @@ from PySide6.QtWidgets import QGraphicsView, QGraphicsScene
 
 from src.content.config import (DEBUG, HEX_RADIUS, MAP_IMAGE_PATH,
                                 X_OFFSET, Y_OFFSET)
-from src.content.constants import WS, HL, UI_COLORS
+from src.content.constants import WS, HL
+from src.content.style import UI_COLORS
 from src.content.runtime_diagnostics import RuntimeDiagnostics
 from src.content.specs import GamePhase, HexsideType
 from src.game.map import Hex
