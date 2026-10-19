@@ -1,16 +1,45 @@
 name: Publish HTML to Wiki
+
 on:
   push:
-    branches: [main]
     paths:
-      - 'assets/html/**' # Monitor your directory
+      - 'assets/html/**'
+  workflow_dispatch:
+
 permissions:
-  contents: write # Must have write permission
+  contents: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: Andrew-Chen-Wang/github-wiki-action@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          path: assets/html # Point to your directory
+          fetch-depth: 0
+
+      - name: Configure git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone wiki
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Clone the wiki using the workflow token for authentication
+          git clone https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.wiki.git wiki
+
+      - name: Copy HTML files into wiki
+        run: |
+          # Copy contents of assets/html into the wiki repo, deleting stale files
+          rsync -av --delete assets/html/ wiki/
+          cd wiki
+          git add -A
+          # Only commit & push when there are changes
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Publish HTML to wiki from ${GITHUB_SHA}"
+            git push origin HEAD
+          fi
