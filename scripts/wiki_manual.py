@@ -151,6 +151,8 @@ MANUAL_SECTIONS = [
             "transport": [
                 {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
+                {"t": "p", "key": "p4"},
             ],
         },
     },
@@ -167,16 +169,18 @@ MANUAL_SECTIONS = [
                 {"t": "tbl", "key": "table"},
                 {"t": "p", "key": "p2"},
             ],
+            "drm": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+            ],
             "dragon_combat": [
                 {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
             ],
             "naval_combat": [
                 {"t": "p", "key": "p1"},
-            ],
-            "siege": [
-                {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
             ],
         },
     },
@@ -196,6 +200,11 @@ MANUAL_SECTIONS = [
     {
         "id": "artifacts",
         "subsections": {
+            "how_they_work": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+                {"t": "p", "key": "p2"},
+            ],
             "artifacts": [
                 {"t": "p", "key": "p1"},
                 {"t": "tbl", "key": "table"},
@@ -203,16 +212,6 @@ MANUAL_SECTIONS = [
             "heroes": [
                 {"t": "p", "key": "p1"},
                 {"t": "warn", "key": "warn"},
-            ],
-        },
-    },
-    {
-        "id": "events",
-        "subsections": {
-            "how_they_work": [
-                {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
-                {"t": "p", "key": "p2"},
             ],
         },
     },

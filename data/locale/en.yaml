@@ -669,8 +669,10 @@ not hexes entered."
         - "Interception rules can be toggled in the game options (Naval interception on / off)."
     transport:
       title: "Sea and air transport"
-      p1: "A fleet in the same hex may carry an army as a passenger. Boarded units cannot move on their own for the rest of the turn and leave the spatial map until they disembark."
-      p2: "If the fleet boards outside a port its movement allowance is halved (minimum half of its allowance). Unloading places the army back on a coastal hex or port."
+      p1: "FLEETS: Each ship can carry one ground army and any number of leaders when it moves. The ship must pick up the ground army from a port at any point during its move, and can carry it for as long as the player wishes. The ground army can be aboard the ship (at sea) when the ship finishes its movement, and can remain aboard the ship for an unlimited number of Turns."
+      p2: "The ground army can be dropped off in a port, and the ship can continue its move if it has not used up its movement allowance.Alternately, the ground army can be dropped off in any coastal hex, but the ship can move no farther that Turn. A ground army cannot move on its own during a Turn that it is carried by a ship.."
+      p3: "WINGS: A griffon or pegasus wing can carry one infantry army of their same nationality and one leader when it moves. Dragons can only carry a leader on their back. Passengers must begin and end the Movement Step with the wing. Thus, they cannot move by themselves. The wing can only use half of its Movement Points on a Turn when it carries passengers. Other than this, all normal rules of air movement apply."
+      p4: "FLYING CITADELS: Up to three Highlord Armies of any types and an unlimited number of leaders can ride upon a Flying Citadel. Highlord ground armies can board the citadel whenever they are in the same hex, provided the armies have not yet moved that Turn. Ground armies can also be dropped off at any time. An army that has been carried even one hex on the citadel cannot move under its own power during the same Turn."
   combat:
     title: "Combat"
     land_combat:
@@ -692,17 +694,19 @@ not hexes entered."
           - ["1, 2 (steps)", "Combat step losses; the number is applied as additional depletion steps."]
           - ["E (eliminate)", "All affected units of that side are eliminated. Leaders may attempt to escape."]
       p2: "After combat, surviving attackers may advance into a vacated hex, and a victorious side may conquer the hex at the end of the combat phase. Stacking is always enforced."
+    drm:
+      title: "Die-Roll Modifiers"
+      p1: "Placeholder."
+      p2: "Placeholder for table."
     dragon_combat:
       title: "Dragon duels and air supremacy"
       p1: "Before a land battle, each side's dragons fight an air-supremacy duel. Every dragon rolls one die per combat point and each roll of 4 or more scores a hit: hits step the target down ACTIVE → DEPLETED → DESTROYED."
       p2: "The duel runs in rounds until one side is eliminated, both sides withdraw, or twenty rounds are fought. Players may withdraw their dragons between rounds; withdrawn wings relocate to a random hex."
     naval_combat:
       title: "Naval combat"
-      p1: "Fleets fight in simultaneous rounds. Each operational fleet rolls a d10 and scores a hit on a roll equal to or below its attack rating. Hits are applied step by step: ACTIVE → DEPLETED → RESERVE, and a side may withdraw from the battle."
-    siege:
-      title: "Sieges and Towers"
-      p1: "Citadels and fortresses defend with a defence rating. A besieging army may bombard before assaulting; fortress modifiers shift the combat odds or the die roll in the defender's favour."
-      p2: "The Towers of Eli guard the sea approaches: each tower fires twice a turn, hits on a d10 roll of 4 or less and steps down fleet integrity ACTIVE → DEPLETED → RESERVE. Neutral towers fire on any invading fleet; once activated, an allegiance-controlled tower only fires against enemies."
+      p1: "To fight a naval battle, ships must move into the same hex as the ships they are attacking. Each side then lines up their ships, and then the attacker assigns a target to each of their ships. In the advanced rules, Ships are not allowed to target an already assigned target unless all targets have one assigned. Once all have one assigned, then a second may be assigned; once all have two, then a third may be assigned, and so on."
+      p2: "Once all targets are assigned, a d10 is rolled for each ship. If the result is equal or less than the ship's combat rating, a hit is scored. Every attacking and defending ship in a battle is entitled to attack. All combat is considered to be simultaneous, so if one of your ships is damaged or sunk before you roll the die for your attack, you still get to roll as if it is undamaged."
+      p3: "After all ships have rolled, the combat round is over and the defending player has the option of withdrawing all of his ships one hex (or hexside on a river) in any direction, thus ending the combat. If the defending player declines this option, the attacking player may withdraw his ships and end the combat. If neither player withdraws, another round of combat is fought. The battle continues like this until one player withdraws or loses all of his ships."
   winter:
     title: "Winter & Supply"
     winter:
@@ -721,7 +725,15 @@ not hexes entered."
         - "Advanced: units may additionally trace inland supply to the owning country or its capital."
         - "Units that cannot trace supply suffer attrition (step losses) during the supply phase."
   artifacts:
-    title: "Artifacts & Heroes"
+    title: "Events & Artifacts"
+    how_they_work:
+      title: "How events work"
+      p1: "Strategic events fire during the strategic-events phase of every fifth turn. Each event defines a trigger (or 'always'), a maximum number of occurrences, and an effect, and many belong to one allegiance."
+      bullets:
+        - "Types: BONUS (diplomacy, combat or activation bonus), UNITS (reinforcements), BANNER (a country joins the cause) and ARTIFACT (a new artifact enters play)."
+        - "Diplomacy events grant activation bonuses, e.g. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] and [[event:hl_minor_diplomacy]]."
+        - "Artifact events put the war-winning relics into play, from the [[event:dragonlance_forged]] to the [[event:dragon_orb]]."
+      p2: "The full catalogue, with effects and pictures, is in the Events tab."
     artifacts:
       title: "Artifact quick reference"
       p1: "Artefacts are wielded by leaders and armies. The complete list with descriptions is in the Artifacts tab; the table below summarises their mechanical effects."
@@ -745,20 +757,10 @@ not hexes entered."
           - ["[[artifact:dragonmetal]]", "The resource required to forge Dragonlances."]
     heroes:
       title: "Eliminated leaders"
-      p1: "Leaders eliminated in battle roll an escape attempt. The roll is improved by equipment such as the dragonarmor and the Plate of Solamnus (+1). Leaders that escape return off-map for later redeployment; the rest are lost with their equipment."
+      p1: "If a leader is on a stack of ground and/or air units that gets completely eliminated by a combat result, the owning player rolls a d6. On a result of 1-3, the leader is permanently eliminated and removed from the game; on a result of 4-6, he must be placed with the nearest friendly army."
       warn:
         title: "Lost equipment"
-        text: "Equipment carried by a truly lost leader is destroyed and does not return to the pool."
-  events:
-    title: "Strategic Events"
-    how_they_work:
-      title: "How events work"
-      p1: "Strategic events fire during the strategic-events phase of every fifth turn. Each event defines a trigger (or 'always'), a maximum number of occurrences, and an effect, and many belong to one allegiance."
-      bullets:
-        - "Types: BONUS (diplomacy, combat or activation bonus), UNITS (reinforcements), BANNER (a country joins the cause) and ARTIFACT (a new artifact enters play)."
-        - "Diplomacy events grant activation bonuses, e.g. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] and [[event:hl_minor_diplomacy]]."
-        - "Artifact events put the war-winning relics into play, from the [[event:dragonlance_forged]] to the [[event:dragon_orb]]."
-      p2: "The full catalogue, with effects and pictures, is in the Events tab."
+        text: "Equipment carried by any eliminated leader is destroyed and does not return to the pool."
   victory:
     title: "Victory"
     victory:

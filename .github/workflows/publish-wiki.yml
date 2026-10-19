@@ -1,0 +1,16 @@
+name: Publish HTML to Wiki
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/html/**' # Monitor your directory
+permissions:
+  contents: write # Must have write permission
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Andrew-Chen-Wang/github-wiki-action@v4
+        with:
+          path: assets/html # Point to your directory

@@ -667,9 +667,11 @@ manual:
         - "El invierno restringe las intercepciones a distancia 1 con un 50%."
         - "Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada)."
     transport:
-      title: "Transporte marítimo"
-      p1: "Una flota en el mismo hexágono puede llevar un ejército a bordo. Las unidades embarcadas no pueden moverse por su cuenta durante el resto del turno y abandonan el mapa espacial hasta que desembarcan."
-      p2: "Si la flota embarca fuera de un puerto, su asignación de movimiento se reduce a la mitad (mínimo la mitad de su asignación). El desembarco coloca al ejército de nuevo en un hexágono costero o un puerto."
+      title: "Transporte aéreo y marítimo"
+      p1: "FLOTAS: Cada barco puede transportar un ejército terrestre y cualquier número de líderes cuando se mueve. El barco debe recoger el ejército terrestre en un puerto en cualquier momento durante su movimiento, y puede transportarlo durante el tiempo que el jugador desee. El ejército terrestre puede estar a bordo del barco (en el mar) cuando el barco termina su movimiento, y puede permanecer a bordo del barco durante un número ilimitado de turnos."
+      p2: "El ejército terrestre puede ser dejado en un puerto, y el barco puede continuar su movimiento si no ha usado todo su permiso de movimiento. Alternativamente, el ejército terrestre puede ser dejado en cualquier hexágono costero, pero el barco no puede moverse más lejos en ese turno. Un ejército terrestre no puede moverse por sí mismo durante un turno en el que esté siendo transportado por un barco."
+      p3: "ALAS: Un ala de grifos o pegasos puede transportar un ejército de infantería de su misma nacionalidad y un líder. Los dragones solo pueden transportar un líder. Los pasajeros deben comenzar y terminar el Paso de Movimiento con el ala. Por lo tanto, no pueden moverse por sí mismos. El ala solo puede usar la mitad de sus Puntos de Movimiento en un turno cuando lleva pasajeros. Excepto esto, todas las reglas normales de movimiento aéreo se aplican."
+      p4: "CIUDADELAS VOLANTES: Hasta tres Ejércitos de los dragones de cualquier tipo y un número ilimitado de líderes pueden viajar sobre una Ciudadela Volante. Los ejércitos terrestres de Altos Señores pueden abordar la ciudadela siempre que estén en el mismo hexágono, siempre que los ejércitos no hayan movido aún ese turno. Los ejércitos también pueden ser dejados en cualquier momento. Un ejército que haya sido transportado incluso un hexágono en la ciudadela no puede moverse por su propia fuerza durante el mismo turno."
   combat:
     title: "Combate"
     land_combat:
@@ -691,17 +693,19 @@ manual:
           - ["1, 2 (pasos)", "Pérdidas de pasos de combate; el número se aplica como pasos de merma adicionales."]
           - ["E (eliminar)", "Todas las unidades afectadas de ese bando son eliminadas. Los líderes pueden intentar escapar."]
       p2: "Tras el combate, los atacantes supervivientes pueden avanzar a un hexágono desocupado, y un bando victorioso puede conquistar el hexágono al final de la fase de combate. El apliñamiento siempre se respeta."
+    drm:
+      title: "Modificadores a la tirada de dados"
+      p1: "Placeholder."
+      p2: "Placeholder for table."
     dragon_combat:
       title: "Duelos de dragones y supremacía aérea"
       p1: "Antes de una batalla terrestre, los dragones de cada bando libran un duelo de supremacía aérea. Cada dragón tira un dado por punto de combate y cada resultado de 4 o más es un impacto: los impactos reducen al objetivo ACTIVO → MERMADO → DESTRUIDO."
       p2: "El duelo transcurre en rondas hasta que un bando es eliminado, ambos se retiran o se llega a veinte rondas. Entre ronda y ronda, los jugadores pueden retirar sus dragones; las alas retiradas se trasladan a un hexágono aleatorio."
     naval_combat:
       title: "Combate naval"
-      p1: "Las flotas combaten en rondas simultáneas. Cada flota operativa tira un d10 y logra un impacto con un resultado igual o inferior a su valor de ataque. Los impactos se aplican paso a paso: ACTIVA → MERMADA → RESERVA, y un bando puede retirarse del combate."
-    siege:
-      title: "Asedios y Torres"
-      p1: "Las ciudadelas y fortalezas se defienden con un valor de defensa. Un asaltante puede bombardear antes del asalto; los modificadores de fortaleza desplazan las probabilidades de combate o la tirada a favor del defensor."
-      p2: "Las Torres de Eli vigilan las aproximaciones marítimas: cada torre dispara dos veces por turno, acierta con un d10 igual o inferior a 4 y reduce la integridad de la flota ACTIVA → MERMADA → RESERVA. Las torres neutrales disparan contra cualquier flota invasora; una vez activada, una torre controlada solo dispara contra los enemigos."
+      p1: "To fight a naval battle, ships must move into the same hex as the ships they are attacking. Each side then lines up their ships, and then the attacker assigns a target to each of their ships. In the advanced rules, Ships are not allowed to target an already assigned target unless all targets have one assigned. Once all have one assigned, then a second may be assigned; once all have two, then a third may be assigned, and so on."
+      p2: "Once all targets are assigned, a d10 is rolled for each ship. If the result is equal or less than the ship's combat rating, a hit is scored. Every attacking and defending ship in a battle is entitled to attack. All combat is considered to be simultaneous, so if one of your ships is damaged or sunk before you roll the die for your attack, you still get to roll as if it is undamaged."
+      p3: "After all ships have rolled, the combat round is over and the defending player has the option of withdrawing all of his ships one hex (or hexside on a river) in any direction, thus ending the combat. If the defending player declines this option, the attacking player may withdraw his ships and end the combat. If neither player withdraws, another round of combat is fought. The battle continues like this until one player withdraws or loses all of his ships."
   winter:
     title: "Invierno y suministro"
     winter:
@@ -720,7 +724,15 @@ manual:
         - "Avanzado: las unidades pueden, además, trazar suministro por tierra hasta el país propietario o su capital."
         - "Las unidades que no puedan trazar suministro sufren desgaste (pérdidas de pasos) durante la fase de suministro."
   artifacts:
-    title: "Artefactos y héroes"
+    title: "Eventos y Artefactos"
+    how_they_work:
+      title: "Cómo funcionan los eventos"
+      p1: "Los eventos estratégicos se disparan durante la fase de eventos estratégicos de cada quinto turno. Cada evento define un disparador (o 'siempre'), un número máximo de ocurrencias y un efecto, y muchos pertenecen a una alineación."
+      bullets:
+        - "Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego)."
+        - "Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]]."
+        - "Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]]."
+      p2: "El catálogo completo, con efectos e imágenes, está en la pestaña Eventos."
     artifacts:
       title: "Referencia rápida de artefactos"
       p1: "Los artefactos los portan líderes y ejércitos. La lista completa con descripciones está en la pestaña Artefactos; la tabla siguiente resume sus efectos mecánicos."
@@ -748,16 +760,6 @@ manual:
       warn:
         title: "Equipo perdido"
         text: "El equipo que porte un líder definitivamente perdido se destruye y no vuelve a la reserva."
-  events:
-    title: "Eventos estratégicos"
-    how_they_work:
-      title: "Cómo funcionan los eventos"
-      p1: "Los eventos estratégicos se disparan durante la fase de eventos estratégicos de cada quinto turno. Cada evento define un disparador (o 'siempre'), un número máximo de ocurrencias y un efecto, y muchos pertenecen a una alineación."
-      bullets:
-        - "Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego)."
-        - "Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]]."
-        - "Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]]."
-      p2: "El catálogo completo, con efectos e imágenes, está en la pestaña Eventos."
   victory:
     title: "Victoria"
     victory:
