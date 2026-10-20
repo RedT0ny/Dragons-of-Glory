@@ -32,7 +32,9 @@ Each section title and subsection title are read from ``manual.<id>.title`` and
 Inline cross-links use the marker  [[kind:id]]  (e.g. [[artifact:dragonlance]],
 [[country:qualinesti]], [[event:ws_diplomacy]]). The link label is resolved
 automatically from the already-localized names in the locale files, so the text
-itself never carries a display label.
+itself never carries a display label.  [[tab:countries]] (any key of
+SECTION_LABELS: countries, units, artifacts, events, bonuses, rules) links to
+the top of that tab instead of a single entry.
 """
 
 MANUAL_SECTIONS = [
@@ -163,14 +165,14 @@ MANUAL_SECTIONS = [
                 {"t": "p", "key": "p1"},
                 {"t": "ul", "key": "bullets"},
             ],
+            "drm": [
+                {"t": "p", "key": "p1"},
+                {"t": "tbl", "key": "table"},
+            ],
             "crt": [
                 {"t": "p", "key": "p1"},
                 {"t": "crt"},
                 {"t": "tbl", "key": "table"},
-                {"t": "p", "key": "p2"},
-            ],
-            "drm": [
-                {"t": "p", "key": "p1"},
                 {"t": "p", "key": "p2"},
             ],
             "dragon_combat": [
@@ -203,6 +205,7 @@ MANUAL_SECTIONS = [
             "how_they_work": [
                 {"t": "p", "key": "p1"},
                 {"t": "ul", "key": "bullets"},
+                {"t": "tbl", "key": "table"},
                 {"t": "p", "key": "p2"},
             ],
             "artifacts": [

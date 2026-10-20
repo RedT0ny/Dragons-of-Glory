@@ -502,6 +502,13 @@ unit_names:
   topus: "Topus"
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
+  harkol: "Harkol Waythorn"
+  iolanthe: "Iolanthe"
+  ladonna: "Ladonna"
+  dracart: "Dracart"
+  par-salian: "Par-Salian"
+  justarius: "Justarius"
+  fizban: "Fizban the Fabulous"
 
 terrain:
   grassland: "Grassland"
@@ -531,7 +538,7 @@ manual:
     how_to_read:
       title: "How to read this manual"
       p1: "This tab is a rule primer generated from the game's own data and code. It mirrors the same entry points as the wiki: countries, units, artifacts, events and the game's option switches."
-      p2: "Coloured links jump to the matching entry in the other tabs. Anything flagged with the EN/ES toggle at the top right is shown in either language."
+      p2: "Coloured links jump to the matching entry in the other tabs. Anything flagged with the EN/ES toggle at the top right is shown in either language. A [[tab:countries]] link, for example, jumps to the top of 'Countries' tab."
       warn:
         title: "A note on the rulebooks"
         text: "The classic PDF rulebooks shipped with the game (Manual, Advanced Rules, House Rules) remain available from the in-game Help menu and are linked at the bottom of this tab. The chapters below are an original summary of the computer game's rules as implemented."
@@ -573,7 +580,7 @@ manual:
     title: "Countries & Diplomacy"
     powers:
       title: "The Nations of Ansalon"
-      p1: "The map contains 44 countries. Each one has a strength rating (the size of the forces it can field) and an alignment: a pair of modifiers telling how favourable it is to Whitestone and to the Highlord."
+      p1: "The map contains 44 [[tab:countries]]. Each one has a strength rating (the size of the forces it can field) and an alignment: a pair of modifiers telling how favourable it is to Whitestone and to the Highlord."
       bullets:
         - "Whitestone-leaning powers include the Elven nations of [[country:qualinesti]] and [[country:silvanesti]], [[country:nergoth]], [[country:palanthas]] and the kender nations of [[country:hylo]] and [[country:goodlund]]."
         - "The Solamnic knight countries — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] and [[country:vingaard]] — receive a special Whitestone activation bonus."
@@ -682,9 +689,31 @@ not hexes entered."
         - "Odds beyond 6:1 are capped at 6:1; odds below 1:3 are treated as 1:3."
         - "Walls, fortresses and bombards modify the ratio before the dice are rolled."
         - "Leaders, armies, dragons and artefacts can each add a die-roll modifier (DRM)."
+    drm:
+      title: "Die-Roll Modifiers"
+      p1: "Each player calculates all die roll modifiers that apply to the combat. Die roll modifiers are caused by leaders, specific creature types, terrain, and fortifications. They are listed in the table below. All modifiers are added together to get a cumulative modifier; for example, modifiers of -2, -3, -1, +6, and +4 equal a cumulative modifier of +4."
+      table:
+        headers: ["Source", "DRM", "Notes"]
+        rows:
+          - ["Attacking leader", "+ TR", "If there are several leaders in the attacking stack, only the one with highest tactical rating is counted."]
+          - ["Attacking wizards", "+ TR", "If there are several wizards in the attacking stack, only the one with highest tactical rating is counted." ]
+          - ["Defending leader", "− TR", "Highest tactical rating in the defending stack, subtracted from the attacker's roll."]
+          - ["Defending wizards", "− TR", "Highest tactical rating in the defending stack, subtracted from the attacker's roll."]
+          - ["Attacking dragons", "+ CR", "Total combat rating of all dragons in the attacking stack. A defending Dragon Slayer artifact negates this bonus."]
+          - ["Defending dragons", "− CR", "Total combat rating of all dragons in the defending stack."]
+          - ["Cavalry charge", "+1", "Any attacking cavalry — Not applicable VS units in fortified locations, forests or jungle."]
+          - ["Air support", "+1 / -1", "Any flying unit in the stack — not effective VS. units in dwarven fortresses, forests, mountains or jungle."]
+          - ["Fortified location", "−2 / −4 / −10", "City, port or temple −2. Fortress −4. Dwarven fortress −10."]
+          - ["River or bridge", "−4", "Attacking across a river, deep river or bridge (Except if frozen)."]
+          - ["Ford", "−3", "Attacking across a river ford."]
+          - ["Pass or tunnel", "−2", "Attacking through a mountain pass or tunnel."]
+          - ["Terrain affinity", "+1 / −1", "+1 for every attacking army on its affinity terrain, −1 for every defending army on its affinity terrain."]
+          - ["Kender taunt", "+2 / −2", "Roll 1d10 minus enemy's best Tactical Rating and (if attacking) location defense modifier. Success with 6+."]
+          - ["Gnome Tech", "Varies", "Roll 2d6: on any non-double the higher die is added; on doubles the modifier is −6 and the device is destroyed."]
+          - ["Event combat bonus", "varies", "Strategic-event combat bonus of the active player, current battle turn only."]
     crt:
       title: "The combat-results table"
-      p1: "A d10 is rolled and adjusted by the DRM (clamped between -5 and +16); the adjusted roll crosses the combat-results table at the current odds column. Results are printed attacker/defender — e.g. E/1, DR/- or -/DR."
+      p1: "Once the odds ratio is set, the attacker rolls 1d10 and adds the total die-roll modifier (DRM). The result is clamped between -5 and +16. The adjusted roll crosses the combat-results table at the current odds column. Results are printed attacker/defender — e.g. E/1, DR/- or -/DR."
       table:
         headers: ["Code", "Meaning"]
         rows:
@@ -694,10 +723,6 @@ not hexes entered."
           - ["1, 2 (steps)", "Combat step losses; the number is applied as additional depletion steps."]
           - ["E (eliminate)", "All affected units of that side are eliminated. Leaders may attempt to escape."]
       p2: "After combat, surviving attackers may advance into a vacated hex, and a victorious side may conquer the hex at the end of the combat phase. Stacking is always enforced."
-    drm:
-      title: "Die-Roll Modifiers"
-      p1: "Placeholder."
-      p2: "Placeholder for table."
     dragon_combat:
       title: "Dragon duels and air supremacy"
       p1: "Before a land battle, each side's dragons fight an air-supremacy duel. Every dragon rolls one die per combat point and each roll of 4 or more scores a hit: hits step the target down ACTIVE → DEPLETED → DESTROYED."
@@ -728,15 +753,46 @@ not hexes entered."
     title: "Events & Artifacts"
     how_they_work:
       title: "How events work"
-      p1: "Strategic events fire during the strategic-events phase of every fifth turn. Each event defines a trigger (or 'always'), a maximum number of occurrences, and an effect, and many belong to one allegiance."
+      p1: "Strategic [[tab:events]] fire during the strategic-events phase of every fifth turn. Each event defines a trigger (or 'always'), a maximum number of occurrences, and an effect, and many belong to one allegiance."
       bullets:
         - "Types: BONUS (diplomacy, combat or activation bonus), UNITS (reinforcements), BANNER (a country joins the cause) and ARTIFACT (a new artifact enters play)."
         - "Diplomacy events grant activation bonuses, e.g. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] and [[event:hl_minor_diplomacy]]."
         - "Artifact events put the war-winning relics into play, from the [[event:dragonlance_forged]] to the [[event:dragon_orb]]."
-      p2: "The full catalogue, with effects and pictures, is in the Events tab."
+      table:
+        headers: [ "Turn", "Event", "Effects", "Occurrences", "Side" ]
+        rows:
+          - [ "1", "[[event:hl_wizard]]", "Adds: [[unit:iolanthe]], [[unit:ladonna]], [[unit:dracart]]", "3", "Highlord" ]
+          - [ "1", "[[event:highlord_blitzkrieg]]", "Combat bonus: +1", "3", "Highlord" ]
+          - [ "1", "[[event:hl_diplomacy]]", "Activation bonus: +2", "5", "Highlord" ]
+          - [ "1", "[[event:hl_minor_diplomacy]]", "Activation bonus: +1", "5", "Highlord" ]
+          - [ "1", "[[event:ws_diplomacy]]", "Activation bonus: +2", "5", "Whitestone" ]
+          - [ "1", "[[event:ws_minor_diplomacy]]", "Activation bonus: +1", "5", "Whitestone" ]
+          - [ "2", "[[event:ws_wizard]]", "Adds: [[unit:justarius]], [[unit:par-salian]], [[unit:fizban]]", "3", "Whitestone" ]
+          - [ "5", "[[event:crown_of_power]]", "Grants: [[artifact:crown_of_power]]", "1", "Highlord" ]
+          - [ "5", "[[event:dragonarmor]]", "Grants: [[artifact:dragonarmor]]", "4", "Highlord" ]
+          - [ "5", "[[event:plate_of_solamnus]]", "Grants: [[artifact:plate_of_solamnus]] (needs [[country:tower]] active)", "4", "Whitestone" ]
+          - [ "6", "[[event:wildrunner_tactics]]", "Combat bonus: +1", "3", "Whitestone" ]
+          - [ "7", "[[event:dragonmetal]]", "Grants: [[artifact:dragonmetal]]", "1", "Whitestone" ]
+          - [ "8", "[[event:staff_of_magius]]", "Grants: [[artifact:staff_of_magius]]", "1", "—" ]
+          - [ "10", "[[event:dragonlance_forged]]", "Grants: [[artifact:dragonlance]] (needs [[artifact:dragonmetal]])", "5", "Whitestone" ]
+          - [ "10", "[[event:dragon_orb]]", "Grants: [[artifact:dragon_orb]]", "1", "—" ]
+          - [ "10", "[[event:hammer_of_kharas]]", "Grants: [[artifact:hammer_of_kharas]]", "1", "—" ]
+          - [ "11", "[[event:blue_crystal_staff]]", "Grants: [[artifact:blue_crystal_staff]]", "1", "Whitestone" ]
+          - [ "12", "[[event:temptation_of_verminaard]]", "Grants: [[artifact:nightbringer]]", "1", "Highlord" ]
+          - [ "15", "[[event:gnome_tech]]", "Grants: [[artifact:gnome_tech]]; Alliance with [[country:nevermind]]", "1", "—" ]
+          - [ "18", "[[event:soths_legions]]", "Alliance with [[country:dargaard]]", "1", "Highlord" ]
+          - [ "19", "[[event:disks_of_mishakal]]", "Grants: [[artifact:disks_of_mishakal]] (needs [[artifact:blue_crystal_staff]])", "1", "Whitestone" ]
+          - [ "19", "[[event:medallion_of_faith]]", "Grants: [[artifact:medallion_of_faith]]", "4", "Whitestone" ]
+          - [ "19", "[[event:wyrmslayer]]", "Grants: [[artifact:wyrmslayer]]", "1", "Whitestone" ]
+          - [ "20", "[[event:good_dragons]]", "Adds: [[unit:gold_dragon_wing]], [[unit:silver_dragon_wing]], [[unit:bronze_dragon_wing]], [[unit:copper_dragon_wing]], [[unit:brass_dragon_wing]]", "1", "Whitestone" ]
+          - [ "20", "[[event:silver_arm]]", "Grants: [[artifact:silver_arm]]", "1", "Whitestone" ]
+          - [ "21", "[[event:flying_citadel]]", "Adds: a flying [[unit:magic_citadel]]", "1", "Highlord" ]
+          - [ "21", "[[event:golden_general]]", "Adds: [[unit:laurana]]", "1", "Whitestone" ]
+          - [ "21", "[[event:whitestone_council]]", "Activation bonus: +3", "1", "Whitestone" ]
+      p2: "The full catalogue, with flavour texts and pictures, is in the [[tab:events]] tab. The table above summarises the events by the first turn on which they can occur."
     artifacts:
       title: "Artifact quick reference"
-      p1: "Artefacts are wielded by leaders and armies. The complete list with descriptions is in the Artifacts tab; the table below summarises their mechanical effects."
+      p1: "[[tab:artifacts]] are wielded by leaders and armies. The complete list with descriptions is in the [[tab:artifacts]] tab; the table below summarises their bonuses and effects."
       table:
         headers: ["Artifact", "Effect"]
         rows:

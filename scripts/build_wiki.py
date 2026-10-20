@@ -29,7 +29,9 @@ from collections import defaultdict
 
 import yaml
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _SCRIPTS_DIR)
+sys.path.insert(0, os.path.dirname(_SCRIPTS_DIR))
 
 from src.content.config import (
     IMAGES_DIR,
@@ -41,6 +43,7 @@ from src.content.config import (
     HTML_DIR,
     EVENTS_DATA,
     INVASION_ODDS_DATA,
+    MAP_IMAGE_PATH,
     ARTIFACTS_DATA,
     UNITS_DATA,
     COUNTRIES_DATA,
@@ -956,6 +959,15 @@ class WikiGen:
 
     def _countries_tab(self):
         htmls = [self._section_open("tab-countries", self.lbl("Countries", "Naciones"), len(self.countries))]
+        map_src = f"../img/{_esc(os.path.basename(MAP_IMAGE_PATH))}"
+        htmls.append(f'<h3 class="map-title">{self.lbl("Map of Ansalon", "Mapa de Ansalon")}</h3>')
+        htmls.append(
+            f'<figure class="map-fig" data-zoom="{map_src}" role="button" tabindex="0" '
+            f'title="{_esc("Click to enlarge")}" aria-label="{_esc("Map of Ansalon — click to enlarge")}">'
+            f'<img class="map-img" src="{map_src}" alt="{_esc("Map of Ansalon")}" '
+            f'loading="lazy" onerror="this.closest(&quot;.map-fig&quot;).hidden = true;">'
+            f'</figure>'
+        )
         htmls.append('<div class="grid">')
         for cid in sorted(self.countries.keys(), key=lambda c: self._name("countries", c, c).lower()):
             htmls.append(self._country_card(self.countries[cid]))
@@ -1075,7 +1087,10 @@ class WikiGen:
         elif kind == "event":
             label = self.L("events", tid, tid)
         elif kind == "unit":
-            label = self.L("unit_names", tid, tid)
+            label = self.L("unit_names", tid, tid.replace("_", " ").title())
+        elif kind == "tab":
+            en, es = self.SECTION_LABELS.get(tid, (tid.title(), tid.title()))
+            label = self.lbl(en, es)
         else:
             label = self.lbl(tid, tid)
         return (f'<a class="l-x" data-goto="{_esc(kind)}/{_esc(tid)}" '

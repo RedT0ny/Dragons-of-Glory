@@ -24,6 +24,7 @@ h1 { font-size: 20px; margin: 4px 0; color: var(--gold); letter-spacing: .5px; }
 main { padding: 16px 18px 40px; max-width: 1500px; margin: 0 auto; }
 .tab { display: none; }
 .tab.active { display: block; }
+section.tab { scroll-margin-top: 104px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .alleg-sec { margin-top: 6px; }
 .alleg-title { margin: 14px 0 6px; font-size: 15px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); }
@@ -138,3 +139,20 @@ a { color: var(--ws); text-decoration: none; border-bottom: 1px dotted rgba(126,
 }
 .footer { border-top: 1px solid var(--line); padding: 14px 18px; text-align: center; }
 h4 { margin: 0; }
+/* --- countries tab: full-width map with magnifier --- */
+.map-title { margin: 14px 0 8px; font-size: 15px; text-transform: uppercase;
+  letter-spacing: 1.5px; color: var(--gold); }
+.map-fig { margin: 0 0 16px; border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; background: var(--panel2); cursor: zoom-in; }
+.map-fig:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.map-img { display: block; width: 100%; height: auto; }
+.lightbox { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; padding: 20px;
+  background: rgba(5,7,12,.92); }
+.lightbox[hidden] { display: none; }
+.lightbox-stage { max-width: 96vw; max-height: 84vh; overflow: auto; border-radius: 8px;
+  background: #000; box-shadow: 0 10px 40px rgba(0,0,0,.6); cursor: zoom-in; }
+.lightbox.zoomed .lightbox-stage { cursor: grab; }
+.lightbox.zoomed .lightbox-stage:active { cursor: grabbing; }
+.lightbox-stage img { display: block; cursor: inherit; user-select: none; }
+.lightbox-hint { color: var(--muted); font-size: 13px; text-align: center; }

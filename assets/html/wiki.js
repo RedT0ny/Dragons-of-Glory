@@ -75,6 +75,14 @@
   function goto(kind, id) {
     var map = { unit: "tab-units", artifact: "tab-artifacts", event: "tab-events",
                 country: "tab-countries", group: "tab-units", bonus: "tab-bonuses" };
+    if (kind === "tab") {
+      var tabSec = document.getElementById("tab-" + id);
+      if (tabSec) {
+        setTab("tab-" + id);
+        setTimeout(function () { tabSec.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60);
+      }
+      return;
+    }
     var tabId = map[kind] || "tab-units";
     setTab(tabId);
     var target = kind === "group" ? "group-" + id : kind + "-card-" + id;
@@ -122,8 +130,130 @@
     try { history.replaceState(null, "", "#" + parts[0] + "/" + parts[1]); } catch (e) {}
   });
 
+  var zoomables = Array.prototype.slice.call(document.querySelectorAll("[data-zoom]"));
+  if (zoomables.length) {
+    var lightbox = document.createElement("div");
+    lightbox.className = "lightbox";
+    lightbox.hidden = true;
+    var lightboxStage = document.createElement("div");
+    lightboxStage.className = "lightbox-stage";
+    var lightboxImg = document.createElement("img");
+    lightboxImg.alt = "";
+    lightboxImg.draggable = false;
+    lightboxStage.appendChild(lightboxImg);
+    var lightboxHint = document.createElement("div");
+    lightboxHint.className = "lightbox-hint l10n";
+    lightbox.appendChild(lightboxStage);
+    lightbox.appendChild(lightboxHint);
+    document.body.appendChild(lightbox);
+
+    var zoomLevel = 1;
+    var HINTS = {
+      fit: ["Click the map to magnify · click the background or press Esc to close",
+            "Haz clic en el mapa para ampliar · haz clic en el fondo o pulsa Esc para cerrar"],
+      zoom: ["Click the map to fit again · drag to pan · press Esc to close",
+             "Haz clic en el mapa para ajustar · arrastra para moverte · pulsa Esc para cerrar"]
+    };
+    function setHint(key) {
+      lightboxHint.dataset.en = HINTS[key][0];
+      lightboxHint.dataset.es = HINTS[key][1];
+      lightboxHint.textContent = (currentLang === "es") ? HINTS[key][1] : HINTS[key][0];
+    }
+    setHint("fit");
+
+    function naturalSize() {
+      return {
+        w: lightboxImg.naturalWidth || lightboxImg.width || 1600,
+        h: lightboxImg.naturalHeight || lightboxImg.height || 1200
+      };
+    }
+    function fitScale() {
+      var n = naturalSize();
+      var availW = window.innerWidth * 0.94;
+      var availH = window.innerHeight * 0.84;
+      return Math.min(availW / n.w, availH / n.h);
+    }
+    function applyZoom(center) {
+      var n = naturalSize();
+      var fit = fitScale();
+      var scale = fit;
+      if (zoomLevel > 1) {
+        scale = Math.min(fit * 2.5, 1);
+        if (scale <= fit) scale = fit * 2;
+      }
+      lightboxImg.style.width = Math.round(n.w * scale) + "px";
+      lightboxImg.style.height = Math.round(n.h * scale) + "px";
+      lightbox.classList.toggle("zoomed", zoomLevel > 1);
+      setHint(zoomLevel > 1 ? "zoom" : "fit");
+      if (center) {
+        lightboxStage.scrollLeft = (lightboxStage.scrollWidth - lightboxStage.clientWidth) / 2;
+        lightboxStage.scrollTop = (lightboxStage.scrollHeight - lightboxStage.clientHeight) / 2;
+      }
+    }
+    function openLightbox(el) {
+      zoomLevel = 1;
+      lightboxImg.src = el.dataset.zoom;
+      lightbox.hidden = false;
+      if (lightboxImg.complete) applyZoom(false);
+    }
+    function closeLightbox() {
+      lightbox.hidden = true;
+      lightboxImg.removeAttribute("src");
+    }
+    lightboxImg.addEventListener("load", function () {
+      if (!lightbox.hidden) applyZoom(zoomLevel > 1);
+    });
+
+    var dragging = false, moved = false;
+    var startX = 0, startY = 0, startSL = 0, startST = 0;
+    lightboxImg.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      if (moved) return;
+      zoomLevel = (zoomLevel === 1) ? 2 : 1;
+      applyZoom(zoomLevel === 2);
+    });
+    lightboxStage.addEventListener("pointerdown", function (ev) {
+      if (zoomLevel < 2) return;
+      dragging = true;
+      moved = false;
+      startX = ev.clientX; startY = ev.clientY;
+      startSL = lightboxStage.scrollLeft; startST = lightboxStage.scrollTop;
+      lightboxStage.setPointerCapture(ev.pointerId);
+    });
+    lightboxStage.addEventListener("pointermove", function (ev) {
+      if (!dragging) return;
+      var dx = ev.clientX - startX, dy = ev.clientY - startY;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      lightboxStage.scrollLeft = startSL - dx;
+      lightboxStage.scrollTop = startST - dy;
+    });
+    ["pointerup", "pointercancel"].forEach(function (type) {
+      lightboxStage.addEventListener(type, function () {
+        if (!dragging) return;
+        dragging = false;
+        setTimeout(function () { moved = false; }, 0);
+      });
+    });
+    lightbox.addEventListener("click", function (ev) {
+      if (ev.target === lightbox) closeLightbox();
+    });
+    window.addEventListener("resize", function () {
+      if (!lightbox.hidden && lightboxImg.complete) applyZoom(zoomLevel > 1);
+    });
+
+    zoomables.forEach(function (el) {
+      el.addEventListener("click", function () { openLightbox(el); });
+      el.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openLightbox(el); }
+      });
+    });
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape" && !lightbox.hidden) closeLightbox();
+    });
+  }
+
   function routeFromHash() {
-    var m = (location.hash || "").match(/^#(unit|artifact|event|country|group|bonus)\/([\w_-]+)/);
+    var m = (location.hash || "").match(/^#(unit|artifact|event|country|group|bonus|tab)\/([\w_-]+)/);
     if (m) goto(m[1], m[2]);
   }
   window.addEventListener("hashchange", routeFromHash);

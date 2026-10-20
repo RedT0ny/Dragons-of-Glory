@@ -367,7 +367,7 @@ class CombatResolver:
         if is_attacking:
             loc = self._get_defender_location()
             if loc:
-                roll_mod += loc.get_defense_modifier()
+                roll_mod -= loc.get_defense_modifier()
         roll = random.randint(1, 10)
         final = roll + roll_mod
         label = "attacking" if is_attacking else "defending"

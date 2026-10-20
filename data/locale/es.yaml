@@ -503,6 +503,13 @@ unit_names:
   topus: "Topus"
   verminaard: "Verminaard"
   zhak: "Zhak Pillarstone"
+  harkol: "Harkol Waythorn"
+  iolanthe: "Iolanthe"
+  ladonna: "Ladonna"
+  dracart: "Dracart"
+  par-salian: "Par-Salian"
+  justarius: "Justarius"
+  fizban: "Fizban el Fabuloso"
 
 terrain:
   grassland: "Pradera"
@@ -532,7 +539,7 @@ manual:
     how_to_read:
       title: "Cómo leer este manual"
       p1: "Esta pestaña es un prontuario de reglas generado a partir de los datos y el código del propio juego. Espeja los mismos puntos de entrada que la wiki: países, unidades, artefactos, eventos y los interruptores de opción del juego."
-      p2: "Los enlaces de color saltan a la entrada correspondiente en las demás pestañas. Cualquier elemento marcado con el conmutador EN/ES de la esquina superior derecha se muestra en uno u otro idioma."
+      p2: "Los enlaces de color saltan a la entrada correspondiente en las demás pestañas. Cualquier elemento marcado con el conmutador EN/ES de la esquina superior derecha se muestra en uno u otro idioma. Un enlace [[tab:countries]], por ejemplo, salta al principio de una pestaña."
       warn:
         title: "Una nota sobre los manuales"
         text: "Los manuales clásicos en PDF incluidos con el juego (Manual, Reglas avanzadas, Reglas de la casa) siguen disponibles desde el menú Ayuda del juego y están enlazados al pie de esta pestaña. Los capítulos siguientes son un resumen original de las reglas del juego de ordenador tal y como están implementadas."
@@ -681,6 +688,28 @@ manual:
         - "Las relaciones por encima de 6:1 se limitan a 6:1; las inferiores a 1:3 se tratan como 1:3."
         - "Las murallas, fortalezas y bombardas modifican la relación antes de tirar los dados."
         - "Los líderes, ejércitos, dragones y artefactos pueden sumar cada uno un modificador de tirada (DRM)."
+    drm:
+      title: "Modificadores a la tirada de dados"
+      p1: "Fijada la relación de odds, el atacante tira 1d10 y suma el modificador de tirada de dados (DRM) total. Los modificadores positivos favorecen al atacante y los negativos al defensor, y la tirada ajustada se consulta en la tabla de resultados de combate bajo la columna de odds vigente. Todos los modificadores de la tabla son acumulativos; la tirada final se limita entre −5 y +16, y el registro de combate imprime el desglose completo."
+      table:
+        headers: ["Fuente", "DRM", "Notas"]
+        rows:
+          - ["Líder atacante", "+ TÁC", "Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder."]
+          - ["Mago atacante", "+ TÁC", "Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder."]
+          - ["Líder defensor", "− TÁC", "Mejor táctica de la pila defensora, restada de la tirada del atacante."]
+          - ["Mago defensor", "− TÁC", "Mejor táctica de la pila defensora, restada de la tirada del atacante."]
+          - ["Dragones atacantes", "+ COM", "Combate total de todos los dragones de la pila atacante. Un artefacto de matadragones defensor anula este bonus."]
+          - ["Dragones defensores", "− COM", "Combate total de todos los dragones de la pila defensora."]
+          - ["Carga de caballería", "+1", "Cualquier caballería atacante — no contra ubicación fortificada, bosque o jungla."]
+          - ["Apoyo aéreo", "+1 / −1", "Cualquier unidad alada en la pila — no efectivo contra unidades en fortalezas enanos, bosques, montañas o jungla."]
+          - ["Ubicación fortificada", "−2 / −4 / −10", "Ciudad, puerto o templo −2; fortaleza −4; ciudad subterránea −10."]
+          - ["Río o puente", "−4", "Atacar a través de río, río profundo o puente. En invierno los ríos congelados se cruzan sin coste."]
+          - ["Vado", "−3", "Atacar a través de un vado."]
+          - ["Paso o túnel", "−2", "Atacar por un paso de montaña o túnel. Solo se aplica el cruce más severo."]
+          - ["Afinidad de terreno", "+1 / −1", "+1 por cada ejército atacante en su terreno de afinidad, −1 por cada ejército defensor en el suyo."]
+          - ["Provocación kender", "+2 / −2", "Kender infantes en la pila atacante otorgan +2; en la defensora infligen −2 (la provocación necesita una tirada ajustada de 6 o más)."]
+          - ["Tecnología gnoma", "+ mayor / −6", "Tira 2d6: si no salen dobles se suma el dado más alto; con dobles el modificador es −6 y el dispositivo queda destruido."]
+          - ["Bonus de combate de evento", "varía", "Bonus de combate del evento estratégico del jugador activo, solo atacante, durante el turno de batalla actual."]
     crt:
       title: "La tabla de resultados de combate"
       p1: "Se tira un d10 ajustado por el DRM (limitado entre −5 y +16); el resultado ajustado cruza la tabla en la columna de relación actual. Los resultados se imprimen atacante/defensor, p. ej. E/1, DR/− o −/DR."
@@ -693,10 +722,6 @@ manual:
           - ["1, 2 (pasos)", "Pérdidas de pasos de combate; el número se aplica como pasos de merma adicionales."]
           - ["E (eliminar)", "Todas las unidades afectadas de ese bando son eliminadas. Los líderes pueden intentar escapar."]
       p2: "Tras el combate, los atacantes supervivientes pueden avanzar a un hexágono desocupado, y un bando victorioso puede conquistar el hexágono al final de la fase de combate. El apliñamiento siempre se respeta."
-    drm:
-      title: "Modificadores a la tirada de dados"
-      p1: "Placeholder."
-      p2: "Placeholder for table."
     dragon_combat:
       title: "Duelos de dragones y supremacía aérea"
       p1: "Antes de una batalla terrestre, los dragones de cada bando libran un duelo de supremacía aérea. Cada dragón tira un dado por punto de combate y cada resultado de 4 o más es un impacto: los impactos reducen al objetivo ACTIVO → MERMADO → DESTRUIDO."
@@ -732,7 +757,38 @@ manual:
         - "Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego)."
         - "Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]]."
         - "Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]]."
-      p2: "El catálogo completo, con efectos e imágenes, está en la pestaña Eventos."
+      table:
+        headers: [ "Turno", "Evento", "Efectos", "Veces", "Bando" ]
+        rows:
+          - [ "1", "[[event:hl_wizard]]", "Añade: [[unit:iolanthe]], [[unit:ladonna]], [[unit:dracart]]", "3", "Señor del Dragón" ]
+          - [ "1", "[[event:highlord_blitzkrieg]]", "Bonificación de combate: +1", "3", "Señor del Dragón" ]
+          - [ "1", "[[event:hl_diplomacy]]", "Bonificación de activación: +2", "5", "Señor del Dragón" ]
+          - [ "1", "[[event:hl_minor_diplomacy]]", "Bonificación de activación: +1", "5", "Señor del Dragón" ]
+          - [ "1", "[[event:ws_diplomacy]]", "Bonificación de activación: +2", "5", "Piedra Blanca" ]
+          - [ "1", "[[event:ws_minor_diplomacy]]", "Bonificación de activación: +1", "5", "Piedra Blanca" ]
+          - [ "2", "[[event:ws_wizard]]", "Añade: un mago de Piedra Blanca", "3", "Piedra Blanca" ]
+          - [ "5", "[[event:crown_of_power]]", "Otorga: [[artifact:crown_of_power]]", "1", "Señor del Dragón" ]
+          - [ "5", "[[event:dragonarmor]]", "Otorga: [[artifact:dragonarmor]]", "4", "Señor del Dragón" ]
+          - [ "5", "[[event:plate_of_solamnus]]", "Otorga: [[artifact:plate_of_solamnus]] (requiere [[country:tower]] activa)", "4", "Piedra Blanca" ]
+          - [ "6", "[[event:wildrunner_tactics]]", "Bonificación de combate: +1", "3", "Piedra Blanca" ]
+          - [ "7", "[[event:dragonmetal]]", "Otorga: [[artifact:dragonmetal]]", "1", "Piedra Blanca" ]
+          - [ "8", "[[event:staff_of_magius]]", "Otorga: [[artifact:staff_of_magius]]", "1", "—" ]
+          - [ "10", "[[event:dragonlance_forged]]", "Otorga: [[artifact:dragonlance]] (requiere [[artifact:dragonmetal]])", "5", "Piedra Blanca" ]
+          - [ "10", "[[event:dragon_orb]]", "Otorga: [[artifact:dragon_orb]]", "1", "—" ]
+          - [ "10", "[[event:hammer_of_kharas]]", "Otorga: [[artifact:hammer_of_kharas]]", "1", "—" ]
+          - [ "11", "[[event:blue_crystal_staff]]", "Otorga: [[artifact:blue_crystal_staff]]", "1", "Piedra Blanca" ]
+          - [ "12", "[[event:temptation_of_verminaard]]", "Otorga: [[artifact:nightbringer]]", "1", "Señor del Dragón" ]
+          - [ "15", "[[event:gnome_tech]]", "Otorga: [[artifact:gnome_tech]]; Alianza con [[country:nevermind]]", "1", "—" ]
+          - [ "18", "[[event:soths_legions]]", "Alianza con [[country:dargaard]]", "1", "Señor del Dragón" ]
+          - [ "19", "[[event:disks_of_mishakal]]", "Otorga: [[artifact:disks_of_mishakal]] (requiere [[artifact:blue_crystal_staff]])", "1", "Piedra Blanca" ]
+          - [ "19", "[[event:medallion_of_faith]]", "Otorga: [[artifact:medallion_of_faith]]", "4", "Piedra Blanca" ]
+          - [ "19", "[[event:wyrmslayer]]", "Otorga: [[artifact:wyrmslayer]]", "1", "Piedra Blanca" ]
+          - [ "20", "[[event:good_dragons]]", "Añade: los alados de dragones buenos", "1", "Piedra Blanca" ]
+          - [ "20", "[[event:silver_arm]]", "Otorga: [[artifact:silver_arm]]", "1", "Piedra Blanca" ]
+          - [ "21", "[[event:flying_citadel]]", "Añade: una ciudadela voladora", "1", "Señor del Dragón" ]
+          - [ "21", "[[event:golden_general]]", "Añade: [[unit:laurana]]", "1", "Piedra Blanca" ]
+          - [ "21", "[[event:whitestone_council]]", "Bonificación de activación: +3", "1", "Piedra Blanca" ]
+      p2: "El catálogo completo, con textos de ambientación e imágenes, está en la pestaña Eventos. La tabla anterior resume los eventos por el primer turno en que pueden ocurrir."
     artifacts:
       title: "Referencia rápida de artefactos"
       p1: "Los artefactos los portan líderes y ejércitos. La lista completa con descripciones está en la pestaña Artefactos; la tabla siguiente resume sus efectos mecánicos."

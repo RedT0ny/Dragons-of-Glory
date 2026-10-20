@@ -182,5 +182,5 @@ def _event_adds_units(wiki_html, eid):
 def test_wizard_events_filtered_by_allegiance(wiki_html):
     ws = _event_adds_units(wiki_html, "ws_wizard")
     hl = _event_adds_units(wiki_html, "hl_wizard")
-    assert sorted(ws) == ["fizban", "justarius", "par_salian"]
+    assert sorted(ws) == ["fizban", "justarius", "par-salian"]
     assert sorted(hl) == ["dracart", "iolanthe", "ladonna"]
