@@ -13,17 +13,18 @@ concurrency:
 
 jobs:
   build-windows:
-    name: Trigger build Windows EXE
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Trigger build-windows-exe
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           gh workflow run "Build Windows EXE" --ref "${{ github.ref_name }}"
-
+          
   release:
     name: Create GitHub release
     needs: build-windows
