@@ -17,10 +17,17 @@ jobs:
     outputs:
       run_id: ${{ steps.trigger.outputs.run_id }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 1
+
       - name: Trigger build-windows-exe
         id: trigger
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
