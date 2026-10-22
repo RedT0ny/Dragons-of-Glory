@@ -1,853 +1,1086 @@
 general:
-  app_name: "Dragons of Glory"
+  app_name: Dragons of Glory
 intro:
-  menu_continue: "Continuar"
-  menu_new_game: "Nueva Partida"
-  menu_settings: "Ajustes"
-  menu_quit: "Salir"
+  menu_continue: Continuar
+  menu_new_game: Nueva Partida
+  menu_settings: Ajustes
+  menu_quit: Salir
 countries:
   abanasinia:
-    name: "Abanasinia"
-    adjective: "Abanasinia"
+    name: Abanasinia
+    adjective: Abanasinia
   balifor:
-    name: "Balifor"
-    adjective: "Balifor"
+    name: Balifor
+    adjective: Balifor
   black:
-    name: "Ala Negra"
-    adjective: "Negra"
+    name: Ala Negra
+    adjective: Negra
   blode:
-    name: "Blode"
-    adjective: "Blode"
+    name: Blode
+    adjective: Blode
   blodehelm:
-    name: "Yelmo de Blode"
-    adjective: "Yelmo"
+    name: Yelmo de Blode
+    adjective: Yelmo
   blue:
-    name: "Ala Azul"
-    adjective: "Azul"
+    name: Ala Azul
+    adjective: Azul
   brass:
-    name: "Ala de Latón"
-    adjective: "Latón"
+    name: Ala de Latón
+    adjective: Latón
   bronze:
-    name: "Ala de Bronce"
-    adjective: "Bronce"
+    name: Ala de Bronce
+    adjective: Bronce
   coastlund:
-    name: "Coastlund"
-    adjective: "Coastlund"
+    name: Coastlund
+    adjective: Coastlund
   copper:
-    name: "Ala de Cobre"
-    adjective: "Cobre"
+    name: Ala de Cobre
+    adjective: Cobre
   daltigoth:
-    name: "Daltigoth"
-    adjective: "Daltigoth"
+    name: Daltigoth
+    adjective: Daltigoth
   dargaard:
-    name: "Dargaard"
-    adjective: "Dargaard"
+    name: Dargaard
+    adjective: Dargaard
   dtemple:
-    name: "Templo de la Oscuridad"
-    adjective: "Templo"
+    name: Templo de la Oscuridad
+    adjective: Templo
   estwilde:
-    name: "Estwilde"
-    adjective: "Estwilde"
+    name: Estwilde
+    adjective: Estwilde
   gold:
-    name: "Ala Dorada"
-    adjective: "Oro"
+    name: Ala Dorada
+    adjective: Oro
   goodlund:
-    name: "Goodlund"
-    adjective: "Goodlund"
+    name: Goodlund
+    adjective: Goodlund
   green:
-    name: "Ala Verde"
-    adjective: "Verde"
+    name: Ala Verde
+    adjective: Verde
   haltigoth:
-    name: "Haltigoth"
-    adjective: "Haltigoth"
+    name: Haltigoth
+    adjective: Haltigoth
   hinterlund:
-    name: "Hinterlund"
-    adjective: "Hinterlund"
+    name: Hinterlund
+    adjective: Hinterlund
   hylo:
-    name: "Hylo"
-    adjective: "Hylo"
+    name: Hylo
+    adjective: Hylo
   icereach:
-    name: "Muro de Hielo"
-    adjective: "Muro"
+    name: Muro de Hielo
+    adjective: Muro
   kaolyn:
-    name: "Kaolyn"
-    adjective: "Kaolyn"
+    name: Kaolyn
+    adjective: Kaolyn
   kern:
-    name: "Kern"
-    adjective: "Kern"
+    name: Kern
+    adjective: Kern
   kharolis:
-    name: "Kharolis"
-    adjective: "Kharolis"
+    name: Kharolis
+    adjective: Kharolis
   khur:
-    name: "Khur"
-    adjective: "Khur"
+    name: Khur
+    adjective: Khur
   kothas:
-    name: "Kothas"
-    adjective: "Kothas"
+    name: Kothas
+    adjective: Kothas
   lemish:
-    name: "Lemish"
-    adjective: "Lemish"
+    name: Lemish
+    adjective: Lemish
   mithas:
-    name: "Mithas"
-    adjective: "Mithas"
+    name: Mithas
+    adjective: Mithas
   nergoth:
-    name: "Ergoth del Norte"
-    adjective: "N.Ergoth"
+    name: Ergoth del Norte
+    adjective: N.Ergoth
   nevermind:
-    name: "Monte Noimporta"
-    adjective: "M.Noimporta"
+    name: Monte Noimporta
+    adjective: M.Noimporta
   nightlund:
-    name: "Nightlund"
-    adjective: "Nightlund"
+    name: Nightlund
+    adjective: Nightlund
   nordmaar:
-    name: "Nordmaar"
-    adjective: "Nordmaar"
+    name: Nordmaar
+    adjective: Nordmaar
   palanthas:
-    name: "Palanthas"
-    adjective: "Palanthas"
+    name: Palanthas
+    adjective: Palanthas
   qualinesti:
-    name: "Qualinesti"
-    adjective: "Qualinesti"
+    name: Qualinesti
+    adjective: Qualinesti
   red:
-    name: "Ala Roja"
-    adjective: "Roja"
+    name: Ala Roja
+    adjective: Roja
   saifhum:
-    name: "Saifhum"
-    adjective: "Saifhum"
+    name: Saifhum
+    adjective: Saifhum
   sancrist:
-    name: "Sancrist"
-    adjective: "Sancrist"
+    name: Sancrist
+    adjective: Sancrist
   sanction:
-    name: "Sanction"
-    adjective: "Sanction"
+    name: Sanction
+    adjective: Sanction
   schallsea:
-    name: "Schallsea"
-    adjective: "Schallsea"
+    name: Schallsea
+    adjective: Schallsea
   sikket:
-    name: "Sikk'et Hul"
-    adjective: "Sikk'et"
+    name: Sikk'et Hul
+    adjective: Sikk'et
   silvanesti:
-    name: "Silvanesti"
-    adjective: "Silvanesti"
+    name: Silvanesti
+    adjective: Silvanesti
   silver:
-    name: "Ala Plateada"
-    adjective: "Plata"
+    name: Ala Plateada
+    adjective: Plata
   solanthus:
-    name: "Solanthus"
-    adjective: "Solanthus"
+    name: Solanthus
+    adjective: Solanthus
   southlund:
-    name: "Southlund"
-    adjective: "Southlund"
+    name: Southlund
+    adjective: Southlund
   taman:
-    name: "Taman Busuk"
-    adjective: "Neraka"
+    name: Taman Busuk
+    adjective: Neraka
   tarsis:
-    name: "Tarsis"
-    adjective: "Tarsis"
+    name: Tarsis
+    adjective: Tarsis
   thank:
-    name: "Than-Khal"
-    adjective: "Than-Khal"
+    name: Than-Khal
+    adjective: Than-Khal
   thorbardin:
-    name: "Thorbardin"
-    adjective: "Thorbardin"
+    name: Thorbardin
+    adjective: Thorbardin
   throt:
-    name: "Throt"
-    adjective: "Throt"
+    name: Throt
+    adjective: Throt
   tower:
-    name: "Torre del Sumo Sacerdote"
-    adjective: "Torre"
+    name: Torre del Sumo Sacerdote
+    adjective: Torre
   vingaard:
-    name: "Vingaard"
-    adjective: "Vingaard"
+    name: Vingaard
+    adjective: Vingaard
   white:
-    name: "Ala Blanca"
-    adjective: "Blanca"
+    name: Ala Blanca
+    adjective: Blanca
   zhakar:
-    name: "Zhakar"
-    adjective: "Zhakar"
+    name: Zhakar
+    adjective: Zhakar
 races:
   draconian:
-    name: "Draconiano"
-    plural: "Draconianos"
-    adjective: "Draconiana"
+    name: Draconiano
+    plural: Draconianos
+    adjective: Draconiana
   dragon:
-    name: "Dragón"
-    plural: "Dragones"
-    adjective: "Dragón"
+    name: Dragón
+    plural: Dragones
+    adjective: Dragón
   dwarf:
-    name: "Enano"
-    plural: "Enanos"
-    adjective: "Enanil"
+    name: Enano
+    plural: Enanos
+    adjective: Enanil
   elf:
-    name: "Elfo"
-    plural: "Elfos"
-    adjective: "Élfica"
+    name: Elfo
+    plural: Elfos
+    adjective: Élfica
   gnome:
-    name: "Gnomo"
-    plural: "Gnomos"
-    adjective: "Gnómica"
+    name: Gnomo
+    plural: Gnomos
+    adjective: Gnómica
   goblin:
-    name: "Goblin"
-    plural: "Goblins"
-    adjective: "Goblin"
+    name: Goblin
+    plural: Goblins
+    adjective: Goblin
   griffon:
-    name: "Grifo"
-    plural: "Grifos"
-    adjective: "Grifo"
+    name: Grifo
+    plural: Grifos
+    adjective: Grifo
   human:
-    name: "Humano"
-    plural: "Humanos"
-    adjective: "Humana"
+    name: Humano
+    plural: Humanos
+    adjective: Humana
   kender:
-    name: "Kender"
-    plural: "Kenders"
-    adjective: "Kender"
+    name: Kender
+    plural: Kenders
+    adjective: Kender
   magic:
-    name: "Volante"
-    plural: "Volantes"
-    adjective: "Volante"
+    name: Volante
+    plural: Volantes
+    adjective: Volante
   minotaur:
-    name: "Minotauro"
-    plural: "Minotauros"
-    adjective: "Minotauro"
+    name: Minotauro
+    plural: Minotauros
+    adjective: Minotauro
   ogre:
-    name: "Ogro"
-    plural: "Ogros"
-    adjective: "Ogra"
+    name: Ogro
+    plural: Ogros
+    adjective: Ogra
   pegasus:
-    name: "Pegaso"
-    plural: "Pegasos"
-    adjective: "Pegaso"
+    name: Pegaso
+    plural: Pegasos
+    adjective: Pegaso
   pirate:
-    name: "Pirata"
-    plural: "Piratas"
-    adjective: "Pirata"
+    name: Pirata
+    plural: Piratas
+    adjective: Pirata
   solamnic:
-    name: "Solámnico"
-    plural: "Caballeros"
-    adjective: "Solámnica"
+    name: Solámnico
+    plural: Caballeros
+    adjective: Solámnica
   thanoi:
-    name: "Thanoi"
-    plural: "Thanois"
-    adjective: "Thanoi"
+    name: Thanoi
+    plural: Thanois
+    adjective: Thanoi
   undead:
-    name: "No-Muerto"
-    plural: "No-Muertos"
-    adjective: "No-Muerta"
+    name: No-Muerto
+    plural: No-Muertos
+    adjective: No-Muerta
 assets:
-    blue_crystal_staff: "Vara de Cristal Azul"
-    crown_of_power: "Corona de Poder"
-    disks_of_mishakal: "Discos de Mishakal"
-    dragon_orb: "Orbe de los Dragones"
-    dragonarmor: "Armadura de Señor del Dragón"
-    dragonlance: "Dragonlance"
-    dragonmetal: "Dragonmetal"
-    gnome_tech: "Tecnología Gnómica"
-    hammer_of_kharas: "Mazo de Kharas"
-    medallion_of_faith: "Medallón de la Fe"
-    nightbringer: "Medianoche"
-    plate_of_solamnus: "Armadura de Solamnus"
-    silver_arm: "Brazo de Plata de Ergoth"
-    staff_of_magius: "Bastón de Mago"
-    wyrmslayer: "Wyrmslayer"
+  blue_crystal_staff: Vara de Cristal Azul
+  crown_of_power: Corona de Poder
+  disks_of_mishakal: Discos de Mishakal
+  dragon_orb: Orbe de los Dragones
+  dragonarmor: Armadura de Señor del Dragón
+  dragonlance: Dragonlance
+  dragonmetal: Dragonmetal
+  gnome_tech: Tecnología Gnómica
+  hammer_of_kharas: Mazo de Kharas
+  medallion_of_faith: Medallón de la Fe
+  nightbringer: Medianoche
+  plate_of_solamnus: Armadura de Solamnus
+  silver_arm: Brazo de Plata de Ergoth
+  staff_of_magius: Bastón de Mago
+  wyrmslayer: Wyrmslayer
 events:
-  ws_diplomacy: "Acercamiento Diplomático"
-  ws_minor_diplomacy: "Alianza Menor"
-  hl_minor_diplomacy: "Alianza Oscura"
-  blue_crystal_staff: "Vara de Cristal Azul"
-  crown_of_power: "Corona de Poder"
-  dragonarmor: "Armadura de Señor del Dragón"
-  dragonmetal: "Dragonmetal"
-  hammer_of_kharas: "El Mazo de Kharas"
-  highlord_blitzkrieg: "¡Los Señores de los Dragones avanzan!"
-  medallion_of_faith: "Medallón de la Fe"
-  plate_of_solamnus: "Armadura de Solamnus"
-  wildrunner_tactics: "Tácticas élficas"
-  ws_wizard: "Mago de la Piedra Blanca"
-  hl_wizard: "Mago Oscuro"
-  dragonlance_forged: "Dragonlance Forjada"
-  dragon_orb: "¡Orbe de los Dragones encontrado!"
-  disks_of_mishakal: "Discos de Mishakal"
-  hl_diplomacy: "Diplomacia Oscura"
-  whitestone_council: "El Consejo de la Piedra Blanca"
-  flying_citadel: "Ciudadela Volante"
-  gnome_tech: "Tecnología Gnómica"
-  golden_general: "El Áureo General"
-  good_dragons: "Los Dragones del Bien"
-  silver_arm: "Brazo de Plata de Ergoth"
-  soths_legions: "Legiones de Soth"
-  staff_of_magius: "Bastón de Magius"
-  temptation_of_verminaard: "La Tentación de Verminaard"
-  wyrmslayer: "Wyrmslayer"
+  ws_diplomacy: Acercamiento Diplomático
+  ws_minor_diplomacy: Alianza Menor
+  hl_minor_diplomacy: Alianza Oscura
+  blue_crystal_staff: Vara de Cristal Azul
+  crown_of_power: Corona de Poder
+  dragonarmor: Armadura de Señor del Dragón
+  dragonmetal: Dragonmetal
+  hammer_of_kharas: El Mazo de Kharas
+  highlord_blitzkrieg: ¡Los Señores de los Dragones avanzan!
+  medallion_of_faith: Medallón de la Fe
+  plate_of_solamnus: Armadura de Solamnus
+  wildrunner_tactics: Tácticas élficas
+  ws_wizard: Mago de la Piedra Blanca
+  hl_wizard: Mago Oscuro
+  dragonlance_forged: Dragonlance Forjada
+  dragon_orb: ¡Orbe de los Dragones encontrado!
+  disks_of_mishakal: Discos de Mishakal
+  hl_diplomacy: Diplomacia Oscura
+  whitestone_council: El Consejo de la Piedra Blanca
+  flying_citadel: Ciudadela Volante
+  gnome_tech: Tecnología Gnómica
+  golden_general: El Áureo General
+  good_dragons: Los Dragones del Bien
+  silver_arm: Brazo de Plata de Ergoth
+  soths_legions: Legiones de Soth
+  staff_of_magius: Bastón de Magius
+  temptation_of_verminaard: La Tentación de Verminaard
+  wyrmslayer: Wyrmslayer
 locations:
-  haven: "Haven"
-  port_balifor: "Port Balifor"
-  bloten: "Bloten"
-  vantal: "Vantal"
-  shrentak: "Shrentak"
-  caergoth: "Caergoth"
-  dark_temple: "Templo de la Oscuridad"
-  starport: "Starport"
-  daltigoth_city: "Daltigoth"
-  dargaard_keep: "Alcázar de Dargaard"
-  kendermore: "Kendermore"
-  castle_wistan: "Castillo uth Wistan"
-  haltigoth_city: "Haltigoth"
-  hargoth: "Hargoth"
-  kenderhome: "Kenderhome"
-  icewall_castle: "Icewall Castle"
-  kalaman: "Kalaman"
-  garnet_thax: "Garnet Thax"
-  kernen: "Kernen"
-  ogrebend: "Ogrebend"
-  alsip: "Alsip"
-  khuri_khan: "Khuri-Khan"
-  delphon: "Delphon"
-  kalpethis: "Kalpethis"
-  lemish_city: "Lemish"
-  fearfold: "Fearfold"
-  maelgoth: "Maelgoth"
-  mount_nevermind: "Monte Noimporta"
-  sea_reach: "Sea Reach"
-  nethosak: "Nethosak"
-  gwynned: "Gwynned"
-  lancton: "Lancton"
-  north_keep: "North Keep"
-  jachim: "Jachim"
-  palanthas_city: "Palanthas"
-  qualinost: "Qualinost"
-  porliost: "Porliost"
-  qualimori: "Qualimori"
-  port_sanction: "Sanction"
-  manic: "Manic"
-  silvanost: "Silvanost"
-  shalost: "Shalost"
-  west_eli: "Torre Occidental de E'li"
-  east_eli: "Torre Oriental de E'li"
-  silvamori: "Silvamori"
-  solanthus_city: "Solanthus"
-  thelgaard: "Alcázar de Thelgaard"
-  neraka: "Neraka"
-  tarsis_city: "Tarsis"
-  hybardin: "Hybardin"
-  high_clerist_tower: "Torre del Sumo Sacerdote"
-  than_khal: "Than-Khal"
-  throtl: "Throtl"
-  vingaard_keep: "Alcázar de Vingaard"
-  zhakar_city: "Zhakar"
-  lost_names: "Ciudad de los Nombres Perdidos"
-  pax_tharkas: "Pax Tharkas"
-  winston_tower: "Torre de Winston"
-  wayreth: "Torre de la Alta Hechicería"
-  zhea_harbor: "Zhea Harbor"
+  haven: Haven
+  port_balifor: Port Balifor
+  bloten: Bloten
+  vantal: Vantal
+  shrentak: Shrentak
+  caergoth: Caergoth
+  dark_temple: Templo de la Oscuridad
+  starport: Starport
+  daltigoth_city: Daltigoth
+  dargaard_keep: Alcázar de Dargaard
+  kendermore: Kendermore
+  castle_wistan: Castillo uth Wistan
+  haltigoth_city: Haltigoth
+  hargoth: Hargoth
+  kenderhome: Kenderhome
+  icewall_castle: Icewall Castle
+  kalaman: Kalaman
+  garnet_thax: Garnet Thax
+  kernen: Kernen
+  ogrebend: Ogrebend
+  alsip: Alsip
+  khuri_khan: Khuri-Khan
+  delphon: Delphon
+  kalpethis: Kalpethis
+  lemish_city: Lemish
+  fearfold: Fearfold
+  maelgoth: Maelgoth
+  mount_nevermind: Monte Noimporta
+  sea_reach: Sea Reach
+  nethosak: Nethosak
+  gwynned: Gwynned
+  lancton: Lancton
+  north_keep: North Keep
+  jachim: Jachim
+  palanthas_city: Palanthas
+  qualinost: Qualinost
+  porliost: Porliost
+  qualimori: Qualimori
+  port_sanction: Sanction
+  manic: Manic
+  silvanost: Silvanost
+  shalost: Shalost
+  west_eli: Torre Occidental de E'li
+  east_eli: Torre Oriental de E'li
+  silvamori: Silvamori
+  solanthus_city: Solanthus
+  thelgaard: Alcázar de Thelgaard
+  neraka: Neraka
+  tarsis_city: Tarsis
+  hybardin: Hybardin
+  high_clerist_tower: Torre del Sumo Sacerdote
+  than_khal: Than-Khal
+  throtl: Throtl
+  vingaard_keep: Alcázar de Vingaard
+  zhakar_city: Zhakar
+  lost_names: Ciudad de los Nombres Perdidos
+  pax_tharkas: Pax Tharkas
+  winston_tower: Torre de Winston
+  wayreth: Torre de la Alta Hechicería
+  zhea_harbor: Zhea Harbor
 scenarios:
-  campaign_0_war_of_the_lance: "La Guerra de la Lanza"
-  campaign_1_dragonlance_chronicles: "Crónicas de la Dragonlance"
-  scenario_1_fall_of_silvanesti: "La caída de Silvanesti"
-  scenario_2_solamnic_plain: "La llanura de Solamnia"
-  scenario_3_kender_strike: "Ataque Kender!"
-  scenario_4_siege_of_kalaman: "El asedio de Kalaman"
-  scenario_5_invasion_of_abanasinia: "Invasión de Abanasinia y Qualinesti"
-  scenario_6_pirates_of_the_maelstrom: "Piratas del Remolino"
-  scenario_7_battle_for_neraka: "La Batalla de Neraka"
+  campaign_0_war_of_the_lance: La Guerra de la Lanza
+  campaign_1_dragonlance_chronicles: Crónicas de la Dragonlance
+  scenario_1_fall_of_silvanesti: La caída de Silvanesti
+  scenario_2_solamnic_plain: La llanura de Solamnia
+  scenario_3_kender_strike: Ataque Kender!
+  scenario_4_siege_of_kalaman: El asedio de Kalaman
+  scenario_5_invasion_of_abanasinia: Invasión de Abanasinia y Qualinesti
+  scenario_6_pirates_of_the_maelstrom: Piratas del Remolino
+  scenario_7_battle_for_neraka: La Batalla de Neraka
 dialogs:
   common:
-    ok: "OK"
-    cancel: "Cancelar"
+    ok: OK
+    cancel: Cancelar
   config:
-    title: "Seleccionar bando"
-    game_options: "Opciones de juego"
-    difficulty: "Dificultad"
-    difficulty_easy: "Fácil"
-    difficulty_normal: "Normal"
-    difficulty_hard: "Difícil"
-    combat_details: "Detalle de combate"
-    combat_brief: "Breve"
-    combat_verbose: "Detallado"
-    player_config: "Configuración del jugador"
-    human: "Humano"
-    ai: "IA"
+    title: Seleccionar bando
+    game_options: Opciones de juego
+    difficulty: Dificultad
+    difficulty_easy: Fácil
+    difficulty_normal: Normal
+    difficulty_hard: Difícil
+    combat_details: Detalle de combate
+    combat_brief: Breve
+    combat_verbose: Detallado
+    player_config: Configuración del jugador
+    human: Humano
+    ai: IA
   event:
-    window_title: "Evento"
-    strategic_title: "Evento: {title}"
-    timeline_title: "Línea de Tiempo de Eventos"
-    description_placeholder: "Descripción del evento"
-    picture_placeholder: "Imagen del evento"
-    title_placeholder: "Título del evento"
+    window_title: Evento
+    strategic_title: 'Evento: {title}'
+    timeline_title: Línea de Tiempo de Eventos
+    description_placeholder: Descripción del evento
+    picture_placeholder: Imagen del evento
+    title_placeholder: Título del evento
   diplomacy:
-    title: "Fase de Diplomacia"
-    select_neutral: "Selecciona una nación neutral para intentar aliarte con ella."
-    pass_cancel: "Pasar / Cancelar"
-    ally_title: "¿Intentar alianza con {country}?"
-    attempt_activate: "¿Intentar activar {country} para {side}?"
-    rating_needed: "Tirada necesaria: {target} o menos"
-    rating_base_bonus: " (base {base} + {bonus})"
+    title: Fase de Diplomacia
+    select_neutral: Selecciona una nación neutral para intentar aliarte con ella.
+    pass_cancel: Pasar / Cancelar
+    ally_title: ¿Intentar alianza con {country}?
+    attempt_activate: ¿Intentar activar {country} para {side}?
+    rating_needed: 'Tirada necesaria: {target} o menos'
+    rating_base_bonus: ' (base {base} + {bonus})'
     event_bonus: " \n Bono de evento: -{bonus}"
-    attempt_roll: "Tirar"
-    cancel: "Cancelar"
-    rolling: "Tirada... {roll}"
-    rolled: "Resultado: {roll}..."
-    rolled_effective: "Tirada: {roll} (efectiva {effective} tras -{bonus})..."
-    success: "¡ÉXITO!"
-    failure: "FRACASO"
-    close: "Cerrar"
+    attempt_roll: Tirar
+    cancel: Cancelar
+    rolling: Tirada... {roll}
+    rolled: 'Resultado: {roll}...'
+    rolled_effective: 'Tirada: {roll} (efectiva {effective} tras -{bonus})...'
+    success: ¡ÉXITO!
+    failure: FRACASO
+    close: Cerrar
 ui:
-  allegiance: "Bando"
-  strength: "Poder Militar"
-  neutral: "Neutral"
-  whitestone: "Piedra Blanca"
-  highlord: "Señor del Dragón"
+  allegiance: Bando
+  strength: Poder Militar
+  neutral: Neutral
+  whitestone: Piedra Blanca
+  highlord: Señor del Dragón
 victory:
   labels:
-    major: "Decisiva"
-    minor: "Menor"
-    points_to_win: "Puntos necesarios"
-    points: "puntos"
-    by_turn: "turno {turn}"
-    country_filter: " de {country}"
+    major: Decisiva
+    minor: Menor
+    points_to_win: Puntos necesarios
+    points: puntos
+    by_turn: turno {turn}
+    country_filter: ' de {country}'
   operators:
-    all: "y"
-    any: "o"
+    all: y
+    any: o
   unit_types:
-    units: "unidades"
-    fleets: "flotas"
-    leaders: "líderes"
+    units: unidades
+    fleets: flotas
+    leaders: líderes
   types:
-    conquer_country: "Conquistar {country}"
-    capture_location: "Capturar {location}"
-    prevent_country_conquered: "Evitar conquista de {country}"
-    prevent_location_captured: "Evitar captura de {location}"
-    ally_country: "Alianza con {country}"
-    control_n_countries: "Controlar {count} países"
-    prevent_country_control: "Evitar que el enemigo controle {country}"
-    destroy_unit_score: "Destruir al menos {min_points} puntos de {unit_types}{country_part}"
-    survive_unit_score: "Resistir al menos {min_points} puntos con {unit_types}{country_part}"
-    escape_unit_score: "Escapar a {hexes} con al menos {min_points} puntos {unit_types}{country_part}"
+    conquer_country: Conquistar {country}
+    capture_location: Capturar {location}
+    prevent_country_conquered: Evitar conquista de {country}
+    prevent_location_captured: Evitar captura de {location}
+    ally_country: Alianza con {country}
+    control_n_countries: Controlar {count} países
+    prevent_country_control: Evitar que el enemigo controle {country}
+    destroy_unit_score: Destruir al menos {min_points} puntos de {unit_types}{country_part}
+    survive_unit_score: Resistir al menos {min_points} puntos con {unit_types}{country_part}
+    escape_unit_score: Escapar a {hexes} con al menos {min_points} puntos {unit_types}{country_part}
 units:
-  genitive_preposition: "de"
-  log_format_generic: "{ordinal} {type} {race:adjective} {land:prep}"
-  log_format_flight: "{ordinal} {land:name}"
-  log_format_named: "{ordinal} {name}"
+  genitive_preposition: de
+  log_format_generic: '{ordinal} {type} {race:adjective} {land:prep}'
+  log_format_flight: '{ordinal} {land:name}'
+  log_format_named: '{ordinal} {name}'
 unit_types:
   admiral:
-    name: "Almirante"
+    name: Almirante
   cav:
-    name: "Cab."
+    name: Cab.
   citadel:
-    name: "Ciudadela"
+    name: Ciudadela
   emperor:
-    name: "Emperador"
+    name: Emperador
   highlord:
-    name: "Señor del Dragón"
+    name: Señor del Dragón
   hero:
-    name: "Héroe"
+    name: Héroe
   inf:
-    name: "Inf."
+    name: Inf.
   wiz:
-    name: "Mago"
+    name: Mago
   wing:
-    name: "Ala"
+    name: Ala
   fleet:
-    name: "Flota"
+    name: Flota
   general:
-    name: "General"
+    name: General
   leader:
-    name: "Comandante"
+    name: Comandante
 unit_names:
-  ariakas: "Ariakas"
-  barenn: "Barenn"
-  calof: "Calof Miat"
-  chot: "Chot Es-Kalin"
-  blackmaw: "Crod Blackmaw"
-  kitiara: "Kitiara"
-  lorac: "Lorac Caladon"
-  feal-thas: "Feal-Thas"
-  toede: "Toede"
-  kronin: "Kronin Thistleknot"
-  berlan: "Duque Berlan Drafford"
-  mercadior: "Mercadior Redic V"
-  erran: "Erran Flowstone"
-  garik: "Garik Es-Karos"
-  felura: "Grand Mariner Felura Kar-Erian"
-  gunthar: "Gunthar uth Wistan"
-  harald: "Harald Haakan"
-  hornfel: "Thane Hornfel"
-  hullek: "Hullek Skullsmasher"
-  guugar: "Khan Guugar"
-  sharuk: "Khan Sharuk"
-  huemac: "Rey Huemac Kerian"
-  vogor: "Rey Vogor Stoneshaker"
-  wilhelm: "Rey Wilhelm"
-  laurana: "Laurana el Áureo General"
-  loraliee: "Loraliee Spellslinger"
-  amothus: "Lord Amothus"
-  aurik: "Lord Aurik"
-  eleszar: "Lord Eleszar"
-  lord_hargoth: "Lord Hargoth"
-  heltann: "Lord Heltann"
-  mayor: "Lord Mayor"
-  soth: "Lord Soth"
-  tyrian: "Lord Tyrian"
-  lucien: "Lucien"
-  marcus: "Marcus Cadrio"
-  orin: "Orin Woodwind"
-  orwell: "Orwell Harwich"
-  phair_caron: "Phair Caron"
-  tankreed: "Raderic Tankreed"
-  rashften: "Rashften el Rompejuramentos"
-  kurrin: "Regente Kurrin"
-  salah_khan: "Salah Khan"
-  solostaran: "Solostaran"
-  stormogre: "Stormogre"
-  sunchaser: "Sunchaser the Steadfast"
-  topus: "Topus"
-  verminaard: "Verminaard"
-  zhak: "Zhak Pillarstone"
-  harkol: "Harkol Waythorn"
-  iolanthe: "Iolanthe"
-  ladonna: "Ladonna"
-  dracart: "Dracart"
-  par-salian: "Par-Salian"
-  justarius: "Justarius"
-  fizban: "Fizban el Fabuloso"
-
+  ariakas: Ariakas
+  barenn: Barenn
+  calof: Calof Miat
+  chot: Chot Es-Kalin
+  blackmaw: Crod Blackmaw
+  kitiara: Kitiara
+  lorac: Lorac Caladon
+  feal-thas: Feal-Thas
+  toede: Fewmaster Toede
+  kronin: Kronin Thistleknot
+  berlan: Duque Berlan Drafford
+  mercadior: Mercadior Redic V
+  erran: Erran Flowstone
+  garik: Garik Es-Karos
+  felura: Grand Mariner Felura Kar-Erian
+  gunthar: Gunthar uth Wistan
+  harald: Harald Haakan
+  hornfel: Thane Hornfel
+  hullek: Hullek Skullsmasher
+  guugar: Khan Guugar
+  sharuk: Khan Sharuk
+  huemac: Rey Huemac Kerian
+  vogor: Rey Vogor Stoneshaker
+  wilhelm: Rey Wilhelm
+  laurana: Laurana el Áureo General
+  loraliee: Loraliee Spellslinger
+  amothus: Lord Amothus
+  aurik: Lord Aurik
+  eleszar: Lord Eleszar
+  lord_hargoth: Lord Hargoth
+  heltann: Lord Heltann
+  mayor: Lord Mayor
+  soth: Lord Soth
+  tyrian: Lord Tyrian
+  lucien: Lucien
+  marcus: Marcus Cadrio
+  orin: Orin Woodwind
+  orwell: Orwell Harwich
+  phair_caron: Phair Caron
+  tankreed: Raderic Tankreed
+  rashften: Rashften el Rompejuramentos
+  kurrin: Regente Kurrin
+  salah_khan: Salah Khan
+  solostaran: Solostaran
+  stormogre: Stormogre
+  sunchaser: Sunchaser the Steadfast
+  topus: Topus
+  verminaard: Verminaard
+  zhak: Zhak Pillarstone
+  harkol: Harkol Waythorn
+  iolanthe: Iolanthe
+  ladonna: Ladonna
+  dracart: Dracart
+  par-salian: Par-Salian
+  justarius: Justarius
+  fizban: Fizban el Fabuloso
 terrain:
-  grassland: "Pradera"
-  steppe: "Estepa"
-  forest: "Bosque"
-  jungle: "Selva"
-  glacier: "Glaciar"
-  mountain: "Montaña"
-  ocean: "Océano"
-  desert: "Desierto"
-  swamp: "Pantano"
-  maelstrom: "Remolino"
-
-# El manual navegable de la pestaña "Reglas" de la wiki (estructura en scripts/wiki_manual.py).
+  grassland: Pradera
+  steppe: Estepa
+  forest: Bosque
+  jungle: Selva
+  glacier: Glaciar
+  mountain: Montaña
+  ocean: Océano
+  desert: Desierto
+  swamp: Pantano
+  maelstrom: Remolino
 manual:
-  intro: "Un resumen navegable de las reglas, generado a partir de los datos y el código del propio juego. Los manuales clásicos - los mismos documentos que pueden abrirse desde el menú Ayuda del juego (Ayuda → Manual / Reglas avanzadas / Reglas de la casa) - se enlazan a continuación."
+  intro: Un resumen navegable de las reglas, generado a partir de los datos y el código del propio juego. Los manuales clásicos - los mismos documentos que pueden abrirse desde el menú Ayuda del juego (Ayuda → Manual / Reglas avanzadas / Reglas de la casa) - se enlazan a continuación.
   overview:
-    title: "Introducción"
+    title: Introducción
     what_is:
-      title: "¿Qué es Dragons of Glory?"
-      p1: "Dragons of Glory es un juego de estrategia por turnos ambientado en el mundo de Krynn, en el continente de Ansalon, durante la Guerra de la Lanza. Modelado sobre el clásico juego de guerra de Dragonlance, simplifica las reglas de mesa: cada país, ejército, flota, dragón y héroe se muestra sobre un único mapa hexagonal de Ansalon, y cada turno de campaña sigue una secuencia fija de fases."
-      p2: "Dos alianzas compiten por el control del continente: la Alianza del Saber de los pueblos libres y los ejércitos de los señores del dragón del Dragón. Los países neutrales y menores se unen a un bando mediante la diplomacia, la conquista o los eventos especiales."
+      title: ¿Qué es Dragons of Glory?
+      p1: 'Dragons of Glory es un juego de estrategia por turnos ambientado en el mundo de Krynn, en el continente de Ansalon, durante la Guerra de la Lanza. Modelado sobre el clásico juego de guerra de Dragonlance, simplifica las reglas de mesa: cada país, ejército, flota, dragón y héroe se muestra sobre un único mapa hexagonal de Ansalon, y cada turno de campaña sigue una secuencia fija de fases.'
+      p2: 'Dos alianzas compiten por el control del continente: la Alianza del Saber de los pueblos libres y los ejércitos de los señores del dragón del Dragón. Los países neutrales y menores se unen a un bando mediante la diplomacia, la conquista o los eventos especiales.'
       bullets:
-        - "Una campaña abarca los años 348–353 de la Era del Desaliento (el turno 1 es el 348)."
-        - "Los eventos estratégicos se roban cada cinco turnos: los turnos 5, 10, 15, 20, 25 y 30, que son también los turnos de invierno."
-        - "Cada unidad tiene un valor de combate (VC), una asignación de movimiento y, en el caso de los líderes, un valor táctico (VT)."
+      - Una campaña abarca los años 348–353 de la Era del Desaliento (el turno 1 es el 348).
+      - 'Los eventos estratégicos se roban cada cinco turnos: los turnos 5, 10, 15, 20, 25 y 30, que son también los turnos de invierno.'
+      - Cada unidad tiene un valor de combate (VC), una asignación de movimiento y, en el caso de los líderes, un valor táctico (VT).
     how_to_read:
-      title: "Cómo leer este manual"
-      p1: "Esta pestaña es un prontuario de reglas generado a partir de los datos y el código del propio juego. Espeja los mismos puntos de entrada que la wiki: países, unidades, artefactos, eventos y los interruptores de opción del juego."
-      p2: "Los enlaces de color saltan a la entrada correspondiente en las demás pestañas. Cualquier elemento marcado con el conmutador EN/ES de la esquina superior derecha se muestra en uno u otro idioma. Un enlace [[tab:countries]], por ejemplo, salta al principio de una pestaña."
+      title: Cómo leer este manual
+      p1: 'Esta pestaña es un prontuario de reglas generado a partir de los datos y el código del propio juego. Espeja los mismos puntos de entrada que la wiki: países, unidades, artefactos, eventos y los interruptores de opción del juego.'
+      p2: Los enlaces de color saltan a la entrada correspondiente en las demás pestañas. Cualquier elemento marcado con el conmutador EN/ES de la esquina superior derecha se muestra en uno u otro idioma. Un enlace [[tab:countries]], por ejemplo, salta al principio de una pestaña.
       warn:
-        title: "Una nota sobre los manuales"
-        text: "Los manuales clásicos en PDF incluidos con el juego (Manual, Reglas avanzadas, Reglas de la casa) siguen disponibles desde el menú Ayuda del juego y están enlazados al pie de esta pestaña. Los capítulos siguientes son un resumen original de las reglas del juego de ordenador tal y como están implementadas."
+        title: Una nota sobre los manuales
+        text: Los manuales clásicos en PDF incluidos con el juego (Manual, Reglas avanzadas, Reglas de la casa) siguen disponibles desde el menú Ayuda del juego y están enlazados al pie de esta pestaña. Los capítulos siguientes son un resumen original de las reglas del juego de ordenador tal y como están implementadas.
   turn:
-    title: "El turno de batalla"
+    title: El turno de batalla
     phases:
-      title: "Secuencia del turno"
-      p1: "Cada turno de batalla sigue este orden. Los bandos se alternan en el movimiento y el combate."
+      title: Secuencia del turno
+      p1: Cada turno de batalla sigue este orden. Los bandos se alternan en el movimiento y el combate.
       steps:
-        - "Despliegue — Despliega las unidades al inicio del tablero (ocurre solo una vez)."
-        - "Reemplazos — Reconstruye unidades destruidas y mermadas, despliega unidades de refuerzo; actúa primero el perdedor de la iniciativa. El bando del Señor del Dragón realiza aquí además su paso de producción de dracónidos."
-        - "Eventos estratégicos — se descubren los eventos."
-        - "Activación — los países determinan qué bando apoyan este turno; se aplican las bonificaciones diplomáticas."
-        - "Iniciativa — cada bando tira 1d4; el ganador decide qué bando actúa primero."
-        - "Movimiento y combate — el primer bando mueve y resuelve sus combates, y después hace lo propio el segundo."
-        - "Suministro — en el modo avanzado, las unidades que no puedan trazar suministro sufren desgaste."
-        - "Final del turno — se comprueban las condiciones de victoria y avanza el calendario."
+      - Despliegue — Despliega las unidades al inicio del tablero (ocurre solo una vez).
+      - Reemplazos — Reconstruye unidades destruidas y mermadas, despliega unidades de refuerzo; actúa primero el perdedor de la iniciativa. El bando del Señor del Dragón realiza aquí además su paso de producción de dracónidos.
+      - Eventos estratégicos — se descubren los eventos.
+      - Activación — los países determinan qué bando apoyan este turno; se aplican las bonificaciones diplomáticas.
+      - Iniciativa — cada bando tira 1d4; el ganador decide qué bando actúa primero.
+      - Movimiento y combate — el primer bando mueve y resuelve sus combates, y después hace lo propio el segundo.
+      - Suministro — en el modo avanzado, las unidades que no puedan trazar suministro sufren desgaste.
+      - Final del turno — se comprueban las condiciones de victoria y avanza el calendario.
       warn:
-        title: "Primer turno"
-        text: "El turno 1 es especial: ambos pasos de despliegue actúan como pasos de reposición y se salta directamente al Movimiento, omitiendo los eventos, la activación y la iniciativa."
+        title: Primer turno
+        text: 'El turno 1 es especial: ambos pasos de despliegue actúan como pasos de reposición y se salta directamente al Movimiento, omitiendo los eventos, la activación y la iniciativa.'
     calendar:
-      title: "Calendario y turnos estratégicos"
-      p1: "El calendario de campaña abarca los años 348–353 (treinta turnos)."
+      title: Calendario y turnos estratégicos
+      p1: El calendario de campaña abarca los años 348–353 (treinta turnos).
     initiative:
-      title: "Iniciativa"
-      p1: "Durante la fase de iniciativa cada bando tira un d4. Un empate mantiene al ganador anterior. El ganador ejecuta primero el movimiento y el combate."
+      title: Iniciativa
+      p1: Durante la fase de iniciativa cada bando tira un d4. Un empate mantiene al ganador anterior. El ganador ejecuta primero el movimiento y el combate.
       bullets:
-        - "Clásica: una tirada simple de d4 decide el ganador."
-        - "Avanzada: el poseedor de la ficha de iniciativa puede anular la tirada (un jugador humano)."
-        - "Desactivada: el ganador es fijo (no se tiran dados)."
+      - 'Clásica: una tirada simple de d4 decide el ganador.'
+      - 'Avanzada: el poseedor de la ficha de iniciativa puede anular la tirada (un jugador humano).'
+      - 'Desactivada: el ganador es fijo (no se tiran dados).'
     replacements:
-      title: "Reemplazos"
-      p1: "Durante la fase de Reemplazos, los jugadores pueden combinar unidades reducidas y desplegar unidades desde la reserva. El jugador sin la iniciativa resuelve sus reemplazos primero."
-      p2: "Por cada dos ejércitos de la misma combinación de color (nacionalidad) en su reserva de reemplazo, un jugador puede inmediatamente desplegar uno de esos dos ejércitos, el otro es destruido."
-      p3: "Si dos ejércitos reducidos de la misma nacionalidad están apilados juntos en un hexágono durante el paso de Reemplazo, pueden combinarse en uno solo a plena fuerza. El otro ejército vuelve a la reserva, y es inmediatamente elegible para combinar con otros reemplazos."
-      p4: "Un reemplazo puede ser desplegado únicamente en un hexágono de ciudad o fortaleza desocupado de su país."
-      p5: "Los dragones, grifos y pegasos nunca pueden ser reemplazados ni combinados a plena fuerza, son eliminados directamente."
+      title: Reemplazos
+      p1: Durante la fase de Reemplazos, los jugadores pueden combinar unidades reducidas y desplegar unidades desde la reserva. El jugador sin la iniciativa resuelve sus reemplazos primero.
+      p2: Por cada dos ejércitos de la misma combinación de color (nacionalidad) en su reserva de reemplazo, un jugador puede inmediatamente desplegar uno de esos dos ejércitos, el otro es destruido.
+      p3: Si dos ejércitos reducidos de la misma nacionalidad están apilados juntos en un hexágono durante el paso de Reemplazo, pueden combinarse en uno solo a plena fuerza. El otro ejército vuelve a la reserva, y es inmediatamente elegible para combinar con otros reemplazos.
+      p4: Un reemplazo puede ser desplegado únicamente en un hexágono de ciudad o fortaleza desocupado de su país.
+      p5: Los dragones, grifos y pegasos nunca pueden ser reemplazados ni combinados a plena fuerza, son eliminados directamente.
   countries:
-    title: "Países y diplomacia"
+    title: Países y diplomacia
     powers:
-      title: "Los poderes de Ansalon"
-      p1: "El mapa contiene 44 países. Cada uno tiene un valor de fuerza (el tamaño de las fuerzas que puede reunir) y un alineamiento que indica su predisposición hacia la Piedra Blanca o el Señor del Dragón."
+      title: Los poderes de Ansalon
+      p1: El mapa contiene 44 países. Cada uno tiene un valor de fuerza (el tamaño de las fuerzas que puede reunir) y un alineamiento que indica su predisposición hacia la Piedra Blanca o el Señor del Dragón.
       bullets:
-        - "Los poderes pro-Saber incluyen [[country:qualinesti]], [[country:palanthas]], [[country:silvanesti]], [[country:nergoth]], [[country:goodlund]], [[country:sancrist]] y [[country:hylo]]."
-        - "Los países de caballeros solámnicos — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] y [[country:vingaard]] — reciben una bonificación especial de activación pro-Saber."
-        - "Los poderes pro-Señor del Dragón incluyen [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] y [[country:tarsis]]."
+      - Los poderes pro-Saber incluyen [[country:qualinesti]], [[country:palanthas]], [[country:silvanesti]], [[country:nergoth]], [[country:goodlund]], [[country:sancrist]] y [[country:hylo]].
+      - Los países de caballeros solámnicos — [[country:coastlund]], [[country:hinterlund]], [[country:nightlund]], [[country:solanthus]], [[country:southlund]] y [[country:vingaard]] — reciben una bonificación especial de activación pro-Saber.
+      - Los poderes pro-Señor del Dragón incluyen [[country:throt]], [[country:kern]], [[country:blode]], [[country:kothas]], [[country:mithas]], [[country:lemish]], [[country:zhakar]] y [[country:tarsis]].
     activation:
-      title: "Activación de países neutrales"
-      p1: "Durante el paso de Activación de cada turno, cada jugador puede elegir una nación neutral e intentar activarla como aliada tirando 1d10. El jugador sin la iniciativa tira primero."
-      p2: "La activación tiene éxito si la tirada es igual o menor que el índice de alineación de la nación hacia ese bando. El jugador puede sumar a la tirada los modificadores de eventos, líderes o artefactos."
-      p3: "Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión."
+      title: Activación de países neutrales
+      p1: Durante el paso de Activación de cada turno, cada jugador puede elegir una nación neutral e intentar activarla como aliada tirando 1d10. El jugador sin la iniciativa tira primero.
+      p2: La activación tiene éxito si la tirada es igual o menor que el índice de alineación de la nación hacia ese bando. El jugador puede sumar a la tirada los modificadores de eventos, líderes o artefactos.
+      p3: 'Dos países no pueden ser atraídos por la sola diplomacia: [[country:dargaard]] y los gnomos de [[country:nevermind]] solo pueden unirse a un bando mediante un evento o a consecuencia de una invasión.'
     invasion:
-      title: "Invasión"
-      p1: "El jugador del Señor del Dragón puede invadir países neutrales. Un país solo puede ser invadido si el Señor del Dragón tiene tropas con movimiento restante adyacentes a su frontera."
-      p2: "Para efectos de ser adyacente, se cuenta cualquier tropa adyacente a la frontera enemiga, cualquier tropa adyacente a otra tropa en la frontera, o cualquier tropa que pueda trazar una línea de tropas adyacentes hasta una que esté en la frontera."
-      p3: "Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn."
-      p4: "Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:."
-      p5: "On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side."
+      title: Invasión
+      p1: El jugador del Señor del Dragón puede invadir países neutrales. Un país solo puede ser invadido si el Señor del Dragón tiene tropas con movimiento restante adyacentes a su frontera.
+      p2: Para efectos de ser adyacente, se cuenta cualquier tropa adyacente a la frontera enemiga, cualquier tropa adyacente a otra tropa en la frontera, o cualquier tropa que pueda trazar una línea de tropas adyacentes hasta una que esté en la frontera.
+      p3: Ships that are in range can land troops in the invaded nation. These troops are counted into the invasion strength total. An army can only participate in one invasion per combat turn.
+      p4: Upon entry of the first stack, an activation check is made. Starting with Whitestone player, the players alternate making Activation rolls until the neutral nation is activated for one side or the other. Whitestone receives a +2 bonus to their roll, while the Highlord's roll is modified by the size of the invading force. Compare the total strength of the invading force to the total strength of the defending nation and compute this as an odds ratio. Count each strength point in the invading force. Consult the table below for the modification to the HL activation rating:.
+      p5: On further rounds both sides add a +1 modifier to their current activation value. This continues until the nation is allied to a side.
       warn:
-        title: "Ejemplo:"
-        text: "El Señor del Dragón quiere invadir Khur, que tiene una fuerza militar de 24. El paso de Neraka sólo permite unidades con potencia máxima de 16 junto a la frontera (2x unidades de fuerza 6 y 2x dragones de fuerza 2). Sin embargo, junto a este hexágono hay otro con 2 unidades de fuerza 6. Esto hace un total de 28 (ratio 1:1), así que la invasión recibe un bono de +0 a la tirada de activatión. Primera tirada: WS activation is a 3 (+2) = 5, HL activation is a 6. Second rolloff: WS 3 (+2+1) = 6, HL 6 (+1) =7. Third rolloff: WS 3 (+2+1+1) = 7, HL 6 (+1+1) = 8. Etc."
+        title: 'Ejemplo:'
+        text: 'El Señor del Dragón quiere invadir Khur, que tiene una fuerza militar de 24. El paso de Neraka sólo permite unidades con potencia máxima de 16 junto a la frontera (2x unidades de fuerza 6 y 2x dragones de fuerza 2). Sin embargo, junto a este hexágono hay otro con 2 unidades de fuerza 6. Esto hace un total de 28 (ratio 1:1), así que la invasión recibe un bono de +0 a la tirada de activatión. Primera tirada: WS activation is a 3 (+2) = 5, HL activation is a 6. Second rolloff: WS 3 (+2+1) = 6, HL 6 (+1) =7. Third rolloff: WS 3 (+2+1+1) = 7, HL 6 (+1+1) = 8. Etc.'
     conquest:
-      title: "Conquista"
-      p1: "Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas."
-      p2: "Si un país es conquistado, sus ejércitos quedan eliminados permanentemente."
+      title: Conquista
+      p1: Un país es conquistado cuando todas sus ciudades y fuertes han sido capturados por tropas enemigas.
+      p2: Si un país es conquistado, sus ejércitos quedan eliminados permanentemente.
       warn:
-        title: "Países especiales"
-        text: "[[country:dargaard]] y [[country:nevermind]] sólo pueden ser activados mediante un evento o como resultado de una invasión."
+        title: Países especiales
+        text: '[[country:dargaard]] y [[country:nevermind]] sólo pueden ser activados mediante un evento o como resultado de una invasión.'
   units:
-    title: "Unidades"
+    title: Unidades
     types:
-      title: "Tipos de unidad"
-      p1: "Las unidades se organizan en cuatro grandes grupos: ejércitos, flotas, alas y líderes."
+      title: Tipos de unidad
+      p1: 'Las unidades se organizan en cuatro grandes grupos: ejércitos, flotas, alas y líderes.'
       bullets:
-        - "Ejércitos — infantería y caballería con un valor de combate (VC) y una asignación de movimiento."
-        - "Flotas — barcos de guerra que transportan ejércitos, dominan los mares y libran batallas navales."
-        - "Alas — unidades voladoras (dragones, grifos y pegasos) que luchan en el aire y se mueven libremente por el mapa."
-        - "Líderes — generales, almirantes, magos, emperadores y señores del dragón aportan modificadores de combate por su valor táctico (VT); si son eliminados intentan escapar."
-        - "Magos — unidades de apoyo que se mueven libremente por el mapa y lanzan magia."
-        - "Ciudadelas — ciudadelas volantes que pueden transportar varias unidades y proporcionan defensas similares a una ciudad fortificada."
+      - Ejércitos — infantería y caballería con un valor de combate (VC) y una asignación de movimiento.
+      - Flotas — barcos de guerra que transportan ejércitos, dominan los mares y libran batallas navales.
+      - Alas — unidades voladoras (dragones, grifos y pegasos) que luchan en el aire y se mueven libremente por el mapa.
+      - Líderes — generales, almirantes, magos, emperadores y señores del dragón aportan modificadores de combate por su valor táctico (VT); si son eliminados intentan escapar.
+      - Magos — unidades de apoyo que se mueven libremente por el mapa y lanzan magia.
+      - Ciudadelas — ciudadelas volantes que pueden transportar varias unidades y proporcionan defensas similares a una ciudad fortificada.
     ratings:
-      title: "Valores"
-      p1: "El valor de combate (VC) se usa para calcular las probabilidades de combate y las tiradas de impacto del combate naval. El valor táctico (VT) se suma a la tirada de combate cuando un líder está presente en la batalla."
-      p2: "Toda unidad gasta puntos de movimiento para moverse; la asignación por defecto es de 5 puntos. Los magos se mueven sin gastar puntos. Las unidades con afinidad de terreno ignoran el coste de movimiento de ese terreno."
+      title: Valores
+      p1: El valor de combate (VC) se usa para calcular las probabilidades de combate y las tiradas de impacto del combate naval. El valor táctico (VT) se suma a la tirada de combate cuando un líder está presente en la batalla.
+      p2: Toda unidad gasta puntos de movimiento para moverse; la asignación por defecto es de 5 puntos. Los magos se mueven sin gastar puntos. Las unidades con afinidad de terreno ignoran el coste de movimiento de ese terreno.
     statuses:
-      title: "Estados de las unidades"
+      title: Estados de las unidades
       bullets:
-        - "Activa — a plena fuerza en el mapa."
-        - "Mermada — reducida, en el mapa."
-        - "Reserva — a la espera en la reserva, fuera del mapa."
-        - "Destruida — perdida para siempre (su equipo se pierde y no vuelve a la reserva)."
-        - "Lista — disponible para despliegue."
+      - Activa — a plena fuerza en el mapa.
+      - Mermada — reducida, en el mapa.
+      - Reserva — a la espera en la reserva, fuera del mapa.
+      - Destruida — perdida para siempre (su equipo se pierde y no vuelve a la reserva).
+      - Lista — disponible para despliegue.
       warn:
-        title: "Apilado"
-        text: "Ningún hexágono puede contener más de dos unidades en ningún momento."
+        title: Apilado
+        text: Ningún hexágono puede contener más de dos unidades en ningún momento.
   movement:
-    title: "Movimiento y transporte"
+    title: Movimiento y transporte
     land_movement:
-      title: "Movimiento terrestre"
-      p1: "Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y las fronteras malas cuestan más."
+      title: Movimiento terrestre
+      p1: Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y las fronteras malas cuestan más.
     terrain_effects:
-      title: "Efectos del terreno en el movimiento"
-      p1: "Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y los cruces cuestan más."
-      legend: "La tabla muestra el coste para una unidad terrestre sin afinidad de terreno."
+      title: Efectos del terreno en el movimiento
+      p1: Las unidades terrestres gastan su asignación de movimiento para entrar en hexágonos. En terreno abierto un hexágono cuesta 1 punto; los terrenos difíciles y los cruces cuestan más.
+      legend: La tabla muestra el coste para una unidad terrestre sin afinidad de terreno.
       bullets:
-        - "(-): Los hexágonos de mar, desierto, pantano y remolino son impasables para las unidades terrestres."
-        - "(X) Ninguna unidad puede entrar o volar sobre hexágonos de desierto, excepto las Ciudadelas Volantes."
-        - "(*) Entrar en o moverse por glaciares, bosques y junglas cuesta +1 punto de movimiento."
-        - "(**) Las montañas son infranqueables, salvo por túneles o pasos de montaña."
-        - "Los ríos profundos son impasables para las unidades terrestres, excepto por puentes o vados. Se congelan en invierno y pueden cruzarse libremente (si se utilizan las reglas de invierno)."
-        - "Los demás ríos cuestan +1 punto de movimiento para cruzar. Se congelan en invierno y pueden cruzarse libremente."
-        - "La afinidad de terreno exime del coste del terreno correspondiente. P.ej: Ogros y enanos en montañas, elfos y kenders en bosques, o thanoi en glaciares."
+      - '(-): Los hexágonos de mar, desierto, pantano y remolino son impasables para las unidades terrestres.'
+      - (X) Ninguna unidad puede entrar o volar sobre hexágonos de desierto, excepto las Ciudadelas Volantes.
+      - (*) Entrar en o moverse por glaciares, bosques y junglas cuesta +1 punto de movimiento.
+      - (**) Las montañas son infranqueables, salvo por túneles o pasos de montaña.
+      - Los ríos profundos son impasables para las unidades terrestres, excepto por puentes o vados. Se congelan en invierno y pueden cruzarse libremente (si se utilizan las reglas de invierno).
+      - Los demás ríos cuestan +1 punto de movimiento para cruzar. Se congelan en invierno y pueden cruzarse libremente.
+      - 'La afinidad de terreno exime del coste del terreno correspondiente. P.ej: Ogros y enanos en montañas, elfos y kenders en bosques, o thanoi en glaciares.'
     air_movement:
-      title: "Movimiento aéreo"
-      p1: "Las unidades voladoras (dragones, grifos y pegasos) se mueven libremente por el mapa, ignorando los costes de terreno. No pueden entrar en hexágonos enemigos a menos que estén atacando."
-      p2: "A Wing must begin and end its movement over a land (including coastal) hex, but it can fly over sea hexes. It costs one extra Movement Point for a Wing to fly over a mountain hexside. Citadels are not affected by these restrictions."
+      title: Movimiento aéreo
+      p1: Las unidades voladoras (dragones, grifos y pegasos) se mueven libremente por el mapa, ignorando los costes de terreno. No pueden entrar en hexágonos enemigos a menos que estén atacando.
+      p2: A Wing must begin and end its movement over a land (including coastal) hex, but it can fly over sea hexes. It costs one extra Movement Point for a Wing to fly over a mountain hexside. Citadels are not affected by these restrictions.
     sea_movement:
-      title: "Movimiento marítimo"
-      p1: "Las flotas se mueven por el mapa gastando puntos de movimiento. Cada hexágono cuesta un número de puntos para entrar. Las flotas no pueden moverse a través de hexágonos enemigos. Las flotas no tienen que moverse a menos que el jugador quiera moverlas. No tienen que usar todos sus Puntos de Movimiento si se mueven."
-      p2: "Una flota no puede entrar en un hexágono o lado de hexágono que contenga una flota enemiga. Una flota no puede moverse a un hexágono (o lado de hexágono) que contenga un ejército enemigo. Un ejército puede moverse a un hexágono que contenga una flota enemiga. La flota no es destruida, sino que se mueve al hexágono (o lado de hexágono) más cercano que no contenga un ejército enemigo. Un jugador puede apilar cualquier número de sus flotas en un hexágono de mar abierto o costero."
+      title: Movimiento marítimo
+      p1: Las flotas se mueven por el mapa gastando puntos de movimiento. Cada hexágono cuesta un número de puntos para entrar. Las flotas no pueden moverse a través de hexágonos enemigos. Las flotas no tienen que moverse a menos que el jugador quiera moverlas. No tienen que usar todos sus Puntos de Movimiento si se mueven.
+      p2: Una flota no puede entrar en un hexágono o lado de hexágono que contenga una flota enemiga. Una flota no puede moverse a un hexágono (o lado de hexágono) que contenga un ejército enemigo. Un ejército puede moverse a un hexágono que contenga una flota enemiga. La flota no es destruida, sino que se mueve al hexágono (o lado de hexágono) más cercano que no contenga un ejército enemigo. Un jugador puede apilar cualquier número de sus flotas en un hexágono de mar abierto o costero.
     interception:
-      title: "Interception"
-      p1: "Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%)."
-      p2: "When, during a Movement Phase, a player moves his air armies or ships into a hex that is two or fewer hexes from an enemy air army or ship, the enemy air army or ship can attempt to intercept the moving air army or ship.
-       In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%). 
-       If the attempt is unsuccessful, the moving player continues his move normally.
-       If the interception is successful, the moving player stops moving until the interception attack is resolved. The intercepting air army or ship immediately moves by the shortest possible path to a hex next to the moving player's air army or ship. The air
-       army or ship that intercepted must then attack the intercepted counter, or stack of counters. All normal combat rules apply.
-       After the interception attack is made, surviving intercepted units continue moving, and the intercepting units immediately return to the hex from which they started."
-      p3: "Ships can attempt to intercept enemy ships only. Wings can attempt to intercept enemy wings, or enemy ships. Each non-moving unit can make only one interception attempt, regardless of its success, during the opponent's Movement Step. A moving unit can possibly be intercepted many times, but each attempt must be made by a different non-moving counter or stack. If several ships or air armies are stacked in a hex together, they can make an interception together. Notes:"
+      title: Interception
+      p1: Fleets that have not yet reacted may intercept enemy movement. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%).
+      p2: When, during a Movement Phase, a player moves his air armies or ships into a hex that is two or fewer hexes from an enemy air army or ship, the enemy air army or ship can attempt to intercept the moving air army or ship. In normal conditions an adjacent interception always succeeds (distance 1) and a distance-2 interception succeeds half the time (50%). If the attempt is unsuccessful, the moving player continues his move normally. If the interception is successful, the moving player stops moving until the interception attack is resolved. The intercepting air army or ship immediately moves by the shortest possible path to a hex next to the moving player's air army or ship. The air army or ship that intercepted must then attack the intercepted counter, or stack of counters. All normal combat rules apply. After the interception attack is made, surviving intercepted units continue moving, and the intercepting units immediately return to the hex from which they started.
+      p3: 'Ships can attempt to intercept enemy ships only. Wings can attempt to intercept enemy wings, or enemy ships. Each non-moving unit can make only one interception attempt, regardless of its success, during the opponent''s Movement Step. A moving unit can possibly be intercepted many times, but each attempt must be made by a different non-moving counter or stack. If several ships or air armies are stacked in a hex together, they can make an interception together. Notes:'
       bullets:
-        - "El invierno restringe las intercepciones a distancia 1 con un 50%."
-        - "Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada)."
+      - El invierno restringe las intercepciones a distancia 1 con un 50%.
+      - Las reglas de intercepción pueden activarse en las opciones del juego (Intercepción naval activada / desactivada).
     transport:
-      title: "Transporte aéreo y marítimo"
-      p1: "FLOTAS: Cada barco puede transportar un ejército terrestre y cualquier número de líderes cuando se mueve. El barco debe recoger el ejército terrestre en un puerto en cualquier momento durante su movimiento, y puede transportarlo durante el tiempo que el jugador desee. El ejército terrestre puede estar a bordo del barco (en el mar) cuando el barco termina su movimiento, y puede permanecer a bordo del barco durante un número ilimitado de turnos."
-      p2: "El ejército terrestre puede ser dejado en un puerto, y el barco puede continuar su movimiento si no ha usado todo su permiso de movimiento. Alternativamente, el ejército terrestre puede ser dejado en cualquier hexágono costero, pero el barco no puede moverse más lejos en ese turno. Un ejército terrestre no puede moverse por sí mismo durante un turno en el que esté siendo transportado por un barco."
-      p3: "ALAS: Un ala de grifos o pegasos puede transportar un ejército de infantería de su misma nacionalidad y un líder. Los dragones solo pueden transportar un líder. Los pasajeros deben comenzar y terminar el Paso de Movimiento con el ala. Por lo tanto, no pueden moverse por sí mismos. El ala solo puede usar la mitad de sus Puntos de Movimiento en un turno cuando lleva pasajeros. Excepto esto, todas las reglas normales de movimiento aéreo se aplican."
-      p4: "CIUDADELAS VOLANTES: Hasta tres Ejércitos de los dragones de cualquier tipo y un número ilimitado de líderes pueden viajar sobre una Ciudadela Volante. Los ejércitos terrestres de Altos Señores pueden abordar la ciudadela siempre que estén en el mismo hexágono, siempre que los ejércitos no hayan movido aún ese turno. Los ejércitos también pueden ser dejados en cualquier momento. Un ejército que haya sido transportado incluso un hexágono en la ciudadela no puede moverse por su propia fuerza durante el mismo turno."
+      title: Transporte aéreo y marítimo
+      p1: 'FLOTAS: Cada barco puede transportar un ejército terrestre y cualquier número de líderes cuando se mueve. El barco debe recoger el ejército terrestre en un puerto en cualquier momento durante su movimiento, y puede transportarlo durante el tiempo que el jugador desee. El ejército terrestre puede estar a bordo del barco (en el mar) cuando el barco termina su movimiento, y puede permanecer a bordo del barco durante un número ilimitado de turnos.'
+      p2: El ejército terrestre puede ser dejado en un puerto, y el barco puede continuar su movimiento si no ha usado todo su permiso de movimiento. Alternativamente, el ejército terrestre puede ser dejado en cualquier hexágono costero, pero el barco no puede moverse más lejos en ese turno. Un ejército terrestre no puede moverse por sí mismo durante un turno en el que esté siendo transportado por un barco.
+      p3: 'ALAS: Un ala de grifos o pegasos puede transportar un ejército de infantería de su misma nacionalidad y un líder. Los dragones solo pueden transportar un líder. Los pasajeros deben comenzar y terminar el Paso de Movimiento con el ala. Por lo tanto, no pueden moverse por sí mismos. El ala solo puede usar la mitad de sus Puntos de Movimiento en un turno cuando lleva pasajeros. Excepto esto, todas las reglas normales de movimiento aéreo se aplican.'
+      p4: 'CIUDADELAS VOLANTES: Hasta tres Ejércitos de los dragones de cualquier tipo y un número ilimitado de líderes pueden viajar sobre una Ciudadela Volante. Los ejércitos terrestres de Altos Señores pueden abordar la ciudadela siempre que estén en el mismo hexágono, siempre que los ejércitos no hayan movido aún ese turno. Los ejércitos también pueden ser dejados en cualquier momento. Un ejército que haya sido transportado incluso un hexágono en la ciudadela no puede moverse por su propia fuerza durante el mismo turno.'
   combat:
-    title: "Combate"
+    title: Combate
     land_combat:
-      title: "Combate terrestre y probabilidades"
-      p1: "Cuando una unidad entra en un hexágono con una fuerza enemiga (o ataca a través de una frontera de paso), se resuelve el combate. La fuerza de combate total del atacante se compara con la del defensor para producir una relación de combate, expresada de 1:3 a 6:1."
+      title: Combate terrestre y probabilidades
+      p1: Cuando una unidad entra en un hexágono con una fuerza enemiga (o ataca a través de una frontera de paso), se resuelve el combate. La fuerza de combate total del atacante se compara con la del defensor para producir una relación de combate, expresada de 1:3 a 6:1.
       bullets:
-        - "Las relaciones por encima de 6:1 se limitan a 6:1; las inferiores a 1:3 se tratan como 1:3."
-        - "Las murallas, fortalezas y bombardas modifican la relación antes de tirar los dados."
-        - "Los líderes, ejércitos, dragones y artefactos pueden sumar cada uno un modificador de tirada (DRM)."
+      - Las relaciones por encima de 6:1 se limitan a 6:1; las inferiores a 1:3 se tratan como 1:3.
+      - Las murallas, fortalezas y bombardas modifican la relación antes de tirar los dados.
+      - Los líderes, ejércitos, dragones y artefactos pueden sumar cada uno un modificador de tirada (DRM).
     drm:
-      title: "Modificadores a la tirada de dados"
-      p1: "Fijada la relación de odds, el atacante tira 1d10 y suma el modificador de tirada de dados (DRM) total. Los modificadores positivos favorecen al atacante y los negativos al defensor, y la tirada ajustada se consulta en la tabla de resultados de combate bajo la columna de odds vigente. Todos los modificadores de la tabla son acumulativos; la tirada final se limita entre −5 y +16, y el registro de combate imprime el desglose completo."
+      title: Modificadores a la tirada de dados
+      p1: Fijada la relación de odds, el atacante tira 1d10 y suma el modificador de tirada de dados (DRM) total. Los modificadores positivos favorecen al atacante y los negativos al defensor, y la tirada ajustada se consulta en la tabla de resultados de combate bajo la columna de odds vigente. Todos los modificadores de la tabla son acumulativos; la tirada final se limita entre −5 y +16, y el registro de combate imprime el desglose completo.
       table:
-        headers: ["Fuente", "DRM", "Notas"]
+        headers:
+        - Fuente
+        - DRM
+        - Notas
         rows:
-          - ["Líder atacante", "+ TÁC", "Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder."]
-          - ["Mago atacante", "+ TÁC", "Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder."]
-          - ["Líder defensor", "− TÁC", "Mejor táctica de la pila defensora, restada de la tirada del atacante."]
-          - ["Mago defensor", "− TÁC", "Mejor táctica de la pila defensora, restada de la tirada del atacante."]
-          - ["Dragones atacantes", "+ COM", "Combate total de todos los dragones de la pila atacante. Un artefacto de matadragones defensor anula este bonus."]
-          - ["Dragones defensores", "− COM", "Combate total de todos los dragones de la pila defensora."]
-          - ["Carga de caballería", "+1", "Cualquier caballería atacante — no contra ubicación fortificada, bosque o jungla."]
-          - ["Apoyo aéreo", "+1 / −1", "Cualquier unidad alada en la pila — no efectivo contra unidades en fortalezas enanos, bosques, montañas o jungla."]
-          - ["Ubicación fortificada", "−2 / −4 / −10", "Ciudad, puerto o templo −2; fortaleza −4; ciudad subterránea −10."]
-          - ["Río o puente", "−4", "Atacar a través de río, río profundo o puente. En invierno los ríos congelados se cruzan sin coste."]
-          - ["Vado", "−3", "Atacar a través de un vado."]
-          - ["Paso o túnel", "−2", "Atacar por un paso de montaña o túnel. Solo se aplica el cruce más severo."]
-          - ["Afinidad de terreno", "+1 / −1", "+1 por cada ejército atacante en su terreno de afinidad, −1 por cada ejército defensor en el suyo."]
-          - ["Provocación kender", "+2 / −2", "Kender infantes en la pila atacante otorgan +2; en la defensora infligen −2 (la provocación necesita una tirada ajustada de 6 o más)."]
-          - ["Tecnología gnoma", "+ mayor / −6", "Tira 2d6: si no salen dobles se suma el dado más alto; con dobles el modificador es −6 y el dispositivo queda destruido."]
-          - ["Bonus de combate de evento", "varía", "Bonus de combate del evento estratégico del jugador activo, solo atacante, durante el turno de batalla actual."]
+        - - Líder atacante
+          - + TÁC
+          - Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder.
+        - - Mago atacante
+          - + TÁC
+          - Mejor táctica de la pila atacante; la táctica de un mago se suma a la del mejor líder.
+        - - Líder defensor
+          - − TÁC
+          - Mejor táctica de la pila defensora, restada de la tirada del atacante.
+        - - Mago defensor
+          - − TÁC
+          - Mejor táctica de la pila defensora, restada de la tirada del atacante.
+        - - Dragones atacantes
+          - + COM
+          - Combate total de todos los dragones de la pila atacante. Un artefacto de matadragones defensor anula este bonus.
+        - - Dragones defensores
+          - − COM
+          - Combate total de todos los dragones de la pila defensora.
+        - - Carga de caballería
+          - '+1'
+          - Cualquier caballería atacante — no contra ubicación fortificada, bosque o jungla.
+        - - Apoyo aéreo
+          - +1 / −1
+          - Cualquier unidad alada en la pila — no efectivo contra unidades en fortalezas enanos, bosques, montañas o jungla.
+        - - Ubicación fortificada
+          - −2 / −4 / −10
+          - Ciudad, puerto o templo −2; fortaleza −4; ciudad subterránea −10.
+        - - Río o puente
+          - −4
+          - Atacar a través de río, río profundo o puente. En invierno los ríos congelados se cruzan sin coste.
+        - - Vado
+          - −3
+          - Atacar a través de un vado.
+        - - Paso o túnel
+          - −2
+          - Atacar por un paso de montaña o túnel. Solo se aplica el cruce más severo.
+        - - Afinidad de terreno
+          - +1 / −1
+          - +1 por cada ejército atacante en su terreno de afinidad, −1 por cada ejército defensor en el suyo.
+        - - Provocación kender
+          - +2 / −2
+          - Kender infantes en la pila atacante otorgan +2; en la defensora infligen −2 (la provocación necesita una tirada ajustada de 6 o más).
+        - - Tecnología gnoma
+          - + mayor / −6
+          - 'Tira 2d6: si no salen dobles se suma el dado más alto; con dobles el modificador es −6 y el dispositivo queda destruido.'
+        - - Bonus de combate de evento
+          - varía
+          - Bonus de combate del evento estratégico del jugador activo, solo atacante, durante el turno de batalla actual.
     crt:
-      title: "La tabla de resultados de combate"
-      p1: "Se tira un d10 ajustado por el DRM (limitado entre −5 y +16); el resultado ajustado cruza la tabla en la columna de relación actual. Los resultados se imprimen atacante/defensor, p. ej. E/1, DR/− o −/DR."
+      title: La tabla de resultados de combate
+      p1: Se tira un d10 ajustado por el DRM (limitado entre −5 y +16); el resultado ajustado cruza la tabla en la columna de relación actual. Los resultados se imprimen atacante/defensor, p. ej. E/1, DR/− o −/DR.
       table:
-        headers: ["Código", "Significado"]
+        headers:
+        - Código
+        - Significado
         rows:
-          - ["−", "Sin efecto en ese bando."]
-          - ["R (retirada)", "Los supervivientes de ese bando se retiran: R fuerza una retirada de un hexágono, 2R de dos (obligatoria en montañas, desiertos o a través de pasos)."]
-          - ["D (mermar)", "Todas las unidades afectadas de ese bando descienden un paso: ACTIVA → MERMADA."]
-          - ["1, 2 (pasos)", "Pérdidas de pasos de combate; el número se aplica como pasos de merma adicionales."]
-          - ["E (eliminar)", "Todas las unidades afectadas de ese bando son eliminadas. Los líderes pueden intentar escapar."]
-      p2: "Tras el combate, los atacantes supervivientes pueden avanzar a un hexágono desocupado, y un bando victorioso puede conquistar el hexágono al final de la fase de combate. El apliñamiento siempre se respeta."
+        - - −
+          - Sin efecto en ese bando.
+        - - R (retirada)
+          - 'Los supervivientes de ese bando se retiran: R fuerza una retirada de un hexágono, 2R de dos (obligatoria en montañas, desiertos o a través de pasos).'
+        - - D (mermar)
+          - 'Todas las unidades afectadas de ese bando descienden un paso: ACTIVA → MERMADA.'
+        - - 1, 2 (pasos)
+          - Pérdidas de pasos de combate; el número se aplica como pasos de merma adicionales.
+        - - E (eliminar)
+          - Todas las unidades afectadas de ese bando son eliminadas. Los líderes pueden intentar escapar.
+      p2: Tras el combate, los atacantes supervivientes pueden avanzar a un hexágono desocupado, y un bando victorioso puede conquistar el hexágono al final de la fase de combate. El apliñamiento siempre se respeta.
     dragon_combat:
-      title: "Duelos de dragones y supremacía aérea"
-      p1: "Antes de una batalla terrestre, los dragones de cada bando libran un duelo de supremacía aérea. Cada dragón tira un dado por punto de combate y cada resultado de 4 o más es un impacto: los impactos reducen al objetivo ACTIVO → MERMADO → DESTRUIDO."
-      p2: "El duelo transcurre en rondas hasta que un bando es eliminado, ambos se retiran o se llega a veinte rondas. Entre ronda y ronda, los jugadores pueden retirar sus dragones; las alas retiradas se trasladan a un hexágono aleatorio."
+      title: Duelos de dragones y supremacía aérea
+      p1: 'Antes de una batalla terrestre, los dragones de cada bando libran un duelo de supremacía aérea. Cada dragón tira un dado por punto de combate y cada resultado de 4 o más es un impacto: los impactos reducen al objetivo ACTIVO → MERMADO → DESTRUIDO.'
+      p2: El duelo transcurre en rondas hasta que un bando es eliminado, ambos se retiran o se llega a veinte rondas. Entre ronda y ronda, los jugadores pueden retirar sus dragones; las alas retiradas se trasladan a un hexágono aleatorio.
     naval_combat:
-      title: "Combate naval"
-      p1: "To fight a naval battle, ships must move into the same hex as the ships they are attacking. Each side then lines up their ships, and then the attacker assigns a target to each of their ships. In the advanced rules, Ships are not allowed to target an already assigned target unless all targets have one assigned. Once all have one assigned, then a second may be assigned; once all have two, then a third may be assigned, and so on."
-      p2: "Once all targets are assigned, a d10 is rolled for each ship. If the result is equal or less than the ship's combat rating, a hit is scored. Every attacking and defending ship in a battle is entitled to attack. All combat is considered to be simultaneous, so if one of your ships is damaged or sunk before you roll the die for your attack, you still get to roll as if it is undamaged."
-      p3: "After all ships have rolled, the combat round is over and the defending player has the option of withdrawing all of his ships one hex (or hexside on a river) in any direction, thus ending the combat. If the defending player declines this option, the attacking player may withdraw his ships and end the combat. If neither player withdraws, another round of combat is fought. The battle continues like this until one player withdraws or loses all of his ships."
+      title: Combate naval
+      p1: To fight a naval battle, ships must move into the same hex as the ships they are attacking. Each side then lines up their ships, and then the attacker assigns a target to each of their ships. In the advanced rules, Ships are not allowed to target an already assigned target unless all targets have one assigned. Once all have one assigned, then a second may be assigned; once all have two, then a third may be assigned, and so on.
+      p2: Once all targets are assigned, a d10 is rolled for each ship. If the result is equal or less than the ship's combat rating, a hit is scored. Every attacking and defending ship in a battle is entitled to attack. All combat is considered to be simultaneous, so if one of your ships is damaged or sunk before you roll the die for your attack, you still get to roll as if it is undamaged.
+      p3: After all ships have rolled, the combat round is over and the defending player has the option of withdrawing all of his ships one hex (or hexside on a river) in any direction, thus ending the combat. If the defending player declines this option, the attacking player may withdraw his ships and end the combat. If neither player withdraws, another round of combat is fought. The battle continues like this until one player withdraws or loses all of his ships.
   winter:
-    title: "Invierno y suministro"
+    title: Invierno y suministro
     winter:
-      title: "Invierno"
-      p1: "Cada cinco turnos el invierno azota Ansalon — salvo en la región 'libre de invierno' del mapa (columnas 40–64, filas 0–35), donde se conserva el movimiento normal."
+      title: Invierno
+      p1: Cada cinco turnos el invierno azota Ansalon — salvo en la región 'libre de invierno' del mapa (columnas 40–64, filas 0–35), donde se conserva el movimiento normal.
       bullets:
-        - "Ríos helados: las fronteras de río no cuestan movimiento extra, y los ríos profundos bloquean la entrada de flotas."
-        - "Pasos nevados: los pasos de montaña se vuelven intransitables para las unidades terrestres."
-        - "Las alas de dragones reducen a la mitad su asignación de movimiento (mínimo 1)."
-        - "Supervivencia de las flotas: las flotas en aguas expuestas tiran un d6 cada invierno; un 1 arriesga daños por hielo y obliga a comprobar la huida del líder."
+      - 'Ríos helados: las fronteras de río no cuestan movimiento extra, y los ríos profundos bloquean la entrada de flotas.'
+      - 'Pasos nevados: los pasos de montaña se vuelven intransitables para las unidades terrestres.'
+      - Las alas de dragones reducen a la mitad su asignación de movimiento (mínimo 1).
+      - 'Supervivencia de las flotas: las flotas en aguas expuestas tiran un d6 cada invierno; un 1 arriesga daños por hielo y obliga a comprobar la huida del líder.'
     supply:
-      title: "Suministro"
-      p1: "El sistema de suministro funciona en modo Estándar o Avanzado, seleccionado en las opciones del juego."
+      title: Suministro
+      p1: El sistema de suministro funciona en modo Estándar o Avanzado, seleccionado en las opciones del juego.
       bullets:
-        - "Estándar: los hexágonos costeros y los puertos están siempre abastecidos."
-        - "Avanzado: las unidades pueden, además, trazar suministro por tierra hasta el país propietario o su capital."
-        - "Las unidades que no puedan trazar suministro sufren desgaste (pérdidas de pasos) durante la fase de suministro."
+      - 'Estándar: los hexágonos costeros y los puertos están siempre abastecidos.'
+      - 'Avanzado: las unidades pueden, además, trazar suministro por tierra hasta el país propietario o su capital.'
+      - Las unidades que no puedan trazar suministro sufren desgaste (pérdidas de pasos) durante la fase de suministro.
   artifacts:
-    title: "Eventos y Artefactos"
+    title: Eventos y Artefactos
     how_they_work:
-      title: "Cómo funcionan los eventos"
-      p1: "Los eventos estratégicos se disparan durante la fase de eventos estratégicos de cada quinto turno. Cada evento define un disparador (o 'siempre'), un número máximo de ocurrencias y un efecto, y muchos pertenecen a una alineación."
+      title: Cómo funcionan los eventos
+      p1: Los eventos estratégicos se disparan durante la fase de eventos estratégicos de cada quinto turno. Cada evento define un disparador (o 'siempre'), un número máximo de ocurrencias y un efecto, y muchos pertenecen a una alineación.
       bullets:
-        - "Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego)."
-        - "Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]]."
-        - "Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]]."
+      - 'Tipos: BONUS (bonificación de diplomacia, combate o activación), UNITS (refuerzos), BANNER (un país se une a la causa) y ARTIFACT (un nuevo artefacto entra en juego).'
+      - Los eventos de diplomacia otorgan bonificaciones de activación, p. ej. [[event:ws_diplomacy]], [[event:ws_minor_diplomacy]] y [[event:hl_minor_diplomacy]].
+      - Los eventos de artefactos ponen las reliquias decisivas en juego, desde [[event:dragonlance_forged]] hasta el [[event:dragon_orb]].
       table:
-        headers: [ "Turno", "Evento", "Efectos", "Veces", "Bando" ]
+        headers:
+        - Turno
+        - Evento
+        - Efectos
+        - Veces
+        - Bando
         rows:
-          - [ "1", "[[event:hl_wizard]]", "Añade: [[unit:iolanthe]], [[unit:ladonna]], [[unit:dracart]]", "3", "Señor del Dragón" ]
-          - [ "1", "[[event:highlord_blitzkrieg]]", "Bonificación de combate: +1", "3", "Señor del Dragón" ]
-          - [ "1", "[[event:hl_diplomacy]]", "Bonificación de activación: +2", "5", "Señor del Dragón" ]
-          - [ "1", "[[event:hl_minor_diplomacy]]", "Bonificación de activación: +1", "5", "Señor del Dragón" ]
-          - [ "1", "[[event:ws_diplomacy]]", "Bonificación de activación: +2", "5", "Piedra Blanca" ]
-          - [ "1", "[[event:ws_minor_diplomacy]]", "Bonificación de activación: +1", "5", "Piedra Blanca" ]
-          - [ "2", "[[event:ws_wizard]]", "Añade: un mago de Piedra Blanca", "3", "Piedra Blanca" ]
-          - [ "5", "[[event:crown_of_power]]", "Otorga: [[artifact:crown_of_power]]", "1", "Señor del Dragón" ]
-          - [ "5", "[[event:dragonarmor]]", "Otorga: [[artifact:dragonarmor]]", "4", "Señor del Dragón" ]
-          - [ "5", "[[event:plate_of_solamnus]]", "Otorga: [[artifact:plate_of_solamnus]] (requiere [[country:tower]] activa)", "4", "Piedra Blanca" ]
-          - [ "6", "[[event:wildrunner_tactics]]", "Bonificación de combate: +1", "3", "Piedra Blanca" ]
-          - [ "7", "[[event:dragonmetal]]", "Otorga: [[artifact:dragonmetal]]", "1", "Piedra Blanca" ]
-          - [ "8", "[[event:staff_of_magius]]", "Otorga: [[artifact:staff_of_magius]]", "1", "—" ]
-          - [ "10", "[[event:dragonlance_forged]]", "Otorga: [[artifact:dragonlance]] (requiere [[artifact:dragonmetal]])", "5", "Piedra Blanca" ]
-          - [ "10", "[[event:dragon_orb]]", "Otorga: [[artifact:dragon_orb]]", "1", "—" ]
-          - [ "10", "[[event:hammer_of_kharas]]", "Otorga: [[artifact:hammer_of_kharas]]", "1", "—" ]
-          - [ "11", "[[event:blue_crystal_staff]]", "Otorga: [[artifact:blue_crystal_staff]]", "1", "Piedra Blanca" ]
-          - [ "12", "[[event:temptation_of_verminaard]]", "Otorga: [[artifact:nightbringer]]", "1", "Señor del Dragón" ]
-          - [ "15", "[[event:gnome_tech]]", "Otorga: [[artifact:gnome_tech]]; Alianza con [[country:nevermind]]", "1", "—" ]
-          - [ "18", "[[event:soths_legions]]", "Alianza con [[country:dargaard]]", "1", "Señor del Dragón" ]
-          - [ "19", "[[event:disks_of_mishakal]]", "Otorga: [[artifact:disks_of_mishakal]] (requiere [[artifact:blue_crystal_staff]])", "1", "Piedra Blanca" ]
-          - [ "19", "[[event:medallion_of_faith]]", "Otorga: [[artifact:medallion_of_faith]]", "4", "Piedra Blanca" ]
-          - [ "19", "[[event:wyrmslayer]]", "Otorga: [[artifact:wyrmslayer]]", "1", "Piedra Blanca" ]
-          - [ "20", "[[event:good_dragons]]", "Añade: los alados de dragones buenos", "1", "Piedra Blanca" ]
-          - [ "20", "[[event:silver_arm]]", "Otorga: [[artifact:silver_arm]]", "1", "Piedra Blanca" ]
-          - [ "21", "[[event:flying_citadel]]", "Añade: una ciudadela voladora", "1", "Señor del Dragón" ]
-          - [ "21", "[[event:golden_general]]", "Añade: [[unit:laurana]]", "1", "Piedra Blanca" ]
-          - [ "21", "[[event:whitestone_council]]", "Bonificación de activación: +3", "1", "Piedra Blanca" ]
-      p2: "El catálogo completo, con textos de ambientación e imágenes, está en la pestaña Eventos. La tabla anterior resume los eventos por el primer turno en que pueden ocurrir."
+        - - '1'
+          - '[[event:hl_wizard]]'
+          - 'Añade: [[unit:iolanthe]], [[unit:ladonna]], [[unit:dracart]]'
+          - '3'
+          - Señor del Dragón
+        - - '1'
+          - '[[event:highlord_blitzkrieg]]'
+          - 'Bonificación de combate: +1'
+          - '3'
+          - Señor del Dragón
+        - - '1'
+          - '[[event:hl_diplomacy]]'
+          - 'Bonificación de activación: +2'
+          - '5'
+          - Señor del Dragón
+        - - '1'
+          - '[[event:hl_minor_diplomacy]]'
+          - 'Bonificación de activación: +1'
+          - '5'
+          - Señor del Dragón
+        - - '1'
+          - '[[event:ws_diplomacy]]'
+          - 'Bonificación de activación: +2'
+          - '5'
+          - Piedra Blanca
+        - - '1'
+          - '[[event:ws_minor_diplomacy]]'
+          - 'Bonificación de activación: +1'
+          - '5'
+          - Piedra Blanca
+        - - '2'
+          - '[[event:ws_wizard]]'
+          - 'Añade: un mago de Piedra Blanca'
+          - '3'
+          - Piedra Blanca
+        - - '5'
+          - '[[event:crown_of_power]]'
+          - 'Otorga: [[artifact:crown_of_power]]'
+          - '1'
+          - Señor del Dragón
+        - - '5'
+          - '[[event:dragonarmor]]'
+          - 'Otorga: [[artifact:dragonarmor]]'
+          - '4'
+          - Señor del Dragón
+        - - '5'
+          - '[[event:plate_of_solamnus]]'
+          - 'Otorga: [[artifact:plate_of_solamnus]] (requiere [[country:tower]] activa)'
+          - '4'
+          - Piedra Blanca
+        - - '6'
+          - '[[event:wildrunner_tactics]]'
+          - 'Bonificación de combate: +1'
+          - '3'
+          - Piedra Blanca
+        - - '7'
+          - '[[event:dragonmetal]]'
+          - 'Otorga: [[artifact:dragonmetal]]'
+          - '1'
+          - Piedra Blanca
+        - - '8'
+          - '[[event:staff_of_magius]]'
+          - 'Otorga: [[artifact:staff_of_magius]]'
+          - '1'
+          - —
+        - - '10'
+          - '[[event:dragonlance_forged]]'
+          - 'Otorga: [[artifact:dragonlance]] (requiere [[artifact:dragonmetal]])'
+          - '5'
+          - Piedra Blanca
+        - - '10'
+          - '[[event:dragon_orb]]'
+          - 'Otorga: [[artifact:dragon_orb]]'
+          - '1'
+          - —
+        - - '10'
+          - '[[event:hammer_of_kharas]]'
+          - 'Otorga: [[artifact:hammer_of_kharas]]'
+          - '1'
+          - —
+        - - '11'
+          - '[[event:blue_crystal_staff]]'
+          - 'Otorga: [[artifact:blue_crystal_staff]]'
+          - '1'
+          - Piedra Blanca
+        - - '12'
+          - '[[event:temptation_of_verminaard]]'
+          - 'Otorga: [[artifact:nightbringer]]'
+          - '1'
+          - Señor del Dragón
+        - - '15'
+          - '[[event:gnome_tech]]'
+          - 'Otorga: [[artifact:gnome_tech]]; Alianza con [[country:nevermind]]'
+          - '1'
+          - —
+        - - '18'
+          - '[[event:soths_legions]]'
+          - Alianza con [[country:dargaard]]
+          - '1'
+          - Señor del Dragón
+        - - '19'
+          - '[[event:disks_of_mishakal]]'
+          - 'Otorga: [[artifact:disks_of_mishakal]] (requiere [[artifact:blue_crystal_staff]])'
+          - '1'
+          - Piedra Blanca
+        - - '19'
+          - '[[event:medallion_of_faith]]'
+          - 'Otorga: [[artifact:medallion_of_faith]]'
+          - '4'
+          - Piedra Blanca
+        - - '19'
+          - '[[event:wyrmslayer]]'
+          - 'Otorga: [[artifact:wyrmslayer]]'
+          - '1'
+          - Piedra Blanca
+        - - '20'
+          - '[[event:good_dragons]]'
+          - 'Añade: los alados de dragones buenos'
+          - '1'
+          - Piedra Blanca
+        - - '20'
+          - '[[event:silver_arm]]'
+          - 'Otorga: [[artifact:silver_arm]]'
+          - '1'
+          - Piedra Blanca
+        - - '21'
+          - '[[event:flying_citadel]]'
+          - 'Añade: una ciudadela voladora'
+          - '1'
+          - Señor del Dragón
+        - - '21'
+          - '[[event:golden_general]]'
+          - 'Añade: [[unit:laurana]]'
+          - '1'
+          - Piedra Blanca
+        - - '21'
+          - '[[event:whitestone_council]]'
+          - 'Bonificación de activación: +3'
+          - '1'
+          - Piedra Blanca
+      p2: El catálogo completo, con textos de ambientación e imágenes, está en la pestaña Eventos. La tabla anterior resume los eventos por el primer turno en que pueden ocurrir.
     artifacts:
-      title: "Referencia rápida de artefactos"
-      p1: "Los artefactos los portan líderes y ejércitos. La lista completa con descripciones está en la pestaña Artefactos; la tabla siguiente resume sus efectos mecánicos."
+      title: Referencia rápida de artefactos
+      p1: Los artefactos los portan líderes y ejércitos. La lista completa con descripciones está en la pestaña Artefactos; la tabla siguiente resume sus efectos mecánicos.
       table:
-        headers: ["Artefacto", "Efecto"]
+        headers:
+        - Artefacto
+        - Efecto
         rows:
-          - ["[[artifact:dragonlance]]", "Duplica el valor de combate de un ejército del Saber y otorga matadragones (anula la bonificación de DRM del dragón enemigo)."]
-          - ["[[artifact:dragon_orb]]", "Contra dragones o dracónidos: el portador tira 1d6 contra el VT del líder. Un fallo destruye líder y orbe; un éxito destruye todos los dragones opuestos."]
-          - ["[[artifact:crown_of_power]]", "Otorga al Señor del Dragón el mando de todos los vuelos cromáticos y +1 VT."]
-          - ["[[artifact:silver_arm]]", "+2 al valor de combate de un ejército del Saber."]
-          - ["[[artifact:staff_of_magius]]", "+1 al valor táctico, usable por magos."]
-          - ["[[artifact:blue_crystal_staff]]", "+1 VT; puede resucitar a un líder muerto una vez, y después se pierde."]
-          - ["[[artifact:disks_of_mishakal]]", "+1 VC; una vez por batalla, cura a un ejército mermado de vuelta a ACTIVO."]
-          - ["[[artifact:medallion_of_faith]]", "Cura a una unidad mermada pero se destruye en el proceso."]
-          - ["[[artifact:gnome_tech]]", "Dos dados precombate: la cara más alta se convierte en el DRM; un doble significa −6 y el artilugio se destruye."]
-          - ["[[artifact:dragonarmor]]", "+1 a las tiradas de huida del líder."]
-          - ["[[artifact:plate_of_solamnus]]", "+1 a las tiradas de huida del líder para los líderes solámnicos."]
-          - ["[[artifact:hammer_of_kharas]]", "+1 VT y +1 de diplomacia con Kaolyn, Thorbardin y Zhakar."]
-          - ["[[artifact:nightbringer]]", "+1 VT, usable por los señores del dragón del Ala Roja."]
-          - ["[[artifact:wyrmslayer]]", "+1 VT y matadragones, para líderes élficos."]
-          - ["[[artifact:dragonmetal]]", "El recurso necesario para forjar Lanzas de Dragón."]
+        - - '[[artifact:dragonlance]]'
+          - Duplica el valor de combate de un ejército del Saber y otorga matadragones (anula la bonificación de DRM del dragón enemigo).
+        - - '[[artifact:dragon_orb]]'
+          - 'Contra dragones o dracónidos: el portador tira 1d6 contra el VT del líder. Un fallo destruye líder y orbe; un éxito destruye todos los dragones opuestos.'
+        - - '[[artifact:crown_of_power]]'
+          - Otorga al Señor del Dragón el mando de todos los vuelos cromáticos y +1 VT.
+        - - '[[artifact:silver_arm]]'
+          - +2 al valor de combate de un ejército del Saber.
+        - - '[[artifact:staff_of_magius]]'
+          - +1 al valor táctico, usable por magos.
+        - - '[[artifact:blue_crystal_staff]]'
+          - +1 VT; puede resucitar a un líder muerto una vez, y después se pierde.
+        - - '[[artifact:disks_of_mishakal]]'
+          - +1 VC; una vez por batalla, cura a un ejército mermado de vuelta a ACTIVO.
+        - - '[[artifact:medallion_of_faith]]'
+          - Cura a una unidad mermada pero se destruye en el proceso.
+        - - '[[artifact:gnome_tech]]'
+          - 'Dos dados precombate: la cara más alta se convierte en el DRM; un doble significa −6 y el artilugio se destruye.'
+        - - '[[artifact:dragonarmor]]'
+          - +1 a las tiradas de huida del líder.
+        - - '[[artifact:plate_of_solamnus]]'
+          - +1 a las tiradas de huida del líder para los líderes solámnicos.
+        - - '[[artifact:hammer_of_kharas]]'
+          - +1 VT y +1 de diplomacia con Kaolyn, Thorbardin y Zhakar.
+        - - '[[artifact:nightbringer]]'
+          - +1 VT, usable por los señores del dragón del Ala Roja.
+        - - '[[artifact:wyrmslayer]]'
+          - +1 VT y matadragones, para líderes élficos.
+        - - '[[artifact:dragonmetal]]'
+          - El recurso necesario para forjar Lanzas de Dragón.
     heroes:
-      title: "Líderes eliminados"
-      p1: "Los líderes eliminados en batalla intentan escapar. La tirada mejora con equipo como la armadura de dragón y la Placa de Solamnia (+1). Los que escapan vuelven fuera del mapa para reaparecer más tarde; el resto se pierde con su equipo."
+      title: Líderes eliminados
+      p1: Los líderes eliminados en batalla intentan escapar. La tirada mejora con equipo como la armadura de dragón y la Placa de Solamnia (+1). Los que escapan vuelven fuera del mapa para reaparecer más tarde; el resto se pierde con su equipo.
       warn:
-        title: "Equipo perdido"
-        text: "El equipo que porte un líder definitivamente perdido se destruye y no vuelve a la reserva."
+        title: Equipo perdido
+        text: El equipo que porte un líder definitivamente perdido se destruye y no vuelve a la reserva.
   victory:
-    title: "Victoria"
+    title: Victoria
     victory:
-      title: "Condiciones de victoria"
-      p1: "La victoria se mide con puntos menores: controlar países, ciudades, fortalezas y objetivos concede puntos a un bando. Cada escenario define sus propias condiciones de victoria — los umbrales para la victoria mayor o menor — y la partida termina cuando un bando los alcanza al final de un turno."
-      p2: "Las victorias de país único y los objetivos de fortaleza son habituales: reduce el cuartel general enemigo o la Torre de la Reina Oscura, mantén un conjunto fijo de objetivos o simplemente supera en puntos al oponente cuando acaba el calendario."
+      title: Condiciones de victoria
+      p1: 'La victoria se mide con puntos menores: controlar países, ciudades, fortalezas y objetivos concede puntos a un bando. Cada escenario define sus propias condiciones de victoria — los umbrales para la victoria mayor o menor — y la partida termina cuando un bando los alcanza al final de un turno.'
+      p2: 'Las victorias de país único y los objetivos de fortaleza son habituales: reduce el cuartel general enemigo o la Torre de la Reina Oscura, mantén un conjunto fijo de objetivos o simplemente supera en puntos al oponente cuando acaba el calendario.'
   options:
-    title: "Dificultad y reglas de la casa"
+    title: Dificultad y reglas de la casa
     options:
-      title: "Opciones del juego"
-      p1: "El diálogo de Opciones (pestaña Reglas de la configuración de partida) ajusta las reglas a tu gusto:"
+      title: Opciones del juego
+      p1: 'El diálogo de Opciones (pestaña Reglas de la configuración de partida) ajusta las reglas a tu gusto:'
       table:
-        headers: ["Opción", "Elecciones"]
+        headers:
+        - Opción
+        - Elecciones
         rows:
-          - ["Despliegue", "Despliegue canónico o manual de las fuerzas iniciales."]
-          - ["Intercepción", "Intercepción naval activada, desactivada o solo naval."]
-          - ["Combate naval", "Reglas navales clásicas o avanzadas."]
-          - ["Iniciativa", "Clásica, avanzada (ficha de iniciativa) o desactivada."]
-          - ["Invierno", "Activado o desactivado."]
-          - ["Dificultad", "Fija la postura de la IA y sus bonificaciones."]
-  scenarios:
-    title: "Escenarios y campañas"
-    scenarios:
-      title: "Escenarios disponibles"
-      p1: "Se incluyen dos campañas y siete escenarios independientes. Cada uno define su propio subconjunto del mapa, turno inicial y final, fuerzas de partida, eventos activos y condiciones de victoria."
+        - - Despliegue
+          - Despliegue canónico o manual de las fuerzas iniciales.
+        - - Intercepción
+          - Intercepción naval activada, desactivada o solo naval.
+        - - Combate naval
+          - Reglas navales clásicas o avanzadas.
+        - - Iniciativa
+          - Clásica, avanzada (ficha de iniciativa) o desactivada.
+        - - Invierno
+          - Activado o desactivado.
+        - - Dificultad
+          - Fija la postura de la IA y sus bonificaciones.
+    details:
+      title: Detalles de combate
+      p1: Esta opción controla la cantidad de información que se muestra durante el combate.
       bullets:
-        - "Campaña: La Guerra de la Lanza — la campaña completa de 348–353."
-        - "Campaña: Crónicas de la Dragonlance — una campaña que sigue la historia de Dragonlance."
-        - "Escenario: La Caída de Silvanesti."
-        - "Escenario: La Llanura de Solamnia."
-        - "Escenario: Los Kenders Atacan."
-        - "Escenario: El Asedio de Kalaman."
-        - "Escenario: Invasión de Abanasinia."
-        - "Escenario: Piratas del Maremoto."
-        - "Escenario: Batalla por Neraka."
+      - 'Breve: Los resultados solo se muestran en el registro.'
+      - 'Detallado: Se muestran en detalle y en un diálogo.'
+    difficulty:
+      title: Dificultad
+      p1: Afecta el comportamiento de la IA y otorga una bonificación a las tiradas de combate.
+      bullets:
+      - 'Fácil: IA pasiva y defensiva; -1.'
+      - 'Normal: IA moderadamente agresiva; sin bonificación.'
+      - 'Difícil: IA agresiva y oportunista; +1.'
+    deployment:
+      title: Despliegue
+      p1: Las fuerzas iniciales pueden desplegarse automáticamente o manualmente.
+      bullets:
+      - 'Canónico: Despliegue automático.'
+      - 'Manual: Despliegue manual por el jugador humano (la IA siempre usa el canónico).'
+    interception:
+      title: Intercepción
+      p1: Permite interceptar movimientos enemigos con alas o flotas.
+      bullets:
+      - 'Desactivada: Sin intercepciones.'
+      - 'Activada: Alas y flotas pueden interceptar.'
+      - 'Solo naval: Solo las flotas.'
+    naval:
+      title: Combate Naval
+      p1: Reglas navales clásicas o avanzadas.
+      bullets:
+      - 'Clásico: Sin restricción en la selección de objetivos.'
+      - 'Avanzado: Restricción en la asignación de objetivos.'
+    initiative:
+      title: Iniciativa
+      p1: Determina qué bando mueve primero.
+      bullets:
+      - 'Clásica: Tirada de 1d4; empate mantiene al anterior.'
+      - 'Avanzada: Ficha de iniciativa.'
+      - 'Desactivada: Orden fijo.'
+    supply:
+      title: Suministro
+      p1: Con suministro avanzado las unidades deben trazar una línea de suministro.
+      p2: Solo las pilas de más de una unidad terrestre lo necesitan.
+      p3: Si no hay línea, la pila sufre desgaste (una unidad pasa a la reserva). No afecta a líderes, alas ni flotas.
+    winter:
+      title: Invierno
+      p1: 'Efectos del invierno:'
+      bullets:
+      - 'Ríos helados: sin coste extra; ríos profundos bloquean flotas.'
+      - 'Pasos nevados: intransitables para unidades terrestres.'
+      - 'Alas: movimiento a la mitad (mínimo 1).'
+      - 'Flotas: tirada de 1d6 en aguas expuestas (1 = daños).'
+      warn: Sin efectos en columnas 40-64, filas 0-35.
+  scenarios:
+    title: Escenarios y campañas
+    scenarios:
+      title: Escenarios disponibles
+      p1: Se incluyen dos campañas y siete escenarios independientes. Cada uno define su propio subconjunto del mapa, turno inicial y final, fuerzas de partida, eventos activos y condiciones de victoria.
+      bullets:
+      - 'Campaña: La Guerra de la Lanza — la campaña completa de 348–353.'
+      - 'Campaña: Crónicas de la Dragonlance — una campaña que sigue la historia de Dragonlance.'
+      - 'Escenario: La Caída de Silvanesti.'
+      - 'Escenario: La Llanura de Solamnia.'
+      - 'Escenario: Los Kenders Atacan.'
+      - 'Escenario: El Asedio de Kalaman.'
+      - 'Escenario: Invasión de Abanasinia.'
+      - 'Escenario: Piratas del Maremoto.'
+      - 'Escenario: Batalla por Neraka.'
+    victory:
+      title: Victoria
+      p1: Se puntúan países, ciudades, fortalezas y objetivos.
+      p2: Victoria mayor/menor al alcanzar los umbrales al final de un turno.

@@ -67,7 +67,6 @@ MANUAL_SECTIONS = [
             ],
             "initiative": [
                 {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
             ],
             "replacements": [
                 {"t": "p", "key": "p1"},
@@ -187,19 +186,6 @@ MANUAL_SECTIONS = [
         },
     },
     {
-        "id": "winter",
-        "subsections": {
-            "winter": [
-                {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
-            ],
-            "supply": [
-                {"t": "p", "key": "p1"},
-                {"t": "ul", "key": "bullets"},
-            ],
-        },
-    },
-    {
         "id": "artifacts",
         "subsections": {
             "how_they_work": [
@@ -219,26 +205,55 @@ MANUAL_SECTIONS = [
         },
     },
     {
-        "id": "victory",
-        "subsections": {
-            "victory": [
-                {"t": "p", "key": "p1"},
-                {"t": "p", "key": "p2"},
-            ],
-        },
-    },
-    {
         "id": "options",
         "subsections": {
             "options": [
                 {"t": "p", "key": "p1"},
                 {"t": "tbl", "key": "table"},
             ],
+            "difficulty": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "details": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "supply": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+                {"t": "p", "key": "p3"},
+            ],
+            "deployment": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "interception": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "naval": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "initiative": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+            ],
+            "winter": [
+                {"t": "p", "key": "p1"},
+                {"t": "ul", "key": "bullets"},
+                {"t": "warn", "key": "warn"},
+            ],
         },
     },
     {
         "id": "scenarios",
         "subsections": {
+            "victory": [
+                {"t": "p", "key": "p1"},
+                {"t": "p", "key": "p2"},
+            ],
             "scenarios": [
                 {"t": "p", "key": "p1"},
                 {"t": "ul", "key": "bullets"},

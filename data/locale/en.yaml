@@ -461,7 +461,7 @@ unit_names:
   kitiara: "Kitiara"
   lorac: "Lorac Caladon"
   feal-thas: "Feal-Thas"
-  toede: "Toede"
+  toede: "Fewmaster Toede"
   kronin: "Kronin Thistleknot"
   berlan: "Duke Berlan Drafford"
   mercadior: "Mercadior Redic V"
@@ -548,9 +548,9 @@ manual:
       title: "Turn sequence"
       p1: "Each battle turn follows this order. Player sides alternate in movement and combat."
       steps:
-        - "Initial Deployment - Happens only once. Each side deploys its starting units on the map."
-        - "Replacements — Rebuild destroyed and depleted units and deploy replacements; the player without the initiative acts first. Draconian production also happens here."
-        - "Strategic Events — event cards are drawn."
+        - "Initial Deployment - Happens only once. Each side deploys its starting [[tab:units]] on the map."
+        - "Replacements — Rebuild destroyed and depleted [[tab:units]] and deploy replacements; the player without the initiative acts first. Draconian production also happens here."
+        - "Strategic [[tab:events]] — event cards are drawn."
         - "Activation — Starting with the player without the initiative, each player can attempt to Activate a neutral nation of his choice by rolling 1d10."
         - "Initiative — each side rolls 1d4; the winner acts first. In case of a tie, the previous winner keeps the initiative."
         - "Movement & Combat — the first side moves and resolves its combats, then the second side does the same."
@@ -565,10 +565,6 @@ manual:
     initiative:
       title: "Initiative"
       p1: "In the initiative phase, it is decided which player acts first. The winner of the initiative roll may move and fight first, and also draws the first Strategic Event counter."
-      bullets:
-        - "Classic: The winner is decided by a plain d4 roll. In case of a tie, the previous winner keeps the initiative."
-        - "Advanced: The player that does not have the initiative at the start of the game receives an initiative chit. The holder of the initiative chit may override the roll, handing the chit to the other player."
-        - "Disabled: Player order is fixed for the campaign/scenario (no dice are rolled)."
     replacements:
       title: "Replacements"
       p1: "During the Replacement step, players can combine depleted units and deploy units from the reserve. The player without the initiative resolves their replacements first."
@@ -732,23 +728,6 @@ not hexes entered."
       p1: "To fight a naval battle, ships must move into the same hex as the ships they are attacking. Each side then lines up their ships, and then the attacker assigns a target to each of their ships. In the advanced rules, Ships are not allowed to target an already assigned target unless all targets have one assigned. Once all have one assigned, then a second may be assigned; once all have two, then a third may be assigned, and so on."
       p2: "Once all targets are assigned, a d10 is rolled for each ship. If the result is equal or less than the ship's combat rating, a hit is scored. Every attacking and defending ship in a battle is entitled to attack. All combat is considered to be simultaneous, so if one of your ships is damaged or sunk before you roll the die for your attack, you still get to roll as if it is undamaged."
       p3: "After all ships have rolled, the combat round is over and the defending player has the option of withdrawing all of his ships one hex (or hexside on a river) in any direction, thus ending the combat. If the defending player declines this option, the attacking player may withdraw his ships and end the combat. If neither player withdraws, another round of combat is fought. The battle continues like this until one player withdraws or loses all of his ships."
-  winter:
-    title: "Winter & Supply"
-    winter:
-      title: "Winter"
-      p1: "Every five turns winter grips Ansalon — except inside the 'winter-free' region of the map (columns 40–64, rows 0–35), where normal movement is preserved."
-      bullets:
-        - "Frozen rivers: river borders cost no extra movement, and deep rivers block fleet entry."
-        - "Snow-blocked passes: mountain passes become impassable to ground units."
-        - "Dragon wings halve their movement allowance (minimum 1)."
-        - "Fleet survival: fleets in exposed waters roll a d6 each winter; a roll of 1 risks ice damage and forces a leader-escape check."
-    supply:
-      title: "Supply"
-      p1: "The supply system runs in Standard or Advanced mode, selected in the game options."
-      bullets:
-        - "Standard: coastal hexes and ports are always in supply."
-        - "Advanced: units may additionally trace inland supply to the owning country or its capital."
-        - "Units that cannot trace supply suffer attrition (step losses) during the supply phase."
   artifacts:
     title: "Events & Artifacts"
     how_they_work:
@@ -817,14 +796,8 @@ not hexes entered."
       warn:
         title: "Lost equipment"
         text: "Equipment carried by any eliminated leader is destroyed and does not return to the pool."
-  victory:
-    title: "Victory"
-    victory:
-      title: "Victory conditions"
-      p1: "Victory is measured with minor points: controlling countries, cities, fortresses and objectives grants points to a side. Each scenario defines its own victory conditions — the thresholds for a major or minor victory — and the game ends when a side reaches them at the end of a turn."
-      p2: "Single-country victories and fortress goals are common: reduce the enemy's headquarters or the Tower of the Dark Queen, hold a fixed set of objectives, or simply out-score the opponent when the calendar ends."
   options:
-    title: "Difficulty & House Rules"
+    title: "Advanced & optional rules"
     options:
       title: "Game options"
       p1: "The Options dialog (Rules tab of the game setup) tunes the rules to your taste:"
@@ -837,8 +810,67 @@ not hexes entered."
           - ["Initiative", "Classic, advanced (initiative chit) or disabled."]
           - ["Winter", "Enabled or disabled."]
           - ["Difficulty", "Sets the AI stance and its bonuses."]
+          - ["Supply", "Standard or advanced supply rules."]
+    difficulty:
+        title: "Difficulty"
+        p1: "The AI difficulty setting affects the computer's strategic and tactical behaviour, and grants it a bonus to combat rolls. (Not implemented yet!)"
+        bullets:
+            - "Easy: AI is passive and defensive; -1 combat bonus."
+            - "Normal: AI is moderately aggressive; No combat bonus."
+            - "Hard: AI is aggressive and opportunistic; +1 combat bonus."
+    details:
+      title: "Combat details"
+      p1: "This option controls how much information is displayed during combat."
+      bullets:
+        - "Brief: Combat results are displayed in the game log only."
+        - "Verbose: Combat results are displayed in detail. Battle results are shown in a pop-up dialog."
+    supply:
+      title: "Supply"
+      p1: "Supply problems were critical to both the Highlord and the Whitestone forces. With the absence of squad-level clerics to produce food and water, supplies had to be brought overland: an event unforeseen by strategists on Krynn and highly debilitating to their plans. Gunthar himself notes these problems in his war journal. The following rules apply if advanced supply is chosen:"
+      p2: "During the Supply Step, players must be able to trace a line of supply from ground armies to fortresses or fortified cities that are controlled by the player tracing the supply line. Only ground armies that are stacked together (more than one army in a hex) need to trace supply lines. (Lone armies are capable of foraging off the land.) A line of supply is a path of connecting land hexses of unlimited length between the stack of units and any friendly fortress or fortified city. However, it cannot be traced through a hex containing an enemy counter, nor through a hex that is next to an enemy counter (unless that hex is occupied by a friendly counter.) The supply line cannot be traced through mountains, except mountain passes (if they are not covered by snow - see winter rules below)."
+      p3: "If a player cannot trace a line of supply for a stack of units, that stack suffers attrition. One of the units in the stack must be removed from the map and put in the Replacement Pool. Supply has no effect on leaders, wings, or fleets."
+    deployment:
+      title: "Deployment"
+      p1: "The starting forces of each side can be deployed automatically in the canonical positions, or manually by the player."
+      bullets:
+        - "Canonical: Units are deployed automatically, intending to match the battle orders in the Dragonlance books and D&D modules."
+        - "Manual: Human players can manually deploy their units. Not applicable for AI players, which always deploy canonically."
+    interception:
+      title: "Interception"
+      p1: "Crossing the Bloodsea of Istar was hazardous, but was all the more so due to the presence of fast pirate ships. Flights of griffons were less effective transport when dragons rose from the ground to meet them in the air. With the interception rules, players may intercept the movements of their enemy."
+      bullets:
+        - "Disabled: No interceptions happen (classic rules)."
+        - "Enabled: Wings and Fleets may attempt to intercept their enemy counterparts during the movement phase (advanced rules)."
+        - "Naval only'. Interception rules apply only to fleets."
+    naval:
+      title: "Naval Combat"
+      p1: "Naval combat can be resolved with the classic rules or as per Brian Bradford's houserules."
+      bullets:
+        - "Classic: No restriction in target selection for attacking ships."
+        - "Advanced: Ships are not allowed to target an already assigned target unless all targets already have one assigned."
+    initiative:
+        title: "Initiative"
+        p1: "The initiative rules determine which player moves first in a turn."
+        bullets:
+          - "Classic: The winner is decided by a plain d4 roll. In case of a tie, the previous winner keeps the initiative."
+          - "Advanced: The player that does not have the initiative at the start of the game receives an initiative chit. The holder of the initiative chit may override the roll, handing the chit to the other player."
+          - "Disabled: Player order is fixed for the campaign/scenario (no dice are rolled)."
+    winter:
+      title: "Winter"
+      p1: "Winter weather tended to slow down the armies of draconians (who did not operate well in the cold) and was a great factor in stalling the Solamnic Advance during the winter of 351 AC. When advanced winter rules are enabled, the following effects apply:"
+      bullets:
+        - "Frozen rivers: river borders cost no extra movement, and deep rivers block fleet entry."
+        - "Snow-blocked passes: mountain passes become impassable to ground units."
+        - "Wings halve their movement allowance (minimum 1)."
+        - "Fleet survival: fleets in exposed waters roll a d6 each winter; a roll of 1 means the ships suffered weather damage."
+      warn:
+        "Winter was milder in Nordmar and the regions around the Blood Sea of Istar. As such, winter effects don't apply in the region delimited by columns 40–64, rows 0–35, even if advanced winter rules is activated."
   scenarios:
-    title: "Scenarios & Campaigns"
+    title: "Campaigns & Scenarios"
+    victory:
+      title: "Victory"
+      p1: "Victory is measured with minor points: controlling countries, cities, fortresses and objectives grants points to a side. Each scenario defines its own victory conditions — the thresholds for a major or minor victory — and the game ends when a side reaches them at the end of a turn."
+      p2: "Single-country victories and fortress goals are common: reduce the enemy's headquarters or the Tower of the Dark Queen, hold a fixed set of objectives, or simply out-score the opponent when the calendar ends."
     scenarios:
       title: "Available scenarios"
       p1: "Two campaigns and seven stand-alone scenarios are shipped with the game. Each defines its own map subset, start and end turn, starting forces, active events and victory conditions."
