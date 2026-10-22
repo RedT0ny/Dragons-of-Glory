@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
   actions: write
-  
+
 concurrency:
   group: release
   cancel-in-progress: false
@@ -14,17 +14,38 @@ concurrency:
 jobs:
   build-windows:
     runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.trigger.outputs.run_id }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Trigger build-windows-exe
+        id: trigger
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ github.repository }}
         run: |
-          gh workflow run "Build Windows EXE" --ref "${{ github.ref_name }}"
-          
+          set -euo pipefail
+
+          gh api \
+            -X POST \
+            "repos/${{ github.repository }}/actions/workflows/build-windows-exe.yml/dispatches" \
+            -f ref="${{ github.ref_name }}"
+
+          sleep 10
+
+          RUN_ID=$(gh run list \
+            --workflow build-windows-exe.yml \
+            --branch "${{ github.ref_name }}" \
+            --limit 20 \
+            --json databaseId,createdAt \
+            --jq 'sort_by(.createdAt) | reverse | .[0].databaseId')
+
+          if [ -z "${RUN_ID:-}" ]; then
+            echo "::error::No workflow run was created for Build Windows EXE on ${{ github.ref_name }}"
+            exit 1
+          fi
+
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+          gh run watch "$RUN_ID" --interval 30
+
   release:
     name: Create GitHub release
     needs: build-windows
@@ -107,50 +128,39 @@ jobs:
       - name: Download latest Windows EXE
         id: artifact
         env:
+          RUN_ID: ${{ needs.build-windows.outputs.run_id }}
           EXPECTED: dog_${{ steps.meta.outputs.version }}.exe
         run: |
-          set -uo pipefail
+          set -euo pipefail
           rm -rf dist
           mkdir -p dist
-          RUN_IDS=()
-          while read -r run_id; do
-            if [ -n "$run_id" ]; then
-              RUN_IDS+=("$run_id")
-            fi
-          done < <(gh run list --workflow build-windows-exe.yml --status success --limit 50 --json databaseId --jq '.[].databaseId')
-          FOUND=""
-          for run_id in "${RUN_IDS[@]}"; do
-            echo "Looking for $EXPECTED in build run $run_id"
-            rm -rf dist
-            mkdir -p dist
-            if ! gh run download "$run_id" --name dog-windows-exe --dir dist >/dev/null 2>&1; then
-              echo "No dog-windows-exe artifact in run $run_id"
-              continue
-            fi
-            if [ -f "dist/dog-windows-exe.zip" ]; then
-              echo "Extracting dog-windows-exe.zip"
-              unzip -o "dist/dog-windows-exe.zip" -d dist >/dev/null
-              rm -f "dist/dog-windows-exe.zip"
-            fi
-            if [ -f "dist/$EXPECTED" ]; then
-              FOUND="$run_id"
-              break
-            fi
-            found_exe=$(find dist -type f -name '*.exe' | head -n 1 || true)
-            if [ -n "$found_exe" ]; then
-              echo "Found $found_exe, renaming to dist/$EXPECTED"
-              mv "$found_exe" "dist/$EXPECTED"
-              find dist -type f ! -name "$EXPECTED" -delete
-              FOUND="$run_id"
-              break
-            fi
-            echo "Artifact of run $run_id does not contain an exe"
-          done
-          if [ -z "$FOUND" ]; then
-            echo "::error::Could not find $EXPECTED in any recent successful run of build-windows-exe.yml. Run 'Build Windows EXE' manually first for this version."
+
+          if [ -z "${RUN_ID:-}" ]; then
+            echo "::error::Build run id was not recorded. The Windows EXE build did not finish successfully."
             exit 1
           fi
-          echo "run_id=$FOUND" >> "$GITHUB_OUTPUT"
+
+          gh run download "$RUN_ID" --name dog-windows-exe --dir dist >/dev/null
+
+          if [ -f "dist/dog-windows-exe.zip" ]; then
+            echo "Extracting dog-windows-exe.zip"
+            unzip -o "dist/dog-windows-exe.zip" -d dist >/dev/null
+            rm -f "dist/dog-windows-exe.zip"
+          fi
+
+          found_exe=$(find dist -type f -name '*.exe' | head -n 1 || true)
+          if [ -z "$found_exe" ]; then
+            echo "::error::Artifact dog-windows-exe from run $RUN_ID does not contain any .exe file."
+            exit 1
+          fi
+
+          if [ "$(basename "$found_exe")" != "$EXPECTED" ]; then
+            echo "Renaming $found_exe to dist/$EXPECTED"
+            mv "$found_exe" "dist/$EXPECTED"
+          fi
+
+          find dist -type f ! -name "$EXPECTED" -delete
+          echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
           ls -la dist
 
       - name: Create or update release
