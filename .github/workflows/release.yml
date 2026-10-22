@@ -175,7 +175,7 @@ jobs:
           TAG: ${{ steps.meta.outputs.tag }}
           TITLE: ${{ steps.meta.outputs.title }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
-          EXE: dist/${{ steps.meta.outputs.version }}.exe
+          EXE: dist/dog_${{ steps.meta.outputs.version }}.exe
         run: |
           set -euo pipefail
           TARGET=$(git -C "$GITHUB_WORKSPACE" rev-parse HEAD)
@@ -199,7 +199,7 @@ jobs:
           TITLE: ${{ steps.meta.outputs.title }}
           PRERELEASE: ${{ steps.meta.outputs.prerelease }}
           PREV_TAG: ${{ steps.notes.outputs.previous_tag }}
-          EXE: dist/${{ steps.meta.outputs.version }}.exe
+          EXE: dist/dog_${{ steps.meta.outputs.version }}.exe
         run: |
           {
             echo "### Release $TAG"
