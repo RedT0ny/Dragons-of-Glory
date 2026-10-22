@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  workflow_dispatch:
+#  workflow_run:
+#    workflows: ["Build Windows EXE"]
+#    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create GitHub release
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          (github.event.workflow_run.conclusion == 'success' &&
+           github.event.workflow_run.event == 'push' &&
+           github.event.workflow_run.head_branch == 'main') }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compute release metadata
+        id: meta
+        run: |
+          python - <<'PY' > /dev/null
+          import os
+          import pathlib
+          import re
+          import sys
+
+          text = pathlib.Path("src/content/config.py").read_text(encoding="utf-8")
+          match = re.search(r"APP_VERSION\s*=\s*['\"]([^'\"]+)['\"]", text)
+          if not match:
+              sys.exit("APP_VERSION not found in src/content/config.py")
+
+          version = match.group(1)
+          base, dash, suffix = version.partition("-")
+          if dash and suffix:
+              label = suffix.replace("-", " ").strip().capitalize()
+              title = f"Dragons of Glory {base} {label}"
+              prerelease = "true"
+          else:
+              title = f"Dragons of Glory {version}"
+              prerelease = "false"
+
+          pathlib.Path("title.txt").write_text(title + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"version={version}\n")
+              fh.write(f"tag=v{version}\n")
+              fh.write(f"title={title}\n")
+              fh.write(f"prerelease={prerelease}\n")
+          PY
+
+      - name: Build release notes
+        id: notes
+        env:
+          TITLE: ${{ steps.meta.outputs.title }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          {
+            printf '%s\n\n' "$TITLE"
+            git log -1 --pretty=%B
+            printf '\n'
+          } > release_notes.md
+          PREV_TAG=$(gh release list --limit 100 --json tagName,createdAt \
+            | jq -r --arg cur "$TAG" '[.[] | select(.tagName != $cur)] | sort_by(.createdAt) | reverse | .[0].tagName // empty')
+          if [ -z "$PREV_TAG" ]; then
+            PREV_TAG=$(git tag --list --sort=-v:refname | grep -v -x "$TAG" | head -n 1 || true)
+          fi
+          echo "previous_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          if [ -n "$PREV_TAG" ]; then
+            printf '**Full Changelog**: https://github.com/%s/compare/%s...%s\n' \
+              "${{ github.repository }}" "$PREV_TAG" "$TAG" >> release_notes.md
+          fi
+          cat release_notes.md
+
+      - name: Download latest Windows EXE
+        id: artifact
+        env:
+          EXPECTED: dog_${{ steps.meta.outputs.version }}.exe
+        run: |
+          set -uo pipefail
+          mkdir -p dist
+          RUN_IDS=()
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            RUN_IDS+=("${{ github.event.workflow_run.id }}")
+          fi
+          while read -r run_id; do
+            if [ -n "$run_id" ]; then
+              RUN_IDS+=("$run_id")
+            fi
+          done < <(gh run list --workflow build-windows-exe.yml --status success --limit 25 --json databaseId --jq '.[].databaseId')
+          FOUND=""
+          for run_id in "${RUN_IDS[@]}"; do
+            echo "Looking for $EXPECTED in build run $run_id"
+            rm -rf dist
+            mkdir -p dist
+            if ! gh run download "$run_id" --name dog-windows-exe --dir dist >/dev/null 2>&1; then
+              echo "No dog-windows-exe artifact in run $run_id"
+              continue
+            fi
+            if [ -f "dist/$EXPECTED" ]; then
+              FOUND="$run_id"
+              break
+            fi
+            echo "Artifact of run $run_id does not contain $EXPECTED"
+          done
+          if [ -z "$FOUND" ]; then
+            echo "::error::Could not find $EXPECTED in any recent successful run of build-windows-exe.yml"
+            exit 1
+          fi
+          echo "run_id=$FOUND" >> "$GITHUB_OUTPUT"
+          ls -l dist
+
+      - name: Create or update release
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          TITLE: ${{ steps.meta.outputs.title }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          EXE: dist/${{ steps.meta.outputs.version }}.exe
+        run: |
+          set -euo pipefail
+          TARGET=$(git rev-parse HEAD)
+          FLAGS=(--title "$TITLE" --notes-file release_notes.md)
+          if [ "$PRERELEASE" = "true" ]; then
+            FLAGS+=(--prerelease)
+          else
+            FLAGS+=(--prerelease=false)
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "${{ github.event_name }}" = "workflow_run" ]; then
+              echo "Release $TAG already exists - only refreshing the attached binary"
+              gh release upload "$TAG" "$EXE" --clobber
+            else
+              echo "Release $TAG already exists - updating it"
+              gh release edit "$TAG" "${FLAGS[@]}"
+              gh release upload "$TAG" "$EXE" --clobber
+            fi
+          else
+            gh release create "$TAG" "$EXE" "${FLAGS[@]}" --target "$TARGET"
+          fi
+
+      - name: Summary
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          TITLE: ${{ steps.meta.outputs.title }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          PREV_TAG: ${{ steps.notes.outputs.previous_tag }}
+          EXE: dist/${{ steps.meta.outputs.version }}.exe
+        run: |
+          {
+            echo "### Release $TAG"
+            echo ""
+            echo "- Title: $TITLE"
+            echo "- Prerelease: $PRERELEASE"
+            echo "- Asset: \`$EXE\`"
+            echo "- Previous tag: ${PREV_TAG:-none}"
+            echo "- Full changelog: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-$TAG}...$TAG"
+          } >> "$GITHUB_STEP_SUMMARY"
