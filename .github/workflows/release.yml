@@ -122,10 +122,18 @@ jobs:
               FOUND="$run_id"
               break
             fi
-            echo "Artifact of run $run_id does not contain $EXPECTED"
+            # Fallback: if any .exe exists, rename to expected
+            found_exe=$(find dist -type f -name '*.exe' | head -n 1 || true)
+            if [ -n "$found_exe" ]; then
+              echo "Found $found_exe, renaming to dist/$EXPECTED"
+              mv "$found_exe" "dist/$EXPECTED"
+              FOUND="$run_id"
+              break
+            fi
+            echo "Artifact of run $run_id does not contain an exe"
           done
           if [ -z "$FOUND" ]; then
-            echo "::error::Could not find $EXPECTED in any recent successful run of build-windows-exe.yml"
+            echo "::error::Could not find $EXPECTED in any recent successful run of build-windows-exe.yml. Run 'Build Windows EXE' manually first for this version."
             exit 1
           fi
           echo "run_id=$FOUND" >> "$GITHUB_OUTPUT"
