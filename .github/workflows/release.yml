@@ -2,9 +2,6 @@ name: Release
 
 on:
   workflow_dispatch:
-#  workflow_run:
-#    workflows: ["Build Windows EXE"]
-#    types: [completed]
 
 permissions:
   contents: write
@@ -15,13 +12,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-windows:
+    name: Trigger build Windows EXE
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger build-windows-exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run "Build Windows EXE" --ref "${{ github.ref_name }}"
+
   release:
     name: Create GitHub release
-    if: >-
-      ${{ github.event_name == 'workflow_dispatch' ||
-          (github.event.workflow_run.conclusion == 'success' &&
-           github.event.workflow_run.event == 'push' &&
-           github.event.workflow_run.head_branch == 'main') }}
+    needs: build-windows
+    if: ${{ always() && needs.build-windows.result == 'success' }}
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -29,7 +35,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -99,16 +105,14 @@ jobs:
           EXPECTED: dog_${{ steps.meta.outputs.version }}.exe
         run: |
           set -uo pipefail
+          rm -rf dist
           mkdir -p dist
           RUN_IDS=()
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            RUN_IDS+=("${{ github.event.workflow_run.id }}")
-          fi
           while read -r run_id; do
             if [ -n "$run_id" ]; then
               RUN_IDS+=("$run_id")
             fi
-          done < <(gh run list --workflow build-windows-exe.yml --status success --limit 25 --json databaseId --jq '.[].databaseId')
+          done < <(gh run list --workflow build-windows-exe.yml --status success --limit 50 --json databaseId --jq '.[].databaseId')
           FOUND=""
           for run_id in "${RUN_IDS[@]}"; do
             echo "Looking for $EXPECTED in build run $run_id"
@@ -118,15 +122,23 @@ jobs:
               echo "No dog-windows-exe artifact in run $run_id"
               continue
             fi
+            # If artifact came as zip, extract it
+            if [ -f "dist/dog-windows-exe.zip" ]; then
+              echo "Extracting dog-windows-exe.zip"
+              unzip -o "dist/dog-windows-exe.zip" -d dist >/dev/null
+              rm -f "dist/dog-windows-exe.zip"
+            fi
             if [ -f "dist/$EXPECTED" ]; then
               FOUND="$run_id"
               break
             fi
-            # Fallback: if any .exe exists, rename to expected
+            # Fallback: if any .exe exists anywhere under dist, move/rename to expected
             found_exe=$(find dist -type f -name '*.exe' | head -n 1 || true)
             if [ -n "$found_exe" ]; then
               echo "Found $found_exe, renaming to dist/$EXPECTED"
               mv "$found_exe" "dist/$EXPECTED"
+              # Clean up other files if any
+              find dist -type f ! -name "$EXPECTED" -delete
               FOUND="$run_id"
               break
             fi
@@ -137,7 +149,7 @@ jobs:
             exit 1
           fi
           echo "run_id=$FOUND" >> "$GITHUB_OUTPUT"
-          ls -l dist
+          ls -la dist
 
       - name: Create or update release
         env:
@@ -155,14 +167,9 @@ jobs:
             FLAGS+=(--prerelease=false)
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
-            if [ "${{ github.event_name }}" = "workflow_run" ]; then
-              echo "Release $TAG already exists - only refreshing the attached binary"
-              gh release upload "$TAG" "$EXE" --clobber
-            else
-              echo "Release $TAG already exists - updating it"
-              gh release edit "$TAG" "${FLAGS[@]}"
-              gh release upload "$TAG" "$EXE" --clobber
-            fi
+            echo "Release $TAG already exists - updating it"
+            gh release edit "$TAG" "${FLAGS[@]}"
+            gh release upload "$TAG" "$EXE" --clobber
           else
             gh release create "$TAG" "$EXE" "${FLAGS[@]}" --target "$TARGET"
           fi
