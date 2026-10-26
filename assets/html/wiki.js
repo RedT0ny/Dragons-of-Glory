@@ -74,7 +74,8 @@
 
   function goto(kind, id) {
     var map = { unit: "tab-units", artifact: "tab-artifacts", event: "tab-events",
-                country: "tab-countries", group: "tab-units", bonus: "tab-bonuses" };
+                scenario: "tab-scenarios", country: "tab-countries", group: "tab-units",
+                bonus: "tab-bonuses" };
     if (kind === "tab") {
       var tabSec = document.getElementById("tab-" + id);
       if (tabSec) {
@@ -253,7 +254,7 @@
   }
 
   function routeFromHash() {
-    var m = (location.hash || "").match(/^#(unit|artifact|event|country|group|bonus|tab)\/([\w_-]+)/);
+    var m = (location.hash || "").match(/^#(unit|artifact|event|scenario|country|group|bonus|tab)\/([\w_-]+)/);
     if (m) goto(m[1], m[2]);
   }
   window.addEventListener("hashchange", routeFromHash);

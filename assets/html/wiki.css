@@ -36,7 +36,7 @@ section.tab { scroll-margin-top: 104px; }
   display: flex; flex-direction: column; }
 .card.flash { outline: 2px solid var(--gold); outline-offset: 2px; }
 .card-img { width: 100%; height: auto; object-fit: contain; display: block; background: var(--panel2); }
-.card-img.artifact-img, .card-img.event-img { height: auto; }
+.card-img.artifact-img, .card-img.event-img, .card-img.scenario-img { height: auto; }
 .card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
 .card-title { margin: 0; font-size: 17px; color: var(--gold); }
 .qty { color: var(--muted); font-size: 13px; font-weight: normal; }
@@ -139,6 +139,18 @@ a { color: var(--ws); text-decoration: none; border-bottom: 1px dotted rgba(126,
 }
 .footer { border-top: 1px solid var(--line); padding: 14px 18px; text-align: center; }
 h4 { margin: 0; }
+/* --- scenarios tab --- */
+.scenario-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px; margin-top: 8px; }
+.scenario-panel { background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 12px; }
+.scenario-panel h5 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--gold); }
+.scenario-side { margin: 8px 0; }
+.scenario-side:first-of-type { margin-top: 0; }
+.scenario-side h6 { margin: 0 0 4px; }
+.scenario-panel .kv li:last-child { border-bottom: none; }
+.scenario-panel .kv .kv { margin-top: 4px; padding-left: 14px; }
 /* --- countries tab: full-width map with magnifier --- */
 .map-title { margin: 14px 0 8px; font-size: 15px; text-transform: uppercase;
   letter-spacing: 1.5px; color: var(--gold); }

@@ -57,10 +57,22 @@ def test_inline_mode_embeds_assets(needle, kind):
 
 @pytest.mark.parametrize(
     "tab",
-    ["tab-units", "tab-artifacts", "tab-events", "tab-countries", "tab-bonuses", "tab-rules"],
+    ["tab-units", "tab-artifacts", "tab-events", "tab-scenarios", "tab-countries",
+     "tab-bonuses", "tab-rules"],
 )
 def test_all_tabs_present(wiki_html, tab):
     assert f'id="{tab}"' in wiki_html
+
+
+def test_scenario_cards_present(wiki_html):
+    section = wiki_html.split('id="tab-scenarios"', 1)[1].split("</section>", 1)[0]
+    ids = re.findall(r'id="scenario-card-([a-z0-9_]+)"', section)
+    assert len(ids) == 9
+    assert ids[:2] == ["campaign_0_war_of_the_lance", "campaign_1_dragonlance_chronicles"]
+    assert "scenario-img" in section
+    assert "Victory conditions" in section
+    assert not re.search(r"\{\w+\}", section), "unresolved victory-condition placeholder"
+    assert "&lt;span" not in section, "escaped localization markup in scenario text"
 
 
 @pytest.mark.parametrize(

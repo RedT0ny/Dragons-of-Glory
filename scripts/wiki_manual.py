@@ -252,7 +252,7 @@ MANUAL_SECTIONS = [
         "subsections": {
             "victory": [
                 {"t": "p", "key": "p1"},
-                {"t": "p", "key": "p2"},
+                {"t": "ul", "key": "bullets"},
             ],
             "scenarios": [
                 {"t": "p", "key": "p1"},

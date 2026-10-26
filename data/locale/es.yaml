@@ -992,7 +992,14 @@ manual:
     victory:
       title: Condiciones de victoria
       p1: 'La victoria se mide con puntos menores: controlar países, ciudades, fortalezas y objetivos concede puntos a un bando. Cada escenario define sus propias condiciones de victoria — los umbrales para la victoria mayor o menor — y la partida termina cuando un bando los alcanza al final de un turno.'
-      p2: 'Las victorias de país único y los objetivos de fortaleza son habituales: reduce el cuartel general enemigo o la Torre de la Reina Oscura, mantén un conjunto fijo de objetivos o simplemente supera en puntos al oponente cuando acaba el calendario.'
+      bullets:
+        - "Capture: Capture a location (city, fortress or temple)."
+        - "Conquer: Conquer a country or countries."
+        - "Control: Maintain control over a set of countries."
+        - "Destroy: Eliminate specific enemy units."
+        - "Prevent: Stop the enemy from achieving their objectives."
+        - "Escape: Safely withdraw your forces from the map."
+        - "survive: Make your units survive until the end of the scenario."
   options:
     title: Dificultad y reglas de la casa
     options:

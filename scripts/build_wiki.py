@@ -50,6 +50,7 @@ from src.content.config import (
     CRT_DATA,
     CALENDAR_DATA,
     LOCALE_DIR,
+    SCENARIOS_DIR,
 )
 from src.content.constants import DRAGONFLIGHTS, EVIL_DRAGONFLIGHTS, WS
 
@@ -65,6 +66,7 @@ def _esc(s) -> str:
 
 
 _MANUAL_LINK_RE = re.compile(r"\[\[([a-z_]+):([\w_-]+)\]\]")
+_V_TOKEN_RE = re.compile(r"\{(\w+)\}")
 
 
 # --- unit counter icons ---------------------------------------------------------
@@ -320,6 +322,55 @@ def load_events() -> dict:
     return events
 
 
+def load_scenarios() -> dict:
+    scenarios = {}
+    if not os.path.isdir(SCENARIOS_DIR):
+        return scenarios
+    for filename in sorted(os.listdir(SCENARIOS_DIR)):
+        if not filename.lower().endswith((".yaml", ".yml")):
+            continue
+        if filename.startswith("scenario_template"):
+            continue
+        path = os.path.join(SCENARIOS_DIR, filename)
+        with open(path, "r", encoding="utf-8") as fh:
+            raw = yaml.safe_load(fh) or {}
+        data = raw.get("scenario", {}) or {}
+        sid = str(data.get("id") or os.path.splitext(filename)[0])
+        if sid == "unique_scenario_id":
+            continue
+
+        setup_raw = data.get("initial_setup", {}) or {}
+        setup = {
+            "neutral": setup_raw.get("neutral", {}) or {},
+            "highlord": setup_raw.get("highlord", {}) or {},
+            "whitestone": setup_raw.get("whitestone", {}) or {},
+        }
+
+        victory = data.get("victory_conditions")
+        if not isinstance(victory, dict) or not victory:
+            victory = {
+                "highlord": setup["highlord"].get("victory_conditions", {}) or {},
+                "whitestone": setup["whitestone"].get("victory_conditions", {}) or {},
+            }
+
+        scenarios[sid] = {
+            "id": sid,
+            "kind": "campaign" if sid.startswith("campaign") else "scenario",
+            "description": (data.get("description") or "").strip(),
+            "start_turn": data.get("start_turn"),
+            "end_turn": data.get("end_turn"),
+            "initiative": data.get("initiative_start", "highlord"),
+            "map_subset": data.get("map_subset"),
+            "active_events": data.get("active_events") or {},
+            "possible_events": data.get("possible_events"),
+            "setup": setup,
+            "victory": victory,
+            "picture": data.get("picture") or "scenario.jpg",
+            "notes": (data.get("notes") or "").strip(),
+        }
+    return scenarios
+
+
 class WikiGen:
     LOCATION_TYPES = {
         "city": ("City", "Ciudad"),
@@ -337,9 +388,14 @@ class WikiGen:
         "units": ("Units", "Unidades"),
         "artifacts": ("Artifacts", "Artefactos"),
         "events": ("Events", "Eventos"),
+        "scenarios": ("Scenarios", "Escenarios"),
         "countries": ("Countries", "Naciones"),
         "bonuses": ("Bonuses", "Bonus"),
         "rules": ("Rules", "Reglas"),
+    }
+    SCENARIO_KIND_LABELS = {
+        "campaign": ("Campaign", "Campaña"),
+        "scenario": ("Scenario", "Escenario"),
     }
     EVENT_TYPE_LABELS = {
         "diplomacy": ("Diplomacy", "Diplomacia"),
@@ -432,6 +488,7 @@ class WikiGen:
         self.units = load_units()
         self.artifacts = load_artifacts()
         self.events = load_events()
+        self.scenarios = load_scenarios()
 
         self.units_by_id = {u["raw_id"]: u for u in self.units}
         self.units_by_type = defaultdict(list)
@@ -667,6 +724,7 @@ class WikiGen:
         parts.append(self._units_tab())
         parts.append(self._artifacts_tab())
         parts.append(self._events_tab())
+        parts.append(self._scenarios_tab())
         parts.append(self._countries_tab())
         parts.append(self._bonuses_tab())
         parts.append(self._rules_tab())
@@ -880,6 +938,485 @@ class WikiGen:
             f'{effects_html}'
             f'</div></article>'
         )
+
+    # --- scenarios ----------------------------------------------------------------------
+    def _scenarios_tab(self):
+        ordered = sorted(
+            self.scenarios.values(),
+            key=lambda s: (0 if s["kind"] == "campaign" else 1, s["id"]),
+        )
+        htmls = [self._section_open("tab-scenarios", self.lbl("Scenarios", "Escenarios"), len(ordered))]
+        for scenario in ordered:
+            htmls.append(self._scenario_card(scenario))
+        htmls.append('</section>')
+        return "\n".join(htmls)
+
+    def _scenario_card(self, scenario):
+        sid = scenario["id"]
+        kind = self.SCENARIO_KIND_LABELS.get(scenario["kind"], (scenario["kind"], scenario["kind"]))
+        badges = [self.badge(l10n_span(*kind), "dragon" if scenario["kind"] == "campaign" else "gray")]
+
+        start = scenario.get("start_turn")
+        end = scenario.get("end_turn")
+        if start is not None or end is not None:
+            if start is None:
+                turns = str(end)
+            elif end is None or start == end:
+                turns = str(start)
+            else:
+                turns = f"{start}–{end}"
+            badges.append(self.badge(self.lbl("Turns", "Turnos") + f' {_esc(turns)}'))
+
+        initiative = scenario.get("initiative")
+        if initiative:
+            label = self.ALLEGIANCE_LABELS.get(initiative, (initiative.title(), initiative.title()))
+            badges.append(self.badge(self.lbl("Initiative", "Iniciativa") + " " + l10n_span(*label)))
+
+        panels = []
+        victory = self._scenario_victory_panel(scenario.get("victory") or {})
+        if victory:
+            panels.append(victory)
+        active = self._scenario_events_panel(
+            "Active events", "Eventos activos", scenario.get("active_events"))
+        if active:
+            panels.append(active)
+        possible = self._scenario_events_panel(
+            "Possible events", "Eventos posibles", scenario.get("possible_events"))
+        if possible:
+            panels.append(possible)
+        forces = self._scenario_forces_panel(scenario.get("setup") or {})
+        if forces:
+            panels.append(forces)
+        fields_html = f'<div class="scenario-fields">{"".join(panels)}</div>' if panels else ""
+
+        map_html = (
+            f'<p class="meta"><b>{self.lbl("Map", "Mapa")}:</b> '
+            f'{self._scenario_map_text(scenario.get("map_subset"))}</p>'
+        )
+        notes = scenario.get("notes")
+        notes_html = ""
+        if notes:
+            notes_html = (
+                f'<p class="links"><b>{self.lbl("Notes", "Notas")}:</b></p>'
+                f'<p class="desc note">{_esc(notes)}</p>'
+            )
+
+        terms = [
+            sid,
+            self._name("scenarios", sid, sid),
+            self._name_es("scenarios", sid, sid) or "",
+            scenario["kind"],
+            kind[0], kind[1],
+            scenario.get("description") or "",
+            notes or "",
+            self._scenario_map_text(scenario.get("map_subset"), plain=True),
+        ]
+        for side in ("highlord", "whitestone"):
+            side_setup = (scenario.get("setup") or {}).get(side) or {}
+            for cid in self._scenario_country_ids(side_setup.get("countries")):
+                terms.append(self._name("countries", cid, cid))
+                terms.append(self._name_es("countries", cid, cid) or "")
+        for value in (scenario.get("active_events"), scenario.get("possible_events")):
+            for eid, _ in self._scenario_event_items(value):
+                terms.append(self._name("events", eid, eid))
+                terms.append(self._name_es("events", eid, eid) or "")
+
+        return (
+            f'<article class="card scenario" id="scenario-card-{_esc(sid)}" '
+            f'data-search="{_esc(" ".join(t for t in terms if t).lower())}">'
+            f'{self.img(scenario.get("picture"), "scenario.jpg", "card-img scenario-img")}'
+            f'<div class="card-body">'
+            f'<h4 class="card-title">{self.L("scenarios", sid, sid.replace("_", " ").title())}</h4>'
+            f'<div class="badges">{"".join(badges)}</div>'
+            f'<p class="desc">{_esc(scenario.get("description") or "")}</p>'
+            f'{map_html}'
+            f'{fields_html}'
+            f'{notes_html}'
+            f'</div></article>'
+        )
+
+    def _scenario_map_text(self, map_subset, plain=False):
+        if isinstance(map_subset, dict):
+            xr = map_subset.get("x_range") or []
+            yr = map_subset.get("y_range") or []
+            if len(xr) >= 2 and len(yr) >= 2:
+                en = f"Columns {xr[0]}–{xr[1]} · Rows {yr[0]}–{yr[1]}"
+                es = f"Columnas {xr[0]}–{xr[1]} · Filas {yr[0]}–{yr[1]}"
+                return f"{en} {es}" if plain else self.lbl(en, es)
+        en, es = "Full map", "Mapa completo"
+        return f"{en} {es}" if plain else self.lbl(en, es)
+
+    def _scenario_country_ids(self, value):
+        if isinstance(value, dict):
+            return [str(k) for k in value.keys()]
+        if isinstance(value, (list, tuple)):
+            return [str(v) for v in value if isinstance(v, str)]
+        if isinstance(value, str):
+            return [value]
+        return []
+
+    def _scenario_country_link(self, cid):
+        if not cid:
+            return ""
+        cid = str(cid)
+        if cid in self.countries:
+            return self.link("country", cid, self.country_name(cid))
+        if cid in DRAGONFLIGHTS:
+            return self.link("group", cid, self.country_name(cid))
+        return _esc(cid)
+
+    def _scenario_assets_html(self, assets):
+        if not assets:
+            return ""
+        items = []
+        if isinstance(assets, dict):
+            items = [(str(aid), qty) for aid, qty in assets.items()]
+        elif isinstance(assets, (list, tuple)):
+            items = [(str(aid), 1) for aid in assets]
+        elif isinstance(assets, str):
+            items = [(assets, 1)]
+        if not items:
+            return ""
+
+        counts = {}
+        order = []
+        for aid, qty in items:
+            if aid not in counts:
+                counts[aid] = qty
+                order.append(aid)
+            elif isinstance(counts[aid], int) and isinstance(qty, int):
+                counts[aid] += qty
+
+        pieces = []
+        for aid in order:
+            fallback = aid.replace("_", " ").title()
+            if aid in self.artifacts:
+                name = self.link("artifact", aid, self.L("assets", aid, fallback))
+            else:
+                name = _esc(self._name("assets", aid, fallback))
+            qty = counts[aid]
+            if isinstance(qty, int) and qty > 1:
+                name += f' <span class="qty">×{qty}</span>'
+            elif qty == "all":
+                name += f' <span class="qty">({self.lbl("all", "todas")})</span>'
+            pieces.append(name)
+        return " · ".join(pieces)
+
+    def _scenario_forces_panel(self, setup):
+        blocks = []
+        for side in ("highlord", "whitestone"):
+            side_setup = setup.get(side) or {}
+            ids = self._scenario_country_ids(side_setup.get("countries"))
+            assets = self._scenario_assets_html(side_setup.get("assets"))
+            if not ids and not assets:
+                continue
+            label = self.ALLEGIANCE_LABELS.get(side, (side.title(), side.title()))
+            bits = []
+            if ids:
+                links = " · ".join(self._scenario_country_link(cid) for cid in ids)
+                bits.append(f'<p class="meta"><b>{self.lbl("Countries", "Naciones")}:</b> {links}</p>')
+            if assets:
+                bits.append(f'<p class="meta"><b>{self.lbl("Artifacts", "Artefactos")}:</b> {assets}</p>')
+            blocks.append(
+                f'<div class="scenario-side"><h6>{self.badge(l10n_span(*label), side)}</h6>'
+                f'{"".join(bits)}</div>'
+            )
+
+        neutral = setup.get("neutral") or {}
+        neutral_ids = self._scenario_country_ids(neutral.get("countries"))
+        if neutral_ids:
+            blocks.append(
+                f'<p class="meta"><b>{self.lbl("Neutral countries", "Naciones neutrales")}:</b> '
+                f'{len(neutral_ids)}</p>'
+            )
+        if not blocks:
+            return ""
+        return (
+            f'<div class="scenario-panel"><h5>{self.lbl("Forces", "Fuerzas")}</h5>'
+            f'{"".join(blocks)}</div>'
+        )
+
+    def _scenario_event_items(self, value):
+        if isinstance(value, dict):
+            return [(str(eid), times) for eid, times in value.items()]
+        if isinstance(value, (list, tuple)):
+            return [(str(eid), None) for eid in value if isinstance(eid, str)]
+        if isinstance(value, str) and value.upper() != "ALL":
+            return [(value, None)]
+        return []
+
+    def _scenario_events_panel(self, title_en, title_es, value):
+        items = self._scenario_event_items(value)
+        if not items:
+            return ""
+        lis = []
+        for eid, times in items:
+            fallback = eid.replace("_", " ").title()
+            if eid in self.events:
+                name = self.link("event", eid, self.L("events", eid, fallback))
+            else:
+                name = _esc(self._name("events", eid, fallback))
+            if isinstance(times, int) and times > 1:
+                name += f' <span class="qty">×{times}</span>'
+            lis.append(f"<li>{name}</li>")
+        return (
+            f'<div class="scenario-panel"><h5>{self.lbl(title_en, title_es)}</h5>'
+            f'<ul class="kv">{"".join(lis)}</ul></div>'
+        )
+
+    def _loc_pair(self, path, en_default, es_default):
+        parts = path.split(".")
+        en = _get(self.en, *parts, default=en_default)
+        es = _get(self.es, *parts, default=es_default)
+        return en, es
+
+    def _scenario_victory_panel(self, victory):
+        if not isinstance(victory, dict):
+            return ""
+        sides = []
+        for side in ("highlord", "whitestone"):
+            block = victory.get(side)
+            if not isinstance(block, dict) or not block:
+                continue
+            items = self._scenario_victory_items(block)
+            if not items:
+                continue
+            label = self.ALLEGIANCE_LABELS.get(side, (side.title(), side.title()))
+            sides.append(
+                f'<div class="scenario-side"><h6>{self.badge(l10n_span(*label), side)}</h6>'
+                f'<ul class="kv">{"".join(items)}</ul></div>'
+            )
+        if not sides:
+            return ""
+        return (
+            f'<div class="scenario-panel"><h5>{self.lbl("Victory conditions", "Condiciones de victoria")}</h5>'
+            f'{"".join(sides)}</div>'
+        )
+
+    def _scenario_victory_items(self, block):
+        items = []
+        major = block.get("major")
+        if major is not None:
+            items.append(
+                f'<li><b>{self.lbl("Major", "Decisiva")}:</b> {self._v_node(major)}</li>'
+            )
+        minor = block.get("minor")
+        if isinstance(minor, dict) and "conditions" in minor:
+            sub = []
+            points_to_win = minor.get("points_to_win")
+            if points_to_win is not None:
+                sub.append(
+                    f'<li>{self.lbl("Points to win", "Puntos necesarios")}: {_esc(points_to_win)}</li>'
+                )
+            for cond in minor.get("conditions") or []:
+                if isinstance(cond, dict) and "when" in cond:
+                    points = int(cond.get("points", 1) or 1)
+                    sub.append(
+                        f'<li>+{points} {self.lbl("points", "puntos")}: '
+                        f'{self._v_node(cond.get("when"))}</li>'
+                    )
+                else:
+                    sub.append(
+                        f'<li>+1 {self.lbl("points", "puntos")}: {self._v_node(cond)}</li>'
+                    )
+            items.append(
+                f'<li><b>{self.lbl("Minor", "Menor")}:</b>'
+                f'<ul class="kv">{"".join(sub)}</ul></li>'
+            )
+        elif minor is not None:
+            items.append(
+                f'<li><b>{self.lbl("Minor", "Menor")}:</b> {self._v_node(minor)}</li>'
+            )
+        return items
+
+    def _v_node(self, node):
+        if isinstance(node, dict):
+            if "all" in node:
+                return self._v_group(node.get("all") or [], "all")
+            if "any" in node:
+                return self._v_group(node.get("any") or [], "any")
+            return self._v_leaf(node)
+        if isinstance(node, (list, tuple)):
+            return self._v_group(node, "all")
+        return _esc(node)
+
+    def _v_group(self, nodes, op):
+        pieces = [p for p in (self._v_node(n) for n in nodes if n is not None) if p]
+        if not pieces:
+            return ""
+        if len(pieces) == 1:
+            return pieces[0]
+        en, es = self._loc_pair(
+            f"victory.operators.{op}",
+            "and" if op == "all" else "or",
+            "y" if op == "all" else "o",
+        )
+        joiner = l10n_span(f" {en} ", f" {es} ")
+        return "(" + joiner.join(pieces) + ")"
+
+    def _v_leaf(self, node):
+        node_type = str(node.get("type", "unknown"))
+        by_turn = node.get("by_turn")
+
+        if node_type == "conquer_country":
+            en, es = self._loc_pair(
+                "victory.types.conquer_country", "Conquer {country}", "Conquistar {country}")
+            html = self._v_render(en, es, {"country": self._scenario_country_link(node.get("country"))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "capture_location":
+            en, es = self._loc_pair(
+                "victory.types.capture_location", "Capture {location}", "Capturar {location}")
+            html = self._v_render(en, es, {"location": self._scenario_location_link(node.get("location"))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "prevent_country_conquered":
+            en, es = self._loc_pair(
+                "victory.types.prevent_country_conquered",
+                "Prevent {country} from being conquered",
+                "Evitar conquista de {country}",
+            )
+            html = self._v_render(en, es, {"country": self._scenario_country_link(node.get("country"))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "prevent_location_captured":
+            en, es = self._loc_pair(
+                "victory.types.prevent_location_captured",
+                "Prevent {location} from being captured",
+                "Evitar captura de {location}",
+            )
+            html = self._v_render(en, es, {"location": self._scenario_location_link(node.get("location"))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "ally_country":
+            en, es = self._loc_pair(
+                "victory.types.ally_country", "Ally {country}", "Alianza con {country}")
+            html = self._v_render(en, es, {"country": self._scenario_country_link(node.get("country"))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "control_n_countries":
+            en, es = self._loc_pair(
+                "victory.types.control_n_countries",
+                "Control {count} countries",
+                "Controlar {count} países",
+            )
+            html = self._v_render(en, es, {"count": _esc(int(node.get("count", 0) or 0))})
+            return self._v_deadline(html, by_turn)
+        if node_type == "prevent_country_control":
+            en, es = self._loc_pair(
+                "victory.types.prevent_country_control",
+                "Prevent enemy control of {country}",
+                "Evitar que el enemigo controle {country}",
+            )
+            html = self._v_render(en, es, {"country": self._scenario_country_link(node.get("country"))})
+            return self._v_deadline(html, by_turn)
+        if node_type in ("destroy_unit_score", "survive_unit_score", "escape_unit_score"):
+            return self._v_leaf_unit_score(node, node_type)
+
+        return _esc(node)
+
+    def _scenario_location_link(self, location):
+        if not location:
+            return ""
+        return self.L("locations", str(location), str(location).replace("_", " ").title())
+
+    def _v_leaf_unit_score(self, node, node_type):
+        defaults = {
+            "destroy_unit_score": (
+                "Destroy enemy {unit_types}{country_part} for at least {min_points} points",
+                "Destruir al menos {min_points} puntos de {unit_types}{country_part}",
+            ),
+            "survive_unit_score": (
+                "Survive with friendly {unit_types}{country_part} for at least {min_points} points",
+                "Resistir al menos {min_points} puntos con {unit_types}{country_part}",
+            ),
+            "escape_unit_score": (
+                "Escape to {hexes} with friendly {unit_types}{country_part} for at least {min_points} points",
+                "Escapar a {hexes} con al menos {min_points} puntos {unit_types}{country_part}",
+            ),
+        }
+        en, es = self._loc_pair(f"victory.types.{node_type}", *defaults[node_type])
+        country_part = ""
+        country = node.get("country")
+        if country:
+            c_en, c_es = self._loc_pair(
+                "victory.labels.country_filter", " from {country}", " de {country}")
+            country_part = self._v_render(
+                c_en, c_es, {"country": self._scenario_country_link(country)})
+        html = self._v_render(en, es, {
+            "unit_types": self._v_unit_types(node.get("unit_types")),
+            "country_part": country_part,
+            "min_points": _esc(int(node.get("min_points", 0) or 0)),
+            "hexes": self._v_hexes(node.get("hexes") or node.get("escape_hexes") or []),
+        })
+        return self._v_deadline(html, node.get("by_turn"))
+
+    def _v_unit_types(self, raw):
+        if isinstance(raw, list):
+            tokens = [str(v).strip().lower() for v in raw]
+        elif raw is None:
+            tokens = ["units"]
+        else:
+            tokens = [str(raw).strip().lower()]
+        if not tokens:
+            tokens = ["units"]
+        out = []
+        for token in tokens:
+            if token in ("unit", "units"):
+                out.append(l10n_span(*self._loc_pair(
+                    "victory.unit_types.units", "units", "unidades")))
+            elif token in ("fleet", "fleets", "ship", "ships"):
+                out.append(l10n_span(*self._loc_pair(
+                    "victory.unit_types.fleets", "fleets", "flotas")))
+            elif token in ("leader", "leaders"):
+                out.append(l10n_span(*self._loc_pair(
+                    "victory.unit_types.leaders", "leaders", "líderes")))
+            else:
+                out.append(_esc(token))
+        return ", ".join(out)
+
+    def _v_hexes(self, values):
+        if not isinstance(values, list) or not values:
+            return _esc("[]")
+        pairs = [
+            f"[{item[0]},{item[1]}]"
+            for item in values
+            if isinstance(item, (list, tuple)) and len(item) == 2
+        ]
+        return _esc(", ".join(pairs) if pairs else "[]")
+
+    def _v_render(self, en, es, replacements):
+        en = en or ""
+        es = es if es is not None else en
+        en_tokens = list(_V_TOKEN_RE.finditer(en))
+        es_tokens = list(_V_TOKEN_RE.finditer(es))
+        if [m.group(1) for m in en_tokens] != [m.group(1) for m in es_tokens]:
+            out = []
+            pos = 0
+            for m in en_tokens:
+                out.append(_esc(en[pos:m.start()]))
+                token = m.group(1)
+                out.append(replacements.get(token, _esc(m.group(0))))
+                pos = m.end()
+            out.append(_esc(en[pos:]))
+            return "".join(out)
+        out = []
+        epos = spos = 0
+        for em, sm in zip(en_tokens, es_tokens):
+            etext = en[epos:em.start()]
+            stext = es[spos:sm.start()]
+            if etext or stext:
+                out.append(l10n_span(etext, stext))
+            token = em.group(1)
+            out.append(replacements.get(token, _esc(em.group(0))))
+            epos, spos = em.end(), sm.end()
+        etail = en[epos:]
+        stail = es[spos:]
+        if etail or stail:
+            out.append(l10n_span(etail, stail))
+        return "".join(out)
+
+    def _v_deadline(self, html, by_turn):
+        if by_turn is None:
+            return html
+        en, es = self._loc_pair("victory.labels.by_turn", "by turn {turn}", "turno {turn}")
+        deadline = self._v_render(en, es, {"turn": _esc(by_turn)})
+        return f'{html} <span class="dim">({deadline})</span>'
 
     def _effects_html(self, effects, allegiance=None):
         if not effects:
@@ -1401,11 +1938,12 @@ class WikiGen:
             "units": len(self.units),
             "artifacts": len(self.artifacts),
             "events": len(self.events),
+            "scenarios": len(self.scenarios),
             "countries": len(self.countries),
             "bonuses": len(self.bonuses_index),
         }
         tabs = []
-        for key in ("rules", "units", "artifacts", "events", "countries", "bonuses"):
+        for key in ("rules", "units", "artifacts", "events", "scenarios", "countries", "bonuses"):
             en, es = self.SECTION_LABELS[key]
             n = tab_count.get(key)
             label = l10n_span(f"{en} ({n})" if n else en, f"{es} ({n})" if n else es)
