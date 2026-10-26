@@ -48,6 +48,9 @@ countries:
   estwilde:
     name: "Estwilde"
     adjective: "Estwilde"
+  gaarlund:
+    name: "Gaarlund"
+    adjective: "Gaarlund"
   gold:
     name: "Gold Dragon Wing"
     adjective: "Golden"
@@ -630,7 +633,7 @@ makes a total of 28 SP (odds 1:1), so the invasion is done with a +0 to the acti
         - "Ready — available for deployment."
       warn:
         title: "Stacking"
-        text: "No more than two units may occupy the same hex at any time."
+        text: "No more than two ground armies (three in cities) and two air wings may occupy the same hex at any time. There is no restriction in the limit of fleets or leaders that can occupy the same hex."
   movement:
     title: "Movement & Transport"
     land_movement:

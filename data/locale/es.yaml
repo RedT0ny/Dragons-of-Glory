@@ -48,6 +48,9 @@ countries:
   estwilde:
     name: Estwilde
     adjective: Estwilde
+  gaarlund:
+    name: Gaarlund
+    adjective: Gaarlund
   gold:
     name: Ala Dorada
     adjective: Oro
